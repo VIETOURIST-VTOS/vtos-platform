@@ -68,7 +68,14 @@ function Trang() {
           <td>{n.ma} · {n.ten}</td><td>{n.supplier_id ? <Tag cls="ok">NCC #{n.supplier_id}</Tag> : <Tag cls="">Chưa gắn</Tag>}</td>
           <td>{Q.noi && <Chon k={`nh${n.id}`} onChon={(x) => goi(`/cong-ncc/nha-hang/${n.id}`, { ncc_id: x.id })} />}
             {Q.noi && n.supplier_id && <button className="act red" style={{ margin: "0 0 0 6px" }} disabled={busy} onClick={() => goi(`/cong-ncc/nha-hang/${n.id}`, { ncc_id: null })}>Bỏ gắn</button>}</td></tr>)}</tbody></table>}
-        <div className="muted">Gắn nhà hàng thì NCC thấy thực đơn và đơn đặt bàn của nhà hàng đó trên cổng.</div></div></>}
+        <div className="muted">Gắn nhà hàng thì NCC thấy thực đơn và đơn đặt bàn của nhà hàng đó trên cổng.</div></div>
+      <div className="card"><h3>Khách sạn VTD gắn với NCC</h3>{/* KS-15 */}
+        {!(d.khach_san || []).length ? <div className="muted">Chưa có khách sạn trong danh mục «Khách sạn (cổng khách)».</div>
+        : <table><thead><tr><th>Khách sạn</th><th>NCC</th><th></th></tr></thead><tbody>{d.khach_san.map((k: any) => <tr key={k.id}>
+          <td>{k.ma} · {k.ten}</td><td>{k.supplier_id ? <Tag cls="ok">NCC #{k.supplier_id}</Tag> : <Tag cls="">Chưa gắn</Tag>}</td>
+          <td>{Q.noi && <Chon k={`ks${k.id}`} onChon={(x) => goi(`/cong-ncc/khach-san/${k.id}`, { ncc_id: x.id })} />}
+            {Q.noi && k.supplier_id && <button className="act red" style={{ margin: "0 0 0 6px" }} disabled={busy} onClick={() => goi(`/cong-ncc/khach-san/${k.id}`, { ncc_id: null })}>Bỏ gắn</button>}</td></tr>)}</tbody></table>}
+        <div className="muted">Gắn khách sạn thì tài khoản cổng NCC nối với NCC đó thấy và trả lời đánh giá của khách về khách sạn.</div></div></>}
 
     {tab === "gia" && <div className="card"><h3>Đề xuất giá chờ duyệt</h3>
       {!d.de_xuat.length ? <div className="muted">Không có đề xuất chờ duyệt.</div>

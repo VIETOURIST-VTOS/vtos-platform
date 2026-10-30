@@ -4,6 +4,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import { AnhNoiBo } from "@/components/nha-hang/AlbumNhaHang";
+import DanhGiaKsNoiBo from "@/components/khach-san-vtd/DanhGiaKsNoiBo";
 
 /** KS-13 · KHÁCH SẠN HỢP TÁC (CỔNG KHÁCH) — Chủ tịch duyệt bản demo 30/10/2026.
  *  NV / TP Điều hành nhập khách sạn, ảnh, loại phòng, gói giá và mùa giá (chỉ GIÁ BÁN, chưa thuế phí).
@@ -32,7 +33,7 @@ async function guiTep(path: string, fd: FormData) {
 function Trang() {
   const { toast } = useShell();
   const [x, setX] = useState<any>(null);
-  const [tab, setTab] = useState<"ds" | "cd" | "don" | "tien">("ds");
+  const [tab, setTab] = useState<"ds" | "cd" | "don" | "tien" | "dg">("ds");
   const [demDon, setDemDon] = useState<any>({});
   useEffect(() => { api<any>("/khach-san-vtd/don?loc=cho_chot").then((r) => setDemDon(r.dem || {})).catch(() => {}); }, [tab]);
   const [mo, setMo] = useState<number | "moi" | null>(null);
@@ -52,10 +53,12 @@ function Trang() {
       <button className={`act ${tab === "ds" ? "teal" : "grey"}`} onClick={() => setTab("ds")}>Khách sạn ({x.khach_san.length})</button>
       <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Chờ duyệt ({x.cho_duyet.anh} ảnh · {x.cho_duyet.goi} gói giá)</button>
       <button className={`act ${tab === "don" ? "teal" : "grey"}`} onClick={() => setTab("don")}>Đơn đặt phòng{demDon.da_tra ? ` (${demDon.da_tra} chờ chốt)` : ""}</button>
-      <button className={`act ${tab === "tien" ? "teal" : "grey"}`} onClick={() => setTab("tien")}>Tiền &amp; hoàn</button></div>
+      <button className={`act ${tab === "tien" ? "teal" : "grey"}`} onClick={() => setTab("tien")}>Tiền &amp; hoàn</button>
+      <button className={`act ${tab === "dg" ? "teal" : "grey"}`} onClick={() => setTab("dg")}>Đánh giá</button></div>
     {tab === "cd" && <ChoDuyet toast={toast} onDoi={load} />}
     {tab === "don" && <DonDat toast={toast} />}
     {tab === "tien" && <TienHoan toast={toast} />}
+    {tab === "dg" && <DanhGiaKsNoiBo toast={toast} />}
     {tab === "ds" && mo === null && <section className="panel">
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <input value={tim} onChange={(e) => setTim(e.target.value)} placeholder="Tìm tên, mã, thành phố" aria-label="Tìm khách sạn" style={{ maxWidth: 260 }} />

@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import { diCongThe, goiCong } from "@/lib/cong";
+import { DanhGiaKsCong, OD, TomTatDg, VietDanhGiaKs } from "./DanhGiaKs";
 
 type Q = { tinh: string; vao: string; ra: string; nl: number; te: number; phong: number };
 type Loc = { min: number; max: number; coGia: boolean; huy: boolean; sang: boolean; diem9: boolean; sao: number[]; loai: string[]; ten: string };
@@ -241,7 +242,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
     <button type="button" className="ksv-link" onClick={() => setBuoc("ds")}>← Khách sạn ở {ks.tinh_thanh}</button>
     <div className="ksv-gal">{ks.anh.length ? <>{ks.anh.slice(0, 4).map((a: any, i: number) => <span key={a.id}><img src={i ? a.nho : a.hien} alt={a.chu_thich || `${ks.ten} — ${a.nhom_ten}`} loading="lazy" /></span>)}
       <span className="ksv-more">{ks.so_anh} ảnh</span></> : <span style={{ gridColumn: "1 / -1" }}><AnhTrong k={ks} cao={260} /></span>}</div>
-    <nav className="ksv-tabs">{[["ksv-tq", "Tổng quan"], ["ksv-phong", "Phòng"], ["ksv-tn", "Tiện nghi"], ["ksv-cs", "Chính sách"]].map(([id, t]) =>
+    <nav className="ksv-tabs">{[["ksv-tq", "Tổng quan"], ["ksv-phong", "Phòng"], ["ksv-tn", "Tiện nghi"], ["ksv-cs", "Chính sách"], ["ksv-dg", "Đánh giá"]].map(([id, t]) =>
       <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }); }}>{t}</a>)}
       <span className="ksv-tp">{ks.gia_tu && <><small className="ksv-muted">từ</small><b className="ksv-big" style={{ fontSize: 19 }}>₫ {vnd(ks.gia_tu.gia_dem)}</b></>}
         <button type="button" className="ksv-btn" onClick={() => document.getElementById("ksv-phong")?.scrollIntoView({ behavior: "smooth" })}>Xem phòng</button></span></nav>
@@ -251,8 +252,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
         {ks.tien_ich.length > 0 && <div className="ksv-feat">{ks.tien_ich.slice(0, 5).map((t: string) => <span key={t}>{t}</span>)}</div>}
         <p style={{ margin: "4px 0 0", fontSize: 15, lineHeight: 1.65, whiteSpace: "pre-line", maxWidth: "68ch" }}>{ks.mo_ta || "Vietourist đang biên tập phần giới thiệu."}</p>
         {ks.gan && <span className="ksv-muted">{ks.gan}</span>}</div>
-      <div className="ksv-panel"><b style={{ fontSize: 16 }}>Đánh giá của khách</b>
-        <span className="ksv-muted">Chỉ khách đã đặt qua VTD và đã ở mới viết được. Chưa có bài đánh giá nào.</span></div></div>
+      <TomTatDg dg={ks.danh_gia} /></div>
     <div id="ksv-phong" style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: soChon ? 90 : 16 }}>
       <div className="ksv-rhead"><h2 style={{ margin: 0, fontSize: 22 }}>Chọn phòng · {ks.dem} đêm · {q.nl} người lớn{q.te ? ` · ${q.te} trẻ em` : ""}</h2><span className="ksv-muted">{ngay(ks.vao)} → {ngay(ks.ra)}</span></div>
       {loi && <div className="ksv-loi">{loi}</div>}
@@ -284,6 +284,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
         {ks.chinh_sach.tre_em && <span><b>Trẻ em</b> {ks.chinh_sach.tre_em}</span>}{ks.chinh_sach.giuong_phu && <span><b>Giường phụ</b> {ks.chinh_sach.giuong_phu}</span>}
         {ks.chinh_sach.vat_nuoi && <span><b>Vật nuôi</b> {ks.chinh_sach.vat_nuoi}</span>}{ks.chinh_sach.khac && <span style={{ whiteSpace: "pre-line" }}>{ks.chinh_sach.khac}</span>}
         <span><b>Hủy phòng</b> theo từng gói giá đã chọn</span></div></div>
+    <DanhGiaKsCong kid={ks.id} />
     {soChon > 0 && <div className="ksv-total"><span style={{ flex: 1, minWidth: 180 }}><b>{soChon} phòng · {ks.dem} đêm</b><br /><small className="ksv-muted">{dongChon.map((x: any) => `${x.n} × ${x.p.ten} (${x.g.ten})`).join(" · ")}</small></span>
       <span style={{ textAlign: "right" }}><b className="ksv-big" style={{ fontSize: 22 }}>₫ {vnd(tienChon)}</b><br /><small className="ksv-muted">+ thuế phí ₫ {vnd(tienChon * (ks.thue_phi_pt || 0) / 100)}</small></span>
       <button type="button" className="ksv-btn" style={{ minHeight: 50, padding: "0 26px", fontSize: 16 }} disabled={busy} onClick={sangGui}>Đặt ngay</button></div>}
@@ -339,7 +340,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
                 {k.tien_ich.length > 0 && <div className="ksv-feat sm">{k.tien_ich.slice(0, 4).map((t: string) => <span key={t}>{t}</span>)}</div>}</div>
               <div className="ksv-side">
                 {k.danh_gia?.diem_tb ? <><span className="ksv-score"><b>{String(k.danh_gia.diem_tb).replace(".", ",")}</b><b>{nhan(k.danh_gia.diem_tb)}</b></span><small className="ksv-muted">{k.danh_gia.so_bai} đánh giá</small></>
-                  : <small className="ksv-muted">Chưa có đánh giá</small>}
+                  : <small className="ksv-muted">{k.danh_gia?.so_bai ? "Mới — chưa đủ đánh giá" : "Chưa có đánh giá"}</small>}
                 {g ? <>{g.niem_yet_dem && <span style={{ marginTop: "auto" }}><span className="ksv-old">{vnd(g.niem_yet_dem)}</span> <span className="ksv-pct">-{Math.round((1 - g.gia_dem / g.niem_yet_dem) * 100)}%</span></span>}
                   <span className="ksv-big" style={g.niem_yet_dem ? undefined : { marginTop: "auto" }}><small>₫</small> {vnd(g.gia_dem)}</span><small className="ksv-muted">Mỗi đêm, chưa gồm thuế và phí</small>
                   {k.co_mien_phi_huy && <span className="ksv-free">+ MIỄN PHÍ HỦY</span>}
@@ -430,6 +431,8 @@ function TraTien({ d, onDoi, onLai }: { d: any; onDoi: (d: any) => void; onLai: 
 function DonKs({ d, bao, loi: loi0, onDoi, onTra, onLai }: { d: any; bao?: string; loi?: string; onDoi: (d: any) => void; onTra: () => void; onLai: () => void }) {
   const [loi, setLoi] = useState(loi0 || "");
   const [hoi, setHoi] = useState(false);
+  const [viet, setViet] = useState(false);
+  const dg = d.danh_gia || {};
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(bao || "");
   const huy = async () => {
@@ -465,7 +468,14 @@ function DonKs({ d, bao, loi: loi0, onDoi, onTra, onLai }: { d: any; bao?: strin
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {d.co_the_tra && <button type="button" className="ksv-btn" onClick={onTra}>Thanh toán ₫ {vnd(d.con_phai_tra)}</button>}
         {d.co_the_huy && <button type="button" className="ksv-btn line" style={{ color: "var(--ksv-price)", borderColor: "var(--ksv-price)" }} onClick={() => setHoi(true)}>Hủy phòng</button>}
+        {(dg.duoc_viet || dg.duoc_sua) && !viet && <button type="button" className="ksv-btn" onClick={() => setViet(true)}>{dg.bai ? "Sửa đánh giá" : "Viết đánh giá"}</button>}
         <button type="button" className="ksv-btn line" onClick={onLai}>Tìm chỗ ở khác</button></div>
+      {dg.duoc_viet && !viet && <small className="ksv-muted">Bạn đã ở — đánh giá giúp khách sau (còn {dg.con_ngay} ngày, tới {dg.han_viet.split("-").reverse().join("/")}).</small>}
+      {dg.bai && !viet && <section className="ksv-panel" style={{ gap: 6 }}><b>Đánh giá của bạn</b>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}><OD d={dg.bai.diem} /><b>{dg.bai.tieu_de || dg.bai.nhan}</b>{dg.bai.an && <span className="ksv-tt ksv-tt-xam">Đang ẩn · {dg.bai.an_ly_do}</span>}</div>
+        {dg.bai.nhan_xet && <span style={{ whiteSpace: "pre-line" }}>{dg.bai.nhan_xet}</span>}
+        {dg.bai.tra_loi && <div className="ksv-tl-ks"><b>Phản hồi của khách sạn</b><br />{dg.bai.tra_loi}</div>}</section>}
+      {viet && <VietDanhGiaKs d={d} onThoi={() => setViet(false)} onXong={(r) => { setViet(false); setMsg(r.message); onDoi(r.don); }} />}
       {hoi && <HoiHuy d={d} busy={busy} onThoi={() => setHoi(false)} onHuy={huy} />}
     </div>
     <TomTatDon d={d} /></div>;
@@ -501,7 +511,7 @@ export function PhongCuaToi({ gon = false, lamMoi = 0, onMo }: { gon?: boolean; 
           <span style={{ flex: "1 1 240px", minWidth: 0 }}><b>{d.khach_san?.ten}</b><br /><small className="ksv-muted">{d.ma} · {ngay(d.vao)} → {ngay(d.ra)} · {d.so_phong} phòng</small></span>
           <span className={`ksv-tt ${MAU_TT[d.trang_thai] || ""}`}>{d.trang_thai === "da_huy" && d.so_hoan > 0 ? `Đã hủy · ${d.hoan_tt_ten || "đã hoàn"}` : d.trang_thai_ten}</span>
           <b style={{ minWidth: 110, textAlign: "right" }}>₫ {vnd(d.tong)}</b>
-          <button type="button" className="ksv-btn line" onClick={() => xem(d)}>{d.co_the_tra ? "Thanh toán" : "Xem"}</button></div>)}</section>}</div>;
+          <button type="button" className="ksv-btn line" onClick={() => xem(d)}>{d.co_the_tra ? "Thanh toán" : d.danh_gia?.duoc_viet ? "Viết đánh giá" : "Xem"}</button></div>)}</section>}</div>;
 }
 
 function TomTat({ ks, q, tinh }: { ks: any; q: Q; tinh: any }) {
@@ -646,6 +656,17 @@ const CSS = `
 .ksv-hoan{display:flex;flex-direction:column;gap:6px;background:#f6f8fb;border-radius:10px;padding:12px}
 .ksv-donrow{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;border-top:1px solid var(--ksv-line);padding-top:10px}
 .ksv-phieu{border:2px dashed #b9c6dd}
+.ksv-od{display:inline-block;background:var(--ksv-ink);color:#fff;font-weight:700;border-radius:8px 8px 8px 2px;padding:4px 8px;min-width:24px;text-align:center}
+.ksv-od.xam{background:#5f6472}.ksv-od.lon{font-size:26px;padding:10px 14px;border-radius:12px 12px 12px 3px}
+.ksv-bar10{flex:1;height:8px;background:#e7ebf2;border-radius:99px;overflow:hidden}.ksv-bar10 span{display:block;height:100%;background:var(--ksv-ink)}
+.ksv-moi{background:#fff8e6;border:1px solid #f0d38a;border-radius:10px;padding:10px 14px;font-size:14px}
+.ksv-chip{min-height:40px;padding:0 14px;border-radius:99px;border:1px solid #c9cfda;background:#fff;color:#3d4556}
+.ksv-chip.on{border-color:var(--ksv-ink);background:var(--ksv-asoft);color:var(--ksv-ink);font-weight:600}
+.ksv-bai{border-top:1px solid var(--ksv-line);padding-top:14px;display:flex;flex-wrap:wrap;gap:14px}
+.ksv-bai-ai{flex:0 0 170px;display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--ksv-muted)}.ksv-bai-ai b{color:var(--ksv-fg);font-size:15px}
+.ksv-tl-ks{background:#f5f7fb;border-radius:10px;padding:10px 12px;font-size:14px}
+.ksv-so{width:44px;height:44px;border-radius:8px;border:1px solid #c9cfda;background:#fff;color:#23252c}
+.ksv-so.on{border:2px solid var(--ksv-ink);background:var(--ksv-ink);color:#fff;font-weight:700}
 @media print{body *{visibility:hidden}.ksv-phieu,.ksv-phieu *{visibility:visible}.ksv-phieu{position:absolute;left:0;top:0;width:100%}.ksv-phieu button{display:none}}
 @media (max-width:560px){.ksv-search{grid-template-columns:1fr}.ksv-btn-tim{grid-column:auto}}
 `;

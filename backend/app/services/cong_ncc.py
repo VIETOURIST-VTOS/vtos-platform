@@ -137,6 +137,11 @@ def noi(db: Session, u: User, tk_id: int, ncc_id: int | None) -> TaiKhoanNgoai:
     return tk
 
 
+def _co_khach_san(db: Session, s) -> bool:
+    from app.models.khach_san_vtd import KhachSanVtd
+    return db.execute(select(KhachSanVtd.id).where(KhachSanVtd.supplier_id == s.id)).first() is not None
+
+
 def gan_nha_hang(db: Session, u: User, nha_hang_id: int, ncc_id: int | None) -> NhaHang:
     if u.role not in VAI_NOI:
         raise LoiNcc("Chỉ TP Điều hành, GĐ KD, Chủ tịch, TGĐ gắn nhà hàng với NCC", 403)
@@ -731,4 +736,5 @@ def ban_lam_viec(db: Session, s: Supplier) -> dict:
             "vtd_phai_tra": cn["vtd_phai_tra"], "ncc_phai_tra": None,
             "ban_ke_cho": next((b for b in bk if b["trang_thai"] != "da_xac_nhan"), None),
             "la_nha_hang": bool(_nha_hang_cua(db, s)),
+            "la_khach_san": _co_khach_san(db, s),   # KS-15: tab «Đánh giá khách sạn»
             "dat_ban_cho": sum(1 for x in don_dat_ban(db, s) if x["trang_thai"] == "cho")}

@@ -643,7 +643,7 @@ def _phong_ban_duoc(db: Session, kids: list[int], vao: date, ra: date, nl: int, 
     return ra_
 
 
-def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict]) -> dict:
+def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict], dg: dict | None = None) -> dict:
     co_gia = [g for p in phong if p["vua"] for g in p["goi"]]
     goi = [g for p in phong if p["vua"] and p.get("con", 1) > 0 for g in p["goi"]]   # KS-14: bỏ loại phòng đã hết
     re_nhat = min(goi, key=lambda g: g["gia_dem"]) if goi else None
@@ -657,8 +657,8 @@ def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict]) -> d
             "co_mien_phi_huy": any(g["mien_phi_huy"] for g in goi), "co_bua_sang": any(g["bua_sang"] for g in goi),
             "thue_phi_pt": k.thue_phi_pt,
             "het_phong": bool(co_gia) and not goi,
-            # KS-14: điểm đánh giá của khách đã ở. Chưa có đơn đặt nên chưa có bài nào.
-            "danh_gia": {"so_bai": 0, "diem_tb": None}}
+            # KS-15: điểm thang 10 của khách đã ở — chỉ bài đang hiện; dưới 3 bài diem_tb = None («Mới»).
+            "danh_gia": dg or {"so_bai": 0, "diem_tb": None, "du": False, "nhan": "", "muc": {}}}
 
 
 def tim(db: Session, tinh: str, vao, ra, nguoi_lon: int = 2, tre_em: int = 0, so_phong: int = 1,
@@ -674,7 +674,9 @@ def tim(db: Session, tinh: str, vao, ra, nguoi_lon: int = 2, tre_em: int = 0, so
     ks = [k for k in tat_ca if not tinh or k.tinh_thanh == tinh]
     anh = _anh_duyet(db, [k.id for k in ks])
     phong = _phong_ban_duoc(db, [k.id for k in ks], vao, ra, nl, te, sp)
-    the = [_the_cong(k, anh.get(k.id, []), phong.get(k.id, [])) for k in ks]
+    from app.services import danh_gia_ks as DGK
+    dg = DGK.tom_tat(db, [k.id for k in ks])
+    the = [_the_cong(k, anh.get(k.id, []), phong.get(k.id, []), dg.get(k.id)) for k in ks]
     the.sort(key=lambda o: (o["gia_tu"] is None, o["ten"]))
     return {"khach_san": the, "tong": len(the), "dem": (ra - vao).days, "vao": vao.isoformat(), "ra": ra.isoformat(),
             "nguoi_lon": nl, "tre_em": te, "so_phong": sp,
@@ -693,7 +695,8 @@ def chi_tiet_cong(db: Session, kid: int, vao, ra, nguoi_lon: int = 2, tre_em: in
     phong = _phong_ban_duoc(db, [k.id], vao, ra, nl, te, sp).get(k.id, [])
     for p in phong:
         p["anh"] = [_anh_out(a, True) for a in anh if a.loai_phong_id == p["id"]][:6]
-    the = _the_cong(k, anh, phong)
+    from app.services import danh_gia_ks as DGK
+    the = _the_cong(k, anh, phong, DGK.tom_tat(db, [k.id])[k.id])
     return {**the, "dia_chi": k.dia_chi, "mo_ta": k.mo_ta, "gio_nhan": k.gio_nhan, "gio_tra": k.gio_tra,
             "chinh_sach": {"tre_em": k.cs_tre_em, "giuong_phu": k.cs_giuong_phu, "vat_nuoi": k.cs_vat_nuoi, "khac": k.cs_khac},
             "anh": [_anh_out(a, True) for a in anh], "nhom_anh": NHOM_ANH_KS,

@@ -16,6 +16,7 @@ from app.api.v1.cong_ngoai import tai_khoan_ngoai
 from app.db.session import get_db
 from app.models.cong_ngoai import TaiKhoanNgoai
 from app.models.core import User
+from app.models.khach_san_vtd import KhachSanVtd   # KS-15
 from app.models.suppliers import Supplier
 from app.services import cong_ncc as S
 
@@ -248,6 +249,23 @@ def tra_loi_danh_gia(gid: int, data: TraLoiIn, x=Depends(_ncc), db: Session = De
     return {"message": "Đã đăng trả lời", **DG.ds_ncc(db, x[1])}
 
 
+@router.get("/danh-gia-ks")
+def danh_gia_ks(x=Depends(_ncc), db: Session = Depends(get_db)):
+    """KS-15: đánh giá đang hiện về các khách sạn VTD gắn với NCC này (tên khách đã che)."""
+    from app.services import danh_gia_ks as DGK
+    return DGK.ds_ncc(db, x[1])
+
+
+@router.post("/danh-gia-ks/{gid}/tra-loi")
+def tra_loi_danh_gia_ks(gid: int, data: TraLoiIn, x=Depends(_ncc), db: Session = Depends(get_db)):
+    from app.services import danh_gia_ks as DGK
+    try:
+        DGK.tra_loi(db, x[0], x[1], gid, data.noi_dung)
+    except DGK.LoiDanhGiaKs as ex:
+        raise HTTPException(ex.status, str(ex))
+    return {"message": "Đã đăng trả lời", **DGK.ds_ncc(db, x[1])}
+
+
 @router.post("/dat-ban/{yid}/khong-den")
 def dat_ban_khong_den(yid: int, x=Depends(_ncc), db: Session = Depends(get_db)):
     from app.services import dat_ban as DB
@@ -263,6 +281,8 @@ def vt_tong(u: User = Depends(require_roles(*S.VAI_XEM)), db: Session = Depends(
             "de_nghi": S.ds_de_nghi(db), "hoc_lieu": S.ds_hoc_lieu(db), "tu_choi": S.don_bi_tu_choi(db),
             "nha_hang": [{"id": n.id, "ma": n.ma, "ten": n.ten, "supplier_id": n.supplier_id}
                          for n in db.query(S.NhaHang).order_by(S.NhaHang.ten).all()],
+            "khach_san": [{"id": k.id, "ma": k.ma, "ten": k.ten, "supplier_id": k.supplier_id}   # KS-15
+                          for k in db.query(KhachSanVtd).order_by(KhachSanVtd.ten).all()],
             "quyen": {"noi": u.role in S.VAI_NOI, "duyet_gia": u.role in S.VAI_DUYET_GIA, "ke_toan": u.role in S.VAI_KE_TOAN,
                       "dieu_hanh": u.role in S.VAI_DIEU_HANH, "hoc_lieu": u.role in S.VAI_HOC_LIEU},
             "loai_de_nghi": S.LOAI_DE_NGHI, "nhom_hoc_lieu": S.NHOM_HOC_LIEU, "danh_cho": S.DANH_CHO}
@@ -282,6 +302,18 @@ def vt_noi(tk_id: int, data: NoiIn, u: User = Depends(require_roles(*S.VAI_NOI))
     _goi(S.noi, db, u, tk_id, data.ncc_id)
     db.commit()
     return {"message": "Đã nối" if data.ncc_id else "Đã gỡ nối", **vt_tong(u, db)}
+
+
+@router_vtos.post("/khach-san/{kid}")
+def vt_gan_ks(kid: int, data: NoiIn, u: User = Depends(require_roles(*S.VAI_NOI)), db: Session = Depends(get_db)):
+    """KS-15: gắn khách sạn VTD với NCC — tài khoản cổng NCC thấy và trả lời đánh giá."""
+    from app.services import danh_gia_ks as DGK
+    try:
+        DGK.gan_ncc(db, u, kid, data.ncc_id)
+    except DGK.LoiDanhGiaKs as ex:
+        raise HTTPException(ex.status, str(ex))
+    db.commit()
+    return {"message": "Đã gắn khách sạn với NCC" if data.ncc_id else "Đã bỏ gắn", **vt_tong(u, db)}
 
 
 @router_vtos.post("/nha-hang/{nid}")
