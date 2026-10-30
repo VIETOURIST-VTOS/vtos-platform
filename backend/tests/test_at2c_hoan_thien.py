@@ -40,9 +40,9 @@ def test_cham_diem_tu_du_lieu_da_duyet(db):
     nh = _nh(db)
     d = N.diem_hoan_thien(db, [nh.id])[nh.id]
     assert d["diem"] == 0 and not any(m["dat"] for m in d["muc"])
-    # ảnh nháp / chưa xác minh không được tính
+    # KS-16c (31/10/2026): bỏ duyệt ảnh — ảnh tải lên là tính ngay
     N.tai_anh_album(db, _u(db, "dh"), nh.id, "a.jpg", "image/jpeg", anh(1), {"nhom": "mat_tien", "can_cu": "vtd_chup"})
-    assert N.diem_hoan_thien(db, [nh.id])[nh.id]["diem"] == 0
+    assert N.diem_hoan_thien(db, [nh.id])[nh.id]["diem"] > 0
     _du_het(db, nh.id)
     d = N.diem_hoan_thien(db, [nh.id])[nh.id]
     # AT-3 (29/10/2026): thêm «Đánh giá khách» 10 (album 15, giới thiệu 10) — chưa có bài thì đủ 6 mục = 90
@@ -80,8 +80,8 @@ def test_chi_chu_tich_giao_viec(db):
     assert "ảnh bìa" in one["tin_xin"] and "Thực đơn" in one["tin_xin"]
     N.ghi_da_xin(db, _u(db, "mkt"), nh.id)
     assert N.bang_hoan_thien(db, ct)["nha_hang"][0]["cot"] == "dang_xin"
-    N.tai_anh_album(db, _u(db, "mkt"), nh.id, "a.jpg", "image/jpeg", anh(2), {"nhom": "mat_tien", "can_cu": "vtd_chup"})
-    N.gui_duyet(db, _u(db, "mkt"), nh.id)
+    N.luu_mon(db, _u(db, "dh"), nh.id, {"ten": "Bún chả"})                                      # KS-16c: ảnh không còn chờ duyệt — dùng món
+    N.gui_duyet_mon(db, _u(db, "dh"), nh.id)
     assert N.bang_hoan_thien(db, ct)["nha_hang"][0]["cot"] == "cho_duyet"
     assert N.giao_bien_tap(db, ct, [nh.id], "", None) == 1                                      # bỏ giao
     assert N.bang_hoan_thien(db, ct)["chua_giao"] == 1

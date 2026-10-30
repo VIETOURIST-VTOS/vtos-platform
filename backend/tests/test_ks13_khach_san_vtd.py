@@ -82,9 +82,7 @@ def test_hai_nguoi_va_sua_ve_nhap(db):
     with pytest.raises(S.LoiKhachSan, match="ảnh đã duyệt"):
         S.bat_hien(db, _u(db, "tp"), k.id, True)
     x, _ = S.tai_anh(db, _u(db, "tp"), k.id, "a.jpg", _anh(), {"nhom": "phong", "loai_phong_id": lp.id})
-    S.gui_duyet_anh(db, _u(db, "tp"), [x.id])
-    assert S.duyet_anh(db, _u(db, "tp"), [x.id], True)["bo_qua"]           # người tải không tự duyệt
-    S.duyet_anh(db, _u(db, "tp2"), [x.id], True)
+    assert x.trang_thai == "da_duyet"                                   # KS-16c (31/10/2026): bỏ duyệt ảnh — tải là hiện
     k2 = S.luu_ks(db, _u(db, "tp"), {"ten": k.ten, "tinh_thanh": "Đà Nẵng", "sao": 4, "mo_ta": k.mo_ta}, k.id)
     with pytest.raises(S.LoiKhachSan, match="không tự bật"):
         S.bat_hien(db, _u(db, "tp"), k2.id, True)
@@ -109,14 +107,21 @@ def test_cong_tim_chi_tiet_anh(db):
     assert ct["phong"][0]["goi"][0]["tong"] == 3_800_000 and ct["phong"][0]["goi"][0]["huy_han"] == "2026-12-16"
     with pytest.raises(S.LoiKhachSan):
         S.chi_tiet_cong(db, b.id, VAO, RA, hom_nay=HN)
-    # ảnh: cổng không lấy bản gốc, không lấy ảnh chưa duyệt
+    # ảnh: cổng không lấy bản gốc, không lấy ảnh đang ẩn; KS-16c: người tải tự xóa, TP ĐH xóa mọi ảnh
     data, _att = S.tep_anh(db, None, x.id, "nho")
     assert data
     with pytest.raises(S.LoiKhachSan):
         S.tep_anh(db, None, x.id, "goc")
     y, _ = S.tai_anh(db, _u(db, "dh"), a.id, "b.jpg", _anh(2), {"nhom": "phong"})
+    assert S.tep_anh(db, None, y.id, "hien")[0]                          # tải là hiện
+    S.an_anh(db, _u(db, "dh"), y.id, True)
     with pytest.raises(S.LoiKhachSan):
         S.tep_anh(db, None, y.id, "hien")
+    with pytest.raises(S.LoiKhachSan, match="người tải"):
+        S.xoa_anh(db, _u(db, "kd"), y.id)                               # không phải người tải, không phải TP ĐH
+    S.xoa_anh(db, _u(db, "dh"), y.id)                                   # người tải tự xóa
+    z, _ = S.tai_anh(db, _u(db, "dh"), a.id, "c.jpg", _anh(3), {"nhom": "phong"})
+    S.xoa_anh(db, _u(db, "tp"), z.id)                                   # TP ĐH xóa mọi ảnh
     # ngày đã qua / trả trước nhận
     with pytest.raises(S.LoiKhachSan):
         S.tim(db, "Đà Nẵng", dt.date(2026, 11, 1), RA, hom_nay=HN)

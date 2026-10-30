@@ -8,7 +8,8 @@ import DanhGiaKsNoiBo from "@/components/khach-san-vtd/DanhGiaKsNoiBo";
 
 /** KS-13 · KHÁCH SẠN HỢP TÁC (CỔNG KHÁCH) — Chủ tịch duyệt bản demo 30/10/2026.
  *  NV / TP Điều hành nhập khách sạn, ảnh, loại phòng, gói giá và mùa giá (chỉ GIÁ BÁN, chưa thuế phí).
- *  TP Điều hành duyệt ảnh và giá — người nhập không tự duyệt (trừ Chủ tịch, TGĐ). Sửa gói đã duyệt → về Nháp, thôi hiện.
+ *  TP Điều hành duyệt giá — người nhập không tự duyệt (trừ Chủ tịch, TGĐ). Sửa gói đã duyệt → về Nháp, thôi hiện.
+ *  KS-16c (Chủ tịch 31/10/2026): bỏ duyệt ảnh — tải là hiện; người tải tự xóa, TP Điều hành xóa mọi ảnh.
  *  TP Điều hành bật «Hiện trên cổng» khi đủ điều kiện; người vừa sửa hồ sơ không tự bật.
  *  KS-14 (Chủ tịch duyệt bản xem thử 30/10/2026): khách trả ngay 100%. Điều hành sửa số phòng bán mỗi đêm (tab «Phòng trống»),
  *  chốt đơn đã trả với khách sạn hoặc báo hết phòng (tab «Đơn đặt phòng»); Sales xác nhận hoàn, Kế toán ghi sổ thu hộ,
@@ -51,7 +52,7 @@ function Trang() {
       Tiền phòng là tiền thu hộ khách sạn; hoa hồng Kế toán chốt ở tab «Tiền &amp; hoàn».</p>
     <div style={{ display: "flex", gap: 6, margin: "10px 0" }}>
       <button className={`act ${tab === "ds" ? "teal" : "grey"}`} onClick={() => setTab("ds")}>Khách sạn ({x.khach_san.length})</button>
-      <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Chờ duyệt ({x.cho_duyet.anh} ảnh · {x.cho_duyet.goi} gói giá)</button>
+      <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Chờ duyệt ({x.cho_duyet.goi} gói giá)</button>
       <button className={`act ${tab === "don" ? "teal" : "grey"}`} onClick={() => setTab("don")}>Đơn đặt phòng{demDon.da_tra ? ` (${demDon.da_tra} chờ chốt)` : ""}</button>
       <button className={`act ${tab === "tien" ? "teal" : "grey"}`} onClick={() => setTab("tien")}>Tiền &amp; hoàn</button>
       <button className={`act ${tab === "dg" ? "teal" : "grey"}`} onClick={() => setTab("dg")}>Đánh giá</button></div>
@@ -183,23 +184,21 @@ function Album({ h, x, toast, onDoi }: { h: any; x: any; toast: (m: string, l?: 
         <label>Ảnh của loại phòng (nếu là ảnh phòng)<select value={lp} onChange={(e) => setLp(e.target.value)}><option value="">— không —</option>{h.loai_phong.map((p: any) => <option key={p.id} value={p.id}>{p.ten}</option>)}</select></label>
         <label>Nguồn ảnh (nội bộ)<input value={nguon} onChange={(e) => setNguon(e.target.value)} placeholder="Khách sạn gửi qua email 30/10 / VTD tự chụp" /></label></div>
       <button className="act teal" disabled={busy || !teps.length} onClick={tai}>Tải {teps.length || ""} ảnh lên</button> {tien && <span className="muted">{tien}</span>}</div>}
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-      <span className="muted">Đã chọn {chon.length}</span>
-      {x.duoc_nhap && <button className="act teal" disabled={busy || !chon.length} onClick={() => goi("/khach-san-vtd/anh/gui-duyet", { ids: chon })}>Gửi duyệt</button>}
-      <button className="act grey" onClick={() => setChon(h.anh.filter((a: any) => ["nhap", "tra_lai"].includes(a.trang_thai)).map((a: any) => a.id))}>Chọn ảnh nháp</button></div>
+    <p className="muted" style={{ margin: 0, fontSize: 12 }}>Ảnh tải lên là hiện ngay trên cổng (Chủ tịch bỏ khâu duyệt ảnh 31/10/2026). Ảnh sai: người tải tự xóa, TP Điều hành xóa được mọi ảnh.</p>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 10 }}>{h.anh.map((a: any) =>
       <div key={a.id} className="panel" style={{ margin: 0, padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
         <AnhNoiBo src={a.nho} alt={a.chu_thich || a.nhom_ten} style={{ width: "100%", aspectRatio: "4 / 3", borderRadius: 6 }} />
-        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}><input type="checkbox" aria-label="Chọn ảnh" checked={chon.includes(a.id)} onChange={(e) => setChon(e.target.checked ? [...chon, a.id] : chon.filter((y) => y !== a.id))} />
-          <Tag cls={TT[a.trang_thai]}>{a.trang_thai_ten}</Tag>{a.la_bia && <Tag cls="ok">Bìa</Tag>}<span className="muted" style={{ fontSize: 12 }}>{a.nhom_ten}{a.loai_phong_id ? ` · ${tenLp[a.loai_phong_id] || ""}` : ""}</span></div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <Tag cls={TT[a.trang_thai]}>{a.trang_thai === "da_duyet" ? "Đang hiện" : a.trang_thai_ten}</Tag>{a.la_bia && <Tag cls="ok">Bìa</Tag>}<span className="muted" style={{ fontSize: 12 }}>{a.nhom_ten}{a.loai_phong_id ? ` · ${tenLp[a.loai_phong_id] || ""}` : ""}</span></div>
         {a.ly_do_tra_lai && <small style={{ color: "#d99a2b" }}>Trả lại: {a.ly_do_tra_lai}</small>}
-        <small className="muted">tải: {a.tai_boi}{a.duyet_boi ? ` · duyệt: ${a.duyet_boi}` : ""}</small>
+        <small className="muted">tải: {a.tai_boi}{a.duyet_boi && a.duyet_boi !== "tu_dong" ? ` · duyệt: ${a.duyet_boi}` : ""}</small>
         {x.duoc_nhap && <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           {a.trang_thai === "da_duyet" && !a.la_bia && <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/anh/${a.id}`, { la_bia: true })}>Đặt bìa</button>}
           {a.trang_thai !== "an" ? <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/anh/${a.id}/an`, { bat: true })}>Ẩn</button>
-            : <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/anh/${a.id}/an`, { bat: false })}>Bỏ ẩn</button>}</div>}
+            : <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/anh/${a.id}/an`, { bat: false })}>Bỏ ẩn</button>}
+          {(a.tai_boi === x.toi || x.duoc_duyet) && <button className="act grey" disabled={busy} onClick={() => { if (window.confirm("Xóa ảnh này khỏi album?")) goi(`/khach-san-vtd/anh/${a.id}/xoa`, {}); }}>Xóa</button>}</div>}
       </div>)}
-      {!h.anh.length && <p className="muted">Chưa có ảnh. Ảnh do khách sạn gửi hoặc VTD tự chụp; TP Điều hành duyệt rồi mới lên cổng.</p>}</div>
+      {!h.anh.length && <p className="muted">Chưa có ảnh. Ảnh do khách sạn gửi hoặc VTD tự chụp; tải lên là hiện trên cổng.</p>}</div>
   </div>;
 }
 

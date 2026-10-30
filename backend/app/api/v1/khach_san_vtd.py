@@ -281,7 +281,14 @@ def duyet_anh(data: IdsIn, u: User = Depends(require_roles(*S.VAI_DUYET)), db: S
 @router_vtos.post("/anh/{pid:int}/an")
 def an_anh(pid: int, data: BatIn, u: User = Depends(require_roles(*S.VAI_NHAP)), db: Session = Depends(get_db)):
     _goi(S.an_anh, db, u, pid, data.bat)
-    return {"message": "Đã ẩn ảnh" if data.bat else "Ảnh về nháp"}
+    return {"message": "Đã ẩn ảnh" if data.bat else "Đã bỏ ẩn — ảnh hiện lại"}
+
+
+@router_vtos.post("/anh/{pid:int}/xoa")
+def xoa_anh(pid: int, u: User = Depends(require_roles(*S.VAI_NHAP)), db: Session = Depends(get_db)):
+    """KS-16c: người tải tự xóa ảnh của mình; TP Điều hành xóa mọi ảnh."""
+    _goi(S.xoa_anh, db, u, pid)
+    return {"message": "Đã xóa ảnh khỏi album"}
 
 
 @router_vtos.get("/anh/{pid:int}/{co}")

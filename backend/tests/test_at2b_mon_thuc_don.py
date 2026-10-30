@@ -73,8 +73,6 @@ def test_noi_bat_toi_da_va_anh_mon(db):
     nhap, _ = N.tai_anh_album(db, _u(db, "dh"), nh.id, "m.jpg", "image/jpeg", anh(3), {"nhom": "mon_an", "can_cu": "vtd_chup"})
     m = N.luu_mon(db, _u(db, "dh"), nh.id, {"ten": "Bún chả", "anh_id": nhap.id})
     N.gui_duyet_mon(db, _u(db, "dh"), nh.id); N.duyet_mon(db, _u(db, "tp"), [m.id], True)
-    assert N.mon_cong(db, nh.id)[0]["anh"] is None                                             # ảnh chưa duyệt → không hiện
-    N.gui_duyet(db, _u(db, "dh"), nh.id); N.duyet_anh(db, _u(db, "tp"), [nhap.id], True)
     assert N.mon_cong(db, nh.id)[0]["anh"] == f"/api/v1/am-thuc/anh/nh/{nhap.id}/hien"
     ids = [N.luu_mon(db, _u(db, "dh"), nh.id, {"ten": f"M{i}"}).id for i in range(6)]
     for i in ids:
