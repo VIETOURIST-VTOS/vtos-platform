@@ -243,13 +243,18 @@ def doi_soat(tid: int, data: DoiSoatIn, u: User = Depends(require_roles(*S.VAI_K
 
 class ChotIn(BaseModel):
     doanh_so: int
+    hoa_hong: int | None = None          # KS-16d: hoa hồng nhà hàng theo hợp đồng; trống = 0
 
 
 @router_vtos.post("/{did}/chot")
 def chot(did: int, data: ChotIn, u: User = Depends(require_roles(*S.VAI_KE_TOAN)), db: Session = Depends(get_db)):
-    d = _goi(S.kt_chot, db, u, did, data.doanh_so)
+    d = _goi(S.kt_chot, db, u, did, data.doanh_so, None, data.hoa_hong)
     db.commit()
-    return {"message": f"Đã chốt doanh số {d.ma} — đã khóa", **S.tong_vtos(db, u)}
+    them = ""
+    if d.payment_request_id:
+        from app.models.ops import PaymentRequest
+        them = f" · đã lập đề nghị chi {db.get(PaymentRequest, d.payment_request_id).code} trả nhà hàng"
+    return {"message": f"Đã chốt doanh số {d.ma} — đã khóa{them}", **S.tong_vtos(db, u)}
 
 
 @router_vtos.post("/{did}/ghi-km")

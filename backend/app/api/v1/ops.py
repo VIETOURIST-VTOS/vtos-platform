@@ -443,6 +443,7 @@ def pr_out(r: PaymentRequest, db: Session) -> dict:
             "supplier_bank": r.supplier_bank, "amount": r.amount, "description": r.description, "has_document": r.has_document, "document_ref": r.document_ref, "has_invoice": r.has_invoice,
             "over_budget": r.over_budget, "two_signatures": r.two_signatures, "status": r.status, "next": nxt, "created_by": r.created_by, "created_at": r.created_at, "tp_by": r.tp_by,
             "kt_by": r.kt_by, "approved_by": r.approved_by, "signed_chutich": r.signed_chutich, "signed_tgd": r.signed_tgd, "approved_at": r.approved_at, "reject_reason": r.reject_reason,
+            "robot_ghi_chu": r.robot_ghi_chu, "may_lap": r.category in O.LOAI_CHI_MAY_LAP, "co_unc": O.co_unc(db, r),
             "paid_at": r.paid_at, "paid_ref": r.paid_ref, "paid_method": r.paid_method, "entry_ids": r.entry_ids,
             "marketing_muc": r.marketing_muc, "campaign_id": r.campaign_id,
             # Mốc đã áp cho hồ sơ này. RỖNG = chưa chốt mốc lúc lập (hoặc khoản Marketing, nơi mốc
@@ -592,6 +593,20 @@ def pr_step(rid: int, data: StepIn, u: User = Depends(current_user), db: Session
         msg = O.step(db, u, r, data.action, data.reason)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
+    return {"message": msg, "request": pr_out(r, db)}
+
+
+@router.post("/payment-requests/{rid}/robot-kiem")
+def pr_robot_kiem(rid: int, u: User = Depends(require_roles(*AC.PAYMENT_REQUEST_ROLES, mo_ta="robot kiểm lại đề nghị chi")),
+                  db: Session = Depends(get_db)):
+    """KS-16d — chạy lại robot kế toán sau khi đã bổ sung NCC (MST, số tài khoản)."""
+    from app.services import don_ks_vtd as KS
+    r = db.get(PaymentRequest, rid)
+    if not r: raise HTTPException(404, "Không có đề nghị chi")
+    try:
+        msg = KS.robot_kiem_de_nghi(db, u, r)
+    except KS.LoiDon as ex:
+        raise HTTPException(ex.status, str(ex))
     return {"message": msg, "request": pr_out(r, db)}
 
 

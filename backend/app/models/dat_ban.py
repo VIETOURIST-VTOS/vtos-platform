@@ -99,6 +99,11 @@ class DonDatBan(Base):
     giam_voucher: Mapped[float] = mapped_column(TIEN, default=0)
     km_vtd: Mapped[float] = mapped_column(TIEN, default=0)
     km_but_toan: Mapped[str] = mapped_column(String(30), default="")
+    # KS-16d (Chủ tịch 31/10/2026): Kế toán gõ hoa hồng lúc chốt; phải trả nhà hàng = thu hộ − hoàn + voucher VTD chịu
+    # − hoa hồng; máy lập ngay MỘT đề nghị chi trả nhà hàng (loại tra_ncc_thu_ho).
+    hoa_hong: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    phai_tra_nh: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    payment_request_id: Mapped[int | None] = mapped_column(ForeignKey("payment_requests.id"), nullable=True)
 
 
 class ThanhToanDatBan(Base):

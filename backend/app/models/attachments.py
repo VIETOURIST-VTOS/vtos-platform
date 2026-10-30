@@ -137,7 +137,9 @@ LOAI_TEP = {"chung_tu": "Chứng từ gốc", "hoa_don": "Hóa đơn", "hop_dong
             # trông y hệt một bảng thật.
             "bao_gia": "Báo giá đã gửi khách", "phu_luc": "Phụ lục hợp đồng",
             "nghiem_thu": "Biên bản nghiệm thu", "chuong_trinh": "Chương trình tour",
-            "hinh_anh": "Hình ảnh", "bang_bieu": "Bảng biểu", "khac": "Khác"}
+            "hinh_anh": "Hình ảnh", "bang_bieu": "Bảng biểu",
+            # KS-16d (Chủ tịch 31/10/2026): MỌI đề nghị chi — Kế toán tải UNC / phiếu chi rồi mới bấm «Đã chi».
+            "unc": "Ủy nhiệm chi / phiếu chi", "khac": "Khác"}
 
 
 class Attachment(Base):

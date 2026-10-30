@@ -401,7 +401,10 @@ def ra(db: Session, d: DonDatBan, now: datetime | None = None, doi_tac: bool = F
         r.update({"dien_thoai": d.dien_thoai, "nguon": NGUON[d.nguon], "doi_tac_id": d.doi_tac_id, "chot_boi": d.chot_boi,
                   "thu_tai_ban": d.thu_tai_ban, "dung_ghi_chu": d.dung_ghi_chu, "co_bill": d.bill_attachment_id is not None,
                   "huy_boi": d.huy_boi, "mien_phat": d.mien_phat, "hoan_ghi_chu": d.hoan_ghi_chu,
-                  "thanh_toan_id": [t.id for t in tts]})
+                  "thanh_toan_id": [t.id for t in tts],
+                  "hoa_hong": int(d.hoa_hong) if d.hoa_hong is not None else None,
+                  "phai_tra_nh": int(d.phai_tra_nh) if d.phai_tra_nh is not None else None,
+                  "de_nghi_chi": _dnc(db, d.payment_request_id)})
         for t, o in zip(tts, r["thanh_toan"]):
             o.update({"id": t.id, "kenh_ma": t.kenh, "so_gd_cong": t.so_gd_cong, "ma_gd": t.ma_gd, "xac_nhan_boi": t.xac_nhan_boi,
                       "phi_the": t.phi_the, "but_toan": t.but_toan})
@@ -738,6 +741,11 @@ def thu_ho_ncc(db: Session, s) -> list[dict]:
     return ra_
 
 
+def _dnc(db: Session, pid: int | None) -> dict | None:
+    from app.services.don_ks_vtd import _dnc as f
+    return f(db, pid)
+
+
 # ====================================================================== ghi sổ (DT-3: đại lý thu hộ nhà hàng)
 def _doi_tuong_nh(db: Session, d: DonDatBan) -> tuple[str, str]:
     """(tên, mã) đối tượng công nợ 3388 — nhà cung cấp của nhà hàng; chưa gắn NCC thì tên nhà hàng."""
@@ -908,7 +916,9 @@ def kt_da_hoan(db: Session, u: User, did: int, ghi_chu: str, now: datetime | Non
     return d
 
 
-def kt_chot(db: Session, u: User, did: int, doanh_so: int, now: datetime | None = None) -> DonDatBan:
+def kt_chot(db: Session, u: User, did: int, doanh_so: int, now: datetime | None = None, hoa_hong: int | None = None) -> DonDatBan:
+    """Kế toán chốt doanh số + hoa hồng nhà hàng (KS-16d). Phải trả nhà hàng = thu hộ − hoàn + voucher VTD chịu − hoa hồng;
+    > 0 → máy lập ngay một đề nghị chi trả nhà hàng (TP Điều hành xác nhận). Hoa hồng bỏ trống = 0."""
     now = now or datetime.now()
     if u.role not in VAI_KE_TOAN:
         raise LoiDatBan("Chỉ Kế toán chốt doanh số", 403)
@@ -919,11 +929,28 @@ def kt_chot(db: Session, u: User, did: int, doanh_so: int, now: datetime | None 
         raise LoiDatBan("Đơn đã chốt doanh số — đã khóa", 409)
     if doanh_so is None or int(doanh_so) <= 0:
         raise LoiDatBan("Ghi doanh số")
+    giu = da_tra(db, d) - int(d.so_hoan or 0) + khuyen_mai(db, d)
+    hh = int(hoa_hong or 0)
+    if not (0 <= hh <= max(giu, 0)):
+        raise LoiDatBan(f"Ghi hoa hồng theo hợp đồng, 0 – {max(giu, 0):,} đ".replace(",", "."))
     d.doanh_so, d.chot_boi, d.chot_luc = int(doanh_so), u.username, now
+    d.hoa_hong, d.phai_tra_nh = hh, max(giu, 0) - hh
     if khuyen_mai(db, d) > 0 and not d.km_but_toan:          # KS-16b
         kt_ghi_km(db, u, d.id, now)
-    R.audit(db, u.username, u.role, "dat_ban_chot_doanh_so", f"dat_ban:{d.ma}", after={"doanh_so": int(doanh_so), "bill": d.bill_thuc_te})
+    R.audit(db, u.username, u.role, "dat_ban_chot_doanh_so", f"dat_ban:{d.ma}",
+            after={"doanh_so": int(doanh_so), "bill": d.bill_thuc_te, "hoa_hong": hh, "phai_tra_nh": d.phai_tra_nh})
     db.flush()
+    if d.phai_tra_nh > 0:
+        from app.services.don_ks_vtd import LoiDon, lap_de_nghi_chi_ncc
+        nh = db.get(NhaHang, d.nha_hang_id)
+        try:
+            r = lap_de_nghi_chi_ncc(db, u, nh.supplier_id if nh else None, nh.ten if nh else "Nhà hàng", int(d.phai_tra_nh),
+                                    f"Trả nhà hàng {nh.ten if nh else ''} — đặt bàn {d.ma} ngày {d.ngay:%d/%m/%Y}, tiền thu hộ "
+                                    f"sau hoa hồng {hh:,} đ".replace(",", "."), f"Đặt bàn {d.ma}")
+        except LoiDon as ex:
+            raise LoiDatBan(str(ex), 409)
+        d.payment_request_id = r.id
+        db.flush()
     return d
 
 

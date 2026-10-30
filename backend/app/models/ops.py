@@ -182,6 +182,9 @@ class PaymentRequest(Base):
     nguoi_da_ky: Mapped[str] = mapped_column(String(200), default="", server_default="")
     approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reject_reason: Mapped[str] = mapped_column(String(300), default="")
+    # KS-16d (Chủ tịch 31/10/2026): robot kế toán làm bước xác nhận + kiểm của loại máy tự lập; thiếu thông tin
+    # NCC thì robot DỪNG và ghi lý do ở đây cho người bổ sung.
+    robot_ghi_chu: Mapped[str] = mapped_column(String(300), default="")
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     paid_ref: Mapped[str] = mapped_column(String(120), default="")        # mã giao dịch ngân hàng / SePay
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)  # pháp nhân chủ quản – rỗng là CHƯA XÁC ĐỊNH, không mặc định về công ty mẹ

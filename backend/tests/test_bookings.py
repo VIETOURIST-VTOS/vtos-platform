@@ -113,6 +113,7 @@ def test_cancel_with_charge_creates_retention_then_apply_refund_cancel():
     r = client.post(f"/api/v1/retentions/{rt['id']}/refund", json={"note": "Khách xin hoàn"}, headers=login("dh.lan")); assert r.status_code == 200, r.text
     code = r.json()["request"]
     pr = next(x for x in client.get("/api/v1/payment-requests", headers=login("ketoan")).json() if x["code"] == code); assert pr["amount"] == 1_470_000 and pr["category"] == "hoan_tien"
+    _gan_unc(pr["code"])
     for a, w in (("confirm", "tp.dieuhanh"), ("check", "ketoan"), ("approve", "tgd"), ("pay", "ketoan")):
         x = client.post(f"/api/v1/payment-requests/{pr['id']}/step", json={"action": a, "reason": "CK 999" if a == "pay" else ""}, headers=login(w)); assert x.status_code == 200, x.text
     rt3 = next(x for x in client.get("/api/v1/retentions?status=all", headers=login("ketoan")).json()["rows"] if x["id"] == rt["id"]); assert rt3["status"] == "tat_toan" and rt3["remaining"] == 0
@@ -141,3 +142,12 @@ def test_robot_alerts_deposit_and_deadline():
     # hủy booking → cảnh báo của booking tự đóng
     assert client.post(f"/api/v1/bookings/{b['id']}/cancel", json={"reason": "Không cọc, hủy chỗ"}, headers=login("tp.dieuhanh")).status_code == 200
     assert all(a["resolved"] for a in client.get("/api/v1/alerts", headers=login("tp.dieuhanh")).json()["rows"] if a["ref"] == f"booking:{b['code']}")
+
+
+def _gan_unc(ma):
+    """KS-16d (31/10/2026): «Đã chi» cần tệp UNC / phiếu chi gắn với đề nghị chi."""
+    from app.db.session import SessionLocal
+    from app.models.attachments import Attachment
+    s = SessionLocal()
+    s.add(Attachment(doi_tuong="de_nghi_chi", doi_tuong_id=ma, loai="unc", ten_tep="unc.pdf", checksum="unc-" + ma, khoa_luu="unc/" + ma))
+    s.commit(); s.close()
