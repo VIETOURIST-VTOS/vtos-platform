@@ -4,11 +4,11 @@
    Ở bước 12a khách GỬI YÊU CẦU GIỮ PHÒNG: Điều hành giữ phòng với khách sạn rồi báo lại (hàng chờ KS-11). Giá
    trên màn do máy chủ tính từ giá Điều hành nhập và TP Điều hành duyệt; trình duyệt không gửi số tiền nào lên.
    KS-14 (Chủ tịch duyệt bản xem thử 30/10/2026): khách sạn có giá đã duyệt thì khách ĐẶT VÀ TRẢ NGAY 100% —
-   máy giữ phòng 15 phút, trả QR (máy tự khớp) hoặc thẻ OnePay; Điều hành chốt với khách sạn trong 2 giờ làm
+   máy giữ phòng 15 phút, trả QR (máy tự khớp) hoặc thẻ qua cổng SePay (SP-1); Điều hành chốt với khách sạn trong 2 giờ làm
    việc; hủy theo gói. Phòng đã đặt nằm ở «Phòng đã đặt của tôi». Điểm thưởng: khi VTD Rewards chạy. */
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
-import { goiCong } from "@/lib/cong";
+import { diCongThe, goiCong } from "@/lib/cong";
 
 type Q = { tinh: string; vao: string; ra: string; nl: number; te: number; phong: number };
 type Loc = { min: number; max: number; coGia: boolean; huy: boolean; sang: boolean; diem9: boolean; sao: number[]; loai: string[]; ten: string };
@@ -74,7 +74,9 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
       const u = new URLSearchParams(window.location.search), ma = u.get("ks_vtd");
       if (u.get("the") && ma !== null) {
         if (u.get("the") === "ok") setBaoKs("Thanh toán thẻ thành công — Vietourist đang chốt phòng với khách sạn.");
-        else setLoi("Thanh toán thẻ không thành công — bạn có thể thử lại hoặc dùng QR chuyển khoản.");
+        if (u.get("the") === "cho") setBaoKs("Đã trả qua cổng thẻ — đơn chuyển «Đã thanh toán» ngay khi cổng thẻ báo về (thường vài giây).");
+        if (u.get("the") === "huy") setLoi("Bạn đã thoát trang thanh toán thẻ — đơn chưa được trả.");
+        else if (u.get("the") === "loi") setLoi("Thanh toán thẻ không thành công — bạn có thể thử lại hoặc dùng QR chuyển khoản.");
         window.history.replaceState(null, "", window.location.pathname);
         if (ma) goiCong(`/ks-vtd/don/${encodeURIComponent(ma)}`).then((d) => { setDonKs(d); setBuoc(d.trang_thai === "cho_tra" ? "tra" : "don"); }).catch(() => {});
       }
@@ -156,8 +158,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
         yeu_cau: [kh.yc.join(", "), kh.ghi].filter(Boolean).join(" · "), dong_y: kh.dongy });
       setDonKs(r.don);
       if (tt === "the") {
-        const t = await goiCong(`/ks-vtd/don/${encodeURIComponent(r.don.ma)}/the`, {});
-        window.location.href = t.url; return;
+        diCongThe(await goiCong(`/ks-vtd/don/${encodeURIComponent(r.don.ma)}/the`, {})); return;
       }
       setBuoc("tra"); window.scrollTo(0, 0);
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
@@ -219,7 +220,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
           <label className="ksv-fld">Ghi thêm<textarea value={kh.ghi} onChange={(e) => setKh({ ...kh, ghi: e.target.value })} maxLength={800} /></label></section>
         {coGia ? <section className="ksv-panel" style={{ padding: 20 }}><h2 style={{ margin: 0, fontSize: 18 }}>Chọn cách thanh toán</h2>
           {([["qr", "Chuyển khoản / quét mã QR", "Ngân hàng báo về, đơn tự chuyển «Đã thanh toán» trong 1–3 phút", "Không mất phí"],
-            ["the", "Thẻ ATM nội địa / Visa / Mastercard / JCB", "Chuyển sang cổng OnePay — Vietourist không thấy và không lưu số thẻ", ""]] as const).map(([v, t, m, n]) =>
+            ["the", "Thẻ ATM nội địa / Visa / Mastercard / JCB", "Chuyển sang cổng thanh toán SePay — Vietourist không thấy và không lưu số thẻ", ""]] as const).filter(([v]) => v !== "the" || ks.the_bat).map(([v, t, m, n]) =>
             <label key={v} className={`ksv-pay ${tt === v ? "on" : ""}`}><input type="radio" name="ksv-tt" checked={tt === v} onChange={() => setTt(v)} />
               <span style={{ flex: 1 }}><b>{t}</b><br /><small className="ksv-muted">{m}</small></span>{n && <b className="ksv-okc" style={{ fontSize: 12 }}>{n}</b>}</label>)}
           <small className="ksv-muted">Phòng được giữ 15 phút sau khi bấm thanh toán. Trả đủ 100%; hủy theo chính sách của gói đã chọn.</small></section>
@@ -387,7 +388,7 @@ function TraTien({ d, onDoi, onLai }: { d: any; onDoi: (d: any) => void; onLai: 
   }, [d.ma]);  // eslint-disable-line react-hooks/exhaustive-deps
   const the = async () => {
     setBusy(true); setLoi("");
-    try { const t = await goiCong(`/ks-vtd/don/${encodeURIComponent(d.ma)}/the`, {}); window.location.href = t.url; }
+    try { diCongThe(await goiCong(`/ks-vtd/don/${encodeURIComponent(d.ma)}/the`, {})); }
     catch (x: any) { setLoi(x.message); setBusy(false); }
   };
   const huy = async () => {

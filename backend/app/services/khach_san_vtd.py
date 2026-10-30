@@ -698,7 +698,12 @@ def chi_tiet_cong(db: Session, kid: int, vao, ra, nguoi_lon: int = 2, tre_em: in
             "chinh_sach": {"tre_em": k.cs_tre_em, "giuong_phu": k.cs_giuong_phu, "vat_nuoi": k.cs_vat_nuoi, "khac": k.cs_khac},
             "anh": [_anh_out(a, True) for a in anh], "nhom_anh": NHOM_ANH_KS,
             "phong": phong, "dem": (ra - vao).days, "vao": vao.isoformat(), "ra": ra.isoformat(),
-            "nguoi_lon": nl, "tre_em": te, "so_phong": sp}
+            "nguoi_lon": nl, "tre_em": te, "so_phong": sp, "the_bat": _the_bat()}
+
+
+def _the_bat() -> bool:
+    from app.services import sepay_pg as SP   # SP-1: nút trả thẻ chỉ hiện khi có cổng thẻ
+    return SP.cong_the_bat()
 
 
 def tinh_lua_chon(db: Session, kid: int, vao, ra, chon: list[dict], hom_nay: date | None = None) -> dict:

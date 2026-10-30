@@ -54,6 +54,9 @@ CONG_KHAI = {
                           "thử, và mã sai cùng mã đã dùng trả về ĐÚNG MỘT câu giống nhau để nó "
                           "không thành máy dò.",
     # DT-2, 28/10/2026 — Chủ tịch duyệt nhận thẻ Visa / Master qua OnePay cho đặt bàn nhà hàng.
+    "/api/v1/sepay-pg": "SP-1: cổng thanh toán SePay gọi IPN (POST JSON) sau khi khách trả thẻ — không có phiên; "
+                        "xác thực bằng đầu đề X-Secret-Key so với khóa IPN trong cấu hình (sai → 401, không đổi gì); "
+                        "số tiền phải khớp khoản đã tạo; có phanh lượt theo địa chỉ.",
     "/api/v1/onepay": "Cổng thẻ OnePay gọi về sau khi khách trả bằng thẻ (đường trả về qua trình duyệt "
                       "và IPN từ máy chủ OnePay). OnePay không có tài khoản VTOS, nên hàng rào là CHỮ "
                       "KÝ HMAC-SHA256 bằng khóa bí mật chỉ OnePay và VTOS biết: chữ ký sai thì không "

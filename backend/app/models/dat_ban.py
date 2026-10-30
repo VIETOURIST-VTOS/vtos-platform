@@ -32,8 +32,8 @@ CACH_TT = {"coc": "Cọc", "du": "Trả đủ"}
 NGUON = {"khach_hang": "Khách tự đặt", "co_dong": "Cổ đông", "dai_ly": "Đại lý", "ctv": "Cộng tác viên"}
 HOAN_TT = {"": "", "cho_sales": "Chờ Sales xác nhận hoàn", "cho_chi": "Chờ Kế toán hoàn tiền", "da_hoan": "Đã hoàn",
            "khong_hoan": "Không phải hoàn"}
-KENH = {"qr": "QR chuyển khoản", "onepay": "Thẻ (OnePay)"}
-TT_THANH_TOAN = {"cho": "Đang thanh toán", "that_bai": "Không thành công", "thanh_cong": "OnePay báo thành công · chờ đối soát",
+KENH = {"qr": "QR chuyển khoản", "onepay": "Thẻ (OnePay)", "sepay": "Thẻ (cổng SePay)"}
+TT_THANH_TOAN = {"cho": "Đang thanh toán", "that_bai": "Không thành công", "thanh_cong": "Cổng thẻ báo thành công · chờ đối soát",
                  "da_doi_soat": "Đã đối soát", "da_xac_nhan": "Kế toán đã xác nhận"}
 TT_DA_TRA = ("thanh_cong", "da_doi_soat", "da_xac_nhan")
 

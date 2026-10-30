@@ -29,9 +29,9 @@ from app.models.kieu_tien import TIEN
 TRANG_THAI_DON = {"cho_tra": "Chờ thanh toán", "het_han": "Hết giờ giữ phòng", "da_tra": "Đã thanh toán · chờ khách sạn xác nhận",
                   "da_xac_nhan": "Đã xác nhận", "da_huy": "Đã hủy"}
 HOAN_TT_KS = {"": "", "cho_sales": "Chờ Sales xác nhận hoàn", "cho_chi": "Chờ Kế toán hoàn tiền", "da_hoan": "Đã hoàn"}
-KENH_KS = {"qr": "QR chuyển khoản", "onepay": "Thẻ (OnePay)"}
+KENH_KS = {"qr": "QR chuyển khoản", "onepay": "Thẻ (OnePay)", "sepay": "Thẻ (cổng SePay)"}
 TT_TT_KS = {"cho": "Đang thanh toán", "that_bai": "Không thành công", "tu_khop": "Máy tự khớp · chờ Kế toán ghi sổ",
-            "thanh_cong": "OnePay báo thành công · chờ đối soát", "da_doi_soat": "Đã đối soát", "da_xac_nhan": "Kế toán đã xác nhận"}
+            "thanh_cong": "Cổng thẻ báo thành công · chờ đối soát", "da_doi_soat": "Đã đối soát", "da_xac_nhan": "Kế toán đã xác nhận"}
 TT_DA_TRA_KS = ("tu_khop", "thanh_cong", "da_doi_soat", "da_xac_nhan")
 
 
