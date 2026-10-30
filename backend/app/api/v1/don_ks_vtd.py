@@ -262,6 +262,12 @@ def kt_da_hoan(did: int, data: GhiChuIn, u: User = Depends(require_roles(*S.VAI_
     return _xong(db, u, _goi(S.kt_da_hoan, db, u, did, data.ghi_chu))
 
 
+@router_vtos.post("/{did:int}/ghi-dt-hoa-hong")
+def kt_ghi_dt_hoa_hong(did: int, u: User = Depends(require_roles(*S.VAI_KE_TOAN)), db: Session = Depends(get_db)):
+    """KS-16e — Kế toán ghi bù doanh thu hoa hồng (Nợ 3388 / Có 511) cho đơn đã chi trả khách sạn."""
+    return _xong(db, u, _goi(S.kt_ghi_dt_hoa_hong, db, u, did))
+
+
 @router_vtos.post("/{did:int}/chot")
 def kt_chot(did: int, data: HoaHongIn, u: User = Depends(require_roles(*S.VAI_KE_TOAN)), db: Session = Depends(get_db)):
     return _xong(db, u, _goi(S.kt_chot, db, u, did, data.hoa_hong))

@@ -826,6 +826,10 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         r.status, r.paid_at, r.paid_ref = "da_chi", datetime.now(), reason
         r.paid_method = "tien_mat" if reason.lower().startswith("tm") else "chuyen_khoan"
         _post_payment(db, r)
+        if r.category in LOAI_CHI_MAY_LAP:
+            # KS-16e (Chủ tịch 31/10/2026): đã chi trả khách sạn / nhà hàng → ghi doanh thu hoa hồng của đơn gốc.
+            from app.services import don_ks_vtd as _KS
+            _KS.sau_khi_chi_tra_ncc(db, u, r)
         if r.category == "hoan_tien":
             from app.services import bookings as BK
             BK.on_refund_paid(db, r)

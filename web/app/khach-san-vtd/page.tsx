@@ -467,6 +467,12 @@ function TienHoan({ toast }: { toast: (m: string, l?: boolean) => void }) {
         <tbody>{x.phai_tra_ks.map((k: any) => <tr key={k.ma}><td><b>{k.khach_san}</b><div className="muted">{k.ma}</div></td><td>{k.so_don}</td><td>₫ {tien(k.giu_lai)}</td><td>₫ {tien(k.khuyen_mai || 0)}</td><td>₫ {tien(k.hoa_hong)}</td><td><b>₫ {tien(k.phai_tra)}</b></td>
           <td>{(k.de_nghi_chi || []).map((p: any) => <div key={p.id} style={{ fontSize: 12 }}><b>{p.code}</b> · {p.don} · ₫ {tien(p.so_tien)} · {TT_DN[p.status] || p.status}</div>)}{!(k.de_nghi_chi || []).length && <span className="muted">—</span>}</td></tr>)}
           {!x.phai_tra_ks.length && <tr><td colSpan={7} className="muted">Chưa có đơn đã chốt.</td></tr>}</tbody></table></div>
+      {(x.cho_ghi_dt || []).length > 0 && <><h3>Chờ ghi doanh thu hoa hồng ({x.cho_ghi_dt.length})</h3>
+        <div style={{ overflowX: "auto" }}><table><thead><tr><th>Đơn</th><th>Khách sạn</th><th>Đề nghị chi</th><th>Hoa hồng</th><th></th></tr></thead>
+          <tbody>{x.cho_ghi_dt.map((d: any) => <tr key={d.id}><td><b>{d.ma}</b>{d.chot_luc && <div className="muted">chốt {d.chot_luc.slice(8, 10)}/{d.chot_luc.slice(5, 7)}</div>}</td><td>{d.khach_san}</td>
+            <td>{d.de_nghi_chi || <span className="muted">— (chi tay)</span>}</td><td>₫ {tien(d.hoa_hong)}</td>
+            <td>{kt ? <button className="act teal" disabled={busy} onClick={() => goi(`/khach-san-vtd/don/${d.id}/ghi-dt-hoa-hong`, {})}>Ghi doanh thu hoa hồng</button> : <span className="muted">Kế toán ghi</span>}</td></tr>)}</tbody></table></div>
+        <p className="muted" style={{ fontSize: 12 }}>Bình thường máy tự ghi Nợ 3388 / Có 511 khi Kế toán bấm «Đã chi» đề nghị trả khách sạn (trả 0 thì ghi lúc chốt). Bảng này chỉ còn đơn cũ hoặc lần ghi bị kỳ khóa chặn. Hoa hồng chưa gồm VAT — VAT Kế toán xử lý riêng.</p></>}
       <p className="muted" style={{ fontSize: 12 }}>Kế toán chốt → máy lập đề nghị chi; robot kế toán kiểm (thiếu NCC / MST / số tài khoản thì dừng) → TGĐ / Chủ tịch duyệt → Kế toán chuyển khoản, tải UNC, bấm Đã chi.</p></section>
   </div>;
 }
