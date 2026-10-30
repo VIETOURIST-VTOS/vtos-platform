@@ -10,6 +10,7 @@ import { Tag, errMsg } from "@/components/ui";
  *  · Hủy & hoàn: máy tính số giữ / hoàn theo tham số; Sales xác nhận, Kế toán ghi đã hoàn kèm chứng từ.
  *    Hủy miễn phạt chỉ TP / GĐ Kinh doanh, có lý do.
  *  · Doanh số: đơn qua đại lý / CTV đã dùng → Kế toán chốt (vào D06), chốt rồi khóa. */
+const TT_DN: Record<string, string> = { cho_tp: "chờ robot", cho_kt: "robot dừng — bổ sung NCC", cho_duyet: "chờ TGĐ / CT duyệt", cho_chi: "lệnh chi chờ", da_chi: "đã chi", tu_choi: "từ chối" };   // KS-16d
 type Tab = "tien" | "the" | "hoan" | "chot" | "don";
 const TT: Record<string, string> = { cho_nhan: "warn", cho_tra: "warn", da_giu: "ok", het_han: "red", tu_choi: "red", da_dung: "ok", khong_den: "red", huy: "" };
 
@@ -84,16 +85,21 @@ function Trang() {
 
     {tab === "chot" && <div className="card"><h3>Chốt doanh số đơn đã dùng</h3><div className="muted">Đơn qua đại lý / CTV → vào D06. Đơn khách / cổ đông tự đặt → cộng điểm thành viên trên số đã trả qua Vietourist.</div>
       {!chot.length ? <div className="muted">Chưa có đơn đã dùng.</div>
-      : <table><thead><tr><th>Đơn</th><th>Tiền</th><th>Nhà hàng báo</th><th>Doanh số</th></tr></thead><tbody>{chot.map((x: any) => <tr key={x.id}>
+      : <table><thead><tr><th>Đơn</th><th>Tiền</th><th>Nhà hàng báo</th><th>Doanh số</th><th>Hoa hồng NH · trả nhà hàng</th></tr></thead><tbody>{chot.map((x: any) => { const giu = (x.da_tra || 0) - (x.so_hoan || 0) + (x.km_vtd || 0); const hh = Number(q[`h${x.id}`] || 0); return <tr key={x.id}>
         <td>{x.ma}<div className="muted" style={{ fontSize: 12 }}>{x.nguon} · {x.nha_hang} · {fmtD(x.ngay)}</div></td>
         <td>Trả trước {vnd(x.da_tra)}<div className="muted" style={{ fontSize: 12 }}>{x.thanh_toan.map((t: any) => `${t.kenh}: ${t.trang_thai_ten}`).join("; ")}</div>
           {x.km_vtd > 0 && <div className="muted" style={{ fontSize: 12 }}>+ voucher {x.voucher?.ma} {vnd(x.km_vtd)} VTD chịu{x.km_but_toan ? ` · đã ghi ${x.km_but_toan}` : " · chốt sẽ ghi Nợ 641 / Có 3388"}</div>}</td>
         <td>Bill {vnd(x.bill_thuc_te || 0)}<div className="muted" style={{ fontSize: 12 }}>thu tại bàn {vnd(x.thu_tai_ban || 0)}{x.co_bill ? " · có ảnh bill" : " · không ảnh bill"}{x.dung_ghi_chu ? ` · ${x.dung_ghi_chu}` : ""}</div></td>
         <td>{x.doanh_so != null ? <><b>{vnd(x.doanh_so)}</b><div className="muted" style={{ fontSize: 12 }}>kỳ {x.ky_d06} · {x.chot_boi} · khóa</div></>
-          : Q.ke_toan ? <><input type="number" placeholder={String(x.bill_thuc_te || "")} value={q[`c${x.id}`] || ""} onChange={(e) => setQ({ ...q, [`c${x.id}`]: e.target.value })} style={{ width: 120 }} />
-            <button className="act teal" style={{ margin: "0 0 0 6px" }} disabled={busy || !Number(q[`c${x.id}`])} onClick={() => goi(`/dat-ban-nha-hang/${x.id}/chot`, { doanh_so: Number(q[`c${x.id}`]) })}>Chốt</button></>
-          : <span className="muted">Chờ Kế toán</span>}</td></tr>)}</tbody></table>}
-      <div className="muted">Đối chiếu số trả trước Vietourist đã thu + số thu tại bàn với bill. Vào kỳ D06 của ngày muộn hơn giữa ngày ăn và ngày chốt.</div></div>}
+          : Q.ke_toan ? <input type="number" placeholder={String(x.bill_thuc_te || "")} value={q[`c${x.id}`] || ""} onChange={(e) => setQ({ ...q, [`c${x.id}`]: e.target.value })} style={{ width: 120 }} />
+          : <span className="muted">Chờ Kế toán</span>}</td>
+        <td>{x.doanh_so != null ? <>{x.hoa_hong != null ? <>hoa hồng {vnd(x.hoa_hong)} · trả <b>{vnd(x.phai_tra_nh || 0)}</b></> : <span className="muted">chốt trước KS-16d</span>}
+            {x.de_nghi_chi && <div style={{ fontSize: 12 }}>Đề nghị chi <b>{x.de_nghi_chi.code}</b> · {TT_DN[x.de_nghi_chi.status] || x.de_nghi_chi.status}</div>}</>
+          : Q.ke_toan ? <><input type="number" placeholder="0" value={q[`h${x.id}`] || ""} onChange={(e) => setQ({ ...q, [`h${x.id}`]: e.target.value })} style={{ width: 110 }} />
+            <button className="act teal" style={{ margin: "0 0 0 6px" }} disabled={busy || !Number(q[`c${x.id}`]) || hh < 0 || hh > giu} onClick={() => goi(`/dat-ban-nha-hang/${x.id}/chot`, { doanh_so: Number(q[`c${x.id}`]), hoa_hong: hh })}>Chốt</button>
+            <div className="muted" style={{ fontSize: 12 }}>→ trả nhà hàng {vnd(Math.max(giu - hh, 0))} = {vnd(x.da_tra || 0)}{x.so_hoan ? ` − hoàn ${vnd(x.so_hoan)}` : ""}{x.km_vtd ? ` + voucher ${vnd(x.km_vtd)}` : ""} − hoa hồng {vnd(hh)}</div></>
+          : <span className="muted">Chờ Kế toán</span>}</td></tr>; })}</tbody></table>}
+      <div className="muted">Đối chiếu số trả trước Vietourist đã thu + số thu tại bàn với bill. Vào kỳ D06 của ngày muộn hơn giữa ngày ăn và ngày chốt. Hoa hồng nhà hàng theo hợp đồng (trống = 0); phải trả nhà hàng &gt; 0 → máy lập đề nghị chi, robot kế toán kiểm → TGĐ / Chủ tịch duyệt.</div></div>}
 
     {tab === "don" && <div className="card"><h3>Tất cả đơn đặt bàn</h3>
       {!d.don.length ? <div className="muted">Chưa có đơn.</div>

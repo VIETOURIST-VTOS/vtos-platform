@@ -530,7 +530,9 @@ MISA_PURCHASE_COLS = ["Phương thức thanh toán", "Nhận kèm hóa đơn", "
 CATEGORY_ACCOUNT = {"chi_tour": "1541", "marketing": "6417", "hanh_chinh": "6428", "hoan_tien": "131",
                     "tam_ung": "141", "tam_ung_tai_xe": "141", "sua_chua_xe": "627",
                     # Hoa hồng D06 trả đại lý / CTV bán hàng – Chủ tịch chốt 26/10/2026: 6417 dịch vụ mua ngoài.
-                    "hoa_hong": "6417"}
+                    "hoa_hong": "6417",
+                    # KS-16d (Chủ tịch 31/10/2026): trả khách sạn / nhà hàng phần tiền Vietourist thu hộ.
+                    "tra_ncc_thu_ho": "3388"}
 
 
 def thieu_tai_khoan() -> list[str]:

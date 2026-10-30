@@ -180,7 +180,8 @@ def mail_text(u: User, dept: str, d: date, p1: str, p2: dict, p3: str, p4: str, 
               f"— {u.full_name}" + (f" · Mã NV {staff_code}" if staff_code else "") + f" · {name}"]
     return subject, "\n".join(lines)
 
-CATEGORY_ACCOUNT = {"chi_tour": "154", "marketing": "641", "hanh_chinh": "642", "hoa_hong": "641"}   # tam_ung: ghi 141 khi chi, hoàn ứng vào 154 khi Kế toán xác nhận quyết toán
+CATEGORY_ACCOUNT = {"chi_tour": "154", "marketing": "641", "hanh_chinh": "642", "hoa_hong": "641",
+                    "tra_ncc_thu_ho": "3388"}   # KS-16d: trả khách sạn / nhà hàng tiền thu hộ — duyệt: Nợ 3388 / Có 331. tam_ung: ghi 141 khi chi, hoàn ứng vào 154 khi Kế toán xác nhận quyết toán
 # ĐỘI XE — Chủ tịch quyết 05/10/2026: "liên quan đến sửa chữa, hư hỏng, tiền bạc là do TGĐ / CT
 # duyệt và thấy". Hai loại `sua_chua_xe` và `tam_ung_tai_xe` KHÔNG đổi người ký: cửa duyệt vẫn là
 # TGĐ (và Chủ tịch khi cần hai chữ ký), y như mọi loại chi khác. Thứ chúng đổi là người XÁC NHẬN
@@ -197,7 +198,8 @@ CATEGORY_ACCOUNT = {"chi_tour": "154", "marketing": "641", "hanh_chinh": "642", 
 # ngoài tầm đọc ấy, và hàng rào mù đi mà không báo gì.
 CATEGORY_CONFIRMER = {"chi_tour": ("tp_dh",), "marketing": ("ptgd_mkt",), "hanh_chinh": ("hcns",),
                       "hoan_tien": ("gd_kd", "tp_kd", "tp_dh"), "tam_ung": ("tp_dh",),
-                      "sua_chua_xe": ("gd_doi_xe",), "tam_ung_tai_xe": ("gd_doi_xe",), "hoa_hong": ("gd_kd",)}
+                      "sua_chua_xe": ("gd_doi_xe",), "tam_ung_tai_xe": ("gd_doi_xe",), "hoa_hong": ("gd_kd",),
+                      "tra_ncc_thu_ho": ("robot",)}   # KS-16d: robot kế toán xác nhận + kiểm (Chủ tịch 31/10/2026)
 
 # Loại chi tài xế được TỰ LẬP. Đúng một loại, và cố ý.
 #
@@ -437,6 +439,12 @@ def nguong_chu_tich_dang_hieu_luc(db: Session) -> float | None:
         return None
 
 
+LOAI_CHI_MOT_TRONG_HAI = ("tra_ncc_thu_ho",)
+# KS-16d — loại MÁY TỰ LẬP khi Kế toán chốt đơn khách sạn / đặt bàn. Người không lập tay được; bước xác nhận bộ phận
+# và bước Kế toán kiểm do ROBOT kế toán làm (`don_ks_vtd.robot_kiem_de_nghi`), không ai bấm thay.
+LOAI_CHI_MAY_LAP = ("tra_ncc_thu_ho",)
+
+
 def cap_duyet(db: Session, r: PaymentRequest) -> dict:
     """MỘT chỗ duy nhất trả lời câu "khoản này ai duyệt".
 
@@ -453,6 +461,12 @@ def cap_duyet(db: Session, r: PaymentRequest) -> dict:
     ở mọi mức tiền — và hàm này cố ý không áp cho nó. Nay chữ ký của P.TGĐ là bước `confirm` (duyệt
     nội dung), còn bước `approve` là LỆNH CHI và đi đúng mốc chung như mọi loại chi.
     """
+    # KS-16d — Chủ tịch chốt 31/10/2026: trả khách sạn / nhà hàng tiền thu hộ (số đã khóa lúc Kế toán chốt)
+    # KHÔNG theo mốc tiền. TGĐ và Chủ tịch ĐỀU có nút, MỘT TRONG HAI bấm là xong; người kia chỉ còn thấy.
+    # Mọi mức tiền, kể cả khi chưa chốt mốc.
+    if getattr(r, "category", "") in LOAI_CHI_MOT_TRONG_HAI:
+        return {"nguong": None, "nguon": "loai_chi", "chua_chot": False, "tren_moc": None, "mot_trong_hai": True,
+                "can_tgd": True, "can_chutich": True, "ai": "TGĐ hoặc Chủ tịch", "ly_do": ""}
     nguong, nguon = r.nguong_duyet_ap_dung, "ho_so"
     if nguong is None:
         # Hồ sơ lập TRƯỚC bản nâng cấp này không có ô ấy. Lấy mốc đang hiệu lực — sự thật tốt nhất
@@ -518,6 +532,8 @@ def vai_ky_duoc(db: Session, r: PaymentRequest) -> list[str]:
 def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     cat = data["category"]
     if cat not in CATEGORY_CONFIRMER: raise ValueError("Loại chi không hợp lệ")
+    if cat in LOAI_CHI_MAY_LAP and not data.get("_may_lap"):
+        raise ValueError("Đề nghị trả NCC tiền thu hộ do máy tự lập khi Kế toán chốt đơn — không lập tay")
     # Tài xế mở được đúng MỘT loại, và chỉ cho chính mình. Chặn ở đây chứ không chỉ ở cửa API: cửa
     # API nói ai gõ được, chỗ này nói gõ được CÁI GÌ — và chỗ thứ hai là chỗ còn đúng khi mai kia có
     # thêm một cửa khác gọi vào cùng hàm này.
@@ -681,6 +697,9 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         if not reason.strip(): raise ValueError("Từ chối phải có lý do")
         r.status, r.reject_reason = "tu_choi", reason
         msg = f"Đã từ chối {r.code}: {reason}"
+    elif action in ("confirm", "check") and r.category in LOAI_CHI_MAY_LAP:
+        raise ValueError("Bước này do robot kế toán làm. Robot dừng vì thiếu thông tin NCC thì bổ sung NCC rồi bấm "
+                         "«Robot kiểm lại».")
     elif action == "confirm":
         if r.status != "cho_tp": raise ValueError("Không ở bước xác nhận bộ phận")
         if u.role not in CATEGORY_CONFIRMER[r.category] and u.role not in ("tgd",) and not toan_quyen(u): raise ValueError("Không đúng người phụ trách bộ phận")
@@ -773,6 +792,8 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
             else:
                 _vai_ky = "tgd"
                 r.signed_tgd = True
+        elif cd["nguon"] == "loai_chi":
+            raise ValueError("Khoản trả NCC tiền thu hộ do TGĐ hoặc Chủ tịch duyệt (mọi mức tiền).")
         else:
             raise ValueError(
                 f"Khoản {float(r.amount or 0):,.0f}đ "
@@ -786,7 +807,10 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         if _vai_ky:
             _da_ky[_vai_ky] = u.username
             r.nguoi_da_ky = _CK.ghi_nguoi_da_ky(_da_ky)
-        done = (r.signed_tgd or not cd["can_tgd"]) and (r.signed_chutich or not cd["can_chutich"])
+        if cd.get("mot_trong_hai"):
+            done = bool(r.signed_tgd or r.signed_chutich)
+        else:
+            done = (r.signed_tgd or not cd["can_tgd"]) and (r.signed_chutich or not cd["can_chutich"])
         if done:
             r.status, r.approved_by, r.approved_at = "cho_chi", u.username, datetime.now()
             _post_liability(db, r)
@@ -796,6 +820,9 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
     elif action == "pay":
         if r.status != "cho_chi": raise ValueError("Chưa có lệnh chi được duyệt")
         if u.role not in VAI_GHI_DA_CHI and not toan_quyen_ke_ca_tach_bach(u, db): raise ValueError("Chỉ Kế toán ghi nhận đã chi")
+        # KS-16d — Chủ tịch chốt 31/10/2026: MỌI loại chi phải có UNC / phiếu chi tải lên trước khi bấm «Đã chi».
+        if not co_unc(db, r):
+            raise ValueError(f"Tải ủy nhiệm chi (UNC) / phiếu chi của {r.code} lên trước rồi mới bấm «Đã chi»")
         r.status, r.paid_at, r.paid_ref = "da_chi", datetime.now(), reason
         r.paid_method = "tien_mat" if reason.lower().startswith("tm") else "chuyen_khoan"
         _post_payment(db, r)
@@ -810,6 +837,14 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
     R.audit(db, u.username, u.role, f"de_nghi_chi_{action}", f"dc:{r.code}", after={"trang_thai": r.status, "ly_do": reason})
     db.commit()
     return msg
+
+
+def co_unc(db: Session, r: PaymentRequest) -> bool:
+    """Có tệp loại «unc» còn hiệu lực gắn với đề nghị chi (đối tượng de_nghi_chi, theo mã)."""
+    from app.models.attachments import Attachment
+    return db.execute(select(Attachment.id).where(Attachment.doi_tuong == "de_nghi_chi",
+                                                  Attachment.doi_tuong_id.in_((r.code, str(r.id))),
+                                                  Attachment.loai == "unc", Attachment.thu_hoi.is_(False))).first() is not None
 
 
 def _post_liability(db: Session, r: PaymentRequest):

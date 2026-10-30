@@ -618,8 +618,17 @@ def ra_vtos(db: Session, d: DonKsVtd, now: datetime | None = None) -> dict:
               "phai_tra_ks": int(d.phai_tra_ks) if d.phai_tra_ks is not None else None, "chot_boi": d.chot_boi,
               "qua_han_chot": bool(d.trang_thai == "da_tra" and d.han_chot and d.han_chot < now),
               "giu_lai": max(0, o["da_tra"] - int(d.so_hoan)) if d.trang_thai == "da_huy" else None,
-              "khuyen_mai": khuyen_mai(db, d), "km_but_toan": d.km_but_toan})
+              "khuyen_mai": khuyen_mai(db, d), "km_but_toan": d.km_but_toan, "de_nghi_chi": _dnc(db, d.payment_request_id)})
     return o
+
+
+def _dnc(db: Session, pid: int | None) -> dict | None:
+    """KS-16d — mã + trạng thái đề nghị chi trả NCC đã lập lúc chốt."""
+    if not pid:
+        return None
+    from app.models.ops import PaymentRequest
+    r = db.get(PaymentRequest, pid)
+    return {"id": r.id, "code": r.code, "status": r.status, "so_tien": int(r.amount or 0)} if r else None
 
 
 def ds_vtos(db: Session, u: User, loc: str = "", kid: int | None = None, now: datetime | None = None) -> dict:
@@ -923,7 +932,84 @@ def kt_chot(db: Session, u: User, did: int, hoa_hong: int | None, now: datetime 
     R.audit(db, u.username, u.role, "ks_vtd_chot", f"don_ks_vtd:{d.ma}",
             after={"hoa_hong": int(hoa_hong), "phai_tra_ks": d.phai_tra_ks, "khuyen_mai": km, "but_toan_km": d.km_but_toan})
     db.flush()
+    if d.phai_tra_ks > 0:                       # KS-16d: một đơn → một đề nghị chi trả khách sạn, TP Điều hành xác nhận
+        k = db.get(KhachSanVtd, d.khach_san_id)
+        d.payment_request_id = lap_de_nghi_chi_ncc(
+            db, u, k.supplier_id if k else None, k.ten if k else "Khách sạn", int(d.phai_tra_ks),
+            f"Trả khách sạn {k.ten if k else ''} — đơn {d.ma} ({d.vao:%d/%m}–{d.ra:%d/%m/%Y}), tiền thu hộ sau hoa hồng "
+            f"{_vnd(int(hoa_hong))} đ", f"Đơn {d.ma}" + (f" · mã xác nhận KS {d.ma_xac_nhan_ks}" if d.ma_xac_nhan_ks else "")).id
+        db.flush()
     return d
+
+
+def lap_de_nghi_chi_ncc(db: Session, u: User, supplier_id: int | None, ten_du_phong: str, so_tien: int, mo_ta: str,
+                        chung_tu: str):
+    """KS-16d — đề nghị chi loại «tra_ncc_thu_ho» (Nợ 3388 / Có 331 lúc duyệt) cho công ty mẹ; NCC lấy từ danh bạ."""
+    from app.models.core import Company
+    from app.models.suppliers import Supplier
+    from app.services import ops as O
+    s = db.get(Supplier, supplier_id) if supplier_id else None
+    try:
+        r = O.create_request(db, u, {"category": "tra_ncc_thu_ho", "_may_lap": True, **_ncc_vao(s, ten_du_phong), "amount": so_tien,
+                                     "description": mo_ta[:300], "has_document": True, "document_ref": chung_tu[:200]})
+    except ValueError as ex:
+        raise LoiDon(f"Chưa lập được đề nghị chi: {ex}", 409)
+    me = db.execute(select(Company).where(Company.kind == "me").order_by(Company.id)).scalars().first()
+    if me is not None:
+        r.company_id = me.id
+    _robot_buoc(db, r, s)
+    return r
+
+
+def _ncc_vao(s, ten_du_phong: str) -> dict:
+    ngh = " · ".join(x for x in (s.so_tai_khoan, s.ngan_hang, s.chu_tai_khoan) if x) if s is not None and s.so_tai_khoan else ""
+    return {"supplier_name": (s.ten if s else ten_du_phong)[:160], "supplier_tax_code": (s.ma_so_thue or "") if s else "",
+            "supplier_bank": ngh[:120]}
+
+
+def _robot_buoc(db: Session, r, s) -> None:
+    """KS-16d — robot kế toán (Chủ tịch 31/10/2026): xác nhận thay bộ phận + kiểm thay Kế toán. Đủ NCC (đã gắn, có MST,
+    có số tài khoản) → chuyển TGĐ / Chủ tịch duyệt. Thiếu → DỪNG ở bước kiểm, ghi lý do để người bổ sung."""
+    if r.status == "cho_tp":
+        r.status, r.tp_by = "cho_kt", "robot"
+    if r.status != "cho_kt":
+        return
+    thieu = ([] if s is not None else ["chưa gắn nhà cung cấp cho khách sạn / nhà hàng"]) + \
+            ([x for x, co in (("thiếu MST", s.ma_so_thue), ("thiếu số tài khoản", s.so_tai_khoan)) if not (co or "").strip()]
+             if s is not None else [])
+    if thieu:
+        r.robot_ghi_chu = ("Robot dừng: " + "; ".join(thieu) + " — bổ sung ở Nhà cung cấp rồi bấm «Robot kiểm lại»")[:300]
+        R.audit(db, "robot", "robot", "de_nghi_chi_robot_dung", f"dc:{r.code}", after={"thieu": thieu})
+    else:
+        for k, v in _ncc_vao(s, r.supplier_name).items():
+            setattr(r, k, v)
+        r.status, r.kt_by, r.robot_ghi_chu = "cho_duyet", "robot", ""
+        R.audit(db, "robot", "robot", "de_nghi_chi_robot_kiem", f"dc:{r.code}", after={"ncc": s.code, "so_tien": float(r.amount)})
+    db.flush()
+
+
+def robot_kiem_de_nghi(db: Session, u: User, r) -> str:
+    """Nút «Robot kiểm lại»: đọc lại NCC từ khách sạn / nhà hàng của đơn gốc rồi chạy lại bước robot."""
+    from app.models.dat_ban import DonDatBan
+    from app.models.nha_hang import NhaHang
+    from app.models.suppliers import Supplier
+    if r.category != "tra_ncc_thu_ho" or r.status not in ("cho_tp", "cho_kt"):
+        raise LoiDon("Chỉ chạy lại robot cho đề nghị trả NCC tiền thu hộ đang chờ kiểm", 409)
+    sid = None
+    d = db.execute(select(DonKsVtd).where(DonKsVtd.payment_request_id == r.id)).scalars().first()
+    if d is not None:
+        k = db.get(KhachSanVtd, d.khach_san_id)
+        sid = k.supplier_id if k else None
+    else:
+        b = db.execute(select(DonDatBan).where(DonDatBan.payment_request_id == r.id)).scalars().first()
+        if b is None:
+            raise LoiDon("Không tìm thấy đơn gốc của đề nghị chi", 404)
+        nh = db.get(NhaHang, b.nha_hang_id)
+        sid = nh.supplier_id if nh else None
+    _robot_buoc(db, r, db.get(Supplier, sid) if sid else None)
+    R.audit(db, u.username, u.role, "de_nghi_chi_robot_kiem_lai", f"dc:{r.code}", after={"trang_thai": r.status})
+    db.commit()
+    return (f"{r.code}: robot đã kiểm — chuyển TGĐ / Chủ tịch duyệt" if r.status == "cho_duyet" else f"{r.code}: {r.robot_ghi_chu}")
 
 
 def hang_ke_toan(db: Session, u: User, now: datetime | None = None) -> dict:
@@ -947,12 +1033,14 @@ def hang_ke_toan(db: Session, u: User, now: datetime | None = None) -> dict:
     for d in db.execute(select(DonKsVtd).where(DonKsVtd.phai_tra_ks.is_not(None))).scalars():
         k = db.get(KhachSanVtd, d.khach_san_id)
         o = phai_tra.setdefault(d.khach_san_id, {"khach_san": k.ten if k else "", "ma": k.ma if k else "", "so_don": 0,
-                                                 "giu_lai": 0, "hoa_hong": 0, "phai_tra": 0, "khuyen_mai": 0})
+                                                 "giu_lai": 0, "hoa_hong": 0, "phai_tra": 0, "khuyen_mai": 0, "de_nghi_chi": []})
         o["so_don"] += 1
         o["giu_lai"] += int(d.hoa_hong) + int(d.phai_tra_ks)
         o["hoa_hong"] += int(d.hoa_hong)
         o["phai_tra"] += int(d.phai_tra_ks)
         o["khuyen_mai"] += khuyen_mai(db, d) if d.km_but_toan else 0
+        if d.payment_request_id:
+            o["de_nghi_chi"].append({"don": d.ma, **_dnc(db, d.payment_request_id)})
     return {"tien_cho": [{**_tt_out(t), "don_id": t.don_id, "ma": don_tt[t.don_id].ma if t.don_id in don_tt else ""} for t in tt_cho],
             "giao_dich_cho": giao_dich_cho(db, u, now) if u.role in VAI_KE_TOAN + ("chutich", "tgd", "bks", "robot_ks") else [],
             "hoan": [ra_vtos(db, d, now) for d in hoan], "thieu": [ra_vtos(db, d, now) for d in thieu],

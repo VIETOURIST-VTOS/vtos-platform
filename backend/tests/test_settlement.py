@@ -61,6 +61,7 @@ def pay_request(cat, tid, ncc, mst, amount, desc):
     r = client.post("/api/v1/payment-requests", json={"category": cat, "tour_id": tid, "supplier_name": ncc, "supplier_tax_code": mst, "amount": amount, "description": desc, "has_document": True, "has_invoice": cat != "tam_ung"}, headers=login("dh.lan"))
     assert r.status_code == 201, r.text
     rid = r.json()["request"]["id"]
+    _gan_unc(r.json()["request"]["code"])
     for a, w in (("confirm", "tp.dieuhanh"), ("check", "ketoan"), ("approve", "tgd"), ("pay", "ketoan")):
         x = client.post(f"/api/v1/payment-requests/{rid}/step", json={"action": a, "reason": "CK 123" if a == "pay" else ""}, headers=login(w)); assert x.status_code == 200, x.text
     return rid
@@ -126,3 +127,12 @@ def test_match_paid_close_return_and_advance_posting():
     # hoàn ứng 141 → 154; phần chưa có lệnh chi (85.275.000 − 54.000.000 − 1.000.000) trích 335; kết chuyển 632
     assert ("154", 1000000, 0) in pairs and ("141", 0, 1000000) in pairs and ("335", 0, 30275000) in pairs and ("632", 85275000, 0) in pairs
     assert client.get("/api/v1/audit", headers=login("bks")).json()["chain_ok"] is True
+
+
+def _gan_unc(ma):
+    """KS-16d (31/10/2026): «Đã chi» cần tệp UNC / phiếu chi gắn với đề nghị chi."""
+    from app.db.session import SessionLocal
+    from app.models.attachments import Attachment
+    s = SessionLocal()
+    s.add(Attachment(doi_tuong="de_nghi_chi", doi_tuong_id=ma, loai="unc", ten_tep="unc.pdf", checksum="unc-" + ma, khoa_luu="unc/" + ma))
+    s.commit(); s.close()

@@ -13,8 +13,9 @@ import { Tag, errMsg } from "@/components/ui";
  *    · gỡ tệp phải ghi lý do, và bản ghi vẫn còn để đối chiếu;
  *    · giới hạn dung lượng nói bằng số trước khi người ta chọn nhầm tệp 40 MB. */
 export default function DinhKem({ doiTuong, doiTuongId, tieuDe = "Tệp & hình ảnh đính kèm", loai = "chung_tu",
-                                  goi = "", chiXem = false }:
-  { doiTuong: string; doiTuongId: string | number; tieuDe?: string; loai?: string; goi?: string; chiXem?: boolean }) {
+                                  goi = "", chiXem = false, onDoi }:
+  { doiTuong: string; doiTuongId: string | number; tieuDe?: string; loai?: string; goi?: string; chiXem?: boolean;
+    onDoi?: () => void }) {
   const [ds, setDs] = useState<any[]>([]);
   const [cf, setCf] = useState<any>(null);
   const [dang, setDang] = useState(false);
@@ -44,7 +45,7 @@ export default function DinhKem({ doiTuong, doiTuongId, tieuDe = "Tệp & hình 
         headers: { Authorization: `Bearer ${getToken() || ""}` } });
       const d = await r.json();
       if (!r.ok) throw { status: r.status, message: d?.detail || "Không tải được tệp" };
-      setMsg(d.message); await load();
+      setMsg(d.message); await load(); onDoi?.();   // KS-16d: màn gọi làm mới (vd. UNC vừa tải → mở nút «Đã chi»)
     } catch (e) { setMsg(errMsg(e)); } finally { setDang(false); if (inp.current) inp.current.value = ""; }
   };
 
@@ -53,7 +54,7 @@ export default function DinhKem({ doiTuong, doiTuongId, tieuDe = "Tệp & hình 
       "Tệp không bị xóa – bản ghi vẫn còn kèm lý do để sau này đối chiếu.");
     if (!ly_do || !ly_do.trim()) return;
     try { const d = await api<any>(`/tep/${a.id}/thu-hoi`, { method: "POST", json: { ly_do } });
-          setMsg(d.message); await load(); }
+          setMsg(d.message); await load(); onDoi?.(); }
     catch (e) { setMsg(errMsg(e)); }
   };
 

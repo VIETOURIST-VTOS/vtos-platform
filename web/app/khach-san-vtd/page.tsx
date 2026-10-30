@@ -15,6 +15,7 @@ import DanhGiaKsNoiBo from "@/components/khach-san-vtd/DanhGiaKsNoiBo";
  *  chốt đơn đã trả với khách sạn hoặc báo hết phòng (tab «Đơn đặt phòng»); Sales xác nhận hoàn, Kế toán ghi sổ thu hộ,
  *  đối soát thẻ, hoàn tiền, chốt hoa hồng (tab «Tiền & hoàn»). */
 const tien = (n?: number | null) => (n || n === 0 ? Math.round(n).toLocaleString("vi-VN") : "");
+const TT_DN: Record<string, string> = { cho_tp: "chờ robot", cho_kt: "robot dừng — bổ sung NCC", cho_duyet: "chờ TGĐ / CT duyệt", cho_chi: "lệnh chi chờ", da_chi: "đã chi", tu_choi: "từ chối" };   // KS-16d
 const KS0 = { ten: "", tinh_thanh: "", khu_vuc: "", dia_chi: "", sao: 0, loai: "khach_san", km_trung_tam: "", gan: "", noi_bat: "", mo_ta: "",
   tien_ich: [] as string[], gio_nhan: "14:00", gio_tra: "12:00", cs_tre_em: "", cs_giuong_phu: "", cs_vat_nuoi: "", cs_khac: "", thue_phi_pt: 0,
   lien_he_noi_bo: "", ghi_chu_noi_bo: "" };
@@ -462,10 +463,11 @@ function TienHoan({ toast }: { toast: (m: string, l?: boolean) => void }) {
             {o[`hh${d.id}`] ? <span className="muted">→ trả khách sạn ₫ {tien(giu - Number(o[`hh${d.id}`]))}</span> : null}</span> : <span className="muted">Kế toán chốt</span>}</td></tr>; })}
           {!x.cho_chot.length && <tr><td colSpan={6} className="muted">Không có đơn chờ chốt.</td></tr>}</tbody></table></div>
       <h3>Phải trả từng khách sạn (đã chốt)</h3>
-      <div style={{ overflowX: "auto" }}><table><thead><tr><th>Khách sạn</th><th>Số đơn</th><th>Tiền giữ lại</th><th>Voucher VTD chịu</th><th>Hoa hồng VTD</th><th>Phải trả khách sạn</th></tr></thead>
-        <tbody>{x.phai_tra_ks.map((k: any) => <tr key={k.ma}><td><b>{k.khach_san}</b><div className="muted">{k.ma}</div></td><td>{k.so_don}</td><td>₫ {tien(k.giu_lai)}</td><td>₫ {tien(k.khuyen_mai || 0)}</td><td>₫ {tien(k.hoa_hong)}</td><td><b>₫ {tien(k.phai_tra)}</b></td></tr>)}
-          {!x.phai_tra_ks.length && <tr><td colSpan={6} className="muted">Chưa có đơn đã chốt.</td></tr>}</tbody></table></div>
-      <p className="muted" style={{ fontSize: 12 }}>Lập đề nghị chi NCC cho khoản «Phải trả khách sạn» ở màn Đề nghị chi như mọi khoản trả nhà cung cấp (Giám đốc duyệt chi).</p></section>
+      <div style={{ overflowX: "auto" }}><table><thead><tr><th>Khách sạn</th><th>Số đơn</th><th>Tiền giữ lại</th><th>Voucher VTD chịu</th><th>Hoa hồng VTD</th><th>Phải trả khách sạn</th><th>Đề nghị chi (mỗi đơn một)</th></tr></thead>
+        <tbody>{x.phai_tra_ks.map((k: any) => <tr key={k.ma}><td><b>{k.khach_san}</b><div className="muted">{k.ma}</div></td><td>{k.so_don}</td><td>₫ {tien(k.giu_lai)}</td><td>₫ {tien(k.khuyen_mai || 0)}</td><td>₫ {tien(k.hoa_hong)}</td><td><b>₫ {tien(k.phai_tra)}</b></td>
+          <td>{(k.de_nghi_chi || []).map((p: any) => <div key={p.id} style={{ fontSize: 12 }}><b>{p.code}</b> · {p.don} · ₫ {tien(p.so_tien)} · {TT_DN[p.status] || p.status}</div>)}{!(k.de_nghi_chi || []).length && <span className="muted">—</span>}</td></tr>)}
+          {!x.phai_tra_ks.length && <tr><td colSpan={7} className="muted">Chưa có đơn đã chốt.</td></tr>}</tbody></table></div>
+      <p className="muted" style={{ fontSize: 12 }}>Kế toán chốt → máy lập đề nghị chi; robot kế toán kiểm (thiếu NCC / MST / số tài khoản thì dừng) → TGĐ / Chủ tịch duyệt → Kế toán chuyển khoản, tải UNC, bấm Đã chi.</p></section>
   </div>;
 }
 export default function Page() { return <Shell><Trang /></Shell>; }

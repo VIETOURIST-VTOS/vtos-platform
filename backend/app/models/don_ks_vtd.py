@@ -96,6 +96,8 @@ class DonKsVtd(Base):
     voucher_id: Mapped[int | None] = mapped_column(Integer, nullable=True)   # voucher_rewards.id (khoá ngoại ở phía voucher)
     giam_voucher: Mapped[float] = mapped_column(TIEN, default=0)
     km_but_toan: Mapped[str] = mapped_column(String(30), default="")   # bút toán Nợ 641 / Có 3388 lúc chốt
+    # KS-16d (Chủ tịch 31/10/2026): Kế toán chốt → máy lập ngay MỘT đề nghị chi trả khách sạn (loại tra_ncc_thu_ho)
+    payment_request_id: Mapped[int | None] = mapped_column(ForeignKey("payment_requests.id"), nullable=True)
 
 
 class ThanhToanKsVtd(Base):

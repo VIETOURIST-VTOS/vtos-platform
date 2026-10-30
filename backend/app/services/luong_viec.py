@@ -199,6 +199,9 @@ NGUOI_XAC_NHAN_THEO_LOAI = {
     # Hoa hồng D06 đại lý / CTV – Chủ tịch chốt 26/10/2026: Kế toán lập từ kỳ đã chốt, GĐ KD xác nhận
     # nguồn bán, duyệt theo mốc như mọi loại chi khác.
     "hoa_hong":       ("gd_kd",),
+    # KS-16d (Chủ tịch 31/10/2026): trả khách sạn / nhà hàng tiền thu hộ — máy lập khi Kế toán chốt đơn,
+    # TP Điều hành xác nhận (bên chốt phòng / bàn với NCC), duyệt theo mốc như mọi loại chi khác.
+    "tra_ncc_thu_ho": ("robot",),   # KS-16d: robot kế toán xác nhận + kiểm
 }
 
 _DE_NGHI_CHI = (

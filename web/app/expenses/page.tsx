@@ -9,15 +9,16 @@ import { Tag, errMsg } from "@/components/ui";
 // là TGĐ / Chủ tịch như mọi loại khác. Bảng này phải khớp CATEGORY_CONFIRMER ở máy chủ – có hàng rào
 // canh (test_tx2), vì hai bảng khai tay thì sớm muộn cũng lệch và lúc lệch thì màn hình nói sai
 // tên người phụ trách.
-const CAT: Record<string, string> = { chi_tour: "Chi phí tour", marketing: "Marketing", hanh_chinh: "Hành chính", hoan_tien: "Hoàn tiền khách", tam_ung: "Tạm ứng HDV/NCC trước tour", sua_chua_xe: "Sửa chữa xe", tam_ung_tai_xe: "Tạm ứng tài xế", hoa_hong: "Hoa hồng đối tác (D06)" };
+const CAT: Record<string, string> = { chi_tour: "Chi phí tour", marketing: "Marketing", hanh_chinh: "Hành chính", hoan_tien: "Hoàn tiền khách", tam_ung: "Tạm ứng HDV/NCC trước tour", sua_chua_xe: "Sửa chữa xe", tam_ung_tai_xe: "Tạm ứng tài xế", hoa_hong: "Hoa hồng đối tác (D06)" , tra_ncc_thu_ho: "Trả NCC tiền thu hộ (khách sạn / nhà hàng)" };
 const ST: Record<string, [string, string]> = { cho_tp: ["Chờ bộ phận", "warn"], cho_kt: ["Chờ Kế toán", "warn"], cho_duyet: ["Chờ duyệt", "warn"], cho_chi: ["Lệnh chi chờ", "navy"], da_chi: ["Đã chi", "ok"], tu_choi: ["Từ chối", "red"] };
-const CONFIRMER: Record<string, string[]> = { chi_tour: ["tp_dh", "tgd"], marketing: ["ptgd_mkt", "tgd"], hanh_chinh: ["hcns", "tgd"], hoan_tien: ["gd_kd", "tp_dh", "tgd"], tam_ung: ["tp_dh", "tgd"], sua_chua_xe: ["gd_doi_xe", "tgd"], tam_ung_tai_xe: ["gd_doi_xe", "tgd"], hoa_hong: ["gd_kd", "tgd"] };
+const CONFIRMER: Record<string, string[]> = { chi_tour: ["tp_dh", "tgd"], marketing: ["ptgd_mkt", "tgd"], hanh_chinh: ["hcns", "tgd"], hoan_tien: ["gd_kd", "tp_dh", "tgd"], tam_ung: ["tp_dh", "tgd"], sua_chua_xe: ["gd_doi_xe", "tgd"], tam_ung_tai_xe: ["gd_doi_xe", "tgd"], hoa_hong: ["gd_kd", "tgd"] , tra_ncc_thu_ho: [] };
 
 function Expenses() {
   const { user, toast } = useShell();
   const role = user?.role || "";
   const [tab, setTab] = useState("requests");
   const [tepDN, setTepDN] = useState("");   // mã đề nghị chi đang mở chứng từ
+  const [tepUnc, setTepUnc] = useState(false);   // KS-16d: ô đang mở là ô tải UNC (Kế toán, lệnh chi chờ)
   const [filter, setFilter] = useState("cho_tp,cho_kt,cho_duyet,cho_chi");
   const [rows, setRows] = useState<any[]>([]);
   const [cf, setCf] = useState<any[]>([]);
@@ -71,7 +72,10 @@ function Expenses() {
     // "Xác nhận" chung chung làm người bấm tưởng mình chỉ đang xác nhận giấy tờ (Đợt F1b).
     if (r.status === "cho_tp" && CONFIRMER[r.category]?.includes(role))
       out.push([r.category === "marketing" ? "Duyệt nội dung" : "Xác nhận", "confirm", "teal"]);
-    if (r.status === "cho_kt" && role === "ketoan") out.push(["Kế toán kiểm tra", "check", "teal"]);
+    // KS-16d (Chủ tịch 31/10/2026): loại máy tự lập — robot kế toán làm bước xác nhận + kiểm; người chỉ bấm chạy lại robot.
+    if (r.may_lap && ["cho_tp", "cho_kt"].includes(r.status) && ["ketoan", "tp_dh", "nv_dh", "tgd", "chutich"].includes(role))
+      out.push(["Robot kiểm lại", "robot", "teal"]);
+    if (r.status === "cho_kt" && role === "ketoan" && !r.may_lap) out.push(["Kế toán kiểm tra", "check", "teal"]);
     // ĐỢT F1 — màn hình ĐỌC cấp duyệt từ máy chủ (`vai_ky_duoc`), KHÔNG tự suy.
     // Dòng cũ ở đây viết `role === "tgd" || (role === "chutich" && r.two_signatures)` — đúng cái
     // cờ sai mà F1 sửa ở máy chủ, nên để nguyên là màn hình sai cả hai đầu: TGĐ thấy nút trên
@@ -88,7 +92,8 @@ function Expenses() {
     // máy chủ chặn người lập tự ký ở đúng chỗ của nó.
     if (r.status === "cho_duyet" && (r.vai_ky_duoc || []).includes(role))
       out.push([role === "tgd" ? "TGĐ ký lệnh chi" : "Chủ tịch ký lệnh chi", "approve", ""]);
-    if (r.status === "cho_chi" && role === "ketoan") out.push(["Đã chi (nhập mã GD)", "pay", "orange"]);
+    // KS-16d: CK xong → Kế toán tải UNC → mới bấm «Đã chi» (máy chủ chặn nếu chưa có UNC, mọi loại chi).
+    if (r.status === "cho_chi" && role === "ketoan") { out.push(["Tải UNC", "unc", "grey"]); out.push(["Đã chi (nhập mã GD)", "pay", "orange"]); }
     if (!["da_chi", "tu_choi"].includes(r.status) && ["tgd", "chutich", "ketoan", "tp_dh", "ptgd_mkt"].includes(role)) out.push(["Từ chối", "reject", "grey"]);
     return out;
   };
@@ -104,7 +109,7 @@ function Expenses() {
             hồ sơ Marketing dừng ở một chữ ký của ông ấy, nên hồ sơ do chính ông ấy lập thì không
             còn ai ký được ngoài chính mình. Bỏ hẳn lựa chọn khỏi ô chọn loại thay vì để người ta
             điền xong cả biểu mẫu rồi mới bị máy chủ từ chối. */}
-        <label>Loại<select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>{Object.entries(CAT).filter(([k]) => !(k === "marketing" && role === "ptgd_mkt")).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+        <label>Loại<select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>{Object.entries(CAT).filter(([k]) => k !== "tra_ncc_thu_ho" && !(k === "marketing" && role === "ptgd_mkt")).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
         <label>Tour (bắt buộc với chi tour/hoàn tiền)<select value={f.tour_id} onChange={(e) => setF({ ...f, tour_id: e.target.value })}><option value="">–</option>{tours.map((t) => <option key={t.id} value={t.id}>{t.code} · {t.name}</option>)}</select></label>
         <label>NCC / người thụ hưởng<input value={f.supplier_name} onChange={(e) => setF({ ...f, supplier_name: e.target.value })} /></label>
         <label>MST NCC<input value={f.supplier_tax_code} onChange={(e) => setF({ ...f, supplier_tax_code: e.target.value })} /></label>
@@ -145,11 +150,15 @@ function Expenses() {
         <tbody>{rows.length ? rows.map((r) => <tr key={r.id}><td><b>{r.code}</b><div className="muted">{fmtDT(r.created_at)}</div></td><td>{CAT[r.category]}<div className="muted">{r.tour_code}</div></td><td>{r.supplier_name}<div className="muted">{r.supplier_tax_code || <Tag cls="warn">chưa MST</Tag>}</div></td><td style={{ textAlign: "right" }}><b>{vnd(r.amount)}</b>{r.ngoai_te_loi_nhan && <div className="muted">{r.ngoai_te_loi_nhan}</div>}</td><td>{r.description}<div className="muted">{r.document_ref || <Tag cls="warn">thiếu chứng từ</Tag>}{!r.has_invoice && !["hoan_tien", "tam_ung", "tam_ung_tai_xe"].includes(r.category) && <Tag cls="warn">không HĐ</Tag>}</div></td>
           <td>{r.ngay_den_han ? <b>{String(r.ngay_den_han).slice(0, 10).split("-").reverse().join("/")}</b> : <Tag cls="warn">Chưa có hạn</Tag>}
             <div className="muted">{r.ngay_den_han_boi ? `${r.ngay_den_han_boi} gõ` : ""}{!["da_chi", "tu_choi"].includes(r.status) && <> <button className="act grey" style={{ margin: 0, padding: "1px 6px", fontSize: 11 }} onClick={() => datNgay(r)}>{r.ngay_den_han ? "Sửa" : "Gõ hạn"}</button></>}</div></td>
-          <td>{r.over_budget && <Tag cls="red">Ngoài dự toán</Tag>}{r.two_signatures && <Tag cls="navy">2 chữ ký</Tag>}</td><td><Tag cls={ST[r.status]?.[1]}>{ST[r.status]?.[0]}</Tag><div className="muted">{r.next}{r.two_signatures && r.status === "cho_duyet" && ` (CT ${r.signed_chutich ? "✔" : "…"} · TGĐ ${r.signed_tgd ? "✔" : "…"})`}{r.reject_reason && ` – ${r.reject_reason}`}{r.paid_ref && ` – ${r.paid_ref}`}</div></td>
+          <td>{r.over_budget && <Tag cls="red">Ngoài dự toán</Tag>}{r.two_signatures && <Tag cls="navy">2 chữ ký</Tag>}</td><td><Tag cls={ST[r.status]?.[1]}>{ST[r.status]?.[0]}</Tag><div className="muted">{r.next}{r.two_signatures && r.status === "cho_duyet" && ` (CT ${r.signed_chutich ? "✔" : "…"} · TGĐ ${r.signed_tgd ? "✔" : "…"})`}{r.reject_reason && ` – ${r.reject_reason}`}{r.paid_ref && ` – ${r.paid_ref}`}</div>
+            {r.robot_ghi_chu && <div style={{ fontSize: 12, color: "#9a5b00" }}>{r.robot_ghi_chu}</div>}
+            {r.status === "cho_chi" && !r.co_unc && <div style={{ fontSize: 12 }}><Tag cls="warn">Chưa có UNC</Tag> CK xong tải UNC rồi bấm «Đã chi»</div>}</td>
           <td className="muted">{r.created_by}{r.tp_by && ` → ${r.tp_by}`}{r.kt_by && ` → ${r.kt_by}`}{r.approved_by && ` → ${r.approved_by}`}</td>
-          <td>{actions(r).map(([l, a, c]) => <button key={a} className={"act " + c} style={{ margin: "0 4px 4px 0" }} onClick={() => { let reason = ""; if (a === "reject") { reason = prompt("Lý do từ chối (bắt buộc):") || ""; if (!reason) return; } if (a === "pay") { reason = prompt("Mã giao dịch ngân hàng (hoặc 'TM' nếu tiền mặt):") || ""; } step(r, a, reason); }}>{l}</button>)}
-            {" "}<button className="act grey" style={{ margin: "0 4px 4px 0" }} title="Chứng từ kèm theo" onClick={() => setTepDN(r.code)}>Chứng từ</button></td></tr>) : <tr><td colSpan={10} className="muted">Không có đề nghị chi.</td></tr>}</tbody></table></div>
-      {tepDN && <DinhKem doiTuong="de_nghi_chi" doiTuongId={tepDN} tieuDe={`Chứng từ của đề nghị chi ${tepDN}`}
+          <td>{actions(r).map(([l, a, c]) => <button key={a} className={"act " + c} style={{ margin: "0 4px 4px 0" }} disabled={a === "pay" && !r.co_unc} title={a === "pay" && !r.co_unc ? "Tải UNC trước" : ""} onClick={() => { if (a === "unc") { setTepUnc(true); setTepDN(r.code); return; } if (a === "robot") { post(`/payment-requests/${r.id}/robot-kiem`); return; } let reason = ""; if (a === "reject") { reason = prompt("Lý do từ chối (bắt buộc):") || ""; if (!reason) return; } if (a === "pay") { reason = prompt("Mã giao dịch ngân hàng (hoặc 'TM' nếu tiền mặt):") || ""; } step(r, a, reason); }}>{l}</button>)}
+            {" "}<button className="act grey" style={{ margin: "0 4px 4px 0" }} title="Chứng từ kèm theo" onClick={() => { setTepUnc(false); setTepDN(r.code); }}>Chứng từ</button></td></tr>) : <tr><td colSpan={10} className="muted">Không có đề nghị chi.</td></tr>}</tbody></table></div>
+      {tepDN && tepUnc && <DinhKem key={`unc-${tepDN}`} doiTuong="de_nghi_chi" doiTuongId={tepDN} loai="unc" tieuDe={`Tải UNC / phiếu chi của ${tepDN}`}
+        goi="Chuyển khoản xong trên ngân hàng → tải ủy nhiệm chi (UNC) hoặc phiếu chi tiền mặt lên đây → nút «Đã chi» mở." onDoi={load} />}
+      {tepDN && !tepUnc && <DinhKem key={`ct-${tepDN}`} doiTuong="de_nghi_chi" doiTuongId={tepDN} tieuDe={`Chứng từ của đề nghị chi ${tepDN}`}
         goi={"Hóa đơn, hợp đồng, báo giá, ủy nhiệm chi. Người duyệt nhìn thấy đúng chứng từ mình đang " +
              "duyệt thay vì tin vào một dòng mô tả."} />}
     </>}
