@@ -409,7 +409,8 @@ def tai_anh(db: Session, u: User, kid: int, ten_tep: str, data: bytes, d: dict, 
     x = AnhKhachSanVtd(khach_san_id=k.id, loai_phong_id=lid, attachment_id=a.id, hien_id=ah.id, nho_id=an.id,
                        rong=rong, cao=cao, nhom=nhom, chu_thich=str(d.get("chu_thich") or "").strip()[:200],
                        nguon=str(d.get("nguon") or "").strip()[:200], thu_tu=max([y.thu_tu for y in ds], default=0) + 1,
-                       la_bia=False, trang_thai="nhap", tai_boi=u.username, tai_luc=now or datetime.now())
+                       la_bia=False, trang_thai="da_duyet", tai_boi=u.username, tai_luc=now or datetime.now(),
+                       duyet_boi="tu_dong", duyet_luc=now or datetime.now())   # KS-16c: bỏ duyệt ảnh — tải là hiện
     db.add(x)
     db.commit()
     db.refresh(x)
@@ -439,10 +440,7 @@ def sua_anh(db: Session, u: User, pid: int, d: dict) -> AnhKhachSanVtd:
                 raise LoiKhachSan("Loại phòng không thuộc khách sạn này")
         x.loai_phong_id = lid
     if "chu_thich" in d:
-        moi = str(d["chu_thich"] or "").strip()[:200]
-        if moi != x.chu_thich and x.trang_thai == "da_duyet":
-            x.trang_thai, x.duyet_boi, x.duyet_luc = "cho_duyet", "", None   # chữ ra trước khách: duyệt lại
-        x.chu_thich = moi
+        x.chu_thich = str(d["chu_thich"] or "").strip()[:200]           # KS-16c: không còn duyệt lại
     if "thu_tu" in d:
         x.thu_tu = int(d["thu_tu"] or 0)
     if d.get("la_bia"):
@@ -487,11 +485,25 @@ def duyet_anh(db: Session, u: User, ids: list[int], dong_y: bool, ly_do: str = "
 def an_anh(db: Session, u: User, pid: int, an: bool) -> AnhKhachSanVtd:
     _quyen(u, VAI_NHAP, "Chỉ Điều hành ẩn ảnh")
     x = _lay_anh(db, pid)
-    x.trang_thai = "an" if an else "nhap"
+    x.trang_thai = "an" if an else "da_duyet"
     if an:
         x.la_bia = False
     db.commit()
     return x
+
+
+def xoa_anh(db: Session, u: User, pid: int) -> int:
+    """KS-16c (Chủ tịch 31/10/2026): bỏ duyệt ảnh — ai tải người đó tự xóa; TP Điều hành (và Chủ tịch, TGĐ) xóa mọi
+    ảnh. Xóa khỏi album, tệp vẫn trong kho chứng từ."""
+    x = _lay_anh(db, pid)
+    if x.tai_boi != u.username and not _co(u, VAI_DUYET):
+        raise LoiKhachSan("Chỉ người tải ảnh hoặc TP Điều hành xóa ảnh này", 403)
+    kid = x.khach_san_id
+    from app.services import rules as R
+    R.audit(db, u.username, u.role, "ks_vtd_xoa_anh", f"khach_san_vtd:{kid}", before={"anh": x.id, "tai_boi": x.tai_boi})
+    db.delete(x)
+    db.commit()
+    return kid
 
 
 def tep_anh(db: Session, u: User | None, pid: int, co: str):

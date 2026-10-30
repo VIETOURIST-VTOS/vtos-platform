@@ -878,7 +878,7 @@ def album(db: Session, u: User, nid: int) -> dict:
     return {"nha_hang": {"id": nh.id, "ten": nh.ten, "ma": nh.ma}, "anh": [_anh_out(x, goc.get(x.attachment_id)) for x in ds],
             "dem": dem, "tong": len(ds), "toi_da": ANH_TOI_DA_SO, "toi_da_mb": ANH_TOI_DA_MB,
             "nhom_anh": NHOM_ANH, "can_cu_anh": CAN_CU_ANH, "duoc_duyet": _co(u, VAI_DUYET_ANH),
-            "duoc_tai": _co(u, VAI_ANH_NH)}
+            "duoc_tai": _co(u, VAI_ANH_NH), "toi": u.username}
 
 
 def _kiem_can_cu(can_cu: str, nhom: str) -> None:
@@ -964,7 +964,8 @@ def tai_anh_album(db: Session, u: User, nid: int, ten_tep: str, kieu: str, data:
                    chu_thich=(d.get("chu_thich") or "").strip()[:200], mo_ta_thay_the="",
                    thu_tu=(max([y.thu_tu for y in ds], default=0) + 1), la_bia=False, can_cu=can_cu,
                    can_cu_ghi_chu=(d.get("can_cu_ghi_chu") or "").strip()[:300], credit=(d.get("credit") or "").strip()[:160],
-                   trang_thai="nhap", tai_boi=u.username, tai_luc=now)
+                   trang_thai="da_duyet", tai_boi=u.username, tai_luc=now,
+                   duyet_boi="tu_dong", duyet_luc=now)              # KS-16c (Chủ tịch 31/10/2026): bỏ duyệt ảnh — tải là hiện
     db.add(x)
     db.commit(); db.refresh(x)
     return x, True
@@ -990,7 +991,7 @@ def sua_anh(db: Session, u: User, pid: int, d: dict, now: datetime | None = None
     _kiem_can_cu(moi["can_cu"], moi["nhom"])
     if not moi["nhom"] and x.nhom:
         raise LoiNhaHang("Chọn nhóm ảnh")
-    duyet_lai = x.trang_thai == "da_duyet" and any(getattr(x, k) != moi[k] for k in TRUONG_ANH_DUYET_LAI)
+    duyet_lai = False                                    # KS-16c: không còn duyệt lại khi sửa
     for k, v in moi.items():
         setattr(x, k, v)
     if duyet_lai:
@@ -1014,7 +1015,8 @@ def thay_anh(db: Session, u: User, pid: int, ten_tep: str, kieu: str, data: byte
     nh = db.get(NhaHang, x.nha_hang_id)
     a, ah, an, rong, cao = _luu_tep(db, u, nh, ten_tep, duoi, data, x.can_cu)
     x.attachment_id, x.hien_id, x.nho_id, x.rong, x.cao = a.id, ah.id, an.id, rong, cao
-    x.trang_thai, x.duyet_boi, x.duyet_luc, x.ly_do_tra_lai = "nhap", "", None, ""
+    if x.trang_thai != "an":                             # KS-16c: thay tệp là hiện luôn
+        x.trang_thai, x.duyet_boi, x.duyet_luc, x.ly_do_tra_lai = "da_duyet", "tu_dong", now or datetime.now(), ""
     x.sua_boi, x.sua_luc = u.username, now or datetime.now()
     db.commit(); db.refresh(x)
     return x
@@ -1080,10 +1082,27 @@ def an_anh(db: Session, u: User, pid: int, an: bool, now: datetime | None = None
     if an:
         x.trang_thai, x.la_bia = "an", False
     elif x.trang_thai == "an":
-        x.trang_thai, x.duyet_boi, x.duyet_luc = "nhap", "", None
+        x.trang_thai, x.duyet_boi, x.duyet_luc = "da_duyet", "tu_dong", now or datetime.now()   # KS-16c
     x.sua_boi, x.sua_luc = u.username, now or datetime.now()
     db.commit(); db.refresh(x)
     return x
+
+
+def xoa_anh(db: Session, u: User, pid: int) -> int:
+    """KS-16c (Chủ tịch 31/10/2026): ai tải ảnh người đó tự xóa; TP Điều hành (và Chủ tịch, TGĐ) xóa mọi ảnh.
+    Món đang dùng ảnh này thì bỏ gắn ảnh. Tệp vẫn trong kho chứng từ."""
+    from app.models.nha_hang import MonNhaHang
+    from app.services import rules as R
+    x = _lay_anh(db, pid)
+    if x.tai_boi != u.username and not _co(u, VAI_DUYET_ANH):
+        raise LoiNhaHang("Chỉ người tải ảnh hoặc TP Điều hành xóa ảnh này")
+    nid = x.nha_hang_id
+    for m in db.execute(select(MonNhaHang).where(MonNhaHang.anh_id == x.id)).scalars().all():
+        m.anh_id = None
+    R.audit(db, u.username, u.role, "nha_hang_xoa_anh", f"nha_hang:{nid}", before={"anh": x.id, "tai_boi": x.tai_boi})
+    db.delete(x)
+    db.commit()
+    return nid
 
 
 def dat_bia(db: Session, u: User, pid: int) -> AnhNhaHang:

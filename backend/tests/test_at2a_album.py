@@ -38,13 +38,11 @@ def _nh(s, ten="Phở Hòa", hien=True):
 
 
 def anh_da_duyet(s, nid: int, so: int, credit: str = "", nhom: str = "khong_gian") -> int:
-    """Tải (NV ĐH) + gửi duyệt + TP ĐH duyệt một ảnh; trả id ảnh album."""
+    """Tải (NV ĐH) một ảnh — KS-16c (Chủ tịch 31/10/2026): bỏ duyệt ảnh, tải là hiện; trả id ảnh album."""
     from app.services import nha_hang as N
     x, _m = N.tai_anh_album(s, _u(s, "dh"), nid, f"a{so}.jpg", "image/jpeg", anh(so),
                             {"nhom": nhom, "can_cu": "vtd_chup", "credit": credit, "chu_thich": f"Ảnh {so}"})
-    N.gui_duyet(s, _u(s, "dh"), nid)
-    r = N.duyet_anh(s, _u(s, "tp"), [x.id], True)
-    assert r["da_doi"] == 1, r
+    assert x.trang_thai == "da_duyet" and x.duyet_boi == "tu_dong"
     return x.id
 
 
@@ -65,7 +63,7 @@ def test_tai_gioi_han_va_chong_trung(db):
     with pytest.raises(N.LoiNhaHang, match="không mở được"):
         N.tai_anh_album(db, _u(db, "dh"), nh.id, "a.jpg", "image/jpeg", b"khong phai anh", d)
     x, moi = N.tai_anh_album(db, _u(db, "mkt"), nh.id, "a.jpg", "image/jpeg", anh(1), d)
-    assert moi and x.trang_thai == "nhap" and x.tai_boi == "mkt"
+    assert moi and x.trang_thai == "da_duyet" and x.tai_boi == "mkt"                     # KS-16c: tải là hiện
     y, moi2 = N.tai_anh_album(db, _u(db, "dh"), nh.id, "a-ban-sao.jpg", "image/jpeg", anh(1), d)
     assert not moi2 and y.id == x.id                                                      # cùng nội dung → không trùng
     monkey = N.ANH_TOI_DA_SO
@@ -94,32 +92,20 @@ def test_ban_hien_thi_nhe_giu_goc_bo_exif(db):
     assert len(h) < len(goc) and not ih.getexif()                                          # nhẹ hơn, không còn EXIF
 
 
-def test_duyet_hai_nguoi_va_can_cu(db):
+def test_bo_duyet_anh_nguoi_tai_tu_xoa(db):
+    """KS-16c (Chủ tịch 31/10/2026): bỏ duyệt ảnh — tải là hiện; người tải tự xóa, TP Điều hành xóa mọi ảnh."""
     from app.services import nha_hang as N
+    from app.models.nha_hang import AnhNhaHang
     nh = _nh(db)
-    tp = _u(db, "tp")
-    a, _ = N.tai_anh_album(db, tp, nh.id, "a.jpg", "image/jpeg", anh(1), {"nhom": "mat_tien", "can_cu": "vtd_chup"})
-    b, _ = N.tai_anh_album(db, _u(db, "dh"), nh.id, "b.jpg", "image/jpeg", anh(2), {"nhom": "mon_an", "can_cu": "chua_xac_minh"})
-    c, _ = N.tai_anh_album(db, _u(db, "dh"), nh.id, "c.jpg", "image/jpeg", anh(3), {"nhom": "mon_an", "can_cu": "nha_hang"})
-    r = N.duyet_anh(db, tp, [a.id], True)
-    assert r["da_doi"] == 0 and "chờ duyệt" in r["bo_qua"][0]["ly_do"]                     # còn Nháp
-    assert N.gui_duyet(db, _u(db, "dh"), nh.id) == 3
-    with pytest.raises(N.LoiNhaHang):
-        N.duyet_anh(db, _u(db, "dh"), [a.id], True)                                         # NV ĐH không duyệt
-    r = N.duyet_anh(db, tp, [a.id, b.id, c.id], True)
-    ly = {x["id"]: x["ly_do"] for x in r["bo_qua"]}
-    assert r["da_doi"] == 2 and list(ly) == [a.id] and "không tự duyệt" in ly[a.id]           # b (chưa xác minh), c duyệt được
-    r = N.duyet_anh(db, _u(db, "tp2"), [a.id], True)                                        # TP ĐH khác duyệt được
-    assert r["da_doi"] == 1
-    with pytest.raises(N.LoiNhaHang, match="lý do"):
-        N.duyet_anh(db, tp, [b.id], False)
-    N.duyet_anh(db, tp, [b.id], False, "Ảnh mờ")                                            # trả lại vẫn được
-    db.refresh(b)
-    assert b.trang_thai == "nhap" and b.ly_do_tra_lai == "Ảnh mờ"
-    x, _ = N.tai_anh_album(db, _u(db, "dh"), nh.id, "d.jpg", "image/jpeg", anh(4), {"nhom": "mon_an"})   # căn cứ không bắt buộc
-    assert x.can_cu == "chua_xac_minh"
-    cd = N.anh_cho_duyet(db, _u(db, "mkt"))
-    assert cd["anh"] == [] and cd["duoc_duyet"] is False
+    a, _ = N.tai_anh_album(db, _u(db, "dh"), nh.id, "a.jpg", "image/jpeg", anh(1), {"nhom": "mat_tien", "can_cu": "vtd_chup"})
+    b, _ = N.tai_anh_album(db, _u(db, "mkt"), nh.id, "b.jpg", "image/jpeg", anh(2), {"nhom": "mon_an"})
+    assert a.trang_thai == b.trang_thai == "da_duyet" and b.can_cu == "chua_xac_minh"
+    assert N.anh_cho_duyet(db, _u(db, "tp"))["anh"] == []
+    with pytest.raises(N.LoiNhaHang, match="người tải"):
+        N.xoa_anh(db, _u(db, "mkt"), a.id)                                                  # không phải người tải
+    N.xoa_anh(db, _u(db, "mkt"), b.id)                                                      # người tải tự xóa
+    N.xoa_anh(db, _u(db, "tp"), a.id)                                                       # TP ĐH xóa mọi ảnh
+    assert db.get(AnhNhaHang, a.id) is None and db.get(AnhNhaHang, b.id) is None
 
 
 def test_cong_chi_anh_da_duyet(db):
@@ -131,10 +117,9 @@ def test_cong_chi_anh_da_duyet(db):
     nh = _nh(db)
     p1 = anh_da_duyet(db, nh.id, 1, credit="Ảnh: Phở Hòa", nhom="mon_an")
     p2 = anh_da_duyet(db, nh.id, 2, nhom="mat_tien")
-    nhap, _ = N.tai_anh_album(db, _u(db, "dh"), nh.id, "n.jpg", "image/jpeg", anh(9), {"nhom": "khong_gian", "can_cu": "vtd_chup"})
     N.dat_bia(db, _u(db, "dh"), p2)
     o = N.mot_nha_hang_cong(db, nh.id)[1]
-    assert [x["id"] for x in o["album"]] == [p2, p1] and o["so_anh"] == 2                  # bìa trước, nháp không ra
+    assert [x["id"] for x in o["album"]] == [p2, p1] and o["so_anh"] == 2                  # bìa trước
     assert o["anh"] == f"/api/v1/am-thuc/anh/nh/{p2}/hien" and o["album"][1]["credit"] == "Ảnh: Phở Hòa"
     assert "album" not in N.danh_sach_cong(db)["nha_hang"][0]                              # danh sách chỉ ảnh bìa
     app.dependency_overrides[get_db] = lambda: db
@@ -144,16 +129,14 @@ def test_cong_chi_anh_da_duyet(db):
         assert c.get(f"/api/v1/am-thuc/anh/nh/{p1}/hien").status_code == 200
         assert c.get(f"/api/v1/am-thuc/anh/nh/{p1}/nho").headers["content-type"] == "image/webp"
         assert c.get(f"/api/v1/am-thuc/anh/nh/{p1}/goc").status_code == 404                # bản gốc không ra cổng
-        assert c.get(f"/api/v1/am-thuc/anh/nh/{nhap.id}/hien").status_code == 404           # nháp
-        # sửa chú thích ảnh đã duyệt → về Chờ duyệt, thôi hiện
+        # KS-16c: sửa chú thích không còn phải duyệt lại — ảnh vẫn hiện
         x = N.sua_anh(db, _u(db, "dh"), p1, {"chu_thich": "Bún chả"})
-        assert x.trang_thai == "cho_duyet"
-        assert c.get(f"/api/v1/am-thuc/anh/nh/{p1}/hien").status_code == 404
-        # đổi nhóm thì không phải duyệt lại
+        assert x.trang_thai == "da_duyet"
+        assert c.get(f"/api/v1/am-thuc/anh/nh/{p1}/hien").status_code == 200
         assert N.sua_anh(db, _u(db, "dh"), p2, {"nhom": "khong_gian"}).trang_thai == "da_duyet"
         N.an_anh(db, _u(db, "dh"), p2, True)
         assert c.get(f"/api/v1/am-thuc/anh/nh/{p2}/hien").status_code == 404                # ẩn
-        assert N.an_anh(db, _u(db, "dh"), p2, False).trang_thai == "nhap"
+        assert N.an_anh(db, _u(db, "dh"), p2, False).trang_thai == "da_duyet"            # bỏ ẩn là hiện lại
         p3 = anh_da_duyet(db, nh.id, 3)
         N.bat_hien(db, _u(db, "tp"), nh.id, False)
         assert c.get(f"/api/v1/am-thuc/anh/nh/{p3}/hien").status_code == 404                # nhà hàng tắt
@@ -172,7 +155,7 @@ def test_thay_anh_va_xep_thu_tu(db):
     from app.models.nha_hang import AnhNhaHang
     cu = db.get(AnhNhaHang, p1).attachment_id
     x = N.thay_anh(db, _u(db, "dh"), p1, "moi.jpg", "image/jpeg", anh(7))
-    assert x.id == p1 and x.trang_thai == "nhap" and x.attachment_id != cu and x.chu_thich == "Ảnh 1"
+    assert x.id == p1 and x.trang_thai == "da_duyet" and x.attachment_id != cu and x.chu_thich == "Ảnh 1"
     assert db.get(Attachment, cu) is not None and not db.get(Attachment, cu).thu_hoi           # tệp cũ vẫn trong kho
     with pytest.raises(N.LoiNhaHang, match="không khớp"):
         N.xep_anh(db, _u(db, "dh"), nh.id, [p2])
@@ -186,12 +169,11 @@ def test_hoan_thien_trong_danh_sach(db):
     _nh(db, "Bún Chả", hien=False)
     p = anh_da_duyet(db, nh.id, 1)
     N.tai_anh_album(db, _u(db, "dh"), nh.id, "b.jpg", "image/jpeg", anh(2), {"nhom": "mon_an", "can_cu": "vtd_chup"})
-    N.gui_duyet(db, _u(db, "dh"), nh.id)
     N.dat_bia(db, _u(db, "dh"), p)
     ds = {x["ten"]: x["anh_ht"] for x in N.danh_sach_vtos(db)["nha_hang"]}
     assert {k: ds["Phở Hòa"][k] for k in ("da_duyet", "cho_duyet", "nhap", "an", "co_bia")} == \
-        {"da_duyet": 1, "cho_duyet": 1, "nhap": 0, "an": 0, "co_bia": True}
-    assert ds["Bún Chả"]["da_duyet"] == 0 and N.danh_sach_vtos(db)["so_anh_cho_duyet"] == 1
+        {"da_duyet": 2, "cho_duyet": 0, "nhap": 0, "an": 0, "co_bia": True}                  # KS-16c: tải là hiện
+    assert ds["Bún Chả"]["da_duyet"] == 0 and N.danh_sach_vtos(db)["so_anh_cho_duyet"] == 0
 
 
 def test_chuyen_anh_don_cu_khong_tu_duyet(db):

@@ -6,7 +6,7 @@ import { Tag, errMsg } from "@/components/ui";
 /** AT-2a · ALBUM ẢNH NHÀ HÀNG (Chủ tịch + Điều hành chốt 29/10/2026).
  *  Chỉ ảnh của chính nhà hàng · 10 MB/ảnh · 60 ảnh/nhà hàng · máy tạo ảnh nhẹ, giữ bản gốc · 5 nhóm ảnh.
  *  Nguồn / căn cứ quyền dùng chỉ là ghi chú NỘI BỘ (Chủ tịch bỏ chặn 29/10/2026): không chặn duyệt, không ra cổng khách.
- *  Ảnh mới «Nháp» → «Gửi duyệt» → TP Điều hành duyệt (người tải / sửa không tự duyệt). */
+ *  KS-16c (Chủ tịch 31/10/2026): bỏ duyệt ảnh — tải là hiện; người tải tự xóa, TP Điều hành xóa mọi ảnh. */
 
 const MB = 1024 * 1024;
 const DUOI = ["jpg", "jpeg", "png", "webp"];
@@ -99,7 +99,7 @@ export default function AlbumNhaHang({ nid, toast, onDoi }: { nid: number; toast
       catch (e: any) { capNhat(d.k, { tt: "loi", loi: e.message || "Lỗi" }); }
     }
     setBusy(false);
-    if (so) { toast(`Đã tải ${so} ảnh (Nháp) — bấm «Gửi duyệt» khi xong lô`); load(); onDoi?.(); }
+    if (so) { toast(`Đã tải ${so} ảnh — đã hiện trên cổng`); load(); onDoi?.(); }
   };
   const goi = async (path: string, json: any, sau?: () => void) => {
     setBusy(true);
@@ -130,10 +130,9 @@ export default function AlbumNhaHang({ nid, toast, onDoi }: { nid: number; toast
         <div className="muted">Chọn ảnh bìa, sắp xếp và hoàn thiện từng ảnh. <b>{a.tong}</b> ảnh / {a.toi_da}</div></div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {a.duoc_tai && <button className="act grey" onClick={() => setMoTai(!moTai)}>{moTai ? "Đóng khung tải" : "⤒ Thêm ảnh"}</button>}
-        {a.duoc_tai && <button className="act teal" disabled={busy || !nhap.length} onClick={() => goi(`/nha-hang/${nid}/album/gui-duyet`, { ids: [] })}>Gửi duyệt{nhap.length ? ` ${nhap.length} ảnh nháp` : ""}</button>}
       </div></div>
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "6px 0" }}>
-      <Tag cls="ok">Đã duyệt {a.dem.da_duyet}</Tag><Tag cls="warn">Chờ duyệt {a.dem.cho_duyet}</Tag><Tag>Nháp {a.dem.nhap}</Tag><Tag cls="red">Ẩn {a.dem.an}</Tag></div>
+      <Tag cls="ok">Đang hiện {a.dem.da_duyet + a.dem.cho_duyet + a.dem.nhap}</Tag><Tag cls="red">Ẩn {a.dem.an}</Tag></div>
 
     {a.duoc_tai && (moTai || hang.length > 0) && <div className="panel" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files?.length) them(e.dataTransfer.files); }}
       style={{ borderStyle: "dashed" }}>
@@ -159,7 +158,7 @@ export default function AlbumNhaHang({ nid, toast, onDoi }: { nid: number; toast
       </div>)}
         <button className="act teal" disabled={busy || !hang.some((d) => d.tt === "cho")} onClick={() => taiHet()}>Tải {hang.filter((d) => d.tt === "cho").length} ảnh lên</button>
         <button className="act grey" disabled={busy} onClick={() => setHang([])}>Xóa danh sách</button>
-        <div className="muted">Tải lại đúng tệp đã có (cùng nội dung) không tạo bản trùng. Ảnh mới vào «Nháp»; bấm «Gửi duyệt» khi xong lô.</div></div>}
+        <div className="muted">Tải lại đúng tệp đã có (cùng nội dung) không tạo bản trùng. Ảnh tải lên là hiện ngay trên cổng.</div></div>}
     </div>}
 
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "8px 0", alignItems: "center" }}>
@@ -229,10 +228,11 @@ export default function AlbumNhaHang({ nid, toast, onDoi }: { nid: number; toast
             {!chon.la_bia && chon.trang_thai !== "an" && <button className="act grey" disabled={busy} onClick={() => goi(`/nha-hang/album/${chon.id}/bia`, {})}>Đặt làm ảnh bìa</button>}
             <button className="act grey" disabled={busy} onClick={() => goi(`/nha-hang/album/${chon.id}/an`, { an: chon.trang_thai !== "an" })}>{chon.trang_thai === "an" ? "Bỏ ẩn" : "Ẩn ảnh"}</button>
             <button className="act grey" disabled={busy} onClick={() => tepThay.current?.click()}>Thay ảnh</button>
+            {(chon.tai_boi === a.toi || a.duoc_duyet) && <button className="act grey" disabled={busy} onClick={() => { if (window.confirm("Xóa ảnh này khỏi album?")) goi(`/nha-hang/album/${chon.id}/xoa`, {}, () => setChon(null)); }}>Xóa ảnh</button>}
             <input ref={tepThay} type="file" accept=".jpg,.jpeg,.png,.webp" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) thay(f); }} />
             <button className="act grey" onClick={() => taiTep(chon.goc.replace(/^\/api\/v1/, ""), chon.ten_tep || `anh_${chon.id}.jpg`).catch((e) => toast(errMsg(e), true))}>Tải bản gốc</button>
           </div>}
-          <div className="muted">Sửa chữ / căn cứ của ảnh đã duyệt → ảnh về «Chờ duyệt», thôi hiện tới khi TP Điều hành duyệt lại. «Thay ảnh» chỉ thay đúng ảnh này; tệp cũ vẫn giữ trong kho.</div>
+          <div className="muted">Sửa chữ, căn cứ hay thay ảnh đều hiện ngay. «Thay ảnh» chỉ thay đúng ảnh này; tệp cũ vẫn giữ trong kho. Ảnh sai: người tải tự xóa, TP Điều hành xóa được mọi ảnh.</div>
         </div></div></div>}
   </div>);
 }

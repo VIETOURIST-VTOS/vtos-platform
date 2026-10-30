@@ -366,7 +366,17 @@ def an_anh(pid: int, data: AnIn, u: User = Depends(require_roles(*N.VAI_ANH_NH))
         x = N.an_anh(db, u, pid, data.an)
     except N.LoiNhaHang as ex:
         _loi(ex)
-    return {"message": "Đã ẩn ảnh" if x.trang_thai == "an" else "Đã bỏ ẩn — ảnh về «Nháp», gửi duyệt lại"}
+    return {"message": "Đã ẩn ảnh" if x.trang_thai == "an" else "Đã bỏ ẩn — ảnh hiện lại"}
+
+
+@router.post("/album/{pid:int}/xoa")
+def xoa_anh(pid: int, u: User = Depends(require_roles(*N.VAI_ANH_NH)), db: Session = Depends(get_db)):
+    """KS-16c: người tải tự xóa ảnh của mình; TP Điều hành xóa mọi ảnh."""
+    try:
+        N.xoa_anh(db, u, pid)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"message": "Đã xóa ảnh khỏi album"}
 
 
 @router.post("/album/{pid:int}/bia")
