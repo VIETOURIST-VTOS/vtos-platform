@@ -257,6 +257,14 @@ def chot(did: int, data: ChotIn, u: User = Depends(require_roles(*S.VAI_KE_TOAN)
     return {"message": f"Đã chốt doanh số {d.ma} — đã khóa{them}", **S.tong_vtos(db, u)}
 
 
+@router_vtos.post("/{did}/ghi-dt-hoa-hong")
+def ghi_dt_hoa_hong(did: int, u: User = Depends(require_roles(*S.VAI_KE_TOAN)), db: Session = Depends(get_db)):
+    """KS-16e — Kế toán ghi bù doanh thu hoa hồng nhà hàng (Nợ 3388 / Có 511)."""
+    d = _goi(S.kt_ghi_dt_hoa_hong, db, u, did)
+    db.commit()
+    return {"message": f"Đã ghi doanh thu hoa hồng {d.ma} ({d.dt_but_toan})", **S.tong_vtos(db, u)}
+
+
 @router_vtos.post("/{did}/ghi-km")
 def ghi_km(did: int, u: User = Depends(require_roles(*S.VAI_KE_TOAN)), db: Session = Depends(get_db)):
     """KS-16b: Kế toán ghi phần voucher VTD chịu của đơn hủy / không đến (đơn đã dùng tự ghi khi chốt)."""

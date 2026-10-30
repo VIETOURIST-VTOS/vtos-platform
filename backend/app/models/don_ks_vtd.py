@@ -98,6 +98,8 @@ class DonKsVtd(Base):
     km_but_toan: Mapped[str] = mapped_column(String(30), default="")   # bút toán Nợ 641 / Có 3388 lúc chốt
     # KS-16d (Chủ tịch 31/10/2026): Kế toán chốt → máy lập ngay MỘT đề nghị chi trả khách sạn (loại tra_ncc_thu_ho)
     payment_request_id: Mapped[int | None] = mapped_column(ForeignKey("payment_requests.id"), nullable=True)
+    # KS-16e: bút toán doanh thu hoa hồng Nợ 3388 / Có 511 (ghi khi đã chi trả khách sạn, hoặc lúc chốt nếu trả 0)
+    dt_but_toan: Mapped[str] = mapped_column(String(30), default="")
 
 
 class ThanhToanKsVtd(Base):

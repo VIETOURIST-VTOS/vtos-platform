@@ -48,3 +48,33 @@ def test_chot_khong_hoa_hong(db):
     ve = _dung(db, d)
     S.kt_chot(db, _u(db, "kt"), d.id, 900_000, ve); db.commit()
     assert d.hoa_hong == 0 and d.phai_tra_nh == 90_000 and d.payment_request_id
+
+
+def test_ks16e_dat_ban_ghi_doanh_thu_hoa_hong(db):
+    """KS-16e: đã chi trả nhà hàng → Nợ 3388 / Có 511 hoa hồng; trả 0 → ghi ngay lúc chốt."""
+    from app.models.attachments import Attachment
+    from app.models.ops import PaymentRequest
+    from app.services import dat_ban as S
+    from app.services import ops as O
+    from tests.test_ks16b_voucher_dat_ban import _ct
+    from app.services import accounting as ACC
+    ACC.seed_accounts(db)
+    sup = _ncc(db); sup.so_tai_khoan = "999"; db.commit()
+    d = _nhan(db, _dat(db, nl=2, cach="coc"))                                    # cọc 90.000
+    _tra_qr(db, d)
+    ve = _dung(db, d)
+    S.kt_chot(db, _u(db, "kt"), d.id, 900_000, ve, 20_000); db.commit()
+    r = db.get(PaymentRequest, d.payment_request_id)
+    assert r.status == "cho_duyet" and d.dt_but_toan == ""
+    r.status = "cho_chi"
+    db.add(Attachment(doi_tuong="de_nghi_chi", doi_tuong_id=r.code, loai="unc", ten_tep="u.pdf", checksum="u", khoa_luu="u"))
+    db.commit()
+    O.step(db, _u(db, "kt"), r, "pay", "CK 9")
+    assert _ct(db, d.dt_but_toan) == [("3388", 20_000, 0), ("511", 0, 20_000)]
+    with pytest.raises(S.LoiDatBan, match="Đã ghi"):
+        S.kt_ghi_dt_hoa_hong(db, _u(db, "kt"), d.id, ve)
+    d2 = _nhan(db, _dat(db, nl=2, cach="coc", gio="19:00"))
+    _tra_qr(db, d2, sid="T2")
+    ve2 = _dung(db, d2)
+    S.kt_chot(db, _u(db, "kt"), d2.id, 900_000, ve2, 90_000); db.commit()        # hoa hồng = toàn bộ → trả 0
+    assert d2.payment_request_id is None and _ct(db, d2.dt_but_toan) == [("3388", 90_000, 0), ("511", 0, 90_000)]

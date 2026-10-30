@@ -104,6 +104,7 @@ class DonDatBan(Base):
     hoa_hong: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     phai_tra_nh: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     payment_request_id: Mapped[int | None] = mapped_column(ForeignKey("payment_requests.id"), nullable=True)
+    dt_but_toan: Mapped[str] = mapped_column(String(30), default="")      # KS-16e: Nợ 3388 / Có 511 hoa hồng
 
 
 class ThanhToanDatBan(Base):

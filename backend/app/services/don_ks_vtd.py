@@ -618,7 +618,8 @@ def ra_vtos(db: Session, d: DonKsVtd, now: datetime | None = None) -> dict:
               "phai_tra_ks": int(d.phai_tra_ks) if d.phai_tra_ks is not None else None, "chot_boi": d.chot_boi,
               "qua_han_chot": bool(d.trang_thai == "da_tra" and d.han_chot and d.han_chot < now),
               "giu_lai": max(0, o["da_tra"] - int(d.so_hoan)) if d.trang_thai == "da_huy" else None,
-              "khuyen_mai": khuyen_mai(db, d), "km_but_toan": d.km_but_toan, "de_nghi_chi": _dnc(db, d.payment_request_id)})
+              "khuyen_mai": khuyen_mai(db, d), "km_but_toan": d.km_but_toan, "de_nghi_chi": _dnc(db, d.payment_request_id),
+              "dt_but_toan": d.dt_but_toan})
     return o
 
 
@@ -736,6 +737,9 @@ def _ghi_so(db: Session, u: User, ngay: date, mo_ta: str, lines: list[dict], ma_
         elif nghiep_vu == "khuyen_mai_rewards":
             e = ACC.post_entry(db, u.username, u.role, ngay, mo_ta, lines, source_type=NGUON_SO, source_ref=ma_nguon,
                                nghiep_vu="khuyen_mai_rewards")
+        elif nghiep_vu == "doanh_thu_hoa_hong":
+            e = ACC.post_entry(db, u.username, u.role, ngay, mo_ta, lines, source_type=NGUON_SO, source_ref=ma_nguon,
+                               nghiep_vu="doanh_thu_hoa_hong")
         else:
             raise ValueError(f"nghiệp vụ {nghiep_vu} không thuộc đặt phòng")
     except ValueError as ex:
@@ -932,6 +936,8 @@ def kt_chot(db: Session, u: User, did: int, hoa_hong: int | None, now: datetime 
     R.audit(db, u.username, u.role, "ks_vtd_chot", f"don_ks_vtd:{d.ma}",
             after={"hoa_hong": int(hoa_hong), "phai_tra_ks": d.phai_tra_ks, "khuyen_mai": km, "but_toan_km": d.km_but_toan})
     db.flush()
+    if d.phai_tra_ks == 0 and d.hoa_hong > 0:   # KS-16e: không còn gì trả khách sạn → ghi doanh thu hoa hồng ngay
+        ghi_dt_hoa_hong(db, u, d, now.date())
     if d.phai_tra_ks > 0:                       # KS-16d: một đơn → một đề nghị chi trả khách sạn, TP Điều hành xác nhận
         k = db.get(KhachSanVtd, d.khach_san_id)
         d.payment_request_id = lap_de_nghi_chi_ncc(
@@ -940,6 +946,76 @@ def kt_chot(db: Session, u: User, did: int, hoa_hong: int | None, now: datetime 
             f"{_vnd(int(hoa_hong))} đ", f"Đơn {d.ma}" + (f" · mã xác nhận KS {d.ma_xac_nhan_ks}" if d.ma_xac_nhan_ks else "")).id
         db.flush()
     return d
+
+
+TK_DT_HH = "511"
+
+
+def ghi_dt_hoa_hong(db: Session, u: User, d: DonKsVtd, ngay: date) -> str:
+    """KS-16e (Chủ tịch 31/10/2026): doanh thu hoa hồng khách sạn — Nợ 3388 / Có 511, chưa gồm VAT (Kế toán xử lý
+    VAT riêng). Ghi khi đề nghị chi trả khách sạn đã chi; không còn gì phải trả thì ghi ngay lúc chốt."""
+    if d.dt_but_toan or not d.hoa_hong or int(d.hoa_hong) <= 0:
+        return d.dt_but_toan
+    ten, ma_dt = _doi_tuong_ks(db, d)
+    hh = int(d.hoa_hong)
+    d.dt_but_toan = _ghi_so(db, u, ngay, f"Doanh thu hoa hồng khách sạn — đặt phòng {d.ma} ({ten})",
+                            [{"account": TK_THU_HO, "debit": hh, "partner": ten, "partner_code": ma_dt, "note": d.ma},
+                             {"account": TK_DT_HH, "credit": hh, "note": d.ma}], f"{d.ma}:hh", "doanh_thu_hoa_hong")
+    R.audit(db, u.username, u.role, "ks_vtd_ghi_dt_hoa_hong", f"don_ks_vtd:{d.ma}", after={"hoa_hong": hh, "but_toan": d.dt_but_toan})
+    db.flush()
+    return d.dt_but_toan
+
+
+def _cho_ghi_dt(db: Session) -> list[dict]:
+    """KS-16e — đơn đã chốt có hoa hồng, khoản trả khách sạn đã chi (hoặc đơn cũ chi tay) mà chưa có bút toán doanh thu."""
+    from app.models.ops import PaymentRequest
+    ra_ = []
+    for d in db.execute(select(DonKsVtd).where(DonKsVtd.hoa_hong > 0, DonKsVtd.dt_but_toan == "").order_by(DonKsVtd.id)).scalars():
+        pr = db.get(PaymentRequest, d.payment_request_id) if d.payment_request_id else None
+        if cho_ghi_dt(d, pr.status if pr else None):
+            k = db.get(KhachSanVtd, d.khach_san_id)
+            ra_.append({"id": d.id, "ma": d.ma, "khach_san": k.ten if k else "", "hoa_hong": int(d.hoa_hong),
+                        "chot_luc": d.chot_luc.isoformat(timespec="minutes") if d.chot_luc else None,
+                        "de_nghi_chi": pr.code if pr else None})
+    return ra_
+
+
+def cho_ghi_dt(d: DonKsVtd, pr_status: str | None) -> bool:
+    """Đã chốt, có hoa hồng, chưa ghi doanh thu, và khoản trả khách sạn đã chi (hoặc đơn chốt trước KS-16d, chi tay)."""
+    return bool(d.hoa_hong and int(d.hoa_hong) > 0 and not d.dt_but_toan
+                and (d.payment_request_id is None or pr_status == "da_chi"))
+
+
+def kt_ghi_dt_hoa_hong(db: Session, u: User, did: int, now: datetime | None = None) -> DonKsVtd:
+    """Nút «Ghi doanh thu hoa hồng» — Kế toán ghi bù cho đơn đã chốt trước KS-16e (hoặc lần ghi tự động hỏng)."""
+    from app.models.ops import PaymentRequest
+    now = now or datetime.now()
+    _quyen(u, VAI_KE_TOAN, "ghi doanh thu hoa hồng (Kế toán)")
+    d = _don(db, did)
+    if d.dt_but_toan:
+        raise LoiDon(f"Đã ghi doanh thu hoa hồng ({d.dt_but_toan})", 409)
+    pr = db.get(PaymentRequest, d.payment_request_id) if d.payment_request_id else None
+    if not cho_ghi_dt(d, pr.status if pr else None):
+        raise LoiDon("Chỉ ghi khi đơn đã chốt có hoa hồng và khoản trả khách sạn đã chi", 409)
+    ghi_dt_hoa_hong(db, u, d, now.date())
+    return d
+
+
+def sau_khi_chi_tra_ncc(db: Session, u: User, r) -> None:
+    """Gọi từ ops.step(pay) cho loại tra_ncc_thu_ho: ghi Nợ 3388 / Có 511 hoa hồng của đơn khách sạn / đặt bàn gốc.
+    Lỗi ghi sổ (kỳ khóa…) không chặn việc «Đã chi» — đơn nằm lại danh sách chờ ghi để Kế toán ghi bù."""
+    from app.models.dat_ban import DonDatBan
+    from app.services import dat_ban as DB
+    try:
+        d = db.execute(select(DonKsVtd).where(DonKsVtd.payment_request_id == r.id)).scalars().first()
+        if d is not None:
+            ghi_dt_hoa_hong(db, u, d, date.today())
+            return
+        b = db.execute(select(DonDatBan).where(DonDatBan.payment_request_id == r.id)).scalars().first()
+        if b is not None:
+            DB.ghi_dt_hoa_hong(db, u, b, date.today())
+    except (LoiDon, DB.LoiDatBan) as ex:
+        R.audit(db, "robot", "robot", "ghi_dt_hoa_hong_that_bai", f"dc:{r.code}", after={"ly_do": str(ex)})
 
 
 def lap_de_nghi_chi_ncc(db: Session, u: User, supplier_id: int | None, ten_du_phong: str, so_tien: int, mo_ta: str,
@@ -1045,4 +1121,5 @@ def hang_ke_toan(db: Session, u: User, now: datetime | None = None) -> dict:
             "giao_dich_cho": giao_dich_cho(db, u, now) if u.role in VAI_KE_TOAN + ("chutich", "tgd", "bks", "robot_ks") else [],
             "hoan": [ra_vtos(db, d, now) for d in hoan], "thieu": [ra_vtos(db, d, now) for d in thieu],
             "cho_chot": [ra_vtos(db, d, now) for d in cho_chot], "phai_tra_ks": list(phai_tra.values()),
+            "cho_ghi_dt": _cho_ghi_dt(db),
             "vai": {"kt": u.role in VAI_KE_TOAN, "sales": u.role in VAI_SALES + VAI_MIEN_PHAT, "mien_phat": u.role in VAI_MIEN_PHAT}}

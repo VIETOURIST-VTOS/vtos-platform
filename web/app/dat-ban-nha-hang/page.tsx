@@ -94,7 +94,10 @@ function Trang() {
           : Q.ke_toan ? <input type="number" placeholder={String(x.bill_thuc_te || "")} value={q[`c${x.id}`] || ""} onChange={(e) => setQ({ ...q, [`c${x.id}`]: e.target.value })} style={{ width: 120 }} />
           : <span className="muted">Chờ Kế toán</span>}</td>
         <td>{x.doanh_so != null ? <>{x.hoa_hong != null ? <>hoa hồng {vnd(x.hoa_hong)} · trả <b>{vnd(x.phai_tra_nh || 0)}</b></> : <span className="muted">chốt trước KS-16d</span>}
-            {x.de_nghi_chi && <div style={{ fontSize: 12 }}>Đề nghị chi <b>{x.de_nghi_chi.code}</b> · {TT_DN[x.de_nghi_chi.status] || x.de_nghi_chi.status}</div>}</>
+            {x.de_nghi_chi && <div style={{ fontSize: 12 }}>Đề nghị chi <b>{x.de_nghi_chi.code}</b> · {TT_DN[x.de_nghi_chi.status] || x.de_nghi_chi.status}</div>}
+            {x.dt_but_toan ? <div className="muted" style={{ fontSize: 12 }}>Doanh thu HH: {x.dt_but_toan}</div>
+              : (x.hoa_hong > 0 && (!x.de_nghi_chi || x.de_nghi_chi.status === "da_chi") && Q.ke_toan)
+                ? <div><button className="act teal" style={{ margin: "4px 0 0" }} disabled={busy} onClick={() => goi(`/dat-ban-nha-hang/${x.id}/ghi-dt-hoa-hong`, {})}>Ghi doanh thu HH</button></div> : null}</>
           : Q.ke_toan ? <><input type="number" placeholder="0" value={q[`h${x.id}`] || ""} onChange={(e) => setQ({ ...q, [`h${x.id}`]: e.target.value })} style={{ width: 110 }} />
             <button className="act teal" style={{ margin: "0 0 0 6px" }} disabled={busy || !Number(q[`c${x.id}`]) || hh < 0 || hh > giu} onClick={() => goi(`/dat-ban-nha-hang/${x.id}/chot`, { doanh_so: Number(q[`c${x.id}`]), hoa_hong: hh })}>Chốt</button>
             <div className="muted" style={{ fontSize: 12 }}>→ trả nhà hàng {vnd(Math.max(giu - hh, 0))} = {vnd(x.da_tra || 0)}{x.so_hoan ? ` − hoàn ${vnd(x.so_hoan)}` : ""}{x.km_vtd ? ` + voucher ${vnd(x.km_vtd)}` : ""} − hoa hồng {vnd(hh)}</div></>
