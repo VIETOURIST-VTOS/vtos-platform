@@ -121,6 +121,23 @@ def the(ma: str, request: Request, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai),
     return _goi(S.the_bat_dau, db, tk, ma, _goc(request), ip)   # SP-1: {"form"} (SePay) hoặc {"url"} (OnePay)
 
 
+class VoucherIn(BaseModel):
+    ma_voucher: str
+
+
+@router.post("/{ma}/voucher")
+def ap_voucher(ma: str, data: VoucherIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    """KS-16b: khách tự nhập voucher VTD Rewards trước khi trả — trừ vào số phải trả trước."""
+    d = _goi(S.ap_voucher, db, tk, ma, data.ma_voucher)
+    return {"message": f"Đã áp voucher — trả trước còn {int(d.phai_tra_truoc):,} đ".replace(",", "."), "dat_ban": S.ds_cua(db, tk)}
+
+
+@router.post("/{ma}/bo-voucher")
+def bo_voucher(ma: str, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _goi(S.bo_voucher, db, tk, ma)
+    return {"message": "Đã bỏ voucher", "dat_ban": S.ds_cua(db, tk)}
+
+
 class ThayDoiIn(BaseModel):
     ngay: date | None = None
     gio: str = ""
@@ -233,6 +250,14 @@ def chot(did: int, data: ChotIn, u: User = Depends(require_roles(*S.VAI_KE_TOAN)
     d = _goi(S.kt_chot, db, u, did, data.doanh_so)
     db.commit()
     return {"message": f"Đã chốt doanh số {d.ma} — đã khóa", **S.tong_vtos(db, u)}
+
+
+@router_vtos.post("/{did}/ghi-km")
+def ghi_km(did: int, u: User = Depends(require_roles(*S.VAI_KE_TOAN)), db: Session = Depends(get_db)):
+    """KS-16b: Kế toán ghi phần voucher VTD chịu của đơn hủy / không đến (đơn đã dùng tự ghi khi chốt)."""
+    d = _goi(S.kt_ghi_km, db, u, did)
+    db.commit()
+    return {"message": f"Đã ghi Nợ 641 / Có 3388 phần voucher {d.ma}", **S.tong_vtos(db, u)}
 
 
 class GhiChuIn(BaseModel):

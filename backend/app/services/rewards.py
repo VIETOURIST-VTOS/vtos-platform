@@ -305,6 +305,8 @@ def tinh(db: Session, chu: str, hom_nay: date | None = None, now: datetime | Non
             tra, v.trang_thai = "Booking dùng voucher đã hủy", "da_hoan"
         elif v.trang_thai == "da_dung" and v.don_ks_id and voucher_ks_tra_lai(db, v):
             tra, v.trang_thai = "Đơn khách sạn dùng voucher đã hủy / hết giờ giữ", "da_hoan"
+        elif v.trang_thai == "da_dung" and v.dat_ban_id and voucher_db_tra_lai(db, v):
+            tra, v.trang_thai = "Đơn đặt bàn dùng voucher đã hủy / hết hạn", "da_hoan"
         if tra:
             han = max(v.han_diem_goc or hn, hn + timedelta(days=GIA_HAN_KHI_TRA))
             _ghi(db, chu, "TRA_GIU", v.so_diem, now, voucher_id=v.id, het_han=han, ghi_chu=f"{tra} · {v.ma}")
@@ -445,6 +447,10 @@ def doi_chieu_voucher_ks(db: Session, d, now: datetime | None = None) -> bool:
 
 def kiem_voucher_ks(db: Session, tk, ma: str, tong_goc: int, hom_nay: date | None = None) -> VoucherRewards:
     """Kiểm voucher khách gõ ở bước thanh toán: đúng chủ, chưa dùng, còn hạn, không quá 5% đơn."""
+    return _kiem_voucher(db, tk, ma, math.floor(int(tong_goc) * TRAN_VOUCHER), "tối đa 5% đơn", hom_nay)
+
+
+def _kiem_voucher(db: Session, tk, ma: str, tran: int, ten_tran: str, hom_nay: date | None = None) -> VoucherRewards:
     hn = hom_nay or _hom_nay()
     if tk.loai not in ("khach_hang", "co_dong"):
         raise LoiDiem("Tài khoản đối tác không dùng voucher cá nhân")
@@ -455,10 +461,48 @@ def kiem_voucher_ks(db: Session, tk, ma: str, tong_goc: int, hom_nay: date | Non
         raise LoiDiem(f"Voucher {TRANG_THAI_VOUCHER.get(v.trang_thai, v.trang_thai).lower()}")
     if v.han_dung < hn:
         raise LoiDiem("Voucher đã quá hạn dùng")
-    tran = math.floor(int(tong_goc) * TRAN_VOUCHER)
     if v.gia_tri > tran:
-        raise LoiDiem(f"Voucher {v.gia_tri:,} đ vượt mức tối đa 5% đơn ({tran:,} đ)".replace(",", "."))
+        raise LoiDiem(f"Voucher {v.gia_tri:,} đ vượt mức {ten_tran} ({tran:,} đ)".replace(",", "."))
     return v
+
+
+# ── KS-16b: voucher khi trả trước đặt bàn nhà hàng ─────────────────────────────────────────────────
+
+def tran_dat_ban(d) -> int:
+    """Trần voucher của một đơn đặt bàn: 5% tạm tính, không quá số phải trả trước (trước khi trừ voucher)."""
+    return min(math.floor(int(d.tam_tinh) * TRAN_VOUCHER), int(d.phai_tra_truoc) + int(d.giam_voucher or 0))
+
+
+def kiem_voucher_db(db: Session, tk, ma: str, d, hom_nay: date | None = None) -> VoucherRewards:
+    return _kiem_voucher(db, tk, ma, tran_dat_ban(d), "tối đa 5% tạm tính và không quá số trả trước", hom_nay)
+
+
+def voucher_db_tra_lai(db: Session, v: VoucherRewards) -> bool:
+    """Như khách sạn: đơn đặt bàn hủy / không đến / nhà hàng từ chối / hết hạn mà có hoàn tiền, hoặc chưa trả đồng
+    nào → trả điểm. Không hoàn đồng nào (phạt hết) → voucher đã dùng hẳn."""
+    from app.models.dat_ban import DonDatBan
+    from app.services.dat_ban import da_tra
+    d = db.get(DonDatBan, v.dat_ban_id)
+    if d is None or d.voucher_id != v.id:
+        return True
+    if d.trang_thai not in ("huy", "khong_den", "tu_choi", "het_han"):
+        return False
+    return int(d.so_hoan or 0) > 0 or da_tra(db, d) <= 0
+
+
+def doi_chieu_voucher_db(db: Session, d, now: datetime | None = None) -> bool:
+    if not d.voucher_id:
+        return False
+    v = db.get(VoucherRewards, d.voucher_id)
+    if v is None or v.trang_thai != "da_dung" or not voucher_db_tra_lai(db, v):
+        return False
+    now = now or datetime.now()
+    hn = now.date()
+    v.trang_thai = "da_hoan"
+    han = max(v.han_diem_goc or hn, hn + timedelta(days=GIA_HAN_KHI_TRA))
+    _ghi(db, v.chu, "TRA_GIU", v.so_diem, now, voucher_id=v.id, het_han=han,
+         ghi_chu=f"Đơn đặt bàn {d.ma} hủy / hết hạn · {v.ma}")
+    return True
 
 
 def ap_voucher_ks(db: Session, tk, v: VoucherRewards, don, now: datetime) -> None:
@@ -507,7 +551,11 @@ def _voucher(db: Session, chu: str) -> list[dict]:
     ra = []
     for v in db.execute(select(VoucherRewards).where(VoucherRewards.chu == chu).order_by(VoucherRewards.tao_luc.desc())).scalars():
         b = db.get(Booking, v.booking_id) if v.booking_id else None
-        if b is None and v.don_ks_id:
+        if b is None and v.dat_ban_id:
+            from app.models.dat_ban import DonDatBan
+            dd = db.get(DonDatBan, v.dat_ban_id)
+            ma_don = dd.ma if dd else None
+        elif b is None and v.don_ks_id:
             from app.models.don_ks_vtd import DonKsVtd
             dk = db.get(DonKsVtd, v.don_ks_id)
             ma_don = dk.ma if dk else None
