@@ -6,7 +6,7 @@ Kết quả OnePay đi chung đường /api/v1/onepay/tra-ve | /ipn với đặt
 """
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -96,6 +96,28 @@ def huy(ma: str, data: HuyIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: 
     so = int(d.so_hoan)
     return {"don": S.ra_khach(db, d),
             "message": (f"Đã hủy {d.ma} · Vietourist hoàn {S._vnd(so)} đ trong 3–7 ngày làm việc" if so else f"Đã hủy {d.ma}")}
+
+
+# ── KS-15 · khách đã ở viết đánh giá (multipart: điểm thang 10 + tối đa 3 ảnh) ─────────────────────────
+@router_cong.post("/{ma}/danh-gia")
+async def danh_gia(ma: str, diem: int = Form(0), diem_sach: int = Form(0), diem_vi_tri: int = Form(0), diem_phong: int = Form(0),
+                   diem_phuc_vu: int = Form(0), diem_gia: int = Form(0), di_cung: str = Form(""), tieu_de: str = Form(""),
+                   nhan_xet: str = Form(""), dong_y: bool = Form(False), giu_anh: str = Form(""),
+                   anh: list[UploadFile] = File(default=[]), tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    from app.services import danh_gia_ks as DGK
+    _khach(tk)
+    if len(anh) > DGK.ANH_TOI_DA:
+        raise HTTPException(400, f"Tối đa {DGK.ANH_TOI_DA} ảnh")
+    tep = [((f.filename or ""), await f.read()) for f in anh]
+    giu = [int(x) for x in giu_anh.split(",") if x.strip().isdigit()]
+    try:
+        g = DGK.viet(db, tk, ma, {"diem": diem, "diem_sach": diem_sach, "diem_vi_tri": diem_vi_tri, "diem_phong": diem_phong,
+                                  "diem_phuc_vu": diem_phuc_vu, "diem_gia": diem_gia, "di_cung": di_cung, "tieu_de": tieu_de,
+                                  "nhan_xet": nhan_xet, "dong_y": dong_y}, tep, giu)
+    except DGK.LoiDanhGiaKs as ex:
+        raise HTTPException(ex.status, str(ex))
+    return {"message": "Đã sửa đánh giá" if g.sua_luc else "Cảm ơn bạn — đánh giá đã hiện trên trang khách sạn",
+            "don": _goi(S.mot_cua, db, tk, ma)}
 
 
 # ── OnePay gọi về (rẽ từ đường chung của đặt bàn) ─────────────────────────────────────────────────

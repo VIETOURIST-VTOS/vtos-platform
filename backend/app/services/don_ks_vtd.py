@@ -361,7 +361,13 @@ def ra_khach(db: Session, d: DonKsVtd, now: datetime | None = None) -> dict:
             "ly_do_huy": d.ly_do_huy, "so_hoan": int(d.so_hoan), "hoan_tt": d.hoan_tt, "hoan_tt_ten": HOAN_TT_KS.get(d.hoan_tt, ""),
             "da_hoan_tien": int(d.da_hoan_tien), "co_the_tra": d.trang_thai == "cho_tra" and tra < int(d.tong),
             "co_the_huy": huy_duoc, "hoan_neu_huy": so_hoan_neu_huy(d, tra, now.date()) if huy_duoc else 0,
+            "danh_gia": _dg(db, d, now),
             "the_bat": SP.cong_the_bat(), "tao_luc": d.tao_luc.isoformat(timespec="minutes") if d.tao_luc else None}
+
+
+def _dg(db: Session, d: DonKsVtd, now: datetime) -> dict:
+    from app.services import danh_gia_ks as DGK   # KS-15
+    return DGK.trang_thai_don(db, d, now)
 
 
 def ds_cua(db: Session, tk, now: datetime | None = None) -> list[dict]:

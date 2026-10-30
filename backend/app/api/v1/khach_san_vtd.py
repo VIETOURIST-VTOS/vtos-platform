@@ -51,6 +51,47 @@ def ds(u: User = Depends(require_roles(*S.VAI_XEM)), db: Session = Depends(get_d
     return _goi(S.ds_vtos, db, u)
 
 
+# ── KS-15 · đánh giá: Marketing ẩn vì vi phạm, TP Điều hành xem lại ─────────────────────────────────────
+@router_vtos.get("/danh-gia")
+def dg_ds(loc: str = "", u: User = Depends(require_roles(*S.VAI_XEM)), db: Session = Depends(get_db)):
+    from app.services import danh_gia_ks as DGK
+    try:
+        return DGK.ds_noi_bo(db, u, loc)
+    except DGK.LoiDanhGiaKs as ex:
+        raise HTTPException(ex.status, str(ex))
+
+
+class AnDgIn(BaseModel):
+    ly_do: str
+    ghi_chu: str = ""
+    phan: str = "bai"
+
+
+class XemLaiDgIn(BaseModel):
+    giu: bool = True
+    ghi_chu: str = ""
+
+
+@router_vtos.post("/danh-gia/{gid:int}/an")
+def dg_an(gid: int, data: AnDgIn, u: User = Depends(require_roles("nv_mkt", "ptgd_mkt")), db: Session = Depends(get_db)):
+    from app.services import danh_gia_ks as DGK
+    try:
+        DGK.an(db, u, gid, data.ly_do, data.ghi_chu, data.phan)
+    except DGK.LoiDanhGiaKs as ex:
+        raise HTTPException(ex.status, str(ex))
+    return {"message": "Đã ẩn — chờ TP Điều hành xem lại", **DGK.ds_noi_bo(db, u)}
+
+
+@router_vtos.post("/danh-gia/{gid:int}/xem-lai")
+def dg_xem_lai(gid: int, data: XemLaiDgIn, u: User = Depends(require_roles("tp_dh", "chutich", "tgd")), db: Session = Depends(get_db)):
+    from app.services import danh_gia_ks as DGK
+    try:
+        DGK.xem_lai(db, u, gid, data.giu, data.ghi_chu)
+    except DGK.LoiDanhGiaKs as ex:
+        raise HTTPException(ex.status, str(ex))
+    return {"message": "Giữ ẩn" if data.giu else "Đã hiện lại", **DGK.ds_noi_bo(db, u)}
+
+
 @router_vtos.get("/cho-duyet")
 def cho_duyet(u: User = Depends(require_roles(*S.VAI_XEM)), db: Session = Depends(get_db)):
     return _goi(S.cho_duyet, db, u)
@@ -275,6 +316,17 @@ class TinhIn(BaseModel):
     chon: list[ChonIn]
 
 
+@router_cong.get("/{kid:int}/danh-gia")
+def danh_gia_cong(kid: int, trang: int = 1, xep: str = "moi", tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    """KS-15: bài đánh giá đang hiện của một khách sạn (tên khách đã che)."""
+    from app.services import danh_gia_ks as DGK
+    _khach(tk)
+    try:
+        return DGK.cong(db, kid, trang, 10, xep)
+    except DGK.LoiDanhGiaKs as ex:
+        raise HTTPException(ex.status, str(ex))
+
+
 @router_cong.post("/{kid:int}/tinh")
 def tinh(kid: int, data: TinhIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
     _khach(tk)
@@ -315,6 +367,18 @@ def _phanh(req: Request) -> None:
     if len(_LUOT) > 5000:
         for k in [k for k, x in _LUOT.items() if not x or now - x[-1] > CUA_SO_GIAY]:
             _LUOT.pop(k, None)
+
+
+@router_anh.get("/dg/{gid:int}/{i:int}/{co}")
+def anh_danh_gia(gid: int, i: int, co: str, request: Request, db: Session = Depends(get_db)):
+    """KS-15: ảnh khách đánh giá (bản làm nhẹ, bài đang hiện, ảnh chưa ẩn, khách sạn đang hiện)."""
+    _phanh(request)
+    from app.services import danh_gia_ks as DGK
+    try:
+        data, a = DGK.tep_anh(db, gid, i, co)
+    except DGK.LoiDanhGiaKs as ex:
+        raise HTTPException(ex.status, str(ex))
+    return Response(content=data, media_type=a.kieu_noi_dung or "image/webp", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router_anh.get("/{pid:int}/{co}")

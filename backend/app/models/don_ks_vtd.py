@@ -111,3 +111,53 @@ class ThanhToanKsVtd(Base):
     goc: Mapped[str] = mapped_column(String(80), default="")
     phi_the: Mapped[float | None] = mapped_column(TIEN, nullable=True)
     but_toan: Mapped[str] = mapped_column(String(30), default="")
+
+
+# ══ KS-15 · ĐÁNH GIÁ KHÁCH SẠN VTD (Chủ tịch duyệt bản xem thử 30/10/2026) ══════════════════════════════════════
+# Luật như đánh giá nhà hàng AT-3, thang 10 như Agoda: chỉ người đặt của một đơn ĐÃ XÁC NHẬN, từ ngày trả phòng, trong
+# 30 ngày; một bài / đơn; sửa trong 7 ngày. Hiện ngay; chỉ Marketing ẩn vì vi phạm; TP Điều hành xem lại. Khách sạn
+# trả lời qua cổng NCC (khách sạn phải được gắn với một NCC). Dưới 3 bài đang hiện: «Mới — chưa đủ đánh giá».
+LY_DO_AN_DG_KS = {"chui_boi": "Chửi bới, xúc phạm", "thong_tin_ca_nhan": "Lộ thông tin cá nhân",
+                  "quang_cao": "Quảng cáo / spam", "anh_sai": "Ảnh không phải khách sạn / phòng"}
+MUC_DG_KS = {"diem_sach": "Sạch sẽ", "diem_vi_tri": "Vị trí", "diem_phong": "Phòng", "diem_phuc_vu": "Phục vụ",
+             "diem_gia": "Đáng giá tiền"}
+DI_CUNG = {"mot_minh": "Đi một mình", "cap_doi": "Cặp đôi", "gia_dinh_tre_nho": "Gia đình có trẻ nhỏ",
+           "gia_dinh": "Gia đình", "nhom_ban": "Nhóm bạn", "cong_tac": "Công tác"}
+
+
+class DanhGiaKsVtd(Base):
+    __tablename__ = "danh_gia_ks_vtd"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    don_id: Mapped[int] = mapped_column(ForeignKey("don_ks_vtd.id"), unique=True)
+    khach_san_id: Mapped[int] = mapped_column(ForeignKey("khach_san_vtd.id"), index=True)
+    tai_khoan_id: Mapped[int] = mapped_column(ForeignKey("tai_khoan_ngoai.id"), index=True)
+    ten_hien: Mapped[str] = mapped_column(String(40), default="")          # đã che, chụp lúc viết
+    loai_phong: Mapped[str] = mapped_column(String(160), default="")
+    so_dem: Mapped[int] = mapped_column(Integer, default=1)
+    ngay_tra: Mapped[date] = mapped_column(Date)
+    di_cung: Mapped[str] = mapped_column(String(20), default="")
+    diem: Mapped[int] = mapped_column(Integer)                              # 1–10, bắt buộc
+    # Năm mục phụ: RỖNG khác 0 — bỏ trống thì không tính vào điểm mục đó.
+    diem_sach: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    diem_vi_tri: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    diem_phong: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    diem_phuc_vu: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    diem_gia: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tieu_de: Mapped[str] = mapped_column(String(120), default="")
+    nhan_xet: Mapped[str] = mapped_column(Text, default="")
+    anh: Mapped[list] = mapped_column(JSON, default=list)                   # [{hien, nho, an, ly_do}]
+    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+    sua_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    an: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    an_ly_do: Mapped[str] = mapped_column(String(20), default="")
+    an_ghi_chu: Mapped[str] = mapped_column(Text, default="")
+    an_boi: Mapped[str] = mapped_column(String(50), default="")
+    an_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    xem_lai: Mapped[str] = mapped_column(String(6), default="")            # "" chờ · "giu" · "hien"
+    xem_lai_boi: Mapped[str] = mapped_column(String(50), default="")
+    xem_lai_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    tra_loi: Mapped[str] = mapped_column(Text, default="")
+    tra_loi_boi: Mapped[str] = mapped_column(String(60), default="")
+    tra_loi_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    tra_loi_an: Mapped[bool] = mapped_column(Boolean, default=False)
+    tra_loi_an_ly_do: Mapped[str] = mapped_column(String(20), default="")
