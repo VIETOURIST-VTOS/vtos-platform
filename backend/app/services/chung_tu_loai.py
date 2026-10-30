@@ -131,6 +131,7 @@ NGUON: dict[str, str] = {
     "quy_tac":      "Ghi sổ qua màn hình quy tắc hạch toán",
     "dao":          "Bút toán đảo của một chứng từ đã ghi sổ",
     "dat_ban":      "Đặt bàn nhà hàng — tiền Vietourist thu hộ nhà hàng (DT-3)",
+    "ks_vtd":       "Đặt phòng khách sạn VTD — tiền Vietourist thu hộ khách sạn (KS-14)",
 }
 
 # ════════════════════════════════════════════════════════════════════════════════════════════════

@@ -985,7 +985,8 @@ MENU_ROLES = {
     "/cong-ncc": BASE_VIEW + ("tp_dh", "nv_dh", "gd_kd", "ketoan", "nv_mkt", "ptgd_mkt"),   # NCC-1: nối, duyệt giá, bản kê, đề nghị, học liệu
     "/dat-ban-nha-hang": BASE_VIEW + ("ketoan", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "sales_admin"),   # DT-2: tiền vào, đối soát thẻ, hủy & hoàn, chốt doanh số
     "/ir-cong-co-dong": BASE_VIEW + ("ir_phapche",),   # CD-1: IR – Pháp chế đưa tài liệu, sự kiện, trả lời; Chủ tịch, TGĐ gỡ
-    "/khach-san-vtd": BASE_VIEW + ("tp_dh", "nv_dh", "gd_kd", "tp_kd", "nv_mkt", "ptgd_mkt"),   # KS-13: Điều hành nhập, TP ĐH duyệt
+    "/khach-san-vtd": BASE_VIEW + ("tp_dh", "nv_dh", "gd_kd", "tp_kd", "nv_mkt", "ptgd_mkt",   # KS-13: Điều hành nhập, TP ĐH duyệt
+                                   "ketoan", "tn_kd", "nv_kd", "sales_admin"),   # KS-14: Kế toán tiền / hoàn, Sales xác nhận hoàn
     "/khach-san-ota": BASE_VIEW,     # KS-1: Chủ tịch nhập và bật; TGĐ, BKS, robot KS xem
     # KS-10: Điều hành là người chạy sáu bước với nguồn, nên tp_dh vào được màn đơn — nhưng KHÔNG
     # vào màn /khach-san-ota, vì nhập link và cấp quyền nguồn vẫn là việc của Chủ tịch.

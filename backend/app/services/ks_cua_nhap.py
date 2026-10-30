@@ -196,6 +196,9 @@ CUA_TAY = (
     "danh_gia_nha_hang",
     # KS-13 (30/10/2026): Điều hành nhập khách sạn, ảnh, loại phòng, gói và mùa giá ở màn /khach-san-vtd.
     "khach_san_vtd", "anh_khach_san_vtd", "loai_phong_vtd", "goi_gia_vtd", "mua_gia_vtd",
+    # KS-14 (30/10/2026): khách đặt + trả trên cổng (phiên cổng, OnePay / QR khớp mã); Điều hành sửa số phòng bán,
+    # chốt với khách sạn; Sales xác nhận hoàn; Kế toán ghi sổ / đối soát / hoàn / chốt hoa hồng — màn /khach-san-vtd.
+    "phong_trong_vtd", "don_ks_vtd", "thanh_toan_ks_vtd",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi

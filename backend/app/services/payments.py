@@ -96,6 +96,9 @@ def ingest_sepay(db: Session, payload: dict) -> tuple[BankTransaction, bool]:
 
 def match_transaction(db: Session, txn: BankTransaction) -> None:
     """R1: tìm mã BKxxxxxxxx trong nội dung; khớp tuyệt đối số tiền còn phải thu → phiếu thu tự động."""
+    from app.services import don_ks_vtd as KV   # KS-14: nội dung có mã đặt phòng KS… → đơn khách sạn VTD nhận
+    if KV.tu_khop(db, txn):
+        return
     m = BOOKING_RE.search(txn.content.replace(" ", "") if txn.content else "")
     if not m:
         return _match_by_tour_code(db, txn)

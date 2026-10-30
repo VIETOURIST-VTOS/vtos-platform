@@ -173,6 +173,9 @@ async def danh_gia(ma: str, diem: int = Form(0), diem_mon: int = Form(0), diem_p
 def tra_ve(request: Request, db: Session = Depends(get_db)):
     _phanh(request)
     p = dict(request.query_params)
+    from app.api.v1 import don_ks_vtd as KV   # KS-14: mã giao dịch KS… là đơn đặt phòng khách sạn VTD
+    if KV.S.cua_minh(p):
+        return KV.onepay_tra_ve(db, p)
     kq = S.onepay_ket_qua(db, p)
     if kq is None:
         return RedirectResponse(f"{GOC_MAC_DINH}/cong?the=loi", status_code=303)
@@ -184,6 +187,9 @@ def tra_ve(request: Request, db: Session = Depends(get_db)):
 @router_onepay.get("/ipn")
 def ipn(request: Request, db: Session = Depends(get_db)):
     _phanh(request)
+    from app.api.v1 import don_ks_vtd as KV   # KS-14: mã giao dịch KS… là đơn đặt phòng khách sạn VTD
+    if KV.S.cua_minh(dict(request.query_params)):
+        return KV.onepay_ipn(db, dict(request.query_params))
     kq = S.onepay_ket_qua(db, dict(request.query_params))
     if kq is None:
         return PlainTextResponse("responsecode=0&desc=confirm-fail")

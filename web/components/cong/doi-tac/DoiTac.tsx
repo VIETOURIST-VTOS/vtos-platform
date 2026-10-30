@@ -55,6 +55,8 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
   const [ds, setDs] = useState<any>(null);
   const [q, setQ] = useState("");
   const [dv, setDv] = useState<"tour" | "khach_san">("tour");
+  // KS-14: quay về từ trang thẻ OnePay (?ks_vtd=…) → mở thẳng Tour & dịch vụ › Khách sạn.
+  useEffect(() => { try { if (new URLSearchParams(window.location.search).get("ks_vtd") !== null) { setTab("tour"); setDv("khach_san"); } } catch { /* bỏ qua */ } }, []);
   const [tourMo, setTourMo] = useState<any>(null);
   const [f, setF] = useState({ ten_khach: "", dien_thoai: "", nguoi_lon: 2, tre_em: 0, ghi_chu: "" });
   const [bk, setBk] = useState<any>(null);
