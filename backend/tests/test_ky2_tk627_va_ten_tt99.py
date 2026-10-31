@@ -19,10 +19,11 @@ lãi hai lần: một lần qua 911, một lần nữa khi 154 ra 632. Nên 627 
 """
 import os, sys, tempfile
 _DB = os.path.join(tempfile.gettempdir(), "vtos_test_ky2.db")
-os.environ["DATABASE_URL"] = f"sqlite:///{_DB}"
 os.environ["SEED_DEMO"] = "1"
 os.environ["ENV"] = "dev"
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from csdl_rieng import dung_csdl_rieng                      # noqa: E402
 try:
     if os.path.exists(_DB): os.remove(_DB)
 except OSError:
@@ -44,6 +45,8 @@ KY = "2026-05"          # kỳ riêng của bộ test này
 
 @pytest.fixture(scope="module", autouse=True)
 def _startup():
+    # GOI TRUOC `TestClient(app)` — xem ghi chu o `tests/csdl_rieng.py`.
+    dung_csdl_rieng("ky2")
     with TestClient(app):
         yield
 
