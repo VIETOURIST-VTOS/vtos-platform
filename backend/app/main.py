@@ -4,7 +4,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.db.session import SessionLocal, engine, Base
+# DOT DON-MISA 01/11/2026 — NHAP MO-DUN, KHONG NHAP TEN.
+#
+# `SessionLocal` va `engine` duoc dung MOT LAN luc import `app.db.session`. Nhap TEN o day
+# thi `main` cam dung hai vat ay vinh vien — ma `main` moi la noi tao bang va gieo du lieu.
+# Hang rao gop chay nhieu tep phep thu trong MOT tien trinh, nen tep nao import `app.main`
+# TRUOC thi co so du lieu cua tep ay THANG, va moi tep sau do IM LANG dung chung so cua no.
+#
+# Nhap mo-dun thi hai vat ay duoc tra LUC GOI. Production chay y het — chi co mot co so du
+# lieu, nen tra luc goi hay luc import deu ra cung mot vat. Khac biet chi hien ra khi co
+# nguoi DOI no, ma doi thi chi phep thu moi lam (`tests/csdl_rieng.py`).
+from app.db import session as _db
+from app.db.session import Base
 from app.api.v1.routes import router
 from app.api.v1.payments import router as payments_router
 from app.api.v1.accounting import router as accounting_router
@@ -144,7 +155,7 @@ from app.services import nguon_don as _nguon_don  # noqa: F401  KS-16h: gắn ng
 def _mot_luot_robot(i: int) -> None:
     """MỘT lượt việc nền. Hàm ĐỒNG BỘ, cố ý — nó được gọi trong một luồng riêng, không trên vòng
     lặp sự kiện. Đừng biến nó thành `async`, và đừng gọi thẳng nó từ `robot_loop`."""
-    db = SessionLocal()
+    db = _db.SessionLocal()
     try:
         from app.services import inbox as IB
         IB.robot_check(db)                      # R12 mỗi phút: AI trả lời thay khi sale trễ SLA
@@ -208,8 +219,8 @@ async def robot_loop():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if settings.ENV == "dev":
-        Base.metadata.create_all(engine)          # prod dùng alembic upgrade head
-    db = SessionLocal()
+        Base.metadata.create_all(_db.engine)      # prod dùng alembic upgrade head
+    db = _db.SessionLocal()
     try:
         R.seed_params(db)
         ACC.seed_accounts(db)

@@ -1,8 +1,9 @@
 """Cầu nối MISA: nạp TK theo cấu trúc MISA + ánh xạ TT99, số dư đầu kỳ theo đối tượng, sổ nhật ký chung, đối chiếu, BCTC TT99, xuất ngược mẫu Import."""
 import os, sys, io
-os.environ["DATABASE_URL"] = "sqlite:///./test_misa.db"; os.environ["SEED_DEMO"] = "1"; os.environ["ENV"] = "dev"
+os.environ["SEED_DEMO"] = "1"; os.environ["ENV"] = "dev"
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-if os.path.exists("test_misa.db"): os.remove("test_misa.db")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from csdl_rieng import dung_csdl_rieng                      # noqa: E402
 import pytest
 from openpyxl import Workbook, load_workbook
 from fastapi.testclient import TestClient
@@ -18,6 +19,8 @@ def login(u):
 
 @pytest.fixture(scope="module", autouse=True)
 def _startup():
+    # GOI TRUOC `TestClient(app)`: chinh vong doi moi la noi tao bang va gieo du lieu.
+    dung_csdl_rieng("misa")
     with TestClient(app) as c:
         global client; client = c; yield
 
