@@ -99,6 +99,9 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
   };
 
+  // KS-16l: khách sạn chưa có gói đặt được thì chưa book trên cổng — mở trang ngoài ở tab mới
+  const moThe = (k: any) => { if (k.dat_ngay === false && k.link_ngoai) { window.open(k.link_ngoai, "_blank", "noopener,noreferrer"); return; } moKs(k.id); };
+
   const loc2 = useMemo(() => {
     if (!ds) return [];
     const L = loc, k0 = khongDau(L.ten.trim());
@@ -371,13 +374,13 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
           return <article key={k.id} className="ksv-card">
             {g && k.co_mien_phi_huy && k.co_bua_sang && <div className="ksv-bar"><span>Giá hợp đồng của Vietourist</span><em>Miễn phí hủy</em><em>Bữa sáng</em></div>}
             <div className="ksv-crow">
-              <div className="ksv-ph">{a ? <button type="button" className="ksv-phbtn" onClick={() => moKs(k.id)} aria-label={`Xem ${k.ten}`}><img src={a.nho} alt={a.chu_thich || k.ten} loading="lazy" /></button>
-                : <button type="button" className="ksv-phbtn" onClick={() => moKs(k.id)} aria-label={`Xem ${k.ten}`}><AnhTrong k={k} /></button>}
+              <div className="ksv-ph">{a ? <button type="button" className="ksv-phbtn" onClick={() => moThe(k)} aria-label={`Xem ${k.ten}`}><img src={a.nho} alt={a.chu_thich || k.ten} loading="lazy" /></button>
+                : <button type="button" className="ksv-phbtn" onClick={() => moThe(k)} aria-label={`Xem ${k.ten}`}><AnhTrong k={k} /></button>}
                 <button type="button" className={`ksv-ico ksv-heart ${thich[k.id] ? "on" : ""}`} aria-label={thich[k.id] ? "Bỏ yêu thích" : "Lưu vào yêu thích"} aria-pressed={!!thich[k.id]} onClick={() => setThich({ ...thich, [k.id]: !thich[k.id] })}><Tim /></button>
                 {k.anh.length > 1 && <><button type="button" className="ksv-ico ksv-prv" aria-label="Ảnh trước" onClick={() => setAnhI({ ...anhI, [k.id]: (i - 1 + k.anh.length) % k.anh.length })}><Mui trai /></button>
                   <button type="button" className="ksv-ico ksv-nxt" aria-label="Ảnh tiếp" onClick={() => setAnhI({ ...anhI, [k.id]: (i + 1) % k.anh.length })}><Mui /></button></>}
                 {k.so_anh > 0 && <span className="ksv-ct">{i + 1}/{k.so_anh}</span>}</div>
-              <div className="ksv-info"><h3><button type="button" className="ksv-ten" onClick={() => moKs(k.id)}>{k.ten}</button></h3>
+              <div className="ksv-info"><h3><button type="button" className="ksv-ten" onClick={() => moThe(k)}>{k.ten}</button></h3>
                 {k.sao > 0 && <span className="ksv-stars" aria-label={`${k.sao} sao`}>{"★".repeat(k.sao)}</span>}
                 <span className="ksv-where"><Ghim />{[k.khu_vuc, k.tinh_thanh].filter(Boolean).join(", ")}{k.km_trung_tam != null ? ` - ${String(k.km_trung_tam).replace(".", ",")} km tới trung tâm` : ""}</span>
                 {k.gan && <span className="ksv-near">{k.gan}</span>}
@@ -390,11 +393,13 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
                   <span className="ksv-big" style={g.niem_yet_dem ? undefined : { marginTop: "auto" }}><small>₫</small> {vnd(g.gia_dem)}</span><small className="ksv-muted">Mỗi đêm, chưa gồm thuế và phí</small>
                   {k.co_mien_phi_huy && <span className="ksv-free">+ MIỄN PHÍ HỦY</span>}
                   {duKien(g.gia_dem * dem * q.phong) > 0 && <span className="ksv-diem">+ khoảng {vnd(duKien(g.gia_dem * dem * q.phong))} điểm sau kỳ ở</span>}
-                  <button type="button" className="ksv-btn wide" onClick={() => moKs(k.id)}>Chọn phòng</button></>
+                  <button type="button" className="ksv-btn wide" onClick={() => moThe(k)}>Chọn phòng</button></>
                   : k.het_phong ? <><b style={{ marginTop: "auto", color: "var(--ksv-price)" }}>Hết phòng ngày này</b><small className="ksv-muted">Đổi ngày để xem phòng trống</small>
-                    <button type="button" className="ksv-btn line wide" onClick={() => moKs(k.id)}>Xem khách sạn</button></>
+                    <button type="button" className="ksv-btn line wide" onClick={() => moThe(k)}>Xem khách sạn</button></>
+                  : k.dat_ngay === false ? <><b style={{ marginTop: "auto" }}>Chưa mở đặt trực tuyến</b><small className="ksv-muted">Xem chi tiết trên vietourist.vn</small>
+                    <button type="button" className="ksv-btn line wide" onClick={() => moThe(k)}>Xem khách sạn ↗</button></>
                   : <><b style={{ marginTop: "auto" }}>Giá đang cập nhật</b><small className="ksv-muted">Vietourist báo giá trong giờ làm việc</small>
-                    <button type="button" className="ksv-btn line wide" onClick={() => moKs(k.id)}>Xem và gửi yêu cầu</button></>}</div>
+                    <button type="button" className="ksv-btn line wide" onClick={() => moThe(k)}>Xem và gửi yêu cầu</button></>}</div>
             </div></article>; })}
       </main></div></div>;
 }
