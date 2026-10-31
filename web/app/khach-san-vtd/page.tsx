@@ -73,7 +73,7 @@ function Trang() {
         <input value={tim} onChange={(e) => setTim(e.target.value)} placeholder="Tìm tên, mã, thành phố" aria-label="Tìm khách sạn" style={{ maxWidth: 260 }} />
         <span style={{ flex: 1 }} />
         {x.duoc_duyet && <button className="act grey" onClick={async () => { try { const r = await api<any>("/khach-san-vtd/hien-cong-loat", { method: "POST", json: {} }); toast(r.message); load(); } catch (e) { toast(errMsg(e), true); } }}
-          title="KS-16l: bật mọi khách sạn đủ hồ sơ + ảnh + giới thiệu; chưa có gói đặt được thì cổng mở trang vietourist.vn/hotel">Bật hiện tất cả khách sạn đủ điều kiện</button>}
+          title="KS-16l: bật mọi khách sạn đủ hồ sơ + ảnh + giới thiệu; chưa có gói đặt được thì cổng mở trang web chính ở tab mới">Bật hiện tất cả khách sạn đủ điều kiện</button>}
         {x.duoc_nhap && <button className="act teal" onClick={() => setMo("moi")}>+ Thêm khách sạn</button>}</div>
       <div style={{ overflowX: "auto" }}><table><thead><tr><th></th><th>Khách sạn</th><th>Thành phố</th><th>Ảnh</th><th>Loại phòng</th><th>Gói giá</th><th>Cổng khách</th><th></th></tr></thead>
         <tbody>{ds.map((h: any) => <tr key={h.id} className="ksv-dong">
@@ -155,7 +155,7 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
     {h && t === "hien" && <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <b>Điều kiện bật «Hiện trên cổng»</b>
       {h.dieu_kien.map((c: any) => <span key={c.ma} style={{ color: c.ok ? "#2bb39a" : "#d99a2b" }}>{c.ok ? "✓" : "✗"} {c.ten}</span>)}
-      <span className="muted">Chưa có loại phòng đang bán với gói giá đã duyệt thì khách sạn vẫn hiện nhưng chưa đặt trên cổng — khách bấm vào sẽ mở trang www.vietourist.vn/hotel ở tab mới (KS-16l).</span>
+      <span className="muted">Chưa có loại phòng đang bán với gói giá đã duyệt thì khách sạn vẫn hiện nhưng chưa đặt trên cổng — khách bấm vào sẽ mở trang web chính ở tab mới (KS-16l; tạm là trang chủ vietourist.com.vn cho tới khi có trang /hotel).</span>
       {x.duoc_duyet && <div style={{ display: "flex", gap: 8 }}>
         {h.khach_san.hien_cong ? <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/${kid}/hien-cong`, { bat: false })}>Tắt hiện</button>
           : <button className="act teal" disabled={busy || h.khach_san.ngung} onClick={() => goi(`/khach-san-vtd/${kid}/hien-cong`, { bat: true })}>Bật hiện trên cổng</button>}

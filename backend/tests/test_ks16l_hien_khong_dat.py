@@ -21,6 +21,6 @@ def test_bat_loat_va_link_ngoai(db):
     r = S.bat_hien_loat(db, _u(db, "tp"))
     assert r["bat"] == [a.ma] and c.ma not in r["bat"]
     the = {k["ten"]: k for k in S.tim(db, "", VAO, RA, 2, 0, 1, HN)["khach_san"]}
-    assert the["Khách sạn Không Phòng"]["dat_ngay"] is False and the["Khách sạn Không Phòng"]["link_ngoai"] == "https://www.vietourist.vn/hotel"
+    assert the["Khách sạn Không Phòng"]["dat_ngay"] is False and the["Khách sạn Không Phòng"]["link_ngoai"] == S.LINK_KS_NGOAI
     assert the["Khách sạn Có Phòng"]["dat_ngay"] is True
     assert "Khách sạn Chưa Ảnh" not in the

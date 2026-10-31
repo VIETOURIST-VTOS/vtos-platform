@@ -282,7 +282,8 @@ def luu_ks(db: Session, u: User, d: dict, kid: int | None = None, now: datetime 
 
 # KS-16l (Chủ tịch 01/11/2026): khách sạn lên cổng khi đủ hồ sơ + ảnh + giới thiệu, KHÔNG cần loại phòng đang bán.
 # Chưa có gói đặt được thì chưa book trên cổng — bấm vào khách sạn mở trang ngoài LINK_KS_NGOAI ở tab mới.
-LINK_KS_NGOAI = "https://www.vietourist.vn/hotel"
+# KS-16n (Chủ tịch 01/11/2026): www.vietourist.vn/hotel chưa có (404) → TẠM trỏ trang chủ; web chính có trang thì đổi lại.
+LINK_KS_NGOAI = "https://vietourist.com.vn/"
 
 
 def dieu_kien_hien(db: Session, k: KhachSanVtd) -> list[dict]:
