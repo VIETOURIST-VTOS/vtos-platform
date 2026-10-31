@@ -165,6 +165,23 @@ def diem(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get
     return ra
 
 
+class CtvIn(BaseModel):
+    ma: str
+
+
+@router.post("/ctv")
+def ghi_link_ctv(data: CtvIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    """KS-16h: khách mở link kh.vietourist.vn/CTV-xxxx → cổng gửi mã lên sau khi đăng nhập (trong 30 ngày)."""
+    _khach(tk)
+    from app.services import nguon_don as ND
+    dt = ND.doi_tac_tu_ma(db, data.ma)
+    if dt is None or not tk.dien_thoai:
+        return {"ghi": False}
+    n = ND.ghi_nguon(db, dt, tk.dien_thoai, "link", ten=tk.ho_ten or "")
+    db.commit()
+    return {"ghi": bool(n and n.trang_thai == "giu")}
+
+
 class NgaySinhIn(BaseModel):
     ngay_sinh: date
 

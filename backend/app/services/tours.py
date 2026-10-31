@@ -78,6 +78,8 @@ def tour_view(db: Session, t: Tour, user: User | None = None, kem_bookings: bool
         "hoa_hong_khach_tien": getattr(t, "hoa_hong_khach_tien", 0),
         # Biên thứ hai đặt CẠNH biên đã nhập, không thay nó. Xem `rules.bien_neu_hoa_hong_chua_vao`.
         "hoa_hong_khach_bien": R.bien_neu_hoa_hong_chua_vao(t, c),
+        # KS-16h: D06 theo v3 — tour có phụ lục hoa hồng? % VAT trong giá bán (loại khỏi doanh số D06)
+        "d06_phu_luc": bool(getattr(t, "d06_phu_luc", False)), "vat_pct": float(getattr(t, "vat_pct", 8) or 0),
         "company_id": t.company_id, "chua_gan_phap_nhan": t.company_id is None,   # P6: chưa xác định pháp nhân là một trạng thái phải nhìn thấy, không gộp về công ty mẹ
         "imported": t.imported, "product_code": t.product_code, "product_id": t.product_id, "days": t.days, "transport": t.transport, "vehicle_type": t.vehicle_type, "departure_point": t.departure_point,
         "d7_flag": bool(c["breakeven_pax"] and bk < c["breakeven_pax"] and 0 <= days_left <= int(R.get_param(db, "moc_d7")) and t.status == "da_duyet"),
@@ -94,9 +96,11 @@ def tour_view(db: Session, t: Tour, user: User | None = None, kem_bookings: bool
         out["kt_tra_lai"] = TLQ.mo_ta(TLQ.dang_bi_tra_lai(db, [t.id]).get(t.id),
                                       getattr(t, "settlement_version", None))
     if kem_bookings:
+        from app.services import nguon_don as _ND        # KS-16h: nguồn CTV máy gắn
         out["bookings"] = [{"id": b.id, "code": b.code, "sales_id": b.sales_id, "customer_name": b.customer_name, "customer_phone": b.customer_phone, "source": b.source,
                             "pax": b.pax, "amount": b.amount, "discount": b.discount, "promo_code": b.promo_code, "sales_name": b.sales.full_name if b.sales else "",
-                            "sla_minutes": b.sla_minutes, "sla_ok": b.sla_ok, "counts_for_target": b.counts_for_target, "created_at": b.created_at} for b in t.bookings]
+                            "sla_minutes": b.sla_minutes, "sla_ok": b.sla_ok, "counts_for_target": b.counts_for_target, "created_at": b.created_at,
+                            "nguon_ctv": _ND.nguon_cua_booking(db, b) if getattr(b, "nguon_don_id", None) else None} for b in t.bookings]
     if user:
         out["actions"] = allowed_actions(db, t, user)
     return out

@@ -76,6 +76,15 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
   const [tab, setTab] = useState<Tab>("home");
   // DT-2: quay về từ trang thẻ OnePay (?dat_ban=…) → mở thẳng «Đơn của tôi», nơi có «Đặt bàn của tôi».
   useEffect(() => { try { if (new URLSearchParams(window.location.search).get("dat_ban")) setTab("bookings"); } catch { /* bỏ qua */ } }, []);
+  // KS-16h: khách mở link kh.vietourist.vn/CTV-xxxx (app/cong/page.tsx lưu mã) → gửi mã CTV một lần, trong 30 ngày.
+  useEffect(() => {
+    try {
+      const x = JSON.parse(localStorage.getItem("vtd_ctv") || "null");
+      if (!x?.ma) return;
+      if (Date.now() - Number(x.luc || 0) > 30 * 864e5) { localStorage.removeItem("vtd_ctv"); return; }
+      goiCong("/khach/ctv", { ma: x.ma }).then(() => { try { localStorage.removeItem("vtd_ctv"); } catch { /* bỏ qua */ } }).catch(() => null);
+    } catch { /* bỏ qua */ }
+  }, []);
   const [menuMo, setMenuMo] = useState(false);
   const [home, setHome] = useState<any>(null);
   const [ds, setDs] = useState<any>(null);
@@ -289,6 +298,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
               <div className="v3-total"><span>Còn lại</span><strong>{tien(donMo.con_lai)}</strong></div>
               <small>Tiền chỉ ghi «đã thu» khi kế toán xác nhận.</small>
             </section></div>
+          {donMo.con_lai > 0 && donMo.muc !== "bad" && <QuyenLoiDon ma={donMo.ma} />}
           {donMo.con_lai > 0 && donMo.muc !== "bad" && <section className="v3-panel"><div className="v3-section-title"><h3>Thanh toán bằng QR chuyển khoản</h3></div>
             <QrThanhToan ma={donMo.ma} /></section>}
         </>}
@@ -323,3 +333,16 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
     </div>
   </section>);
 }
+
+/* KS-16h · «Biết rõ quyền lợi trước khi đặt»: điểm dự kiến và voucher áp được cho đơn này (máy chủ tính). */
+function QuyenLoiDon({ ma }: { ma: string }) {
+  const [q, setQ] = useState<any>(null);
+  useEffect(() => { goiCong(`/khach/don/${encodeURIComponent(ma)}`).then((d) => setQ(d.quyen_loi || null)).catch(() => setQ(null)); }, [ma]);
+  if (!q) return null;
+  const so = (n: number) => Math.round(n).toLocaleString("vi-VN");
+  return (<div className="v3-notice"><I n="gift" /><span><b>Quyền lợi của đơn này:</b> dự kiến <b>+{so(q.diem_du_kien)} điểm</b>
+    {q.truong_doan ? ` (trưởng đoàn: phần của bạn ${so(q.co_so)} đ × ${String(q.he_so).replace(".", ",")} + ${so(q.thuong_doan)} điểm thưởng)` : ` (${so(q.co_so)} đ × ${String(q.he_so).replace(".", ",")} hạng ${q.hang})`} khi tour kết thúc và bạn trả đủ
+    {" · "}dùng được voucher tối đa {so(q.tran_voucher)} đ (5% đơn) — đọc mã cho Sales
+    {q.voucher_dung_duoc.length > 0 && <>{" · "}voucher của bạn dùng được cho đơn này: {q.voucher_dung_duoc.map((v: any) => `${v.ma} (${v.loai_ten} ${so(v.gia_tri)} đ)`).join(", ")}</>}.</span></div>);
+}
+

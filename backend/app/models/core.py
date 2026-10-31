@@ -517,6 +517,10 @@ class Tour(Base):
     planned_pax: Mapped[int] = mapped_column(Integer, default=0)
     rest_stops: Mapped[str] = mapped_column(Text, default="")             # điểm dừng nghỉ
     strategic: Mapped[bool] = mapped_column(Boolean, default=False)       # tour chiến lược (Chủ tịch công bố)
+    # KS-16h (Chủ tịch duyệt 31/10/2026, đề xuất v3 mục 5): D06 chỉ tính tour CÓ PHỤ LỤC hoa hồng, doanh số
+    # đã LOẠI VAT theo % VAT trong giá bán của tour. Áp từ tháng ký tham số `d06_v3_tu`.
+    d06_phu_luc: Mapped[bool] = mapped_column(Boolean, default=False, server_default=_false(), nullable=False)
+    vat_pct: Mapped[float] = mapped_column(Float, default=8, server_default="8", nullable=False)
     # ── Hoa hồng dành cho khách · Chủ tịch quyết 24/9/2026 ──────────────────────────────────────
     #
     # Mục 4.2 bản mô tả Sale Admin buộc kiểm hoa hồng và quà tặng dành cho khách đã nằm trong giá
@@ -726,6 +730,8 @@ class Booking(Base):
     cancel_reason: Mapped[str] = mapped_column(String(200), default="")
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancel_charge: Mapped[float | None] = mapped_column(TIEN)          # phí hủy giữ lại làm doanh thu, nullable=True
+    # KS-16h: nguồn CTV máy gắn lúc tạo booking (khóa) — xem services/nguon_don.py
+    nguon_don_id: Mapped[int | None] = mapped_column(ForeignKey("nguon_don.id"), nullable=True, index=True)
     service_type: Mapped[str] = mapped_column(String(20), default="")       # non-package: VISA/FLIGHT/HOTEL/VEHICLE/RESTAURANT/LAND/GUIDE/OTHER
     country: Mapped[str] = mapped_column(String(60), default="")
     customer_email: Mapped[str] = mapped_column(String(120), default="")

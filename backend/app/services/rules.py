@@ -306,6 +306,9 @@ DEFAULT_PARAMS = [
     ("rewards_v3_tu", "", "VTD Rewards: áp luật đề xuất v3 từ ngày này (khoản đủ điều kiện trước ngày này giữ luật cũ). Rỗng = luật cũ", "ngày DD-MM-YYYY", "KS-16g, Chủ tịch duyệt v3 31/10/2026"),
     ("rewards_gioi_thieu_bat", "0", "VTD Rewards: mở chương trình giới thiệu khách (1 = mở, 0 = đóng — chờ pháp chế xác nhận)", "0/1", "KS-16g, đề xuất v3"),
     ("d06_hieu_luc_tu", "", "Hoa hồng D06 đại lý / CTV: có hiệu lực từ ngày này (đầu tháng). Rỗng = chưa bật, chỉ tính thử", "ngày DD-MM-YYYY", "DH-1, Chủ tịch chốt D06 26/10/2026"),
+    # KS-16h (31/10/2026): D06 theo đề xuất v3 — doanh số loại VAT, chỉ tour có phụ lục hoa hồng, đặt bàn không vào
+    # bậc D06. Áp từ THÁNG chứa ngày này; tháng trước giữ cách tính cũ. Rỗng = cách tính cũ.
+    ("d06_v3_tu", "", "D06 theo đề xuất v3 (loại VAT, chỉ tour có phụ lục, bỏ đặt bàn) từ tháng chứa ngày này. Rỗng = cách tính cũ", "ngày DD-MM-YYYY", "KS-16h, Chủ tịch duyệt 31/10/2026"),
     ("dat_ban_doan_tu", "10", "Đặt bàn: từ bao nhiêu khách (đặt sẵn menu) thì là ĐOÀN", "khách", "DT-2, Chủ tịch chốt 28/10/2026"),
     ("dat_ban_coc_le_pct", "10", "Đặt bàn: % cọc của khách lẻ (hoặc trả đủ)", "%", "DT-2, Chủ tịch chốt 28/10/2026"),
     ("dat_ban_coc_doan_pct", "50", "Đặt bàn: % cọc bắt buộc của đoàn đặt sẵn menu (hoặc trả đủ)", "%", "DT-2, Chủ tịch chốt 28/10/2026"),
@@ -567,7 +570,7 @@ DEFAULT_PARAMS = [
 # GHÉP LẠI 11/9/2026: khối này từng được commit rồi BIẾN MẤT – một phiên khác lưu đè tệp này bằng
 # bản mở từ trước. Thiếu nó thì routes.py vẫn gọi getattr(R, "THAM_SO_NGAY", ()) và nhận về rỗng,
 # nên cửa nhập ngày im lặng không bao giờ chạy: mã trông đủ, hàng rào thì không có.
-THAM_SO_NGAY = ("ngay_van_hanh_that", "ngay_du_lieu_that_vietrip", "bao_cao_ngay_han_0h_tu", "d06_hieu_luc_tu", "rewards_hieu_luc_tu", "rewards_v3_tu")
+THAM_SO_NGAY = ("ngay_van_hanh_that", "ngay_du_lieu_that_vietrip", "bao_cao_ngay_han_0h_tu", "d06_hieu_luc_tu", "rewards_hieu_luc_tu", "rewards_v3_tu", "d06_v3_tu")
 
 
 

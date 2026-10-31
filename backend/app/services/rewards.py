@@ -474,7 +474,7 @@ def tinh(db: Session, chu: str, hom_nay: date | None = None, now: datetime | Non
                 v.trang_thai = "het_han"
                 continue
             tra, v.trang_thai = "Voucher hết hạn chưa dùng", "het_han"
-        elif v.trang_thai == "da_dung" and v.booking_id and getattr(db.get(Booking, v.booking_id), "cancelled", True):
+        elif v.trang_thai == "da_dung" and v.booking_id and voucher_tour_tra_lai(db, v):
             tra = "Booking dùng voucher đã hủy"
         elif v.trang_thai == "da_dung" and v.don_ks_id and voucher_ks_tra_lai(db, v):
             tra = "Đơn khách sạn dùng voucher đã hủy / hết giờ giữ"
@@ -744,6 +744,25 @@ def xem_voucher(db: Session, ma: str) -> dict:
 
 # ── KS-16: khách tự nhập voucher khi đặt khách sạn ─────────────────────────────────────────────────
 
+def voucher_tour_tra_lai(db: Session, v: VoucherRewards) -> bool:
+    """KS-16h: booking tour dùng voucher bị hủy → trả khi KHÔNG có phí hủy (VTD / nhà cung cấp hủy, hoặc khách hủy
+    miễn phí). Có phí hủy → voucher đã dùng."""
+    b = db.get(Booking, v.booking_id)
+    if b is None:
+        return True
+    return bool(b.cancelled) and float(b.cancel_charge or 0) <= 0
+
+
+def doi_chieu_voucher_tour(db: Session, b: Booking, now: datetime | None = None) -> int:
+    """Gọi ngay lúc hủy booking tour: voucher đủ điều kiện → trả điểm / mở lại luôn. Trả số voucher vừa xử lý."""
+    n = 0
+    for v in db.execute(select(VoucherRewards).where(VoucherRewards.booking_id == b.id, VoucherRewards.trang_thai == "da_dung")).scalars().all():
+        if voucher_tour_tra_lai(db, v):
+            _tra_voucher(db, v, now or datetime.now(), f"Booking {b.code} hủy, hoàn đủ")
+            n += 1
+    return n
+
+
 def voucher_ks_tra_lai(db: Session, v: VoucherRewards) -> bool:
     """Voucher đã gắn đơn khách sạn được TRẢ ĐIỂM khi: đơn hủy có hoàn tiền (khoản hoàn đã trừ phần voucher), hoặc
     đơn hết giờ giữ phòng mà chưa nhận đồng nào. Đơn hủy không hoàn (gói không hoàn tiền) → voucher đã dùng hẳn."""
@@ -752,9 +771,12 @@ def voucher_ks_tra_lai(db: Session, v: VoucherRewards) -> bool:
     d = db.get(DonKsVtd, v.don_ks_id)
     if d is None or d.voucher_id != v.id:
         return True
+    tra = da_tra(db, d)
     if d.trang_thai == "da_huy":
-        return int(d.so_hoan or 0) > 0 or da_tra(db, d) <= 0
-    return d.trang_thai == "het_han" and da_tra(db, d) <= 0
+        # KS-16h (Chủ tịch 31/10/2026): chỉ trả khi HOÀN ĐỦ — VTD / khách sạn hủy, hoặc khách hủy trong điều kiện
+        # miễn phí. Hủy mất phí (hoàn một phần) → voucher tính là đã dùng.
+        return tra <= 0 or int(d.so_hoan or 0) >= tra
+    return d.trang_thai == "het_han" and tra <= 0
 
 
 def doi_chieu_voucher_ks(db: Session, d, now: datetime | None = None) -> bool:
@@ -813,7 +835,8 @@ def voucher_db_tra_lai(db: Session, v: VoucherRewards) -> bool:
         return True
     if d.trang_thai not in ("huy", "khong_den", "tu_choi", "het_han"):
         return False
-    return int(d.so_hoan or 0) > 0 or da_tra(db, d) <= 0
+    tra = da_tra(db, d)
+    return tra <= 0 or int(d.so_hoan or 0) >= tra      # KS-16h: chỉ trả khi hoàn đủ
 
 
 def doi_chieu_voucher_db(db: Session, d, now: datetime | None = None) -> bool:
@@ -846,6 +869,37 @@ def he_so_cua(db: Session, tk, hom_nay: date | None = None) -> dict:
     # không ước được trước; `cach_tinh` cho giao diện đổi lời.
     return {"dang_bat": True, "hang": hg["hang"], "he_so": hg["he_so"], "dong_moi_diem": DONG_MOI_DIEM,
             "cach_tinh": "hoa_hong" if v3 else "gia_tri"}
+
+
+def quyen_loi_don(db: Session, tk, b: Booking, hom_nay: date | None = None) -> dict | None:
+    """KS-16h · «Biết rõ quyền lợi trước khi đặt» (v3 mục 11): điểm dự kiến của booking tour + voucher của khách
+    áp được cho booking này (Sales áp khi khách đọc mã). Chỉ booking trực tiếp, chưa hủy, chưa thu đủ."""
+    hn = hom_nay or _hom_nay()
+    h = he_so_cua(db, tk, hn)
+    if not h["dang_bat"] or b.doi_tac_id or b.cancelled:
+        return None
+    net = int(round(float(b.amount or 0) - float(b.discount or 0)))
+    if net <= 0:
+        return None
+    pax = int(b.pax or 1)
+    v3 = _v3(v3_tu(db), hn)
+    doan = v3 and pax > DOAN_TREN
+    co_so = Fraction(net, pax) if doan else Fraction(net)
+    he = Fraction(str(h["he_so"]))
+    diem = math.floor(co_so * TY_LE_TICH_TOUR / GIA_TRI_DIEM * he) + (THUONG_TRUONG_DOAN if doan else 0)
+    tran = math.floor(net * TRAN_VOUCHER)
+    dung = []
+    for v in db.execute(select(VoucherRewards).where(VoucherRewards.chu.in_(chu_cua_tai_khoan(tk)), VoucherRewards.trang_thai == "cho_dung",
+                                                     VoucherRewards.han_dung >= hn).order_by(VoucherRewards.han_dung)).scalars():
+        if v.gia_tri > tran or net < int(v.don_toi_thieu or 0):
+            continue
+        if v.loai == "chao_mung":
+            dau = next((x for x in _bookings(db, v.chu) if not x.cancelled), None)
+            if dau is None or dau.id != b.id:
+                continue
+        dung.append({"ma": v.ma, "gia_tri": v.gia_tri, "loai_ten": LOAI_VOUCHER.get(v.loai, v.loai), "han_dung": v.han_dung.isoformat()})
+    return {"diem_du_kien": diem, "hang": h["hang"], "he_so": h["he_so"], "co_so": int(co_so), "truong_doan": doan,
+            "thuong_doan": THUONG_TRUONG_DOAN if doan else 0, "tran_voucher": tran, "voucher_dung_duoc": dung}
 
 
 def _cho_cong_ks(db: Session, chu: str, hom_nay: date) -> list[dict]:

@@ -288,6 +288,11 @@ def don(db: Session, tk: TaiKhoanNgoai, ma: str) -> dict:
     if d is None:
         # Cùng một câu cho «không có» và «không phải của bạn» — cổng không thành máy dò mã booking.
         raise LoiKhach("Không tìm thấy đơn này trong tài khoản của bạn")
+    # KS-16h: quyền lợi VTD Rewards của đơn — chỉ khi còn phải trả
+    if d["con_lai"] > 0:
+        from app.services import rewards as RW
+        b = db.execute(select(Booking).where(Booking.code == ma)).scalars().first()
+        d["quyen_loi"] = RW.quyen_loi_don(db, tk, b) if b is not None else None
     return d
 
 
