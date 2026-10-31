@@ -30,7 +30,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
-from app.models.accounting import Account, JournalEntry, JournalLine, Partner
+from app.models.accounting import Account, JournalEntry, JournalLine, Partner, Project
+from app.models.core import Tour
 from app.services import chung_tu_loai as CTL
 from app.core.config import settings
 
@@ -909,3 +910,56 @@ def dem_hoa_don_thieu(db: Session, since: date, upto: date) -> dict:
                              + func.coalesce(func.sum(JournalLine.credit), 0.0)), upto, since)
             .where(JournalLine.entry_id.in_(ct), dk_thue)).scalar() or 0), 0)
     return {"chua_nhan": n, "thue": thue, "since": since, "upto": upto}
+
+
+# ---------- Ô CHỌN MÃ CÔNG TRÌNH — ĐỢT R7-MCT 01/11/2026 ----------
+#
+# Chủ tịch nói 01/11/2026: "Mã công trình là nối với mã tour do Điều hành và Sales Admin tạo",
+# và chốt: ĐỌC DANH SÁCH TOUR THẬT, mã nào chưa có trong sổ thì vẫn hiện nhưng ghi rõ.
+#
+# VÌ SAO PHẢI CÓ CỬA RIÊNG CHỨ KHÔNG GỌI `/api/v1/tours`: robot Kiểm soát ĐO ĐƯỢC cửa ấy chạy
+# 16–30 giây trên hệ thật (`backend/tools/ks5_dem_truy_van.py` đặt trần 300 truy vấn cho nó), và
+# giao diện đang gọi nó bằng `?limit=2000`. Nhét cửa ấy vào một ô chọn thì mỗi lần kế toán mở thẻ
+# Sổ kế toán là chờ nửa phút — một màn hình như thế không ai dùng lần thứ hai.
+#
+# Nên cửa này KHÔNG trả danh sách, nó trả KẾT QUẢ TÌM: gõ vài ký tự, nhận tối đa 50 dòng, mỗi dòng
+# bốn thứ. Gộp ở CƠ SỞ DỮ LIỆU bằng một phép nối trái, không nạp 2.000 chuyến lên bộ nhớ — đúng
+# giới hạn bộ nhớ đã khai ở đầu tệp này.
+#
+# `co_trong_so` TRẢ LỜI MỘT CÂU HỎI NGHIỆP VỤ, không phải một chi tiết kỹ thuật: sổ kế toán gom
+# theo `project_code`, nên một mã tour chưa có công trình thì CHỌN NÓ CŨNG KHÔNG RA SỐ. Nếu ô chọn
+# giấu điều đó đi, kế toán sẽ thấy một sổ rỗng và tưởng đoàn ấy không phát sinh gì — tức màn hình
+# nói sai. Hiện ra kèm chữ "chưa gắn vào sổ" thì chỗ hụt lộ ra, và người đọc biết phải đi gắn mã.
+#
+# HAI ĐƯỜNG NỐI, lấy cả hai: `projects.tour_id` (bộ nạp MISA gắn thẳng) HOẶC `projects.code` trùng
+# `tours.code` (bộ nạp ghi "Mã trùng mã tour VTOS → tự gắn"). Chỉ xét một đường thì một nửa số đã
+# gắn sẽ bị báo nhầm là chưa gắn.
+#
+# MÓN NỢ ĐÃ ĐO ĐƯỢC, ghi ra đây để không ai tưởng là đã xong: cửa này liệt kê TOUR, nên một công
+# trình chỉ có trong danh mục mà KHÔNG có tour — mã kỹ thuật (`Project.technical`), hoặc công
+# trình nạp từ MISA của năm cũ — sẽ không hiện trong ô chọn. Chủ tịch chọn đúng hình này
+# 01/11/2026 (phương án "danh sách tour thật") thay vì gộp hai danh sách. Muốn mở thì thêm một
+# nguồn thứ hai vào chính hàm này, đừng mở bằng cách cho gõ tay trở lại.
+
+MA_LIMIT = 50            # trần số dòng của một lần tìm mã; ô chọn tìm theo chữ, không duyệt hết
+
+
+def ma_cong_trinh(db: Session, q: str = "", limit: int = MA_LIMIT) -> dict:
+    """Tìm mã tour theo chữ gõ vào, kèm cờ `co_trong_so`. Một câu SQL, có trần."""
+    limit = max(1, min(int(limit or MA_LIMIT), MA_LIMIT))
+    dk = []
+    if q and q.strip():
+        m = f"%{q.strip()}%"
+        dk.append(or_(Tour.code.ilike(m), Tour.name.ilike(m)))
+    tong = db.execute(select(func.count()).select_from(Tour).where(*dk)).scalar() or 0
+    cau = (select(Tour.code, Tour.name, Tour.start_date, Tour.end_date, func.count(Project.id))
+           .select_from(Tour)
+           .join(Project, or_(Project.tour_id == Tour.id, Project.code == Tour.code), isouter=True)
+           .where(*dk)
+           .group_by(Tour.id, Tour.code, Tour.name, Tour.start_date, Tour.end_date)
+           .order_by(Tour.start_date.desc(), Tour.code)
+           .limit(limit))
+    rows = [{"code": c, "ten": n, "tu_ngay": s, "den_ngay": e, "co_trong_so": int(sl or 0) > 0}
+            for c, n, s, e, sl in db.execute(cau).all()]
+    return {"q": q, "rows": rows, "total_rows": int(tong), "shown_rows": len(rows),
+            "truncated": int(tong) > len(rows), "limit": limit}
