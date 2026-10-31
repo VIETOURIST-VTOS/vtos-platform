@@ -170,6 +170,19 @@ def _bookings(db: Session, chu: str) -> list[Booking]:
     return [b for b in db.execute(cau.order_by(Booking.id)).scalars() if chu_cua_booking(b) == chu]
 
 
+def _bookings_ctv(db: Session, chu: str) -> list[Booking]:
+    """KS-16i (Chủ tịch 01/11/2026, theo v3): booking nguồn CTV của chủ điểm — cũng tích điểm (từ ngày áp v3,
+    trong trần chi phí ưu đãi của booking). Booking qua ĐẠI LÝ vẫn không tích."""
+    from app.models.doi_tac_ban_hang import DoiTacBanHang
+    kieu, gt = chu.split(":", 1)
+    cau = select(Booking).join(DoiTacBanHang, DoiTacBanHang.id == Booking.doi_tac_id).where(DoiTacBanHang.loai == "ctv_ban_hang")
+    if kieu == "sdt":
+        cau = cau.where(Booking.customer_phone.like("%" + "%".join(gt[-9:])))
+    else:
+        cau = cau.where(func.lower(Booking.customer_email) == gt)
+    return [b for b in db.execute(cau.order_by(Booking.id)).scalars() if chu_cua_booking(b) == chu]
+
+
 class _Muc:
     """Một khoản tích điểm: booking tour hoặc đơn đặt bàn. `khoa` phân biệt hai loại trong sổ."""
     def __init__(self, khoa: tuple, ma: str, huy: bool):
@@ -215,7 +228,7 @@ def _b_dat_ban(db: Session, d) -> int:
 
 
 def _muc(db: Session, chu: str) -> list:
-    ra = [_Muc(("b", b.id), b.code, bool(b.cancelled)) for b in _bookings(db, chu)]
+    ra = [_Muc(("b", b.id), b.code, bool(b.cancelled)) for b in _bookings(db, chu) + _bookings_ctv(db, chu)]
     ra += [_Muc(("d", d.id), d.ma, d.trang_thai in ("huy", "khong_den", "tu_choi", "het_han")) for d in _don_dat_ban(db, chu)]
     ra += [_Muc(("k", d.id), d.ma, d.trang_thai in ("da_huy", "het_han")) for d in _don_ks(db, chu)]
     return ra
@@ -224,11 +237,12 @@ def _muc(db: Session, chu: str) -> list:
 class _Du:
     """Một khoản đủ điều kiện. `net` = B hiển thị · `uu_dai` = giá trị (đồng) thành điểm trước hệ số ·
     `chi` = phần vào chi tiêu xét hạng · `doan` = trưởng đoàn (v3, > 15 khách)."""
-    __slots__ = ("muc", "ngay", "net", "uu_dai", "chi", "doan", "v3", "uu_dai_cu")
+    __slots__ = ("muc", "ngay", "net", "uu_dai", "chi", "doan", "v3", "uu_dai_cu", "ctv")
 
     def __init__(self, muc, ngay, net, uu_dai, chi, doan=False, v3=False):
         self.muc, self.ngay, self.net, self.uu_dai, self.chi, self.doan, self.v3 = muc, ngay, net, uu_dai, chi, doan, v3
         self.uu_dai_cu = net * TY_LE_TICH_TOUR      # cách tính cũ — giữ cho khoản đã cộng trước ngày áp v3
+        self.ctv = False                            # KS-16i: booking nguồn CTV — điểm trong trần chi phí
 
 
 def _du_dk(db: Session, chu: str, hom_nay: date) -> list[_Du]:
@@ -237,18 +251,24 @@ def _du_dk(db: Session, chu: str, hom_nay: date) -> list[_Du]:
     from app.services.hoa_hong_d06 import tinh_trang_booking
     moc = v3_tu(db)
     ra = []
-    for b in _bookings(db, chu):
+    for b in _bookings(db, chu) + _bookings_ctv(db, chu):
         if b.cancelled:
             continue
         tt = tinh_trang_booking(db, b, db.get(Tour, b.tour_id) if b.tour_id else None, hom_nay)
         if tt["du"] and tt["net"] > 0:
             net, v3 = tt["net"], _v3(moc, tt["ngay"])
+            if b.doi_tac_id and not v3:         # đơn CTV chỉ tích từ ngày áp v3
+                continue
+            n0 = len(ra)
             pax = int(b.pax or 1)
             if v3 and pax > DOAN_TREN:          # trưởng đoàn: chỉ phần của mình
                 phan = Fraction(net, pax)
                 ra.append(_Du(_Muc(("b", b.id), b.code, False), tt["ngay"], net, phan * TY_LE_TICH_TOUR, phan, True, True))
             else:
                 ra.append(_Du(_Muc(("b", b.id), b.code, False), tt["ngay"], net, net * TY_LE_TICH_TOUR, Fraction(net), False, v3))
+            if b.doi_tac_id:
+                for x in ra[n0:]:
+                    x.ctv = True
     for d in _don_dat_ban(db, chu):
         if d.trang_thai != "da_dung" or d.chot_luc is None:
             continue
@@ -448,6 +468,14 @@ def tinh(db: Session, chu: str, hom_nay: date | None = None, now: datetime | Non
             if k.v3 and x["dau"] and not x.get("v3"):
                 k.v3, k.doan, k.uu_dai = False, False, k.uu_dai_cu
             dich = math.floor(k.uu_dai / GIA_TRI_DIEM * he)
+            if k.ctv:
+                # KS-16i: đơn CTV — không vượt trần chi phí ưu đãi của booking (đã tính hoa hồng nguồn); đã cộng thì
+                # không tăng thêm, chỉ giảm khi giá trị đủ điều kiện giảm. Tour chưa có dự toán → không cộng.
+                if x["diem"] > 0:
+                    dich = min(dich, x["diem"])
+                else:
+                    p = phong_uu_dai_tour(db, db.get(Booking, b.id[1]), chu=chu, bo_diem=True)
+                    dich = min(dich, max(0, p["con"]) // GIA_TRI_DIEM) if p else 0
         else:
             k, net, dich, he, ten = None, 0, 0, None, ""
         chenh = dich - x["diem"]
@@ -458,6 +486,8 @@ def tinh(db: Session, chu: str, hom_nay: date | None = None, now: datetime | Non
                 ghi = f"{b.code} · trưởng đoàn, phần của mình {int(k.chi):,} đ × {float(he):g}"
             else:
                 ghi = f"{b.code} · {net:,} đ × {float(he):g}"
+            if k.ctv:
+                ghi += " · đơn CTV (trong trần chi phí)"
             _ghi(db, chu, "CONG", chenh, now, **noi, het_han=han_moi, co_so=net,
                  he_so=str(he), hang=ten, ghi_chu=ghi.replace(",", ".") + (DAU_V3 if k.v3 else ""))
             so_ghi += 1
@@ -593,7 +623,7 @@ def _ty_le_nguon_cao_nhat(db: Session, b: Booking) -> Fraction:
     return Fraction(max(x[2] for x in BAC[ct]["bac"]), 10_000)
 
 
-def phong_uu_dai_tour(db: Session, b: Booking, them: int = 0, chu: str | None = None) -> dict | None:
+def phong_uu_dai_tour(db: Session, b: Booking, them: int = 0, chu: str | None = None, bo_diem: bool = False) -> dict | None:
     """Trần ưu đãi mới của một booking tour: C ≤ min(40%·G, G − 5%·B). G = (doanh thu dự kiến − dự toán chi) của tour,
     phân bổ theo tỷ trọng B của booking. C = điểm (đã cộng, hoặc ước theo hạng hiện tại) + voucher đã áp + thưởng đã ghi
     + hoa hồng nguồn (bậc D06 cao nhất) + `them`. Tour chưa có dự toán → None (không phát ưu đãi mới)."""
@@ -611,7 +641,9 @@ def phong_uu_dai_tour(db: Session, b: Booking, them: int = 0, chu: str | None = 
     chu = chu or chu_cua_booking(b)
     da_cong = int(db.execute(select(func.coalesce(func.sum(SoDiem.so_diem), 0)).where(
         SoDiem.booking_id == b.id, SoDiem.loai.in_(("CONG", "DAO")))).scalar_one())
-    if da_cong:
+    if bo_diem:
+        diem = 0
+    elif da_cong:
         diem = da_cong * GIA_TRI_DIEM
     else:
         he = he_so_hang(hang(db, chu)["hang"]) if chu else Fraction(1)
@@ -876,8 +908,15 @@ def quyen_loi_don(db: Session, tk, b: Booking, hom_nay: date | None = None) -> d
     áp được cho booking này (Sales áp khi khách đọc mã). Chỉ booking trực tiếp, chưa hủy, chưa thu đủ."""
     hn = hom_nay or _hom_nay()
     h = he_so_cua(db, tk, hn)
-    if not h["dang_bat"] or b.doi_tac_id or b.cancelled:
+    if not h["dang_bat"] or b.cancelled:
         return None
+    ctv = False
+    if b.doi_tac_id:                       # KS-16i: đơn CTV tích điểm từ ngày áp v3 (trong trần), không dùng voucher
+        from app.models.doi_tac_ban_hang import DoiTacBanHang
+        dt_ = db.get(DoiTacBanHang, b.doi_tac_id)
+        if dt_ is None or dt_.loai != "ctv_ban_hang" or not _v3(v3_tu(db), hn):
+            return None
+        ctv = True
     net = int(round(float(b.amount or 0) - float(b.discount or 0)))
     if net <= 0:
         return None
@@ -887,10 +926,10 @@ def quyen_loi_don(db: Session, tk, b: Booking, hom_nay: date | None = None) -> d
     co_so = Fraction(net, pax) if doan else Fraction(net)
     he = Fraction(str(h["he_so"]))
     diem = math.floor(co_so * TY_LE_TICH_TOUR / GIA_TRI_DIEM * he) + (THUONG_TRUONG_DOAN if doan else 0)
-    tran = math.floor(net * TRAN_VOUCHER)
+    tran = 0 if ctv else math.floor(net * TRAN_VOUCHER)
     dung = []
-    for v in db.execute(select(VoucherRewards).where(VoucherRewards.chu.in_(chu_cua_tai_khoan(tk)), VoucherRewards.trang_thai == "cho_dung",
-                                                     VoucherRewards.han_dung >= hn).order_by(VoucherRewards.han_dung)).scalars():
+    for v in ([] if ctv else db.execute(select(VoucherRewards).where(VoucherRewards.chu.in_(chu_cua_tai_khoan(tk)), VoucherRewards.trang_thai == "cho_dung",
+                                                     VoucherRewards.han_dung >= hn).order_by(VoucherRewards.han_dung)).scalars()):
         if v.gia_tri > tran or net < int(v.don_toi_thieu or 0):
             continue
         if v.loai == "chao_mung":
@@ -899,7 +938,7 @@ def quyen_loi_don(db: Session, tk, b: Booking, hom_nay: date | None = None) -> d
                 continue
         dung.append({"ma": v.ma, "gia_tri": v.gia_tri, "loai_ten": LOAI_VOUCHER.get(v.loai, v.loai), "han_dung": v.han_dung.isoformat()})
     return {"diem_du_kien": diem, "hang": h["hang"], "he_so": h["he_so"], "co_so": int(co_so), "truong_doan": doan,
-            "thuong_doan": THUONG_TRUONG_DOAN if doan else 0, "tran_voucher": tran, "voucher_dung_duoc": dung}
+            "thuong_doan": THUONG_TRUONG_DOAN if doan else 0, "tran_voucher": tran, "voucher_dung_duoc": dung, "ctv": ctv}
 
 
 def _cho_cong_ks(db: Session, chu: str, hom_nay: date) -> list[dict]:
