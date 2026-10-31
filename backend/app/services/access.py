@@ -1076,7 +1076,12 @@ MENU_ROLES = {
     # --- Tài chính & Kế toán. Ba màn hình tiền thu về Kế toán; hai Phó TGĐ và CNTT không còn xem. ---
     "/collections": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),
     "/expenses": PAYMENT_REQUEST_ROLES,
-    "/accounting": BASE_VIEW + ("ketoan", "tp_dh", "cntt"),
+    # DOT R7-SO 28/10/2026 — THEM `ketoan_truong`. Day khong phai mot quyen moi: Dot R4b-2b
+    # (23/10/2026) da mo CUA `/api/v1/books` cho vai nay, con MENU thi chua. Mot nguoi co chia
+    # khoa ma khong thay cua la mot cho hut, khong phai mot hang rao. `tp_dh` giu nguyen — vai
+    # ay vao de xem hoa don cua doan, va `books.READ` van chan no doc so, nen the So an o giao
+    # dien (`test_r7so_3` canh ca hai ve).
+    "/accounting": BASE_VIEW + ("ketoan", "ketoan_truong", "tp_dh", "cntt"),
     "/finance": FINANCE_ROLES,
     "/bank-accounts": FINANCE_ROLES,
     # Sổ công nợ toàn hệ thống: phải thu của khách và phải trả nhà cung cấp là số tiền của cả công ty.

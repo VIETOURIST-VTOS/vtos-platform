@@ -12,7 +12,7 @@ const EST: Record<string, [string, string]> = { nhap: ["Nháp", "warn"], da_ghi_
 // khỏi đó qua nút "Dò lại" — màn hình cố ý KHÔNG cho phát hành lại.
 const IST: Record<string, [string, string]> = { nhap: ["Nháp", "warn"], dang_phat_hanh: ["ĐANG PHÁT HÀNH", "warn"], da_phat_hanh: ["Đã phát hành", "ok"], huy: ["Hủy", "red"] };
 const thisPeriod = () => new Date().toISOString().slice(0, 7);
-const TABS = [["journal", "Chứng từ ghi sổ"], ["ledger", "Sổ cái"], ["tb", "Cân đối phát sinh"], ["invoices", "Hóa đơn điện tử"], ["bctc", "BCTC TT99"], ["fs", "BCTC rút gọn"], ["tax", "Tờ khai thuế"], ["misa", "MISA ↔ VTOS"], ["periods", "Khóa kỳ"]];
+const TABS = [["journal", "Chứng từ ghi sổ"], ["so", "Sổ kế toán"], ["invoices", "Hóa đơn điện tử"], ["bctc", "BCTC TT99"], ["fs", "BCTC rút gọn"], ["tax", "Tờ khai thuế"], ["misa", "MISA ↔ VTOS"], ["periods", "Khóa kỳ"]];
 const SRC2: Record<string, string> = { misa: "Sổ MISA", so_du_dau_ky: "Số dư đầu kỳ", kiem_toan: "Điều chỉnh kiểm toán" };
 const dl = (path: string, name: string) => fetch(`/api/v1${path}`, { headers: { Authorization: `Bearer ${localStorage.getItem("vtos_token")}` } }).then((r) => r.blob()).then((b) => { const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = name; a.click(); });
 
@@ -315,6 +315,183 @@ function BctcPanel({ toast, period, isKT, isKy }: { toast: (m: string, e?: boole
   </>;
 }
 
+// ── ĐỢT R7-SO 28/10/2026 — MỘT THẺ "SỔ KẾ TOÁN", MƯỜI BA SỔ ──────────────────────────────────
+// Chủ tịch chốt 24/10/2026. `/api/v1/books` đã có đủ 13 sổ và một cửa danh mục (`GET /books`)
+// viết sẵn "để dựng menu Sổ kế toán giống MISA" từ Đợt R4a — nhưng CHƯA MÀN HÌNH NÀO GỌI NÓ.
+// Một phân hệ không có cửa cho người dùng thì chưa phải là một phân hệ, nó là một thư viện.
+//
+// VÌ SAO GỘP VÀO `/accounting` CHỨ KHÔNG DỰNG MÀN HÌNH MỚI: hai thẻ "Sổ cái" và "Cân đối phát
+// sinh" đang gọi `/ledger` và `/trial-balance` — hai cửa CŨ, hẹp hơn `/books`, không có TK đối
+// ứng, không có Dư Nợ/Dư Có riêng, không xuất Excel, không có trần dòng. Để chúng cạnh thẻ mới
+// là để hai sổ cái trên cùng một màn hình, và sớm muộn có người đối chiếu nhầm bản. Nên thẻ mới
+// THAY hai thẻ cũ, không nằm cạnh.
+const SO_NHOM: [string, string[]][] = [
+  ["Sổ tổng hợp", ["nhat-ky-chung", "so-cai", "can-doi-tai-khoan", "chung-tu-goc"]],
+  ["Sổ chi tiết", ["so-chi-tiet", "so-quy", "so-tien-gui", "nhat-ky-tien"]],
+  ["Công nợ", ["cong-no", "cong-no-tong-hop", "hoa-don-thieu"]],
+  ["Công trình (tour)", ["cong-trinh", "cong-trinh-tong-hop"]],
+];
+type Cot = [string, string, "n" | "d" | "t"];
+const C = (k: string, t: string, kind: "n" | "d" | "t" = "t"): Cot => [k, t, kind];
+const COT_NKC: Cot[] = [C("date", "Ngày", "d"), C("code", "Số chứng từ"), C("doc_no", "Số CT gốc"), C("description", "Diễn giải"), C("account", "TK"), C("contra", "TK đối ứng"), C("partner", "Đối tượng"), C("project_code", "Công trình"), C("debit", "Phát sinh Nợ", "n"), C("credit", "Phát sinh Có", "n")];
+const COT_CT: Cot[] = [C("date", "Ngày", "d"), C("code", "Số chứng từ"), C("doc_no", "Số CT gốc"), C("ngay_hoa_don", "Ngày hóa đơn", "d"), C("so_hoa_don", "Số hóa đơn"), C("description", "Diễn giải"), C("account", "TK"), C("contra", "TK đối ứng"), C("partner", "Đối tượng"), C("project_code", "Công trình"), C("debit", "Phát sinh Nợ", "n"), C("credit", "Phát sinh Có", "n")];
+const COT_TIEN: Cot[] = [C("date", "Ngày", "d"), C("code", "Số chứng từ"), C("doc_no", "Số CT gốc"), C("description", "Diễn giải"), C("contra", "TK đối ứng"), C("partner", "Đối tượng"), C("amount_in", "Thu", "n"), C("amount_out", "Chi", "n"), C("balance", "Tồn", "n")];
+const SO_COT: Record<string, Cot[]> = {
+  "nhat-ky-chung": COT_NKC,
+  "so-cai": [C("date", "Ngày", "d"), C("code", "Số chứng từ"), C("description", "Diễn giải"), C("account", "TK"), C("contra", "TK đối ứng"), C("debit", "Phát sinh Nợ", "n"), C("credit", "Phát sinh Có", "n"), C("balance_debit", "Dư Nợ", "n"), C("balance_credit", "Dư Có", "n")],
+  "so-chi-tiet": COT_CT,
+  "cong-no": COT_CT,
+  "so-quy": COT_TIEN,
+  "so-tien-gui": COT_TIEN,
+  "nhat-ky-tien": [C("date", "Ngày", "d"), C("code", "Số chứng từ"), C("doc_no", "Số CT gốc"), C("description", "Diễn giải"), C("account", "TK tiền"), C("contra", "TK đối ứng"), C("partner", "Đối tượng"), C("project_code", "Công trình"), C("amount", "Số tiền", "n")],
+  "can-doi-tai-khoan": [C("account", "TK"), C("name", "Tên tài khoản"), C("open_debit", "Dư đầu Nợ", "n"), C("open_credit", "Dư đầu Có", "n"), C("debit", "PS Nợ", "n"), C("credit", "PS Có", "n"), C("close_debit", "Dư cuối Nợ", "n"), C("close_credit", "Dư cuối Có", "n")],
+  "cong-no-tong-hop": [C("partner_code", "Mã đối tượng"), C("partner", "Tên đối tượng"), C("opening", "Dư đầu", "n"), C("debit", "PS Nợ", "n"), C("credit", "PS Có", "n"), C("closing", "Dư cuối", "n")],
+  "chung-tu-goc": [C("ma", "Mã loại"), C("ten", "Loại chứng từ"), C("so_chung_tu", "Số chứng từ", "n"), C("debit", "Phát sinh Nợ", "n"), C("credit", "Phát sinh Có", "n"), C("tk_hay_gap", "TK hay gặp")],
+  "cong-trinh": [C("date", "Ngày", "d"), C("code", "Số chứng từ"), C("description", "Diễn giải"), C("account", "TK"), C("account_name", "Tên TK"), C("contra", "TK đối ứng"), C("partner", "Đối tượng"), C("debit", "Phát sinh Nợ", "n"), C("credit", "Phát sinh Có", "n")],
+  "cong-trinh-tong-hop": [C("project_code", "Mã công trình"), C("revenue", "Doanh thu", "n"), C("cost", "Chi phí", "n"), C("profit", "Lãi lỗ", "n")],
+  "hoa-don-thieu": [C("date", "Ngày", "d"), C("code", "Số chứng từ"), C("description", "Diễn giải"), C("account", "TK"), C("partner", "Đối tượng"), C("debit", "Phát sinh Nợ", "n"), C("credit", "Phát sinh Có", "n"), C("so_ngay", "Quá (ngày)", "n")],
+};
+// Sổ nào có tệp Excel — ĐO TỪ `api/v1/books.py`, không đoán. `test_r7so_5` canh hai bên khớp nhau.
+const SO_XLSX = ["nhat-ky-chung", "so-cai", "so-chi-tiet", "so-quy", "so-tien-gui", "cong-no", "cong-no-tong-hop", "can-doi-tai-khoan", "nhat-ky-tien", "cong-trinh-tong-hop", "chung-tu-goc"];
+// Ô nhập mỗi sổ NHẬN, và ô nào BẮT BUỘC. Cửa nào không nhận thì ô ấy xám — người dùng thấy ngay
+// "sổ này không lọc theo đối tượng", thay vì gõ vào rồi tưởng đã lọc.
+const SO_NHAN: Record<string, string[]> = {
+  "nhat-ky-chung": [], "so-cai": ["account"], "so-chi-tiet": ["account", "partner_code", "project_code"],
+  "so-quy": [], "so-tien-gui": ["partner_code"], "cong-no": ["account", "partner_code"],
+  "cong-no-tong-hop": ["account"], "can-doi-tai-khoan": ["level"], "chung-tu-goc": [],
+  "nhat-ky-tien": ["direction"], "cong-trinh": ["project_code"], "cong-trinh-tong-hop": [],
+  "hoa-don-thieu": ["partner_code"],
+};
+const SO_BAT_BUOC: Record<string, string[]> = {
+  "so-cai": ["account"], "so-chi-tiet": ["account"], "cong-no": ["account", "partner_code"],
+  "cong-no-tong-hop": ["account"], "cong-trinh": ["project_code"],
+};
+const soTen = (dm: any[], k: string) => dm.find((d) => d.key === k)?.ten || k;
+const soMau = (dm: any[], k: string) => dm.find((d) => d.key === k)?.mau || "";
+
+// QUY TẮC 4 — Ô TRỐNG LÀ CHƯA CÓ SỐ, KHÔNG PHẢI SỐ KHÔNG. Mọi ô số của màn hình này đi qua
+// đúng một hàm, nên không có chỗ nào lọt một `|| 0`. Bảng cân đối tài khoản là nơi quan trọng
+// nhất: ô "Dư cuối Nợ" trống nghĩa là số dư KHÔNG nằm bên Nợ — viết 0 vào đó là nói sai.
+const oSo = (v: any) => (v === null || v === undefined || v === 0 || v === "" ? "" : vnd(v));
+
+function SoKeToanPanel({ toast }: { toast: (m: string, e?: boolean) => void }) {
+  const [dm, setDm] = useState<any[]>([]);
+  const [so, setSo] = useState("nhat-ky-chung");
+  const [since, setSince] = useState(`${new Date().getFullYear()}-01-01`);
+  const [upto, setUpto] = useState(new Date().toISOString().slice(0, 10));
+  const [f, setF] = useState({ account: "", partner_code: "", project_code: "", direction: "thu", level: "0" });
+  const [rep, setRep] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { api("/books").then(setDm).catch(() => setDm([])); }, []);
+
+  const nhan = (o: string) => (SO_NHAN[so] || []).includes(o);
+  const thieu = (SO_BAT_BUOC[so] || []).filter((o) => !(f as any)[o]);
+  const qs = () => {
+    const p = new URLSearchParams({ since, upto });
+    (SO_NHAN[so] || []).forEach((o) => { const v = (f as any)[o]; if (v !== "" && v !== undefined) p.set(o, v); });
+    return p.toString();
+  };
+  const xem = async () => {
+    setBusy(true);
+    try { setRep({ ...(await api(`/books/${so}?${qs()}`)), _so: so }); }
+    catch (x) { setRep(null); toast(errMsg(x), true); }
+    finally { setBusy(false); }
+  };
+  const tai = () => dl(`/books/${so}.xlsx?${qs()}`, `${so}_${since}_${upto}.xlsx`);
+
+  const cot = SO_COT[rep?._so] || [];
+  const cong: Record<string, any> | null = (() => {
+    if (!rep) return null;
+    const t = rep.total;
+    switch (rep._so) {
+      case "nhat-ky-chung": case "cong-trinh": return { description: "TỔNG CỘNG", debit: t?.debit ?? rep.revenue, credit: t?.credit ?? rep.cost };
+      case "so-cai": case "so-chi-tiet": case "cong-no":
+        return { description: "Cộng phát sinh / Số dư cuối kỳ", debit: t?.debit, credit: t?.credit,
+                 balance_debit: rep.closing > 0 ? rep.closing : null, balance_credit: rep.closing < 0 ? -rep.closing : null };
+      case "so-quy": case "so-tien-gui":
+        return { description: "Cộng phát sinh / Tồn cuối kỳ", amount_in: t?.in, amount_out: t?.out, balance: rep.closing };
+      case "nhat-ky-tien": return { description: "TỔNG CỘNG", amount: rep.total };
+      case "can-doi-tai-khoan": return { name: "Cộng", ...t };
+      case "cong-no-tong-hop": return { partner: "Cộng", opening: t?.opening, debit: t?.debit, credit: t?.credit, closing: t?.closing };
+      case "cong-trinh-tong-hop": return { project_code: "Cộng", revenue: t?.revenue, cost: t?.cost, profit: t?.profit };
+      case "chung-tu-goc": return { ten: "Cộng", so_chung_tu: t?.so_chung_tu, debit: t?.debit, credit: t?.credit };
+      default: return null;
+    }
+  })();
+  const dauKy = rep && ["so-cai", "so-chi-tiet", "cong-no", "so-quy", "so-tien-gui"].includes(rep._so);
+
+  return (<>
+    <div className="panel">
+      <div className="grid">
+        <label>Sổ<select value={so} onChange={(e) => { setSo(e.target.value); setRep(null); }}>
+          {SO_NHOM.map(([ten, ks]) => <optgroup key={ten} label={ten}>
+            {ks.map((k) => <option key={k} value={k}>{soTen(dm, k)}{soMau(dm, k) ? ` (${soMau(dm, k)})` : ""}</option>)}
+          </optgroup>)}
+        </select></label>
+        <label>Từ ngày<input type="date" value={since} onChange={(e) => setSince(e.target.value)} /></label>
+        <label>Đến ngày<input type="date" value={upto} onChange={(e) => setUpto(e.target.value)} /></label>
+        <label style={{ opacity: nhan("account") ? 1 : 0.45 }}>Tài khoản<input disabled={!nhan("account")} placeholder={nhan("account") ? "131" : "sổ này không lọc theo TK"} value={f.account} onChange={(e) => setF({ ...f, account: e.target.value })} /></label>
+        <label style={{ opacity: nhan("partner_code") ? 1 : 0.45 }}>Mã đối tượng<input disabled={!nhan("partner_code")} placeholder={nhan("partner_code") ? "KH0001" : "sổ này không lọc theo đối tượng"} value={f.partner_code} onChange={(e) => setF({ ...f, partner_code: e.target.value })} /></label>
+        <label style={{ opacity: nhan("project_code") ? 1 : 0.45 }}>Mã công trình<input disabled={!nhan("project_code")} placeholder={nhan("project_code") ? "mã tour" : "sổ này không lọc theo công trình"} value={f.project_code} onChange={(e) => setF({ ...f, project_code: e.target.value })} /></label>
+        {nhan("direction") && <label>Chiều tiền<select value={f.direction} onChange={(e) => setF({ ...f, direction: e.target.value })}><option value="thu">Thu tiền (S03a1-DN)</option><option value="chi">Chi tiền (S03a2-DN)</option></select></label>}
+        {nhan("level") && <label>Cấp tài khoản<select value={f.level} onChange={(e) => setF({ ...f, level: e.target.value })}><option value="0">Tất cả các cấp</option><option value="1">Cấp 1</option><option value="2">Cấp 2</option><option value="3">Cấp 3</option></select></label>}
+      </div>
+      <button className="act" disabled={busy || !!thieu.length} onClick={xem}>{busy ? "Đang đọc sổ…" : "Xem sổ"}</button>
+      {SO_XLSX.includes(so) && <button className="act grey" disabled={busy || !!thieu.length} onClick={tai}>Tải Excel</button>}
+      <button className="act grey" disabled={!rep} onClick={() => window.print()}>In</button>
+      {!!thieu.length && <span className="muted" style={{ marginLeft: 8 }}>Còn thiếu: {thieu.join(", ")}</span>}
+    </div>
+
+    <p className="muted" style={{ background: "#fff8e1", border: "1px solid #ffe08a", borderRadius: 6, padding: "6px 10px" }}>
+      Số dư đầu kỳ của mọi sổ ở đây tính TỪ CHỨNG TỪ ĐÃ GHI SỔ, không lấy từ bảng số dư nhập tay.
+      Kỳ đầu tiên sau khi cắt chuyển từ MISA phải nạp số dư đầu kỳ ở thẻ “MISA ↔ VTOS” trước, nếu không
+      cột “Dư đầu” sẽ trống — trống nghĩa là CHƯA CÓ SỐ, không phải bằng không.
+    </p>
+
+    {rep && <>
+      <h2 style={{ marginBottom: 2 }}>{soTen(dm, rep._so)} {soMau(dm, rep._so) && <span className="muted">· mẫu {soMau(dm, rep._so)}</span>}</h2>
+      <p className="muted" style={{ marginTop: 0 }}>Từ {fmtD(rep.since)} đến {fmtD(rep.upto)}{rep.account ? ` · TK ${rep.account} – ${rep.name || ""}` : ""}{rep.partner_code ? ` · đối tượng ${rep.partner_code}` : ""}{rep.project_code ? ` · công trình ${rep.project_code}` : ""}</p>
+
+      {rep._so === "nhat-ky-chung" && <p>{rep.balanced ? <Tag cls="ok">Cân Nợ = Có</Tag> : <Tag cls="red">LỆCH – kiểm tra ngay</Tag>}</p>}
+      {rep._so === "can-doi-tai-khoan" && <p>{rep.balanced ? <Tag cls="ok">Cân cả ba cặp cột</Tag> : <Tag cls="red">LỆCH – kiểm tra ngay</Tag>}</p>}
+      {rep._so === "chung-tu-goc" && rep.so_chua_khai > 0 && <p><Tag cls="warn">{rep.so_chua_khai} chứng từ chưa khai loại</Tag></p>}
+      {rep._so === "hoa-don-thieu" && rep.dem && <div className="kpis">
+        <div className="kpi"><b>{rep.dem.chua_nhan}</b><span>Chưa nhận hóa đơn</span></div>
+        <div className="kpi"><b>{oSo(rep.tien)}</b><span>Số tiền chưa có hóa đơn</span></div>
+        <div className="kpi"><b>{rep.tuoi?.qua_60 ?? 0}</b><span>Quá 60 ngày</span></div>
+        <div className="kpi"><b>{rep.cu_nhat ? fmtD(rep.cu_nhat) : "—"}</b><span>Cũ nhất</span></div>
+      </div>}
+      {dauKy && <div className="kpis">
+        <div className="kpi"><b>{oSo(rep.opening)}</b><span>Dư đầu kỳ</span></div>
+        <div className="kpi"><b>{oSo(rep.total?.debit ?? rep.total?.in)}</b><span>{rep._so === "so-quy" || rep._so === "so-tien-gui" ? "Tổng thu" : "Phát sinh Nợ"}</span></div>
+        <div className="kpi"><b>{oSo(rep.total?.credit ?? rep.total?.out)}</b><span>{rep._so === "so-quy" || rep._so === "so-tien-gui" ? "Tổng chi" : "Phát sinh Có"}</span></div>
+        <div className="kpi"><b>{oSo(rep.closing)}</b><span>{rep._so === "so-quy" || rep._so === "so-tien-gui" ? "Tồn cuối kỳ" : "Dư cuối kỳ"}</span></div>
+      </div>}
+      {rep._so === "cong-trinh" && <div className="kpis">
+        <div className="kpi"><b>{oSo(rep.revenue)}</b><span>Doanh thu</span></div>
+        <div className="kpi"><b>{oSo(rep.cost)}</b><span>Chi phí</span></div>
+        <div className="kpi"><b>{oSo(rep.profit)}</b><span>Lãi lỗ</span></div>
+      </div>}
+
+      <div className="panel wrap"><table>
+        <thead><tr>{cot.map(([k, t, kind]) => <th key={k} style={kind === "n" ? { textAlign: "right" } : undefined}>{t}</th>)}</tr></thead>
+        <tbody>
+          {(rep.rows || []).length ? (rep.rows as any[]).map((r, i) => <tr key={i}>
+            {cot.map(([k, , kind]) => <td key={k} style={kind === "n" ? { textAlign: "right" } : undefined} className={kind === "t" && (k === "partner" || k === "account_name") ? "muted" : undefined}>
+              {kind === "n" ? oSo(r[k]) : kind === "d" ? (r[k] ? fmtD(r[k]) : "") : (r[k] ?? "")}
+            </td>)}
+          </tr>) : <tr><td colSpan={cot.length} className="muted">Không phát sinh trong khoảng ngày này.</td></tr>}
+          {cong && <tr>{cot.map(([k, , kind]) => <td key={k} style={kind === "n" ? { textAlign: "right" } : undefined}><b>{kind === "n" ? oSo(cong[k]) : (cong[k] ?? "")}</b></td>)}</tr>}
+        </tbody>
+      </table></div>
+
+      {rep.truncated
+        ? <p className="muted">Hiện {rep.shown_rows} trong {rep.total_rows} dòng — màn hình cắt ở {rep.limit} dòng cho nhanh. <b>Tệp Excel KHÔNG bị cắt ở mức này</b>; muốn xem đủ thì tải Excel hoặc thu hẹp khoảng ngày.</p>
+        : rep.total_rows !== undefined && <p className="muted">Hiện đủ {rep.total_rows} dòng.</p>}
+    </>}
+  </>);
+}
+
 function Accounting() {
   const { user, toast } = useShell();
   const isKT = user?.role === "ketoan";
@@ -322,6 +499,10 @@ function Accounting() {
   // Giao diện chỉ ẨN nút; chặn thật ở `require_roles` của cửa và ở `mo_lai_ky.ky`.
   const isKTT = user?.role === "ketoan_truong" || user?.role === "cntt";
   const isKy = user?.role === "chutich" || user?.role === "cntt";
+  // DOT R7-SO 28/10/2026 — `tp_dh` vao /accounting de xem hoa don cua doan, nhung `books.READ`
+  // CHAN vai ay doc so. De the "So ke toan" hien ra chi tao mot nut bam vao la 403. An o day;
+  // chan that van o `require_roles` cua cua.
+  const xemSo = user?.role !== "tp_dh";
   const [tab, setTab] = useState("journal");
   // mở đúng tab khi vào từ menu bên trái (?tab=...)
   useEffect(() => { const q = new URLSearchParams(window.location.search).get("tab"); if (q) setTab(q); }, []);
@@ -329,9 +510,6 @@ function Accounting() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [entries, setEntries] = useState<any[]>([]);
   const [open, setOpen] = useState<number | null>(null);
-  const [acc, setAcc] = useState("131");
-  const [ledger, setLedger] = useState<any>(null);
-  const [tb, setTb] = useState<any>(null);
   const [invs, setInvs] = useState<any[]>([]);
   const [tepHD, setTepHD] = useState("");   // hóa đơn đang mở tệp kèm theo
   // ĐỢT E7 13/10/2026. `maViec` GIỮ mã của lần bấm theo id hóa đơn — giữ lại mới là chỗ chống bấm
@@ -358,13 +536,11 @@ function Accounting() {
   const load = useCallback(async () => {
     if (!accounts.length) api("/accounts").then(setAccounts);
     if (tab === "journal") api(`/journal?period=${period}`).then(setEntries);
-    if (tab === "ledger") api(`/ledger?account=${acc}&period=${period}`).then(setLedger).catch(() => setLedger(null));
-    if (tab === "tb") api(`/trial-balance?period=${period}`).then(setTb);
     if (tab === "invoices") { api("/invoices").then(setInvs); api("/collections/summary").then((s) => setBookings(s.bookings)); api("/invoices/so-nhay").then(setSoNhay).catch(() => setSoNhay([])); }
     if (tab === "periods") api("/periods").then(setPeriods);
     if (tab === "fs") Promise.all([api(`/reports/balance-sheet?period=${period}`), api(`/reports/income-statement?period=${period}`), api(`/reports/cash-flow?period=${period}`)]).then(([bs, pl, cf]) => setFs({ bs, pl, cf }));
     if (tab === "tax") Promise.all([api(`/tax/vat?period=${period}`), api(`/tax/pit?period=${period}`)]).then(([vat, pit]) => setTax({ vat, pit }));
-  }, [tab, period, acc, accounts.length]);
+  }, [tab, period, accounts.length]);
   useEffect(() => { load(); }, [load]);
   const post = async (path: string, json?: any) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || "Xong"); load(); return r; } catch (x) { toast(errMsg(x), true); } };
   const num = (v: string) => Number(String(v).replace(/[^\d.-]/g, "")) || 0;
@@ -374,7 +550,7 @@ function Accounting() {
     <h1>Kế toán TT99/2025 – robot R2 ghi sổ tự động</h1>
     <p className="muted">Bút toán sinh tự động khi Kế toán xác nhận phiếu thu (Nợ 111/112 – Có 131), phát hành hóa đơn (Nợ 131 – Có 511, 3331), xác nhận quyết toán tour (Nợ 154 – Có 331; Nợ 632 – Có 154). Chứng từ đã ghi sổ không sửa – chỉ lập bút toán đảo. Kỳ đã khóa không ghi sổ.</p>
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-      {TABS.map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}
+      {TABS.filter(([k]) => k !== "so" || xemSo).map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}
       <label style={{ marginLeft: "auto" }}>Kỳ <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /></label>
     </div>
 
@@ -426,19 +602,7 @@ function Accounting() {
         </>) : <tr><td colSpan={8} className="muted">Chưa có chứng từ trong kỳ.</td></tr>}</tbody></table></div>
     </>}
 
-    {tab === "ledger" && <>
-      <div><label>Tài khoản <select value={acc} onChange={(e) => setAcc(e.target.value)}>{accounts.map((a) => <option key={a.code} value={a.code}>{a.code} – {a.name}</option>)}</select></label></div>
-      {ledger && <><div className="kpis"><div className="kpi"><b>{vnd(ledger.opening)}</b><span>Dư đầu kỳ</span></div><div className="kpi"><b>{vnd(ledger.total_debit)}</b><span>Phát sinh Nợ</span></div><div className="kpi"><b>{vnd(ledger.total_credit)}</b><span>Phát sinh Có</span></div><div className="kpi"><b>{vnd(ledger.closing)}</b><span>Dư cuối kỳ</span></div></div>
-        <div className="panel wrap"><table><thead><tr><th>Ngày</th><th>Số CT</th><th>Diễn giải</th><th>Đối tượng</th><th style={{ textAlign: "right" }}>Nợ</th><th style={{ textAlign: "right" }}>Có</th><th style={{ textAlign: "right" }}>Số dư</th></tr></thead>
-          <tbody>{ledger.rows.length ? ledger.rows.map((r: any, i: number) => <tr key={i}><td>{fmtD(r.date)}</td><td>{r.code}</td><td>{r.description}</td><td className="muted">{r.partner}</td><td style={{ textAlign: "right" }}>{r.debit ? vnd(r.debit) : ""}</td><td style={{ textAlign: "right" }}>{r.credit ? vnd(r.credit) : ""}</td><td style={{ textAlign: "right" }}>{vnd(r.balance)}</td></tr>) : <tr><td colSpan={7} className="muted">Không phát sinh.</td></tr>}</tbody></table></div></>}
-    </>}
-
-    {tab === "tb" && tb && <>
-      <p>{tb.balanced ? <Tag cls="ok">Cân đối Nợ = Có</Tag> : <Tag cls="red">LỆCH – kiểm tra ngay</Tag>}</p>
-      <div className="panel wrap"><table><thead><tr><th>TK</th><th>Tên tài khoản</th><th style={{ textAlign: "right" }}>Dư đầu Nợ</th><th style={{ textAlign: "right" }}>Dư đầu Có</th><th style={{ textAlign: "right" }}>PS Nợ</th><th style={{ textAlign: "right" }}>PS Có</th><th style={{ textAlign: "right" }}>Dư cuối Nợ</th><th style={{ textAlign: "right" }}>Dư cuối Có</th></tr></thead>
-        <tbody>{tb.rows.map((r: any) => <tr key={r.account}><td className="mono"><b>{r.account}</b></td><td>{r.name}</td>{["open_debit", "open_credit", "debit", "credit", "close_debit", "close_credit"].map((k) => <td key={k} style={{ textAlign: "right" }}>{r[k] ? vnd(r[k]) : ""}</td>)}</tr>)}
-          <tr><td></td><td><b>Cộng</b></td>{["open_debit", "open_credit", "debit", "credit", "close_debit", "close_credit"].map((k) => <td key={k} style={{ textAlign: "right" }}><b>{vnd(tb.total[k])}</b></td>)}</tr></tbody></table></div>
-    </>}
+    {tab === "so" && xemSo && <SoKeToanPanel toast={toast} />}
 
     {tab === "invoices" && <>
       {isKT && <div className="panel"><h2>Lập hóa đơn GTGT từ booking</h2><div className="grid">
