@@ -8,7 +8,7 @@
      …) hiện «Sắp ra mắt» — KHÔNG hiện số mẫu như thật. KH-4 mở đánh giá, góp ý, hỗ trợ.
    · «Gửi yêu cầu» thay «Đặt thử»: chưa giữ chỗ, chưa thu tiền; Sales gọi lại và báo giá cuối. */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { goiCong } from "@/lib/cong";
+import { goiCong, LINK_NGOAI, moNgoai } from "@/lib/cong";
 import { svg } from "./icons";
 import NhaHangKhach from "./NhaHangKhach";
 import QrThanhToan from "./QrThanhToan";
@@ -63,7 +63,7 @@ function TheTour({ t, mo }: { t: any; mo: (t: any) => void }) {
     <div className="v3-product-body"><small>{t.thoi_gian} · {ngay(t.khoi_hanh)}{t.noi_khoi_hanh ? ` · từ ${t.noi_khoi_hanh}` : ""}</small>
       <h3>{t.ma}{t.it_cho ? " · sắp hết chỗ" : ""}</h3>
       <div className="v3-price">{t.gia_goc && <del>{tien(t.gia_goc)}</del>}<strong>{tien(t.gia)}</strong><small>/khách · giá bán hiện hành</small></div>
-      <Nut i="arrow-up-right" onClick={() => mo(t)}>Xem hành trình</Nut></div>
+      <Nut i="arrow-up-right" onClick={() => mo(t)}>Xem hành trình ↗</Nut></div>
   </article>);
 }
 
@@ -115,7 +115,8 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
     if (tab === "profile" && !hs) goiCong("/khach/ho-so").then(setHs).catch((x) => setErr(x.message));
   }, [tab, ds, don, hs, timTour]);
 
-  const moTour = (t: any) => { setTourMo(t); di("tour"); };
+  // KS-16m (Chủ tịch 01/11/2026): bấm vào tour mở www.vietourist.vn/tours ở tab mới (tour chưa đặt trực tuyến trên cổng)
+  const moTour = (_t: any) => { moNgoai(LINK_NGOAI.tours); };
   const moYeuCau = (loai: "tour" | "tour_doan") => { setLoaiYc(loai); setYc({ so_khach: loai === "tour" ? 2 : 20, dien_thoai: "", ngay_mong_muon: "", ghi_chu: "", dong_y: false }); di("request"); };
   const guiYc = async () => {
     setBusy(true); setErr(""); setMsg("");

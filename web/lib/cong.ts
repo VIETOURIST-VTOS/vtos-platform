@@ -34,3 +34,9 @@ export function diCongThe(r: { url?: string; form?: { action: string; fields: [s
   for (const [k, v] of r.form.fields) { const i = document.createElement("input"); i.type = "hidden"; i.name = k; i.value = v; f.appendChild(i); }
   document.body.appendChild(f); f.submit();
 }
+
+
+/** KS-16l/16m (Chủ tịch 01/11/2026): dịch vụ chưa mở đặt trực tuyến trên cổng thì bấm vào mở trang ngoài ở tab mới.
+ *  Gọi ĐỒNG BỘ ngay trong sự kiện bấm (không sau await) để trình duyệt không chặn cửa sổ mới. */
+export const LINK_NGOAI = { hotel: "https://www.vietourist.vn/hotel", restaurant: "https://www.vietourist.vn/restaurant", tours: "https://www.vietourist.vn/tours" } as const;
+export function moNgoai(url: string): void { window.open(url, "_blank", "noopener,noreferrer"); }
