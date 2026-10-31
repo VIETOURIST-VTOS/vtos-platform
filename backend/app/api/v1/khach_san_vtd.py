@@ -115,6 +115,13 @@ class KsIn(BaseModel):
     cs_giuong_phu: str = ""
     cs_vat_nuoi: str = ""
     cs_khac: str = ""
+    # KS-16j: chính sách trẻ em kiểu Agoda
+    cs_nhan_tre_em: str = "chua_xac_nhan"
+    cs_tre_tu_tuoi: int | None = None
+    cs_moc_tuoi: list[dict] = []
+    cs_phi_giuong_phu: float | None = None
+    cs_giuong_phu_an_sang: bool = False
+    cs_noi: str = ""
     thue_phi_pt: float = 0
     lien_he_noi_bo: str = ""
     ghi_chu_noi_bo: str = ""
@@ -159,10 +166,21 @@ class LoaiPhongIn(BaseModel):
     giuong: str = ""
     mo_ta: str = ""
     toi_da_nguoi_lon: int = 2
-    toi_da_tre_em: int = 0
-    so_phong: int = 1
+    toi_da_tre_em: int | None = None        # KS-16j: None = chưa xác nhận (khác 0)
+    so_phong: int | None = 1                # KS-16j: 0 là 0
     thu_tu: int = 0
     dang_ban: bool = True
+    mo_ta_dai: str = ""
+    tien_nghi: list[str] = []
+    giuong_phu_toi_da: int | None = None
+    noi_cui: bool | None = None
+    nguon: str = ""
+    ky_doi_chieu: str = ""
+    ma_hang: str = ""
+    ten_tuong_duong: str = ""
+    can_xac_nhan: list[str] = []
+    ghi_chu_doi_chieu: str = ""
+    trang_thai_dc: str = ""
 
 
 @router_vtos.post("/{kid:int}/loai-phong")
@@ -299,19 +317,19 @@ def anh_vtos(pid: int, co: str, u: User = Depends(require_roles(*S.VAI_XEM)), db
 
 # ── CỔNG ──────────────────────────────────────────────────────────────────────────────────────────
 @router_cong.get("/tim")
-def tim(tinh: str = "", vao: str = "", ra: str = "", nguoi_lon: int = 2, tre_em: int = 0, so_phong: int = 1,
+def tim(tinh: str = "", vao: str = "", ra: str = "", nguoi_lon: int = 2, tre_em: int = 0, so_phong: int = 1, tuoi: str = "",
         tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
     _khach(tk)
     from app.services import rewards as RW
-    return {**_goi(S.tim, db, tinh, vao, ra, nguoi_lon, tre_em, so_phong), "diem": RW.he_so_cua(db, tk)}   # KS-16
+    return {**_goi(S.tim, db, tinh, vao, ra, nguoi_lon, tre_em, so_phong, None, tuoi), "diem": RW.he_so_cua(db, tk)}   # KS-16
 
 
 @router_cong.get("/{kid:int}")
-def chi_tiet(kid: int, vao: str = "", ra: str = "", nguoi_lon: int = 2, tre_em: int = 0, so_phong: int = 1,
+def chi_tiet(kid: int, vao: str = "", ra: str = "", nguoi_lon: int = 2, tre_em: int = 0, so_phong: int = 1, tuoi: str = "",
              tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
     _khach(tk)
     from app.services import rewards as RW
-    return {**_goi(S.chi_tiet_cong, db, kid, vao, ra, nguoi_lon, tre_em, so_phong), "diem": RW.he_so_cua(db, tk)}   # KS-16
+    return {**_goi(S.chi_tiet_cong, db, kid, vao, ra, nguoi_lon, tre_em, so_phong, None, tuoi), "diem": RW.he_so_cua(db, tk)}   # KS-16
 
 
 class ChonIn(BaseModel):
@@ -323,6 +341,9 @@ class TinhIn(BaseModel):
     vao: str
     ra: str
     chon: list[ChonIn]
+    nguoi_lon: int = 1          # KS-16j: máy tính phụ thu trẻ em / giường phụ
+    tre_em: int = 0
+    tuoi_tre_em: list[int] = []
 
 
 @router_cong.get("/{kid:int}/danh-gia")
@@ -339,7 +360,8 @@ def danh_gia_cong(kid: int, trang: int = 1, xep: str = "moi", tk: TaiKhoanNgoai 
 @router_cong.post("/{kid:int}/tinh")
 def tinh(kid: int, data: TinhIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
     _khach(tk)
-    return _goi(S.tinh_lua_chon, db, kid, data.vao, data.ra, [c.model_dump() for c in data.chon])
+    return _goi(S.tinh_lua_chon, db, kid, data.vao, data.ra, [c.model_dump() for c in data.chon], None,
+                data.nguoi_lon, data.tre_em, data.tuoi_tre_em)
 
 
 class YeuCauIn(BaseModel):
@@ -347,6 +369,7 @@ class YeuCauIn(BaseModel):
     ngay_tra: date
     nguoi_lon: int = 2
     tre_em: int = 0
+    tuoi_tre_em: list[int] = []
     so_phong: int = 1
     chon: list[ChonIn] = []
     loai_phong: str = ""

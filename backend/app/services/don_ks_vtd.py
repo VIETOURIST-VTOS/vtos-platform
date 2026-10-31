@@ -223,7 +223,7 @@ def het_han_tat(db: Session, now: datetime | None = None) -> None:
     db.flush()
 
 
-def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict]) -> list[dict]:
+def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict], nl: int = 1, te: int = 0, tuoi=None) -> list[dict]:
     """Dòng đơn máy tính từ gói đã duyệt. chon = [{goi_id, so}] — không nhận số tiền."""
     gop: dict[int, int] = {}
     for c in chon or []:
@@ -244,8 +244,18 @@ def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict]
         tien = int(p["tong"]) * n
         hh = S.han_huy(g, vao)
         dong.append({"goi_id": g.id, "loai_phong_id": lp.id, "loai_phong": lp.ten, "goi": g.ten, "so": n, "tien": tien,
-                     "thue": int(round(tien * float(k.thue_phi_pt or 0) / 100)), "bua_sang": bool(g.bua_sang),
-                     "huy_han": hh.isoformat() if hh else None})
+                     "bua_sang": bool(g.bua_sang), "huy_han": hh.isoformat() if hh else None, "_lp": lp})
+    # KS-16j: phụ thu trẻ em / giường phụ máy tự cộng vào dòng (chưa thuế phí, cùng tỷ lệ thuế phí như giá phòng)
+    try:
+        pts = S.phu_thu_dong(k, dong, {x["loai_phong_id"]: x["_lp"] for x in dong}, nl, te, tuoi, (ra - vao).days)
+    except S.LoiKhachSan as ex:
+        raise LoiDon(str(ex))
+    for x, pt in zip(dong, pts):
+        x.pop("_lp")
+        if pt:
+            x["phu_thu"] = pt
+            x["tien"] += pt
+        x["thue"] = int(round(x["tien"] * float(k.thue_phi_pt or 0) / 100))
     return dong
 
 
@@ -272,7 +282,8 @@ def dat(db: Session, tk, kid: int, d: dict, now: datetime | None = None) -> DonK
                                                             DonKsVtd.giu_den > now)).scalar() or 0
     if dang >= DON_CHO_TRA_TOI_DA:
         raise LoiDon("Bạn đang có đơn chờ thanh toán — trả hoặc hủy đơn đó trước", 409)
-    dong = _dong_dat(db, k, vao, ra, d.get("chon") or [])
+    tuoi = S.doc_tuoi(te, d.get("tuoi_tre_em"))
+    dong = _dong_dat(db, k, vao, ra, d.get("chon") or [], nl, te, tuoi)
     so = sum(x["so"] for x in dong)
     if so > 9:
         raise LoiDon("Tối đa 9 phòng một lần đặt")
@@ -297,7 +308,8 @@ def dat(db: Session, tk, kid: int, d: dict, now: datetime | None = None) -> DonK
             raise LoiDon(str(ex))
     giam = int(v.gia_tri) if v else 0
     don = DonKsVtd(ma=_ma_moi(db, vao), khach_san_id=k.id, tai_khoan_ngoai_id=tk.id, cong=tk.loai, ho_ten=ho_ten,
-                   lien_he=lien_he, email=email, yeu_cau=str(d.get("yeu_cau") or "").strip()[:1500], vao=vao, ra=ra,
+                   lien_he=lien_he, email=email, yeu_cau=((f"Tuổi trẻ em: {', '.join(str(t) for t in tuoi)}\n" if tuoi else "")
+                                                                   + str(d.get("yeu_cau") or "").strip())[:1500], vao=vao, ra=ra,
                    nguoi_lon=nl, tre_em=te, dong=dong, so_phong=so, tien_phong=tien, thue_phi=thue, tong=tien + thue - giam,
                    trang_thai="cho_tra", giu_den=now + timedelta(minutes=GIU_PHUT), tao_luc=now,
                    voucher_id=v.id if v else None, giam_voucher=giam)
