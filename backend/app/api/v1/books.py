@@ -317,3 +317,16 @@ def hoa_don_ghi(body: GhiHoaDon, u: User = Depends(require_roles(*GHI_HOA_DON)),
     R_.audit(db, u.username, u.role, "ghi_hoa_don_dong_but_toan", str(body.line_id), after=kq)
     db.commit()
     return kq
+
+
+# ---------- Ô chọn mã công trình (Đợt R7-MCT 01/11/2026) ----------
+#
+# CỬA ĐỌC, mở cho đúng nhóm `READ` của sổ — ai xem được sổ thì chọn được mã để xem. Không nới
+# một vai nào. Đây là cửa cho Ô CHỌN trên màn hình Sổ kế toán, thay cho ô gõ tay: gõ tay thì
+# người dùng tự nghĩ ra một mã không tồn tại rồi nhận về một sổ rỗng, và không biết vì sao.
+
+@router.get("/ma-cong-trinh")
+def ma_cong_trinh(q: str = "", limit: int = BK.MA_LIMIT,
+                  u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Tìm mã tour do Điều hành / Sales Admin tạo; `co_trong_so=false` nghĩa là chưa gắn vào sổ."""
+    return BK.ma_cong_trinh(db, q, limit)
