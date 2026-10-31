@@ -341,8 +341,8 @@ function QuyenLoiDon({ ma }: { ma: string }) {
   if (!q) return null;
   const so = (n: number) => Math.round(n).toLocaleString("vi-VN");
   return (<div className="v3-notice"><I n="gift" /><span><b>Quyền lợi của đơn này:</b> dự kiến <b>+{so(q.diem_du_kien)} điểm</b>
-    {q.truong_doan ? ` (trưởng đoàn: phần của bạn ${so(q.co_so)} đ × ${String(q.he_so).replace(".", ",")} + ${so(q.thuong_doan)} điểm thưởng)` : ` (${so(q.co_so)} đ × ${String(q.he_so).replace(".", ",")} hạng ${q.hang})`} khi tour kết thúc và bạn trả đủ
-    {" · "}dùng được voucher tối đa {so(q.tran_voucher)} đ (5% đơn) — đọc mã cho Sales
+    {q.truong_doan ? ` (trưởng đoàn: phần của bạn ${so(q.co_so)} đ × ${String(q.he_so).replace(".", ",")} + ${so(q.thuong_doan)} điểm thưởng)` : ` (${so(q.co_so)} đ × ${String(q.he_so).replace(".", ",")} hạng ${q.hang})`} khi tour kết thúc và bạn trả đủ{q.ctv ? " (đơn qua cộng tác viên: điểm trong giới hạn chi phí ưu đãi của tour)" : ""}
+    {!q.ctv && <>{" · "}dùng được voucher tối đa {so(q.tran_voucher)} đ (5% đơn) — đọc mã cho Sales</>}
     {q.voucher_dung_duoc.length > 0 && <>{" · "}voucher của bạn dùng được cho đơn này: {q.voucher_dung_duoc.map((v: any) => `${v.ma} (${v.loai_ten} ${so(v.gia_tri)} đ)`).join(", ")}</>}.</span></div>);
 }
 
