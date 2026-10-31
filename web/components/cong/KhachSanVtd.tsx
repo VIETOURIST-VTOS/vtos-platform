@@ -12,7 +12,10 @@ import QRCode from "qrcode";
 import { diCongThe, goiCong } from "@/lib/cong";
 import { DanhGiaKsCong, OD, TomTatDg, VietDanhGiaKs } from "./DanhGiaKs";
 
-type Q = { tinh: string; vao: string; ra: string; nl: number; te: number; phong: number };
+type Q = { tinh: string; vao: string; ra: string; nl: number; te: number; phong: number; tuoi?: number[] };
+// KS-16j: như Agoda — có trẻ em thì chọn tuổi từng bé (-1 = chưa chọn); máy tính phụ thu theo chính sách khách sạn.
+const tuoiStr = (q: Q) => { const t = (q.tuoi || []).slice(0, q.te); return q.te > 0 && t.length === q.te && t.every((x) => x >= 0) ? t.join(",") : ""; };
+const tuoiDs = (q: Q) => (tuoiStr(q) ? (q.tuoi || []).slice(0, q.te) : []);
 type Loc = { min: number; max: number; coGia: boolean; huy: boolean; sang: boolean; diem9: boolean; sao: number[]; loai: string[]; ten: string };
 const LOC0: Loc = { min: 0, max: 0, coGia: false, huy: false, sang: false, diem9: false, sao: [], loai: [], ten: "" };
 const vnd = (n?: number | null) => (n || n === 0 ? Math.round(n).toLocaleString("vi-VN") : "—");
@@ -65,7 +68,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
     setLoi(""); setBusy(true);
     try {
       // Lấy mọi thành phố một lần (danh mục nhỏ) rồi lọc ngay trên màn — đổi thành phố không phải chờ máy chủ.
-      const p = new URLSearchParams({ tinh: "", vao: qq.vao, ra: qq.ra, nguoi_lon: String(qq.nl), tre_em: String(qq.te), so_phong: String(qq.phong) });
+      const p = new URLSearchParams({ tinh: "", vao: qq.vao, ra: qq.ra, nguoi_lon: String(qq.nl), tre_em: String(qq.te), so_phong: String(qq.phong), tuoi: tuoiStr(qq) });
       const r = await goiCong(`/ks-vtd/tim?${p}`);
       setDs(r);
       if (!qq.tinh && r.thanh_pho?.length) setQ({ ...qq, tinh: r.thanh_pho[0].ten });
@@ -91,7 +94,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
   const moKs = async (id: number) => {
     setLoi(""); setBusy(true);
     try {
-      const p = new URLSearchParams({ vao: q.vao, ra: q.ra, nguoi_lon: String(q.nl), tre_em: String(q.te), so_phong: String(q.phong) });
+      const p = new URLSearchParams({ vao: q.vao, ra: q.ra, nguoi_lon: String(q.nl), tre_em: String(q.te), so_phong: String(q.phong), tuoi: tuoiStr(q) });
       setKs(await goiCong(`/ks-vtd/${id}?${p}`)); setChon({}); setBuoc("ks"); window.scrollTo(0, 0);
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
   };
@@ -133,7 +136,8 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
   const sangGui = async () => {
     setLoi(""); setBusy(true);
     try {
-      setTinh(await goiCong(`/ks-vtd/${ks.id}/tinh`, { vao: q.vao, ra: q.ra, chon: dongChon.map((x: any) => ({ goi_id: x.g.id, so: x.n })) }));
+      setTinh(await goiCong(`/ks-vtd/${ks.id}/tinh`, { vao: q.vao, ra: q.ra, chon: dongChon.map((x: any) => ({ goi_id: x.g.id, so: x.n })),
+        nguoi_lon: q.nl, tre_em: q.te, tuoi_tre_em: tuoiDs(q) }));
       setVc({ ma: "", ap: null, loi: "" });
       setBuoc("gui"); window.scrollTo(0, 0);
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
@@ -145,7 +149,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
     if (!kh.dongy) { setLoi("Đánh dấu đồng ý điều kiện giữ phòng để gửi"); return; }
     setLoi(""); setBusy(true);
     try {
-      const r = await goiCong(`/ks-vtd/${ks.id}/yeu-cau`, { ngay_nhan: q.vao, ngay_tra: q.ra, nguoi_lon: q.nl, tre_em: q.te, so_phong: tinh?.so_phong || q.phong,
+      const r = await goiCong(`/ks-vtd/${ks.id}/yeu-cau`, { ngay_nhan: q.vao, ngay_tra: q.ra, nguoi_lon: q.nl, tre_em: q.te, tuoi_tre_em: tuoiDs(q), so_phong: tinh?.so_phong || q.phong,
         chon: dongChon.map((x: any) => ({ goi_id: x.g.id, so: x.n })), loai_phong: tinh?.loai_phong || "",
         nguoi_nhan_phong: kh.ten, lien_he: kh.lien_he, yeu_cau_them: [kh.yc.join(", "), kh.ghi].filter(Boolean).join(" · ") });
       setDon(r.don); setBuoc("xong"); window.scrollTo(0, 0);
@@ -167,7 +171,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
     if (!kh.dongy) { setLoi("Đánh dấu đồng ý chính sách hủy và điều kiện đặt phòng"); return; }
     setLoi(""); setBusy(true);
     try {
-      const r = await goiCong(`/ks-vtd/don/dat/${ks.id}`, { vao: q.vao, ra: q.ra, nguoi_lon: q.nl, tre_em: q.te,
+      const r = await goiCong(`/ks-vtd/don/dat/${ks.id}`, { vao: q.vao, ra: q.ra, nguoi_lon: q.nl, tre_em: q.te, tuoi_tre_em: tuoiDs(q),
         chon: dongChon.map((x: any) => ({ goi_id: x.g.id, so: x.n })), ho_ten: kh.ten, lien_he: kh.lien_he, email: kh.email,
         yeu_cau: [kh.yc.join(", "), kh.ghi].filter(Boolean).join(" · "), dong_y: kh.dongy, ma_voucher: vc.ap?.ma || "" });
       setDonKs(r.don);
@@ -192,6 +196,11 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
         <div key={k} className="ksv-step"><span>{t}</span><div>
           <button type="button" aria-label={`Bớt ${t}`} onClick={() => setQ({ ...q, [k]: Math.max(a, q[k] - 1) })}>−</button><b>{q[k]}</b>
           <button type="button" aria-label={`Thêm ${t}`} onClick={() => setQ({ ...q, [k]: Math.min(b, q[k] + 1) })}>+</button></div></div>)}
+        {q.te > 0 && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>{Array.from({ length: q.te }, (_, i) =>
+          <label key={i} style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>Tuổi trẻ {i + 1}
+            <select className="ksv-sel" value={(q.tuoi || [])[i] ?? -1} onChange={(e) => { const t = Array.from({ length: q.te }, (_x, j) => (q.tuoi || [])[j] ?? -1); t[i] = Number(e.target.value); setQ({ ...q, tuoi: t }); }}>
+              <option value={-1}>Chọn tuổi</option>{Array.from({ length: 18 }, (_x, n) => <option key={n} value={n}>{n} tuổi</option>)}</select></label>)}
+          <small className="ksv-muted" style={{ gridColumn: "1 / -1" }}>Chọn tuổi từng bé để xem giá đúng chính sách trẻ em của khách sạn.</small></div>}
         <button type="button" className="ksv-btn" onClick={() => setPop(false)}>Xong</button></div>}</div>
     <button className="ksv-btn-tim" type="submit" disabled={busy}>TÌM</button></form></div>;
 
@@ -285,8 +294,13 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
         <div className="ksv-rl"><b style={{ fontSize: 17 }}>{p.ten}</b>
           {p.anh?.[0] ? <img src={p.anh[0].nho} alt={p.ten} className="ksv-rp" loading="lazy" /> : <AnhTrong k={ks} cao={110} />}
           {p.video?.[0] && <div style={{ aspectRatio: "16 / 9", maxWidth: "100%" }}><VideoO v={p.video[0]} ten={p.ten} nhan="VIDEO PHÒNG" /></div>}
-          <span className="ksv-muted" style={{ fontSize: 13 }}>{[p.dien_tich ? `${p.dien_tich} m²` : "", p.giuong].filter(Boolean).join(" · ")}{p.mo_ta && <><br />{p.mo_ta}</>}<br />Tối đa {p.toi_da_nguoi_lon} người lớn{p.toi_da_tre_em ? ` + ${p.toi_da_tre_em} trẻ em` : ""}</span>
-          {!p.vua && <small style={{ color: "var(--ksv-price)", fontWeight: 600 }}>Không đủ chỗ cho {q.nl} người lớn / {q.phong} phòng — tăng số phòng</small>}</div>
+          <span className="ksv-muted" style={{ fontSize: 13 }}>{[p.dien_tich ? `${p.dien_tich} m²` : "", p.giuong].filter(Boolean).join(" · ")}{p.mo_ta && <><br />{p.mo_ta}</>}
+            {(p.tien_nghi || []).length > 0 && <><br />{p.tien_nghi.join(" · ")}</>}
+            <br />Tối đa {p.toi_da_nguoi_lon} người lớn{p.toi_da_tre_em ? ` + ${p.toi_da_tre_em} trẻ em` : ""}{p.giuong_phu_toi_da ? ` · kê được ${p.giuong_phu_toi_da} giường phụ` : ""}</span>
+          {p.mo_ta_dai && <details><summary style={{ cursor: "pointer", fontSize: 13 }}>Xem thêm</summary><p className="ksv-muted" style={{ fontSize: 13, whiteSpace: "pre-line", margin: "4px 0 0" }}>{p.mo_ta_dai}</p></details>}
+          {p.vua && p.phu_thu_ky > 0 && <small style={{ fontWeight: 600 }}>+ phụ thu ₫ {vnd(p.phu_thu_ky)} cho {q.phong} phòng × {ks.dem} đêm ({(p.phu_thu_ct || []).join(", ")}) — máy cộng vào tổng</small>}
+          {!p.vua && <small style={{ color: "var(--ksv-price)", fontWeight: 600 }}>{p.ly_do || `Không đủ chỗ cho ${q.nl} người lớn / ${q.phong} phòng — tăng số phòng`}</small>}
+          {!p.vua && /gửi yêu cầu/.test(p.ly_do || "") && <button type="button" className="ksv-btn line" onClick={() => moYeuCauTrong(p.ten)}>Gửi yêu cầu giữ phòng</button>}</div>
         <div className="ksv-rates">{p.goi.length ? <><div className="ksv-rhd"><span>Lợi ích</span><span>Số khách</span><span>Giá mỗi đêm</span><span>Số phòng</span></div>
           {p.goi.map((g: any) => <div key={g.id} className="ksv-rate">
             <div><ul>{g.mien_phi_huy ? <li className="ksv-okc"><b>✓ Miễn phí hủy trước {g.huy_han ? g.huy_han.split("-").reverse().join("/") : ""}</b></li> : <li className="ksv-muted"><b>Không hoàn tiền</b></li>}
@@ -306,12 +320,14 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
       {ks.tien_ich.length ? <div className="ksv-grid2" style={{ gap: 8 }}>{ks.tien_ich.map((t: string) => <span key={t}>✓ {t}</span>)}</div> : <span className="ksv-muted">Đang cập nhật</span>}</div>
       <div className="ksv-panel" id="ksv-cs"><b style={{ fontSize: 18 }}>Chính sách chỗ ở</b>
         <span><b>Nhận phòng</b> từ {ks.gio_nhan} · <b>Trả phòng</b> trước {ks.gio_tra}</span>
-        {ks.chinh_sach.tre_em && <span><b>Trẻ em</b> {ks.chinh_sach.tre_em}</span>}{ks.chinh_sach.giuong_phu && <span><b>Giường phụ</b> {ks.chinh_sach.giuong_phu}</span>}
+        {ks.chinh_sach.tre ? <span><b>Trẻ em &amp; giường phụ</b>{ks.chinh_sach.tre.dong.map((d: string, i: number) => <span key={i} style={{ display: "block" }}>{d}</span>)}</span>
+          : <>{ks.chinh_sach.tre_em && <span><b>Trẻ em</b> {ks.chinh_sach.tre_em}</span>}{ks.chinh_sach.giuong_phu && <span><b>Giường phụ</b> {ks.chinh_sach.giuong_phu}</span>}</>}
         {ks.chinh_sach.vat_nuoi && <span><b>Vật nuôi</b> {ks.chinh_sach.vat_nuoi}</span>}{ks.chinh_sach.khac && <span style={{ whiteSpace: "pre-line" }}>{ks.chinh_sach.khac}</span>}
         <span><b>Hủy phòng</b> theo từng gói giá đã chọn</span></div></div>
     <DanhGiaKsCong kid={ks.id} />
     {soChon > 0 && <div className="ksv-total"><span style={{ flex: 1, minWidth: 180 }}><b>{soChon} phòng · {ks.dem} đêm</b><br /><small className="ksv-muted">{dongChon.map((x: any) => `${x.n} × ${x.p.ten} (${x.g.ten})`).join(" · ")}</small></span>
-      <span style={{ textAlign: "right" }}><b className="ksv-big" style={{ fontSize: 22 }}>₫ {vnd(tienChon)}</b><br /><small className="ksv-muted">+ thuế phí ₫ {vnd(tienChon * (ks.thue_phi_pt || 0) / 100)}</small></span>
+      <span style={{ textAlign: "right" }}><b className="ksv-big" style={{ fontSize: 22 }}>₫ {vnd(tienChon)}</b><br /><small className="ksv-muted">+ thuế phí ₫ {vnd(tienChon * (ks.thue_phi_pt || 0) / 100)}</small>
+        {dongChon.some((x: any) => x.p.phu_thu_ky > 0) && <><br /><small className="ksv-muted">+ phụ thu trẻ em / giường phụ (tính ở bước sau)</small></>}</span>
       <button type="button" className="ksv-btn" style={{ minHeight: 50, padding: "0 26px", fontSize: 16 }} disabled={busy} onClick={sangGui}>Đặt ngay</button></div>}
   </div>;
 
@@ -552,9 +568,9 @@ function TomTat({ ks, q, tinh, giam = 0, maVc, hang, diemDk = 0 }: { ks: any; q:
         <span style={{ padding: "12px 14px" }}><small className="ksv-muted">Trả phòng</small><br /><b>{ngay(q.ra)}</b><br /><small className="ksv-muted">trước {ks.gio_tra}</small></span></div>
       <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 4 }}>
         {tinh.dong.length ? tinh.dong.map((x: any, i: number) => <div key={i} style={{ display: "flex", flexDirection: "column" }}><b>{x.so} × {x.loai_phong}</b>
-          <span className="ksv-muted">{x.goi} · {tinh.dem} đêm</span>{x.huy_han ? <span className="ksv-okc">✓ Miễn phí hủy trước {x.huy_han.split("-").reverse().join("/")}</span> : <span className="ksv-muted">Không hoàn tiền</span>}</div>)
+          <span className="ksv-muted">{x.goi} · {tinh.dem} đêm{x.phu_thu ? ` · gồm phụ thu trẻ em / giường phụ ₫ ${vnd(x.phu_thu)}` : ""}</span>{x.huy_han ? <span className="ksv-okc">✓ Miễn phí hủy trước {x.huy_han.split("-").reverse().join("/")}</span> : <span className="ksv-muted">Không hoàn tiền</span>}</div>)
           : <span>{tinh.loai_phong ? `Loại phòng: ${tinh.loai_phong} · ` : ""}{q.phong} phòng · {q.nl} người lớn · Vietourist báo giá</span>}</div></div>
-    {tinh.tong > 0 && <div className="ksv-panel"><span className="ksv-sum"><span>Giá phòng ({tinh.so_phong} phòng × {tinh.dem} đêm)</span><span>₫ {vnd(tinh.tien_phong)}</span></span>
+    {tinh.tong > 0 && <div className="ksv-panel"><span className="ksv-sum"><span>Giá phòng ({tinh.so_phong} phòng × {tinh.dem} đêm){tinh.phu_thu ? " · gồm phụ thu" : ""}</span><span>₫ {vnd(tinh.tien_phong)}</span></span>
       <span className="ksv-sum"><span>Thuế và phí ({ks.thue_phi_pt || 0}%)</span><span>₫ {vnd(tinh.thue_phi)}</span></span>
       {giam > 0 && <span className="ksv-sum ksv-okc"><span>Voucher {maVc}</span><span>− ₫ {vnd(giam)}</span></span>}
       <span className="ksv-sum" style={{ borderTop: "1px solid var(--ksv-line)", paddingTop: 10, alignItems: "baseline" }}><b style={{ fontSize: 16 }}>{giam > 0 ? "Bạn trả" : "Tổng cộng"}</b><b className="ksv-big" style={{ fontSize: 22 }}>₫ {vnd(tinh.tong - giam)}</b></span>

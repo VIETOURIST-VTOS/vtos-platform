@@ -29,6 +29,17 @@ TIEN_ICH = {"ho_boi": "Hồ bơi", "wifi": "Wi-Fi miễn phí", "dua_don": "Đư
 NHOM_ANH_KS = {"mat_tien": "Mặt tiền", "phong": "Phòng", "ho_boi": "Hồ bơi", "sanh": "Sảnh",
                "nha_hang": "Nhà hàng", "tien_ich": "Tiện ích", "canh_quan": "Cảnh quan", "khac": "Khác"}
 TRANG_THAI_ANH_KS = {"nhap": "Nháp", "cho_duyet": "Chờ duyệt", "da_duyet": "Đã duyệt", "tra_lai": "Trả lại", "an": "Ẩn"}
+# KS-16j
+NHAN_TRE_EM = {"chua_xac_nhan": "Chưa xác nhận", "moi_tuoi": "Nhận trẻ em mọi lứa tuổi", "tu_tuoi": "Chỉ nhận trẻ từ … tuổi",
+               "khong": "Không nhận trẻ em"}
+CACH_TINH_TRE = {"mien_phi": "Miễn phí nếu dùng giường có sẵn", "phu_thu": "Phụ thu (dùng giường có sẵn)",
+                 "nguoi_lon": "Tính như người lớn"}
+TIEN_NGHI_PHONG = ("Máy lạnh", "Wifi", "Vòi sen", "Bồn tắm", "Ban công", "Hướng biển", "Không hút thuốc", "Minibar",
+                   "Két sắt", "Bếp nhỏ", "Hồ bơi riêng", "TV", "Máy sấy tóc", "Bàn làm việc")
+NGUON_LP = {"agoda": "Agoda", "booking": "Booking.com", "ks_gui": "Khách sạn gửi", "hop_dong": "Hợp đồng", "khac": "Khác"}
+CAN_XAC_NHAN = {"ten_hang": "Tên hạng thực tế", "dien_tich": "Diện tích", "giuong": "Giường", "tre_em": "Trẻ em / giường phụ",
+                "tien_nghi": "Tiện nghi mâu thuẫn", "hop_dong": "Hợp đồng", "han_muc": "Hạn mức", "gia": "Giá VTD"}
+TRANG_THAI_DC = {"dang_doi_chieu": "Đang đối chiếu", "cho_ks": "Chờ khách sạn xác nhận", "da_xac_nhan": "Đã xác nhận"}
 TRANG_THAI_GOI = {"nhap": "Nháp", "cho_duyet": "Chờ duyệt", "da_duyet": "Đã duyệt", "tra_lai": "Trả lại"}
 
 
@@ -53,6 +64,14 @@ class KhachSanVtd(Base):
     cs_giuong_phu: Mapped[str] = mapped_column(String(300), default="")
     cs_vat_nuoi: Mapped[str] = mapped_column(String(300), default="")
     cs_khac: Mapped[str] = mapped_column(Text, default="")
+    # KS-16j: chính sách trẻ em có cấu trúc kiểu Agoda (Chủ tịch duyệt 01/11/2026). cs_tre_em / cs_giuong_phu ở trên
+    # giờ là «ghi chú thêm». Mốc tuổi: [{tu, den, cach: mien_phi|phu_thu|nguoi_lon, phu_thu, an_sang}] — tiền / đêm, chưa thuế phí.
+    cs_nhan_tre_em: Mapped[str] = mapped_column(String(14), default="chua_xac_nhan")   # NHAN_TRE_EM
+    cs_tre_tu_tuoi: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cs_moc_tuoi: Mapped[list] = mapped_column(JSON, default=list)
+    cs_phi_giuong_phu: Mapped[float | None] = mapped_column(TIEN, nullable=True)       # / đêm, chưa thuế phí; None = chưa xác nhận
+    cs_giuong_phu_an_sang: Mapped[bool] = mapped_column(Boolean, default=False)
+    cs_noi: Mapped[str] = mapped_column(String(120), default="")                       # «Miễn phí, theo yêu cầu»
     # Giá Điều hành nhập là giá CHƯA gồm thuế phí; khách thấy «chưa gồm thuế và phí» và số thuế phí ở bước
     # thanh toán. Mức % theo từng khách sạn (VAT + phí phục vụ) — Điều hành nhập theo hợp đồng.
     thue_phi_pt: Mapped[float] = mapped_column(Float, default=0)
@@ -100,9 +119,21 @@ class LoaiPhongVtd(Base):
     ten: Mapped[str] = mapped_column(String(120))
     dien_tich: Mapped[int] = mapped_column(Integer, default=0)          # m²
     giuong: Mapped[str] = mapped_column(String(120), default="")
-    mo_ta: Mapped[str] = mapped_column(String(300), default="")         # ban công, hướng biển…
+    mo_ta: Mapped[str] = mapped_column(String(300), default="")         # đặc điểm ngắn — quá 300 thì báo lỗi, không cắt
+    mo_ta_dai: Mapped[str] = mapped_column(Text, default="")            # KS-16j: mô tả chi tiết (≤3.000), khách bấm «Xem thêm»
+    tien_nghi: Mapped[list] = mapped_column(JSON, default=list)         # KS-16j: tên tiện nghi (chọn sẵn hoặc gõ thêm)
     toi_da_nguoi_lon: Mapped[int] = mapped_column(Integer, default=2)
-    toi_da_tre_em: Mapped[int] = mapped_column(Integer, default=0)
+    toi_da_tre_em: Mapped[int | None] = mapped_column(Integer, nullable=True)   # KS-16j: None = chưa xác nhận (khác 0)
+    giuong_phu_toi_da: Mapped[int | None] = mapped_column(Integer, nullable=True)  # None = chưa xác nhận
+    noi_cui: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # KS-16j: nguồn & đối chiếu — NỘI BỘ, không ra cổng khách
+    nguon: Mapped[str] = mapped_column(String(12), default="")          # NGUON_LP
+    ky_doi_chieu: Mapped[str] = mapped_column(String(120), default="")
+    ma_hang: Mapped[str] = mapped_column(String(80), default="")        # mã hạng phòng của KS / OTA — ghi đúng nguồn
+    ten_tuong_duong: Mapped[str] = mapped_column(String(160), default="")
+    can_xac_nhan: Mapped[list] = mapped_column(JSON, default=list)      # khoá trong CAN_XAC_NHAN
+    ghi_chu_doi_chieu: Mapped[str] = mapped_column(String(500), default="")
+    trang_thai_dc: Mapped[str] = mapped_column(String(14), default="")  # TRANG_THAI_DC — Điều hành tự ghi, không chặn bán
     so_phong: Mapped[int] = mapped_column(Integer, default=1)           # số phòng VTD được bán mỗi đêm
     thu_tu: Mapped[int] = mapped_column(Integer, default=0)
     dang_ban: Mapped[bool] = mapped_column(Boolean, default=True)
