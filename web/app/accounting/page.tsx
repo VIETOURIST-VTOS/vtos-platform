@@ -382,6 +382,7 @@ function SoKeToanPanel({ toast }: { toast: (m: string, e?: boolean) => void }) {
   const [f, setF] = useState({ account: "", partner_code: "", project_code: "", direction: "thu", level: "0" });
   const [rep, setRep] = useState<any>(null);
   const [busy, setBusy] = useState(false);
+  const [goiY, setGoiY] = useState<{ ct: any[]; dt: any[] }>({ ct: [], dt: [] });
   useEffect(() => { api("/books").then(setDm).catch(() => setDm([])); }, []);
 
   const nhan = (o: string) => (SO_NHAN[so] || []).includes(o);
@@ -391,6 +392,40 @@ function SoKeToanPanel({ toast }: { toast: (m: string, e?: boolean) => void }) {
     (SO_NHAN[so] || []).forEach((o) => { const v = (f as any)[o]; if (v !== "" && v !== undefined) p.set(o, v); });
     return p.toString();
   };
+  // ── ĐỢT R7-SOb 01/11/2026 — HAI Ô GÕ TAY THÀNH HAI Ô CHỌN ────────────────────────────────
+  //
+  // Chủ tịch nói 01/11/2026: "Mã công trình là nối với mã tour do Điều hành và Sales Admin tạo."
+  //
+  // Ô gõ tay để người dùng TỰ NGHĨ RA một mã không tồn tại, bấm "Xem sổ", nhận một sổ rỗng, và
+  // không biết vì sao. Màn hình nói sai mà không ai thấy nó nói sai — một sổ rỗng và một mã sai
+  // trông giống hệt nhau.
+  //
+  // HOÃN 250 ms RỒI MỚI HỎI. Gõ "VTD-2026-11" là mười một lần thay đổi; hỏi máy chủ mười một
+  // lần cho một lần tìm là tự mình làm chậm chính mình. `clearTimeout` ở nhánh dọn dẹp huỷ lần
+  // hỏi cũ, nên chỉ lần gõ CUỐI đi tới máy chủ.
+  //
+  // HAI CỬA ĐỀU NHẸ VÀ ĐỀU CÓ TRẦN — đo trước khi gọi:
+  //   `/books/ma-cong-trinh?q=`  tối đa 50 dòng (Đợt R7-MCT)
+  //   `/partners?q=&limit=30`    tối đa 30 dòng (`misa.partner_lookup`)
+  // KHÔNG gọi `/api/v1/tours`: robot Kiểm soát đo được cửa ấy chạy 16–30 giây trên hệ thật.
+  useEffect(() => {
+    if (!nhan("project_code")) return;
+    const t = setTimeout(() => {
+      api(`/books/ma-cong-trinh?q=${encodeURIComponent(f.project_code)}`)
+        .then((r) => setGoiY((g) => ({ ...g, ct: r.rows || [] }))).catch(() => { });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [f.project_code, so]);
+  useEffect(() => {
+    if (!nhan("partner_code")) return;
+    const t = setTimeout(() => {
+      api(`/partners?q=${encodeURIComponent(f.partner_code)}&limit=30`)
+        .then((r) => setGoiY((g) => ({ ...g, dt: Array.isArray(r) ? r : [] }))).catch(() => { });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [f.partner_code, so]);
+  const congTrinh = goiY.ct.find((x: any) => x.code === f.project_code);
+  const doiTuong = goiY.dt.find((x: any) => x.code === f.partner_code);
   const xem = async () => {
     setBusy(true);
     try { setRep({ ...(await api(`/books/${so}?${qs()}`)), _so: so }); }
@@ -431,8 +466,14 @@ function SoKeToanPanel({ toast }: { toast: (m: string, e?: boolean) => void }) {
         <label>Từ ngày<input type="date" value={since} onChange={(e) => setSince(e.target.value)} /></label>
         <label>Đến ngày<input type="date" value={upto} onChange={(e) => setUpto(e.target.value)} /></label>
         <label style={{ opacity: nhan("account") ? 1 : 0.45 }}>Tài khoản<input disabled={!nhan("account")} placeholder={nhan("account") ? "131" : "sổ này không lọc theo TK"} value={f.account} onChange={(e) => setF({ ...f, account: e.target.value })} /></label>
-        <label style={{ opacity: nhan("partner_code") ? 1 : 0.45 }}>Mã đối tượng<input disabled={!nhan("partner_code")} placeholder={nhan("partner_code") ? "KH0001" : "sổ này không lọc theo đối tượng"} value={f.partner_code} onChange={(e) => setF({ ...f, partner_code: e.target.value })} /></label>
-        <label style={{ opacity: nhan("project_code") ? 1 : 0.45 }}>Mã công trình<input disabled={!nhan("project_code")} placeholder={nhan("project_code") ? "mã tour" : "sổ này không lọc theo công trình"} value={f.project_code} onChange={(e) => setF({ ...f, project_code: e.target.value })} /></label>
+        <label style={{ opacity: nhan("partner_code") ? 1 : 0.45 }}>Mã đối tượng<input list="ds-doi-tuong" disabled={!nhan("partner_code")} placeholder={nhan("partner_code") ? "gõ mã hoặc tên đối tượng" : "sổ này không lọc theo đối tượng"} value={f.partner_code} onChange={(e) => setF({ ...f, partner_code: e.target.value })} />
+          <datalist id="ds-doi-tuong">{goiY.dt.map((p: any) => <option key={p.code} value={p.code} label={p.trade_name ? `${p.name} · ${p.trade_name}` : p.name} />)}</datalist>
+          {nhan("partner_code") && !!f.partner_code && <span className="muted" style={{ fontSize: 11.5 }}>{doiTuong ? doiTuong.name : "không có đối tượng nào mang mã này"}</span>}</label>
+        <label style={{ opacity: nhan("project_code") ? 1 : 0.45 }}>Mã công trình<input list="ds-cong-trinh" disabled={!nhan("project_code")} placeholder={nhan("project_code") ? "gõ mã hoặc tên tour" : "sổ này không lọc theo công trình"} value={f.project_code} onChange={(e) => setF({ ...f, project_code: e.target.value })} />
+          <datalist id="ds-cong-trinh">{goiY.ct.map((p: any) => <option key={p.code} value={p.code} label={p.co_trong_so ? p.ten : `${p.ten} — chưa gắn vào sổ`} />)}</datalist>
+          {nhan("project_code") && !!f.project_code && (congTrinh
+            ? <span className="muted" style={{ fontSize: 11.5, color: congTrinh.co_trong_so ? undefined : "var(--vtos-danger)" }}>{congTrinh.ten}{congTrinh.co_trong_so ? "" : " · CHƯA GẮN VÀO SỔ – chọn mã này sẽ không ra số"}</span>
+            : <span className="muted" style={{ fontSize: 11.5 }}>không có tour nào mang mã này</span>)}</label>
         {nhan("direction") && <label>Chiều tiền<select value={f.direction} onChange={(e) => setF({ ...f, direction: e.target.value })}><option value="thu">Thu tiền (S03a1-DN)</option><option value="chi">Chi tiền (S03a2-DN)</option></select></label>}
         {nhan("level") && <label>Cấp tài khoản<select value={f.level} onChange={(e) => setF({ ...f, level: e.target.value })}><option value="0">Tất cả các cấp</option><option value="1">Cấp 1</option><option value="2">Cấp 2</option><option value="3">Cấp 3</option></select></label>}
       </div>
