@@ -99,3 +99,20 @@ def danh_gia(nid: int, request: Request, trang: int = 1, xep: str = "moi", db: S
     except NH.LoiNhaHang as ex:
         raise HTTPException(404, str(ex))
     return DG.cong(db, nid, trang, 20, xep)
+
+
+# ── KS-16f · video nhà hàng cho thẻ <video> trên cổng (chỉ video đang hiện của nhà hàng đang hiện) ─────────
+from app.api.v1.video_dich_vu import tra_anh as _vd_anh, tra_video as _vd_xem  # noqa: E402
+
+
+@router.get("/video/{vid:int}/xem")
+def video_xem(vid: int, request: Request, t: str = "", db: Session = Depends(get_db)):
+    """KS-16f — video đang hiện của nhà hàng đang hiện (hoặc vé VTOS ?t=); có phanh."""
+    _phanh(request)
+    return _vd_xem(db, vid, "nha_hang", t)
+
+
+@router.get("/video/{vid:int}/anh")
+def video_anh(vid: int, request: Request, t: str = "", db: Session = Depends(get_db)):
+    _phanh(request)
+    return _vd_anh(db, vid, "nha_hang", t)

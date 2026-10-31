@@ -6,6 +6,7 @@
    AT-1 (28/10/2026): «Khám phá ẩm thực» — mọi nhà hàng đang hiện giới thiệu; chỉ nơi đã ký hợp đồng (máy tính đủ
    5 điều kiện) mới có thực đơn, giá và nút đặt bàn (giao diện ở KhamPhaAmThuc). Khách xem sau khi nhận OTP qua
    Zalo / email, không tạo tài khoản, không mật khẩu (Chủ tịch chốt 28/10/2026). */
+import { DaiVideo } from "../VideoCong";   // KS-16f
 import { useEffect, useMemo, useState } from "react";
 import { goiCong } from "@/lib/cong";
 import { svg } from "./icons";
@@ -46,6 +47,8 @@ export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui, doiTac
     <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => { setMo(null); setF(null); }}><I n="arrow-left" /><span>Quay lại nhà hàng</span></button>
     {loi && <div className="v3-notice warn"><I n="info" /><span>{loi}</span></div>}
     <AlbumKhach album={mo.album} ten={mo.ten} coTab mon={mo.mon} thucDon={mo.thuc_don_nh} danhGia={mo.danh_gia} nhId={mo.id} oTrong={<OTrongNh n={mo} tl="16/9" />} nhan={<div style={{ marginTop: 8 }}><NhanPl n={mo} /></div>} gioiThieu={mo.mo_ta ? <p style={{ margin: 0 }}>{mo.mo_ta}</p> : <p style={{ margin: 0 }}>Vietourist đang biên tập phần giới thiệu nhà hàng này.</p>} />
+    {mo.video?.length > 0 && <section className="v3-panel"><div className="v3-section-title"><h3>Video</h3><span className="v3-badge neutral">{mo.so_video} video</span></div>
+      <DaiVideo video={mo.video} ten={mo.ten} /></section>}
     <section className="v3-panel"><div className="v3-section-title"><h2>{mo.ten}</h2><span className="v3-badge neutral">{mo.am_thuc}</span></div>
       <p>{[mo.tinh_thanh, mo.khu_vuc].filter(Boolean).join(" · ")}{mo.gio_phuc_vu ? ` · Giờ phục vụ ${mo.gio_phuc_vu}` : ""}</p>
       {mo.tien_ich && <p>{mo.tien_ich}</p>}{mo.mo_ta && <p>{mo.mo_ta}</p>}

@@ -733,3 +733,8 @@ def chot_dac_san(nid: int, data: ChotIn, u: User = Depends(require_roles(*N.VAI_
         return PL.chot_dac_san(db, u, nid, data.dong_y)
     except N.LoiNhaHang as ex:
         _loi(ex)
+
+
+# ── KS-16f · video nhà hàng (Chủ tịch duyệt 31/10/2026) ────────────────────────────────────────────────
+from app.api.v1.video_dich_vu import gan_cua_noi as _gan_video_noi  # noqa: E402
+_gan_video_noi(router, "nha_hang", "nid")

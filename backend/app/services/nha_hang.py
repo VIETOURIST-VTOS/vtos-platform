@@ -286,9 +286,16 @@ def _nh_cong(db: Session, n: NhaHang, tds: list[ThucDonNhaHang], hn: date, anh: 
             "anh": bia["hien"] if bia else None, "anh_nho": bia["nho"] if bia else None,
             "anh_alt": bia["alt"] if bia else "", "anh_nguon": bia["credit"] if bia else "", "so_anh": len(anh),
             **({"album": [_anh_cong_out(x) for x in anh], "mon": mon_cong(db, n.id), "thuc_don_nh": thuc_don_cong(db, n.id),
-                "danh_gia": _dg_cong(db, n.id)}
+                "danh_gia": _dg_cong(db, n.id), **_video_cong(db, n.id)}
                if du_album else {}),
             "gia_tu": min(int(t.gia_nguoi_lon or 0) for t in ban) if ban else None, "thuc_don": [_td_out(t, False) for t in ban]}
+
+
+def _video_cong(db: Session, nid: int) -> dict:
+    """KS-16f — video đang hiện của nhà hàng (giới thiệu trước)."""
+    from app.services import video_dich_vu as VD
+    v = VD.video_cong(db, "nha_hang", [nid]).get(nid, [])
+    return {"video": v, "so_video": len(v)}
 
 
 def _pl_cong(n: NhaHang) -> dict:

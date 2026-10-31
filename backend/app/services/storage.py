@@ -60,6 +60,48 @@ class LocalStorage:
     def exists(self, key: str) -> bool:
         return os.path.exists(self._path(key))
 
+    # ── KS-16f: tải tệp lớn (video) theo từng phần — bộ nhớ máy chủ chỉ giữ MỘT phần mỗi lần ──────────
+    def mp_bat_dau(self, key: str, content_type: str = "") -> str:
+        return "local"
+
+    def mp_phan(self, key: str, upload_id: str, so: int, data: bytes) -> str:
+        with open(self._path(key) + f".phan{so:05d}", "wb") as f:
+            f.write(data)
+        return hashlib.md5(data).hexdigest()
+
+    def mp_xong(self, key: str, upload_id: str, phan: list[tuple[int, str]]) -> int:
+        tong = 0
+        with open(self._path(key), "wb") as out:
+            for so, _etag in sorted(phan):
+                pp = self._path(key) + f".phan{so:05d}"
+                with open(pp, "rb") as f:
+                    while True:
+                        b = f.read(1 << 20)
+                        if not b:
+                            break
+                        out.write(b); tong += len(b)
+                os.remove(pp)
+        return tong
+
+    def mp_huy(self, key: str, upload_id: str) -> None:
+        d = os.path.dirname(self._path(key)); goc = os.path.basename(self._path(key))
+        for f in os.listdir(d):
+            if f.startswith(goc + ".phan"):
+                os.remove(os.path.join(d, f))
+
+    def duong_tep(self, key: str) -> str:
+        """Đường dẫn trên đĩa — để phát video có hỗ trợ tua (Range)."""
+        return self._path(key)
+
+    def link_tam(self, key: str, giay: int = 3600, kieu: str = "") -> str | None:
+        return None
+
+    def xoa(self, key: str) -> None:
+        try:
+            os.remove(self._path(key))
+        except OSError:
+            pass
+
     def describe(self) -> dict:
         return {"kind": self.kind, "durable": False, "noi_luu": self.root,
                 "canh_bao": "Đang lưu vào thư mục của máy chủ. Trên Render thư mục này MẤT sau mỗi lần "
@@ -120,6 +162,53 @@ class S3Storage:
             return True
         except Exception:
             return False
+
+    # ── KS-16f: multipart S3 — mỗi phần ≥5 MB (trừ phần cuối); bộ nhớ chỉ giữ một phần ─────────────────
+    def mp_bat_dau(self, key: str, content_type: str = "") -> str:
+        try:
+            return self.client.create_multipart_upload(Bucket=self.bucket, Key=key,
+                                                       ContentType=content_type or "application/octet-stream")["UploadId"]
+        except Exception as ex:
+            raise StorageError(f"Không mở được phiên tải lên kho lưu trữ: {ex}")
+
+    def mp_phan(self, key: str, upload_id: str, so: int, data: bytes) -> str:
+        try:
+            return self.client.upload_part(Bucket=self.bucket, Key=key, UploadId=upload_id, PartNumber=so, Body=data)["ETag"]
+        except Exception as ex:
+            raise StorageError(f"Không ghi được phần {so} lên kho lưu trữ: {ex}")
+
+    def mp_xong(self, key: str, upload_id: str, phan: list[tuple[int, str]]) -> int:
+        try:
+            self.client.complete_multipart_upload(Bucket=self.bucket, Key=key, UploadId=upload_id,
+                                                  MultipartUpload={"Parts": [{"PartNumber": so, "ETag": et} for so, et in sorted(phan)]})
+            return int(self.client.head_object(Bucket=self.bucket, Key=key)["ContentLength"])
+        except Exception as ex:
+            raise StorageError(f"Không ghép được tệp trên kho lưu trữ: {ex}")
+
+    def mp_huy(self, key: str, upload_id: str) -> None:
+        try:
+            self.client.abort_multipart_upload(Bucket=self.bucket, Key=key, UploadId=upload_id)
+        except Exception:
+            pass
+
+    def duong_tep(self, key: str) -> str | None:
+        return None
+
+    def link_tam(self, key: str, giay: int = 3600, kieu: str = "") -> str | None:
+        """Đường xem tạm có chữ ký (hết hạn sau `giay`) — trình duyệt phát / tua thẳng từ kho, máy chủ không gánh băng thông."""
+        try:
+            p = {"Bucket": self.bucket, "Key": key}
+            if kieu:
+                p["ResponseContentType"] = kieu
+            return self.client.generate_presigned_url("get_object", Params=p, ExpiresIn=giay)
+        except Exception as ex:
+            raise StorageError(f"Không tạo được đường xem video: {ex}")
+
+    def xoa(self, key: str) -> None:
+        try:
+            self.client.delete_object(Bucket=self.bucket, Key=key)
+        except Exception:
+            pass
 
     def describe(self) -> dict:
         # CỐ Ý không chạm tới self.client: xem tình trạng kho không được kéo theo 40 MB thư viện.

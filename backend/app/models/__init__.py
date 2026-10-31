@@ -177,3 +177,4 @@ from app.models.don_ks_vtd import *  # noqa   KS-14 đặt phòng khách sạn V
 from app.models.cong_co_dong import *  # noqa
 from app.models.cong_ncc import *  # noqa
 from app.models.dat_ban import *  # noqa
+from app.models.video_dich_vu import *  # noqa   KS-16f video khách sạn / nhà hàng
