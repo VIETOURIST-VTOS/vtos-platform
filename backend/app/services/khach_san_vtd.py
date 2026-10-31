@@ -280,11 +280,14 @@ def luu_ks(db: Session, u: User, d: dict, kid: int | None = None, now: datetime 
     return k
 
 
+# KS-16l (Chủ tịch 01/11/2026): khách sạn lên cổng khi đủ hồ sơ + ảnh + giới thiệu, KHÔNG cần loại phòng đang bán.
+# Chưa có gói đặt được thì chưa book trên cổng — bấm vào khách sạn mở trang ngoài LINK_KS_NGOAI ở tab mới.
+LINK_KS_NGOAI = "https://www.vietourist.vn/hotel"
+
+
 def dieu_kien_hien(db: Session, k: KhachSanVtd) -> list[dict]:
-    lps = _lp_cua(db, k.id)
     return [{"ma": "ho_so", "ten": "Đủ tên, thành phố, hạng sao", "ok": bool(k.ten and k.tinh_thanh in THANH_PHO and k.sao)},
             {"ma": "anh", "ten": "Có ảnh đã duyệt", "ok": bool(_anh_duyet(db, [k.id]).get(k.id))},
-            {"ma": "phong", "ten": "Có loại phòng đang bán", "ok": any(x.dang_ban for x in lps)},
             {"ma": "mo_ta", "ten": "Có giới thiệu cho khách", "ok": len(k.mo_ta or "") >= 40}]
 
 
@@ -305,6 +308,26 @@ def bat_hien(db: Session, u: User, kid: int, bat: bool, now: datetime | None = N
     _audit(db, u, "ks_vtd_bat" if bat else "ks_vtd_tat", k.ma)
     db.commit()
     return k
+
+
+def bat_hien_loat(db: Session, u: User, now: datetime | None = None) -> dict:
+    """KS-16l: bật hiện mọi khách sạn đủ điều kiện, chưa hiện, không ngừng hợp tác. Người vừa sửa hồ sơ không tự bật
+    (trừ Chủ tịch / TGĐ) — khách sạn ấy được bỏ qua và kể tên."""
+    _quyen(u, VAI_DUYET, "Chỉ TP Điều hành / Chủ tịch / TGĐ bật hiện trên cổng")
+    now = now or datetime.now()
+    bat, bo = [], []
+    for k in db.execute(select(KhachSanVtd).where(KhachSanVtd.hien_cong.is_(False), KhachSanVtd.ngung.is_(False))
+                        .order_by(KhachSanVtd.ma)).scalars():
+        if not all(c["ok"] for c in dieu_kien_hien(db, k)):
+            continue
+        if k.sua_boi == u.username and not _co(u, TOAN_QUYEN):
+            bo.append(k.ma)
+            continue
+        k.hien_cong, k.hien_boi, k.hien_luc, k.tat_ly_do = True, u.username, now, ""
+        bat.append(k.ma)
+    _audit(db, u, "ks_vtd_bat_loat", ",".join(bat)[:300], None, {"bat": bat, "bo_qua": bo})
+    db.commit()
+    return {"bat": bat, "bo_qua": bo}
 
 
 def ngung(db: Session, u: User, kid: int, ngung_: bool) -> KhachSanVtd:
@@ -1071,6 +1094,8 @@ def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict], dg: 
             "co_mien_phi_huy": any(g["mien_phi_huy"] for g in goi), "co_bua_sang": any(g["bua_sang"] for g in goi),
             "thue_phi_pt": k.thue_phi_pt,
             "het_phong": bool(co_gia) and not goi,
+            # KS-16l: chưa có gói đặt được → chưa book trên cổng; bấm vào mở trang ngoài ở tab mới
+            "dat_ngay": any(p["goi"] for p in phong), "link_ngoai": LINK_KS_NGOAI,
             # KS-15: điểm thang 10 của khách đã ở — chỉ bài đang hiện; dưới 3 bài diem_tb = None («Mới»).
             "danh_gia": dg or {"so_bai": 0, "diem_tb": None, "du": False, "nhan": "", "muc": {}}}
 

@@ -151,6 +151,14 @@ class BatIn(BaseModel):
     bat: bool
 
 
+@router_vtos.post("/hien-cong-loat")
+def hien_cong_loat(u: User = Depends(require_roles(*S.VAI_DUYET)), db: Session = Depends(get_db)):
+    """KS-16l: bật hiện mọi khách sạn đủ điều kiện."""
+    r = _goi(S.bat_hien_loat, db, u)
+    them = f" · bỏ qua {len(r['bo_qua'])} khách sạn bạn vừa sửa (người khác bật)" if r["bo_qua"] else ""
+    return {**r, "message": f"Đã bật hiện {len(r['bat'])} khách sạn trên cổng khách{them}"}
+
+
 @router_vtos.post("/{kid:int}/hien-cong")
 def hien_cong(kid: int, data: BatIn, u: User = Depends(require_roles(*S.VAI_DUYET)), db: Session = Depends(get_db)):
     k = _goi(S.bat_hien, db, u, kid, data.bat)
