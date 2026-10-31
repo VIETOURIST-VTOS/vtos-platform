@@ -593,8 +593,9 @@ def mot_vtos(db: Session, u: User, kid: int) -> dict:
     lps = _lp_cua(db, kid)
     goi = _goi_cua(db, [x.id for x in lps])
     mua = _mua_cua(db, [g.id for v in goi.values() for g in v])
+    from app.services import video_dich_vu as VD   # KS-16f
     return {"khach_san": _ks_noi_bo(k), "dieu_kien": dieu_kien_hien(db, k),
-            "anh": [_anh_out(x) for x in _anh_cua(db, kid)],
+            "anh": [_anh_out(x) for x in _anh_cua(db, kid)], "so_video": len(VD._cua(db, "khach_san_vtd", kid, False)),
             "loai_phong": [{"id": x.id, "ten": x.ten, "dien_tich": x.dien_tich, "giuong": x.giuong, "mo_ta": x.mo_ta,
                             "toi_da_nguoi_lon": x.toi_da_nguoi_lon, "toi_da_tre_em": x.toi_da_tre_em, "so_phong": x.so_phong,
                             "thu_tu": x.thu_tu, "dang_ban": x.dang_ban,
@@ -705,13 +706,17 @@ def chi_tiet_cong(db: Session, kid: int, vao, ra, nguoi_lon: int = 2, tre_em: in
     nl, te, sp = max(1, int(nguoi_lon or 1)), max(0, int(tre_em or 0)), max(1, int(so_phong or 1))
     anh = _anh_duyet(db, [k.id]).get(k.id, [])
     phong = _phong_ban_duoc(db, [k.id], vao, ra, nl, te, sp).get(k.id, [])
+    from app.services import video_dich_vu as VD   # KS-16f
+    video = VD.video_cong(db, "khach_san_vtd", [k.id]).get(k.id, [])
     for p in phong:
         p["anh"] = [_anh_out(a, True) for a in anh if a.loai_phong_id == p["id"]][:6]
+        p["video"] = [v for v in video if v["loai_phong_id"] == p["id"]]
     from app.services import danh_gia_ks as DGK
     the = _the_cong(k, anh, phong, DGK.tom_tat(db, [k.id])[k.id])
     return {**the, "dia_chi": k.dia_chi, "mo_ta": k.mo_ta, "gio_nhan": k.gio_nhan, "gio_tra": k.gio_tra,
             "chinh_sach": {"tre_em": k.cs_tre_em, "giuong_phu": k.cs_giuong_phu, "vat_nuoi": k.cs_vat_nuoi, "khac": k.cs_khac},
             "anh": [_anh_out(a, True) for a in anh], "nhom_anh": NHOM_ANH_KS,
+            "video": video, "so_video": len(video),
             "phong": phong, "dem": (ra - vao).days, "vao": vao.isoformat(), "ra": ra.isoformat(),
             "nguoi_lon": nl, "tre_em": te, "so_phong": sp, "the_bat": _the_bat()}
 

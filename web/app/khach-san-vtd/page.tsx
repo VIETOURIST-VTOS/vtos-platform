@@ -4,6 +4,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import { AnhNoiBo } from "@/components/nha-hang/AlbumNhaHang";
+import VideoNoiBo from "@/components/VideoNoiBo";   // KS-16f
 import DanhGiaKsNoiBo from "@/components/khach-san-vtd/DanhGiaKsNoiBo";
 
 /** KS-13 · KHÁCH SẠN HỢP TÁC (CỔNG KHÁCH) — Chủ tịch duyệt bản demo 30/10/2026.
@@ -84,7 +85,7 @@ function Trang() {
 function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "moi"; toast: (m: string, l?: boolean) => void; onDong: () => void; onMoi: (id: number) => void; onDoi: () => void }) {
   const [h, setH] = useState<any>(null);
   const [f, setF] = useState<any>(KS0);
-  const [t, setT] = useState<"tt" | "anh" | "phong" | "trong" | "hien">("tt");
+  const [t, setT] = useState<"tt" | "anh" | "video" | "phong" | "trong" | "hien">("tt");
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => {
     if (kid === "moi") { setH(null); setF(KS0); return; }
@@ -110,7 +111,7 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
       {h && <span className="muted">{h.khach_san.ma}</span>}{h && (h.khach_san.hien_cong ? <Tag cls="ok">Đang hiện trên cổng</Tag> : <Tag cls="warn">Chưa hiện</Tag>)}
       <span style={{ flex: 1 }} /><button className="act grey" onClick={onDong}>Đóng</button></div>
     {kid !== "moi" && <div style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: "1px solid var(--line, #2a3b4d)", margin: "10px 0" }}>
-      {([["tt", "Thông tin"], ["anh", `Album ảnh (${h?.anh.length ?? 0})`], ["phong", `Loại phòng & giá (${h?.loai_phong.length ?? 0})`], ["trong", "Phòng trống"], ["hien", "Hiện trên cổng"]] as const).map(([k2, t2]) =>
+      {([["tt", "Thông tin"], ["anh", `Album ảnh (${h?.anh.length ?? 0})`], ["video", `Video (${h?.so_video ?? 0}/5)`], ["phong", `Loại phòng & giá (${h?.loai_phong.length ?? 0})`], ["trong", "Phòng trống"], ["hien", "Hiện trên cổng"]] as const).map(([k2, t2]) =>
         <button key={k2} className={`act ${t === k2 ? "teal" : "grey"}`} onClick={() => setT(k2)}>{t2}</button>)}</div>}
     {(kid === "moi" || t === "tt") && <>
       <div className="grid">
@@ -136,6 +137,7 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
       {nhap && <button className="act teal" disabled={busy} onClick={luu}>{kid === "moi" ? "Thêm khách sạn" : "Lưu hồ sơ"}</button>}
     </>}
     {h && t === "anh" && <Album h={h} x={x} toast={toast} onDoi={() => { load(); onDoi(); }} />}
+    {h && t === "video" && <VideoNoiBo goc="/khach-san-vtd" oid={h.khach_san.id} toast={toast} loaiPhong={h.loai_phong.map((p: any) => ({ id: p.id, ten: p.ten }))} onDoi={load} />}
     {h && t === "phong" && <Phong h={h} x={x} toast={toast} goi={goi} busy={busy} />}
     {h && t === "trong" && <PhongTrong kid={h.khach_san.id} toast={toast} />}
     {h && t === "hien" && <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

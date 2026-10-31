@@ -395,3 +395,21 @@ def anh_cong(pid: int, co: str, request: Request, db: Session = Depends(get_db))
     _phanh(request)
     data, a = _goi(S.tep_anh, db, None, pid, co)
     return Response(content=data, media_type=a.kieu_noi_dung or "image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
+
+
+# ── KS-16f · video khách sạn (Chủ tịch duyệt 31/10/2026) ───────────────────────────────────────────────
+from app.api.v1.video_dich_vu import gan_cua_noi as _gan_video_noi, tra_anh as _vd_anh, tra_video as _vd_xem  # noqa: E402
+_gan_video_noi(router_vtos, "khach_san_vtd", "kid")
+
+
+@router_anh.get("/video/{vid:int}/xem")
+def video_xem(vid: int, request: Request, t: str = "", db: Session = Depends(get_db)):
+    """KS-16f — video đang hiện của khách sạn đang hiện (hoặc vé VTOS ?t=); có phanh."""
+    _phanh(request)
+    return _vd_xem(db, vid, "khach_san_vtd", t)
+
+
+@router_anh.get("/video/{vid:int}/anh")
+def video_anh(vid: int, request: Request, t: str = "", db: Session = Depends(get_db)):
+    _phanh(request)
+    return _vd_anh(db, vid, "khach_san_vtd", t)

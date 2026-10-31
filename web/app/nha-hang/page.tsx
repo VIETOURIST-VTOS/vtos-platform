@@ -4,6 +4,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, getToken, taiTep } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import AlbumNhaHang, { AnhChoDuyet } from "@/components/nha-hang/AlbumNhaHang";
+import { VideoNhaHang } from "@/components/VideoNoiBo";   // KS-16f
 import { MonAnNhaHang, ThucDonNhaHangTab, NoiDungChoDuyet } from "@/components/nha-hang/MonThucDon";
 import { BangHoanThien, ViecCuaToi, HoSoHoanThien } from "@/components/nha-hang/HoanThien";
 import DanhGiaNoiBo from "@/components/nha-hang/DanhGiaNoiBo";
@@ -54,7 +55,7 @@ function Trang() {
   const [f, setF] = useState<any>(NH_TRONG);
   const [td, setTd] = useState<any>(null);         // {id?, ...} gói đang sửa
   const [busy, setBusy] = useState(false);
-  const [tabNh, setTabNh] = useState<"album" | "mon" | "tdnh" | "td" | "gt" | "hd" | "tt" | "dg" | "pl">("album");   // AT-2a: hồ sơ nội dung theo tab
+  const [tabNh, setTabNh] = useState<"album" | "video" | "mon" | "tdnh" | "td" | "gt" | "hd" | "tt" | "dg" | "pl">("album");   // AT-2a: hồ sơ nội dung theo tab
   const [lan, setLan] = useState(0);   // AT-2c: làm mới danh mục kiểm sau mỗi lần dữ liệu đổi
   const load = useCallback(() => { setLan((v) => v + 1); api("/nha-hang").then(setX).catch((e) => toast(errMsg(e), true)); }, [toast]);
   useEffect(() => { load(); }, [load]);
@@ -250,7 +251,7 @@ function Trang() {
           <span style={{ flex: 1 }} />{dang.mo_dat ? <Tag cls="ok">Đang mở đặt bàn</Tag> : <Tag cls="warn">Chưa mở đặt bàn · {dang.dieu_kien.filter((c: any) => c.ok).length}/5</Tag>}</div>
         <HoSoHoanThien nid={dang.id} toast={toast} onTab={(t) => setTabNh(t as any)} lamMoi={lan} />
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: "1px solid var(--line, #2a3b4d)", marginBottom: 10 }}>
-          {([["album", "Album ảnh"], ["mon", "Món ăn"], ["tdnh", "Thực đơn"], ["td", "Gói đặt bàn"], ["gt", "Giới thiệu"], ["hd", "Hợp đồng & đặt bàn"], ["tt", "Thông tin"], ["pl", "Phân loại"], ["dg", "Đánh giá"]] as const).map(([k, t]) =>
+          {([["album", "Album ảnh"], ["video", "Video"], ["mon", "Món ăn"], ["tdnh", "Thực đơn"], ["td", "Gói đặt bàn"], ["gt", "Giới thiệu"], ["hd", "Hợp đồng & đặt bàn"], ["tt", "Thông tin"], ["pl", "Phân loại"], ["dg", "Đánh giá"]] as const).map(([k, t]) =>
             <button key={k} className={`act ${tabNh === k ? "teal" : "grey"}`} onClick={() => setTabNh(k)}>{t}</button>)}</div>
       </> : <h2>Thêm nhà hàng</h2>}
       {(!dang || tabNh === "tt") && <>
@@ -269,6 +270,7 @@ function Trang() {
 
       {dang && <>
         {tabNh === "album" && <AlbumNhaHang nid={dang.id} toast={toast} onDoi={load} />}
+        {tabNh === "video" && <VideoNhaHang nid={dang.id} toast={toast} thucDon={(dang.thuc_don || []).map((g: any) => ({ id: g.id, ten: g.ten }))} onDoi={load} />}
         {tabNh === "mon" && <MonAnNhaHang nid={dang.id} toast={toast} onDoi={load} />}
         {tabNh === "tdnh" && <ThucDonNhaHangTab nid={dang.id} toast={toast} onDoi={load} />}
         {tabNh === "dg" && <DanhGiaNoiBo toast={toast} nid={dang.id} />}

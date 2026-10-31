@@ -6,6 +6,7 @@
    KS-14 (Chủ tịch duyệt bản xem thử 30/10/2026): khách sạn có giá đã duyệt thì khách ĐẶT VÀ TRẢ NGAY 100% —
    máy giữ phòng 15 phút, trả QR (máy tự khớp) hoặc thẻ qua cổng SePay (SP-1); Điều hành chốt với khách sạn trong 2 giờ làm
    việc; hủy theo gói. Phòng đã đặt nằm ở «Phòng đã đặt của tôi». Điểm thưởng: khi VTD Rewards chạy. */
+import { DaiVideo, VideoO } from "./VideoCong";   // KS-16f
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import { diCongThe, goiCong } from "@/lib/cong";
@@ -260,8 +261,11 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
 
   if (buoc === "ks" && ks) return <div className="ksv">{css}
     <button type="button" className="ksv-link" onClick={() => setBuoc("ds")}>← Khách sạn ở {ks.tinh_thanh}</button>
-    <div className="ksv-gal">{ks.anh.length ? <>{ks.anh.slice(0, 4).map((a: any, i: number) => <span key={a.id}><img src={i ? a.nho : a.hien} alt={a.chu_thich || `${ks.ten} — ${a.nhom_ten}`} loading="lazy" /></span>)}
-      <span className="ksv-more">{ks.so_anh} ảnh</span></> : <span style={{ gridColumn: "1 / -1" }}><AnhTrong k={ks} cao={260} /></span>}</div>
+    <div className="ksv-gal">{ks.anh.length || ks.video?.length ? <>
+      {ks.video?.length > 0 && <span key="v0"><VideoO v={ks.video[0]} ten={ks.ten} /></span>}
+      {ks.anh.slice(0, ks.video?.length ? 3 : 4).map((a: any, i: number) => <span key={a.id}><img src={i || ks.video?.length ? a.nho : a.hien} alt={a.chu_thich || `${ks.ten} — ${a.nhom_ten}`} loading="lazy" /></span>)}
+      <span className="ksv-more">{ks.so_anh} ảnh{ks.so_video ? ` · ${ks.so_video} video` : ""}</span></> : <span style={{ gridColumn: "1 / -1" }}><AnhTrong k={ks} cao={260} /></span>}</div>
+    {ks.video?.length > 1 && <DaiVideo video={ks.video} ten={ks.ten} bo={1} />}
     <nav className="ksv-tabs">{[["ksv-tq", "Tổng quan"], ["ksv-phong", "Phòng"], ["ksv-tn", "Tiện nghi"], ["ksv-cs", "Chính sách"], ["ksv-dg", "Đánh giá"]].map(([id, t]) =>
       <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }); }}>{t}</a>)}
       <span className="ksv-tp">{ks.gia_tu && <><small className="ksv-muted">từ</small><b className="ksv-big" style={{ fontSize: 19 }}>₫ {vnd(ks.gia_tu.gia_dem)}</b></>}
@@ -280,6 +284,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
       {ks.phong.map((p: any) => <div key={p.id} className="ksv-room">
         <div className="ksv-rl"><b style={{ fontSize: 17 }}>{p.ten}</b>
           {p.anh?.[0] ? <img src={p.anh[0].nho} alt={p.ten} className="ksv-rp" loading="lazy" /> : <AnhTrong k={ks} cao={110} />}
+          {p.video?.[0] && <div style={{ aspectRatio: "16 / 9", maxWidth: "100%" }}><VideoO v={p.video[0]} ten={p.ten} nhan="VIDEO PHÒNG" /></div>}
           <span className="ksv-muted" style={{ fontSize: 13 }}>{[p.dien_tich ? `${p.dien_tich} m²` : "", p.giuong].filter(Boolean).join(" · ")}{p.mo_ta && <><br />{p.mo_ta}</>}<br />Tối đa {p.toi_da_nguoi_lon} người lớn{p.toi_da_tre_em ? ` + ${p.toi_da_tre_em} trẻ em` : ""}</span>
           {!p.vua && <small style={{ color: "var(--ksv-price)", fontWeight: 600 }}>Không đủ chỗ cho {q.nl} người lớn / {q.phong} phòng — tăng số phòng</small>}</div>
         <div className="ksv-rates">{p.goi.length ? <><div className="ksv-rhd"><span>Lợi ích</span><span>Số khách</span><span>Giá mỗi đêm</span><span>Số phòng</span></div>
