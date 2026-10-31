@@ -80,7 +80,7 @@ function Bookings() {
         <tbody>{rows.length ? rows.map((b) => { const [pl, pc] = PMT[b.pmt_status] || [b.pmt_status, ""]; return <tr key={b.id} style={{ opacity: b.cancelled ? 0.55 : 1 }}>
           <td><b>{b.code}</b><div className="muted">{fmtDT(b.created_at)}</div></td>
           <td><Link href={`/tours/${b.tour_id}`}>{b.tour_code}</Link><div className="muted">{fmtD(b.tour_start)}</div></td>
-          <td>{b.customer_name}<div className="muted">{b.customer_phone} · {b.source}</div>{b.cancelled && <div className="muted">Hủy: {b.cancel_reason}{b.cancel_charge > 0 && ` · phí ${vnd(b.cancel_charge)}`}</div>}</td>
+          <td>{b.customer_name}<div className="muted">{b.customer_phone} · {b.source}</div>{b.nguon_ctv && <div className="muted" title={`${b.nguon_ctv.loai} ${b.nguon_ctv.tu} · giữ nguồn tới ${b.nguon_ctv.den} · máy gắn lúc tạo booking, khóa — đổi nguồn qua khiếu nại`}><Tag cls="navy">Nguồn: CTV {b.nguon_ctv.doi_tac} ({b.nguon_ctv.ma_ctv})</Tag></div>}{b.cancelled && <div className="muted">Hủy: {b.cancel_reason}{b.cancel_charge > 0 && ` · phí ${vnd(b.cancel_charge)}`}</div>}</td>
           <td className="num">{b.pax}{(b.adl || b.chd || b.inf) ? <div className="muted">{b.adl}/{b.chd}/{b.inf}</div> : null}</td>
           <td className="num">{vnd(b.amount - b.discount)}</td><td className="num muted">{b.deposit_pct}% · {vnd(b.deposit_due)}</td><td className="num">{vnd(b.paid)}</td>
           <td className="num">{b.cancelled ? "–" : b.due > 0 ? <Tag cls="warn">{vnd(b.due)}</Tag> : <Tag cls="ok">Đủ</Tag>}</td>

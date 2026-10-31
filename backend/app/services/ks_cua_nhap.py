@@ -200,6 +200,10 @@ CUA_TAY = (
     "video_dich_vu",
     # KS-16g 31/10/2026: khách tự ghi mã người giới thiệu ở trang «Điểm & ưu đãi» trên cổng khách (/cong).
     "gioi_thieu_rewards",
+    # KS-16h 31/10/2026: nguồn đơn ghi khi CTV gửi «Giới thiệu khách» trên cổng dt. / khách mở link CTV trên cổng
+    # kh.; vụ việc do đối tác gửi khiếu nại trên cổng dt. và Trưởng KD / Kế toán xử lý ở /hoa-hong-d06; bảng đối
+    # soát Kế toán bấm «Lập & gửi» ở /hoa-hong-d06, đối tác đồng ý / khiếu nại từng dòng trên cổng dt.
+    "nguon_don", "vu_viec_doi_tac", "bang_doi_soat", "dong_doi_soat",
     # KS-14 (30/10/2026): khách đặt + trả trên cổng (phiên cổng, OnePay / QR khớp mã); Điều hành sửa số phòng bán,
     # chốt với khách sạn; Sales xác nhận hoàn; Kế toán ghi sổ / đối soát / hoàn / chốt hoa hồng — màn /khach-san-vtd.
     "phong_trong_vtd", "don_ks_vtd", "thanh_toan_ks_vtd",

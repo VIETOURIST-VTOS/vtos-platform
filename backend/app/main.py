@@ -111,6 +111,7 @@ from app.api.v1.de_nghi_xe import router as de_nghi_xe_router
 from app.services import rules as R
 from app.services import accounting as ACC
 from app.services.seed import seed_all
+from app.services import nguon_don as _nguon_don  # noqa: F401  KS-16h: gắn nguồn CTV lúc tạo booking (lắng nghe before_flush)
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════

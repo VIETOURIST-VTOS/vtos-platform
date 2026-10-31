@@ -24,7 +24,62 @@ def _ky(ky: str | None) -> str:
 
 @router.get("")
 def xem(ky: str | None = None, u: User = Depends(require_roles(*H.VAI_XEM)), db: Session = Depends(get_db)):
-    return H.tong_hop(db, _ky(ky))
+    from app.services import doi_soat_doi_tac as DS
+    k = _ky(ky)
+    ra = H.tong_hop(db, k)
+    if ra["v3"]:     # KS-16h: cột Đối soát
+        for r in ra["dong"]:
+            r["doi_soat"] = DS.tom_tat(db, r["doi_tac_id"], k)
+    return ra
+
+
+class DoiSoatIn(BaseModel):
+    doi_tac_id: int
+    ky: str
+
+
+@router.post("/doi-soat")
+def gui_doi_soat(data: DoiSoatIn, u: User = Depends(require_roles(*H.VAI_KE_TOAN)), db: Session = Depends(get_db)):
+    from app.services import doi_soat_doi_tac as DS
+    try:
+        b = DS.lap_va_gui(db, u, data.doi_tac_id, _ky(data.ky))
+    except DS.LoiDoiSoat as ex:
+        raise HTTPException(ex.status if ex.status != 400 else 422, str(ex))
+    return {"message": f"Đã gửi bảng đối soát kỳ {b.ky} — đối tác phản hồi đến {b.han_phan_hoi:%d/%m/%Y}, hạn trả {b.han_tra:%d/%m/%Y}"}
+
+
+@router.get("/doi-soat/{doi_tac_id}")
+def xem_doi_soat(doi_tac_id: int, u: User = Depends(require_roles(*H.VAI_XEM)), db: Session = Depends(get_db)):
+    from app.services import doi_soat_doi_tac as DS
+    from app.models.doi_tac_ban_hang import DoiTacBanHang
+    dt = db.get(DoiTacBanHang, doi_tac_id)
+    if dt is None:
+        raise HTTPException(404, "Không có đối tác này")
+    return {"ten": dt.ten, "bang": DS.cua_doi_tac(db, dt)}
+
+
+VAI_VU_VIEC = H.VAI_XEM
+
+
+@router.get("/vu-viec")
+def ds_vu_viec(u: User = Depends(require_roles(*VAI_VU_VIEC)), db: Session = Depends(get_db)):
+    from app.services import nguon_don as ND
+    return {"vu_viec": ND.ds_vu_viec(db)}
+
+
+class XuLyIn(BaseModel):
+    chap_nhan: bool
+    ket_qua: str
+
+
+@router.post("/vu-viec/{vid}")
+def xu_ly_vu_viec(vid: int, data: XuLyIn, u: User = Depends(require_roles(*VAI_VU_VIEC)), db: Session = Depends(get_db)):
+    from app.services import nguon_don as ND
+    try:
+        v = ND.xu_ly_vu_viec(db, u, vid, data.chap_nhan, data.ket_qua)
+    except ND.LoiNguon as ex:
+        raise HTTPException(ex.status if ex.status != 400 else 422, str(ex))
+    return {"message": f"{v.ma}: {'chấp nhận' if v.trang_thai == 'chap_nhan' else 'bác'}"}
 
 
 class KyIn(BaseModel):
@@ -69,3 +124,29 @@ def hinh_thuc(data: HinhThucIn, u: User = Depends(require_roles(*H.VAI_HINH_THUC
     except H.LoiD06 as ex:
         raise HTTPException(422, str(ex))
     return {"message": f"Đã đặt «{H.HINH_THUC[r.hinh_thuc]}» có hiệu lực từ {r.hieu_luc_tu:%d/%m/%Y}"}
+
+
+VAI_PHU_LUC = tuple(dict.fromkeys(H.VAI_KE_TOAN + ("gd_kd", "chutich", "tgd")))
+
+
+class PhuLucIn(BaseModel):
+    d06_phu_luc: bool
+    vat_pct: float = 8
+
+
+@router.post("/tour/{tid}/phu-luc")
+def dat_phu_luc(tid: int, data: PhuLucIn, u: User = Depends(require_roles(*VAI_PHU_LUC)), db: Session = Depends(get_db)):
+    """KS-16h: tour có phụ lục hoa hồng D06 + % VAT trong giá bán (D06 theo v3 loại VAT)."""
+    from app.models.core import Tour
+    from app.services import rules as R
+    t = db.get(Tour, tid)
+    if t is None:
+        raise HTTPException(404, "Không có tour này")
+    if not 0 <= data.vat_pct <= 20:
+        raise HTTPException(422, "% VAT từ 0 đến 20")
+    truoc = {"d06_phu_luc": t.d06_phu_luc, "vat_pct": t.vat_pct}
+    t.d06_phu_luc, t.vat_pct = bool(data.d06_phu_luc), float(data.vat_pct)
+    R.audit(db, u.username, u.role, "d06_phu_luc_tour", f"tour:{t.code}", before=truoc,
+            after={"d06_phu_luc": t.d06_phu_luc, "vat_pct": t.vat_pct})
+    db.commit()
+    return {"message": f"{t.code}: {'có' if t.d06_phu_luc else 'không có'} phụ lục hoa hồng D06 · VAT {t.vat_pct:g}%"}

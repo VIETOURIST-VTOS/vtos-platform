@@ -15,13 +15,13 @@ import KhachSanVtd from "../KhachSanVtd";
 import NhaHangKhach from "../khach/NhaHangKhach";
 import DatBanCuaToi from "../DatBanCuaToi";
 
-type Tab = "home" | "tour" | "hold" | "bookings" | "booking" | "d06" | "debt" | "refer" | "referrals" | "nha_hang" | "dat_ban";
+type Tab = "home" | "tour" | "hold" | "bookings" | "booking" | "d06" | "doi_soat" | "debt" | "refer" | "referrals" | "nha_hang" | "dat_ban";
 const MENU_DL: [Tab, string, string][] = [["home", "Bàn làm việc", "house"], ["tour", "Tour & giữ chỗ", "plane"], ["bookings", "Đã giữ chỗ", "luggage"],
   ["nha_hang", "Đặt bàn nhà hàng", "utensils"], ["dat_ban", "Đặt bàn đã gửi", "receipt"],
-  ["d06", "Hoa hồng D06", "gift"], ["debt", "Công nợ", "receipt"]];
+  ["d06", "Hoa hồng D06", "gift"], ["doi_soat", "Đối soát", "badge-check"], ["debt", "Công nợ", "receipt"]];
 const MENU_CTV: [Tab, string, string][] = [["home", "Bàn làm việc", "house"], ["refer", "Giới thiệu khách", "user-plus"],
   ["nha_hang", "Đặt bàn nhà hàng", "utensils"], ["dat_ban", "Đặt bàn đã gửi", "receipt"],
-  ["referrals", "Nhu cầu đã gửi", "send"], ["d06", "Hoa hồng D06", "gift"]];
+  ["referrals", "Nguồn & nhu cầu", "send"], ["d06", "Hoa hồng D06", "gift"], ["doi_soat", "Đối soát", "badge-check"]];
 
 const I = ({ n, s }: { n: string; s?: number }) => <span style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: svg(n, s) }} />;
 const tien = (n?: number | null) => (n || n === 0 ? `${Math.round(n).toLocaleString("vi-VN")} đ` : "—");
@@ -45,6 +45,13 @@ function BacD06({ hh }: { hh: any }) {
   })}</div>);
 }
 
+function VuViecDs({ vv }: { vv: any[] }) {
+  return (<section className="v3-panel"><div className="v3-section-title"><h3>Vụ việc của bạn</h3></div>
+    <div className="v3-table-wrap kh-bang-the"><table><thead><tr><th scope="col">Mã</th><th scope="col">Nội dung</th><th scope="col">Hạn</th><th scope="col">Kết quả</th></tr></thead>
+      <tbody>{vv.map((v: any) => <tr key={v.ma}><th scope="row">{v.ma}<small>{v.loai}{v.booking ? ` · ${v.booking}` : ""}</small></th><td data-nhan="Nội dung">{v.noi_dung}</td>
+        <td data-nhan="Hạn">{ngay(v.han)}</td><td data-nhan="Kết quả"><Badge c={v.trang_thai === "chap_nhan" ? "good" : v.trang_thai === "mo" ? "warn" : "neutral"}>{v.trang_thai_ten}</Badge>{v.ket_qua && <small>{v.ket_qua}</small>}</td></tr>)}</tbody></table></div></section>);
+}
+
 export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) {
   const [tab, setTab] = useState<Tab>("home");
   const [menuMo, setMenuMo] = useState(false);
@@ -66,6 +73,12 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
   const [gt, setGt] = useState<any>(null);
   const [g, setG] = useState({ tour_id: "", ten_khach: "", dien_thoai: "", so_khach: 2, ghi_chu: "", dong_y: false });
   const [msg, setMsg] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  // KS-16h: nguồn đơn CTV · vụ việc · đối soát
+  const [ng, setNg] = useState<any>(null);
+  const [vv, setVv] = useState<any>(null);
+  const [dso, setDso] = useState<any>(null);
+  const [kn, setKn] = useState({ booking_ma: "", khach_sdt: "", noi_dung: "" });
+  const [knDong, setKnDong] = useState<{ bang: number; dong: number; noi_dung: string } | null>(null);
 
   const ctv = !!blv?.ctv;
   const MENU = ctv ? MENU_CTV : MENU_DL;
@@ -80,7 +93,15 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
     if (tab === "d06" && !hh) goiCong("/doi-tac/hoa-hong").then(setHh).catch((x) => setErr(x.message));
     if (tab === "debt" && !no) goiCong("/doi-tac/cong-no").then(setNo).catch((x) => setErr(x.message));
     if (tab === "referrals" && !gt) goiCong("/doi-tac/gioi-thieu").then(setGt).catch((x) => setErr(x.message));
-  }, [tab, blv, ds, bk, hh, no, gt, timTour]);
+    if ((tab === "refer" || tab === "referrals") && blv.ctv && !ng) goiCong("/doi-tac/nguon").then(setNg).catch((x) => setErr(x.message));
+    if ((tab === "referrals" || tab === "doi_soat") && !vv) goiCong("/doi-tac/vu-viec").then(setVv).catch((x) => setErr(x.message));
+    if (tab === "doi_soat" && !dso) goiCong("/doi-tac/doi-soat").then(setDso).catch((x) => setErr(x.message));
+  }, [tab, blv, ds, bk, hh, no, gt, ng, vv, dso, timTour]);
+  const goi = async (duong: string, body: any, xong?: () => void) => {
+    setBusy(true); setErr(""); setMsg("");
+    try { const r = await goiCong(duong, body); setMsg(r.message); xong?.(); setVv(null); setDso(null); setHh(null); }
+    catch (x: any) { setErr(x.message); } finally { setBusy(false); }
+  };
 
   const moGiu = (t: any) => { setTourMo(t); setF({ ten_khach: "", dien_thoai: "", nguoi_lon: 2, tre_em: 0, ghi_chu: "" }); di("hold"); };
   const giu = async () => {
@@ -225,6 +246,39 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
               <td><Badge c={m.trang_thai === "Đã chi" ? "good" : m.da_chot ? "warn" : "neutral"}>{m.trang_thai}</Badge></td></tr>)}</tbody></table></div>}
             <small>Chỉ tính booking không hủy, tour xong VÀ thu đủ; vào tháng của ngày muộn hơn. Số do Kế toán tính và chốt trên VTOS; cổng chỉ hiện.
               {hh && !hh.hieu_luc_tu ? " D06 chưa có ngày hiệu lực — số hiện là tính thử." : ""}</small></section>
+          {hh?.bac?.length > 0 && <section className="v3-panel"><div className="v3-section-title"><h3>Tháng {thang(hh.thang[0].ky)} · doanh số đủ điều kiện {tien(hh.doanh_so_thang)}</h3></div>
+            <div className="kh-thanh" role="img" aria-label="tiến độ bậc"><i style={{ width: `${Math.min(100, (hh.doanh_so_thang / hh.bac[hh.bac.length - 1][0]) * 100)}%` }} /></div>
+            <p>{hh.bac_hien_tai?.toi_da ? `Đang hưởng tỷ lệ cao nhất ${(hh.bac_hien_tai.bps / 100).toLocaleString("vi-VN")}%.`
+              : hh.bac_hien_tai ? `Đang ở bậc ${(hh.bac_hien_tai.bps / 100).toLocaleString("vi-VN")}% · còn ${trieu(hh.bac_hien_tai.con_toi_bac_sau)} lên bậc sau.` : ""}</p></section>}
+          {hh?.don?.length > 0 && <section className="v3-panel"><div className="v3-section-title"><h3>Hoa hồng từng đơn</h3></div>
+            <div className="v3-table-wrap kh-bang-the"><table><thead><tr><th scope="col">Đơn</th><th scope="col">Doanh số đủ ĐK</th><th scope="col">Bậc</th><th scope="col">Hoa hồng</th><th scope="col">Trạng thái</th></tr></thead>
+              <tbody>{hh.don.map((x: any) => <tr key={x.ky + x.ma}><th scope="row">{x.ma}<small>{x.ten}{x.ten ? " · " : ""}tháng {thang(x.ky)}</small></th>
+                <td data-nhan="Doanh số">{x.doanh_so == null ? "—" : tien(x.doanh_so)}{x.vat_pct != null && <small>đã loại VAT {x.vat_pct}%</small>}</td>
+                <td data-nhan="Bậc">{x.bac_bps?.length ? x.bac_bps.map((b: number) => `${(b / 100).toLocaleString("vi-VN")}%`).join(" → ") : "—"}</td>
+                <td data-nhan="Hoa hồng">{x.hoa_hong == null ? "—" : tien(x.hoa_hong)}</td>
+                <td data-nhan="Trạng thái"><Badge c={x.trang_thai === "da_tra" ? "good" : x.trang_thai === "tam_giu" || x.trang_thai === "khieu_nai" ? "warn" : "neutral"}>{x.trang_thai_ten}</Badge></td></tr>)}</tbody></table></div>
+            <small>Hoa hồng từng đơn = phần của đơn ấy trong bậc lũy tiến tháng (xếp theo ngày đủ điều kiện). Tổng tháng vẫn tính lũy tiến trên cả tháng; số cuối cùng là số Kế toán chốt.{hh.v3 ? " Đặt bàn không vào doanh số D06 từ tháng áp dụng." : ""}</small></section>}
+        </>}
+
+        {blv && tab === "doi_soat" && <>
+          {!dso ? <section className="v3-panel"><p>Đang tải…</p></section> : !dso.bang.length ? <section className="v3-panel"><p>Chưa có bảng đối soát nào. Kế toán Vietourist gửi bảng tháng trước vào ngày 1–5 hằng tháng.</p></section>
+            : dso.bang.map((b: any) => <section key={b.id} className="v3-panel"><div className="v3-section-title"><h3>Đối soát tháng {thang(b.ky)}</h3>
+              <Badge c={b.trang_thai === "da_gui" ? "warn" : b.trang_thai === "co_khieu_nai" ? "warn" : "good"}>{b.trang_thai === "da_gui" ? `Chờ bạn phản hồi đến ${ngay(b.han_phan_hoi)}` : b.trang_thai_ten}</Badge></div>
+              <p>Kế toán gửi {gio(b.gui_luc)} · quá hạn không phản hồi = coi như đồng ý · Vietourist trả chậm nhất {ngay(b.han_tra)}.</p>
+              <div className="v3-table-wrap kh-bang-the"><table><thead><tr><th scope="col">Đơn</th><th scope="col">Doanh số</th><th scope="col">Hoa hồng</th><th scope="col">Ý kiến của bạn</th></tr></thead>
+                <tbody>{b.dong.map((d: any) => <tr key={d.id}><th scope="row">{d.ma_don}<small>{d.ten}</small></th><td data-nhan="Doanh số">{tien(d.doanh_so)}</td><td data-nhan="Hoa hồng">{tien(d.hoa_hong)}</td>
+                  <td data-nhan="Ý kiến">{d.vu_viec ? <Badge c="warn">{d.vu_viec.ma} · {d.vu_viec.trang_thai === "mo" ? `đang xử lý, hạn ${ngay(d.vu_viec.han)}` : d.vu_viec.trang_thai === "chap_nhan" ? "đã chấp nhận" : "đã bác"}</Badge>
+                    : d.y_kien === "dong_y" ? <Badge c="good">Đồng ý</Badge>
+                    : b.con_han ? <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}><Nut disabled={busy} onClick={() => goi(`/doi-tac/doi-soat/${b.id}/dong-y`, { dong_id: d.id })}>Đồng ý</Nut>
+                      <Nut kieu="quiet" disabled={busy} onClick={() => setKnDong({ bang: b.id, dong: d.id, noi_dung: "" })}>Khiếu nại…</Nut></span> : <Badge>—</Badge>}</td></tr>)}</tbody></table></div>
+              {knDong && knDong.bang === b.id && <div style={{ display: "grid", gap: 8 }}><label className="v3-field">Nội dung khiếu nại<textarea rows={2} value={knDong.noi_dung} onChange={(e) => setKnDong({ ...knDong, noi_dung: e.target.value })} /></label>
+                <span style={{ display: "flex", gap: 8 }}><Nut kieu="primary" disabled={busy || knDong.noi_dung.trim().length < 5} onClick={() => goi(`/doi-tac/doi-soat/${b.id}/khieu-nai`, { dong_id: knDong.dong, noi_dung: knDong.noi_dung }, () => setKnDong(null))}>Gửi khiếu nại</Nut>
+                  <Nut kieu="quiet" onClick={() => setKnDong(null)}>Thôi</Nut></span></div>}
+              {b.con_han && b.dong.some((d: any) => !d.y_kien && !d.vu_viec) && <span style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <Nut kieu="primary" i="badge-check" disabled={busy} onClick={() => goi(`/doi-tac/doi-soat/${b.id}/dong-y`, {})}>Đồng ý cả bảng</Nut>
+                <small>Phần đã thống nhất được trả đúng hạn; đơn đang khiếu nại tách riêng, không giữ cả bảng.</small></span>}
+            </section>)}
+          {vv?.vu_viec?.length > 0 && <VuViecDs vv={vv.vu_viec} />}
         </>}
 
         {blv && tab === "debt" && (!no ? <section className="v3-panel"><p>Đang tải…</p></section> : <>
@@ -257,15 +311,33 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
             <div className="v3-check"><input id="ctv-dong-y" type="checkbox" checked={g.dong_y} onChange={(e) => setG({ ...g, dong_y: e.target.checked })} />
               <label htmlFor="ctv-dong-y">Khách đã đồng ý để tôi chuyển thông tin liên hệ cho Vietourist.</label></div>
             <Nut kieu="primary" i="send" disabled={busy || !g.dong_y} onClick={guiGt}>{busy ? "Đang gửi…" : "Gửi giới thiệu"}</Nut></section>
-          <section className="v3-panel"><div className="v3-section-title"><h3>Cách tính nguồn</h3></div>
-            <p>CTV không giữ chỗ, không thu tiền: nhu cầu vào hàng chờ Sales kèm dấu thời gian làm chứng cứ nguồn. Khách đã có Sales chăm từ trước thì TP Kinh doanh xử lý tranh chấp nguồn, có nhật ký.</p>
+          <section className="v3-panel"><div className="v3-section-title"><h3>Mã CTV của bạn: {ng?.ma_ctv || "…"}</h3></div>
+            {ng && <span style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}><small style={{ wordBreak: "break-all" }}>{ng.link}</small>
+              <Nut kieu="quiet" onClick={() => { navigator.clipboard?.writeText(ng.link).then(() => setMsg("Đã sao chép link")).catch(() => null); }}>Sao chép link</Nut></span>}
+            <p>Khách bấm link rồi gửi yêu cầu hoặc đặt tour trên cổng khách trong {ng?.giu_ngay || 30} ngày → đơn ghi nguồn của bạn (nếu khách chưa có nguồn khác đang được giữ). Khách bạn giới thiệu bằng form này được giữ nguồn {ng?.giu_ngay || 30} ngày kể từ lúc gửi.</p>
+            <p>Trùng nguồn máy tự xử theo luật: CTV giới thiệu trước giữ nguồn; Sales chỉ được ưu tiên nếu đã liên hệ khách trong 7 ngày trước lúc bạn gửi. Không đồng ý thì gửi khiếu nại ở mục «Nguồn & nhu cầu».</p>
             <p>Hoa hồng CTV theo D06 — xem mục Hoa hồng D06.</p></section></div>}
 
-        {blv && tab === "referrals" && <section className="v3-panel">
-          {!gt ? <p>Đang tải…</p> : gt.gioi_thieu.length ? <div className="v3-table-wrap"><table>
+        {blv && tab === "referrals" && <>
+          {ctv && <section className="v3-panel"><div className="v3-section-title"><h3>Khách đang giữ nguồn</h3></div>
+            {!ng ? <p>Đang tải…</p> : ng.nguon.length ? <div className="v3-table-wrap kh-bang-the"><table>
+              <thead><tr><th scope="col">Khách</th><th scope="col">Từ</th><th scope="col">Giữ đến</th><th scope="col">Trạng thái</th></tr></thead>
+              <tbody>{ng.nguon.map((x: any, i: number) => <tr key={i}><th scope="row">{x.khach}</th><td data-nhan="Từ">{x.loai} {gio(x.tu)}</td><td data-nhan="Giữ đến">{x.den ? ngay(x.den) : "—"}</td>
+                <td data-nhan="Trạng thái"><Badge c={x.booking.length ? "good" : x.trang_thai === "giu" ? "warn" : "neutral"}>{x.booking.length ? `Đã có booking ${x.booking.join(", ")}` : x.trang_thai_ten}</Badge>{x.ly_do && <small>{x.ly_do}</small>}</td></tr>)}</tbody></table></div>
+              : <p>Chưa có khách nào được giữ nguồn.</p>}</section>}
+          <section className="v3-panel"><div className="v3-section-title"><h3>Nhu cầu đã gửi</h3></div>
+          {!gt ? <p>Đang tải…</p> : gt.gioi_thieu.length ? <div className="v3-table-wrap kh-bang-the"><table>
             <thead><tr><th scope="col">Gửi lúc</th><th scope="col">Khách</th><th scope="col">Tour</th><th scope="col">Trạng thái</th></tr></thead>
-            <tbody>{gt.gioi_thieu.map((x: any) => <tr key={x.id}><td>{gio(x.gui_luc)}</td><th scope="row">{x.khach}<small>{x.so_khach} khách</small></th><td>{x.tour}</td><td><Badge>{x.trang_thai}</Badge></td></tr>)}</tbody></table></div>
-            : <p>Chưa gửi giới thiệu nào.</p>}</section>}
+            <tbody>{gt.gioi_thieu.map((x: any) => <tr key={x.id}><th scope="row">{x.khach}<small>{x.so_khach} khách</small></th><td data-nhan="Gửi lúc">{gio(x.gui_luc)}</td><td data-nhan="Tour">{x.tour}</td><td data-nhan="Trạng thái"><Badge>{x.trang_thai}</Badge></td></tr>)}</tbody></table></div>
+            : <p>Chưa gửi giới thiệu nào.</p>}</section>
+          <section className="v3-panel"><div className="v3-section-title"><h3>Khiếu nại nguồn đơn</h3></div>
+            <p>Booking của khách bạn mang về mà chưa ghi nguồn của bạn: ghi mã booking hoặc SĐT khách và lý do. Có mã vụ việc, xử lý trong 5 ngày làm việc; quá hạn chuyển Trưởng Kinh doanh.</p>
+            <label className="v3-field">Mã booking<input value={kn.booking_ma} onChange={(e) => setKn({ ...kn, booking_ma: e.target.value.toUpperCase() })} /></label>
+            <label className="v3-field">SĐT khách<input inputMode="tel" value={kn.khach_sdt} onChange={(e) => setKn({ ...kn, khach_sdt: e.target.value })} /></label>
+            <label className="v3-field">Nội dung<textarea rows={2} value={kn.noi_dung} onChange={(e) => setKn({ ...kn, noi_dung: e.target.value })} /></label>
+            <Nut kieu="primary" disabled={busy || kn.noi_dung.trim().length < 5 || !(kn.booking_ma || kn.khach_sdt)} onClick={() => goi("/doi-tac/khieu-nai", kn, () => setKn({ booking_ma: "", khach_sdt: "", noi_dung: "" }))}>Gửi khiếu nại</Nut></section>
+          {vv?.vu_viec?.length > 0 && <VuViecDs vv={vv.vu_viec} />}
+        </>}
 
         <footer className="v3-bottom"><I n="shield-check" />Số liệu lấy trực tiếp từ VTOS · chỉ booking của {ten}</footer>
         <nav className="v3-bottom-nav" aria-label="Chức năng nhanh trên điện thoại">{MENU.slice(0, 5).map(([k, t, i]) =>

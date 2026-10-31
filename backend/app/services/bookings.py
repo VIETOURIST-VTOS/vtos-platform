@@ -148,6 +148,9 @@ def cancel(db: Session, u: User, b: Booking, reason: str, charge: float = 0, ret
     b.cancelled, b.cancelled_at, b.cancel_reason, b.cancel_charge = True, datetime.now(), reason.strip()[:200], charge
     b.amount, b.discount = charge, 0.0     # doanh thu còn lại của booking = phí hủy giữ lại
     b.pmt_status = "CANCEL"
+    # KS-16h: voucher VTD Rewards của booking hủy không phí → trả điểm ngay (có phí hủy → voucher đã dùng)
+    from app.services import rewards as RW
+    RW.doi_chieu_voucher_tour(db, b)
     for a in db.execute(select(Alert).where(Alert.ref == f"booking:{b.code}", Alert.resolved == False)).scalars(): a.resolved = True
     out = {"booking": b.code, "paid": b.paid, "charge": charge, "late": late, "retention": None, "refund": None}
     left = round((b.paid or 0) - charge)

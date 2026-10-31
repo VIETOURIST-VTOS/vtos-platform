@@ -101,6 +101,56 @@ def ds_gioi_thieu(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = De
     return {"gioi_thieu": _goi(D.gioi_thieu_ds, db, tk)}
 
 
+# ---------------------------------------------------------------- KS-16h: nguồn đơn · vụ việc · đối soát
+
+@router.get("/nguon")
+def nguon(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    return _goi(D.nguon_cua_ctv, db, tk)
+
+
+class KhieuNaiNguonIn(BaseModel):
+    booking_ma: str = ""
+    khach_sdt: str = ""
+    noi_dung: str
+
+
+@router.post("/khieu-nai")
+def khieu_nai_nguon(data: KhieuNaiNguonIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    v = _goi(D.khieu_nai_nguon, db, tk, data.booking_ma, data.khach_sdt, data.noi_dung)
+    return {"message": f"Đã ghi khiếu nại {v.ma} — xử lý trong 5 ngày làm việc (hạn {v.han:%d/%m/%Y})", "ma": v.ma}
+
+
+@router.get("/vu-viec")
+def vu_viec(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    return {"vu_viec": _goi(D.vu_viec, db, tk)}
+
+
+@router.get("/doi-soat")
+def doi_soat(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    return {"bang": _goi(D.doi_soat, db, tk)}
+
+
+class DongYIn(BaseModel):
+    dong_id: int | None = None
+
+
+@router.post("/doi-soat/{bang_id}/dong-y")
+def doi_soat_dong_y(bang_id: int, data: DongYIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _goi(D.doi_soat_dong_y, db, tk, bang_id, data.dong_id)
+    return {"message": "Đã ghi đồng ý" + ("" if data.dong_id else " cả bảng")}
+
+
+class KhieuNaiDongIn(BaseModel):
+    dong_id: int
+    noi_dung: str
+
+
+@router.post("/doi-soat/{bang_id}/khieu-nai")
+def doi_soat_khieu_nai(bang_id: int, data: KhieuNaiDongIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    v = _goi(D.doi_soat_khieu_nai, db, tk, bang_id, data.dong_id, data.noi_dung)
+    return {"message": f"Đã ghi khiếu nại {v.ma} — đơn này tách riêng, phần còn lại vẫn trả đúng hạn", "ma": v.ma}
+
+
 # ---------------------------------------------------------------- phía VTOS: nối hồ sơ
 
 def _tk(db: Session, tid: int, u: User) -> TaiKhoanNgoai:

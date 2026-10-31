@@ -226,12 +226,92 @@ def hoa_hong(db: Session, tk: TaiKhoanNgoai, so_thang: int = SO_THANG_D06) -> di
                       "con_phai_tra": (tong - da_tra) if da_chot else 0, "da_chot": da_chot, "trang_thai": tt,
                       "dang_bat": th["dang_bat"]})
     ky0 = _ky(hn)
+    don = _don_hoa_hong(db, dt, hn, so_thang)
     ht0 = HH.hinh_thuc_cua(db, dt.id, ky0)
     bac = HH.BAC.get(ht0)
     return {"hinh_thuc": ht0, "hinh_thuc_ten": HH.HINH_THUC.get(ht0, "Chưa chọn hình thức") if ht0 else "Chưa chọn hình thức",
             "bac": [list(b) for b in bac["bac"]] if bac else [],
             "bac_hien_tai": HH.bac_hien_tai(thang[0]["doanh_so"], ht0) if bac else None,
-            "hieu_luc_tu": (HH.hieu_luc_tu(db).isoformat() if HH.hieu_luc_tu(db) else None), "thang": thang}
+            "hieu_luc_tu": (HH.hieu_luc_tu(db).isoformat() if HH.hieu_luc_tu(db) else None), "thang": thang,
+            "doanh_so_thang": thang[0]["doanh_so"], "don": don, "v3": HH.la_v3(db, ky0)}
+
+
+def _don_hoa_hong(db: Session, dt: DoiTacBanHang, hn: date, so_thang: int) -> list[dict]:
+    """KS-16h: hoa hồng TỪNG ĐƠN (phần của đơn trong bậc lũy tiến tháng) + đơn tạm giữ kèm lý do."""
+    from app.services import hoa_hong_d06 as HH
+    from app.models.nguon_doi_soat import DongDoiSoat, BangDoiSoat, VuViecDoiTac
+    ra = []
+    vv = {v.booking_ma: v for v in db.execute(select(VuViecDoiTac).where(VuViecDoiTac.doi_tac_id == dt.id,
+                                                                            VuViecDoiTac.trang_thai == "mo")).scalars()}
+    for i in range(so_thang):
+        ky = _ky(_lui_thang(hn, i))
+        th = HH.tong_hop(db, ky, hn)
+        for r in th["dong"]:
+            if r["doi_tac_id"] != dt.id:
+                continue
+            da_tra = r["da_tra"] >= r["tong"] > 0
+            for x in r["nguon"]:
+                if x["booking"] in vv:
+                    tt, ten = "khieu_nai", f"Đang khiếu nại {vv[x['booking']].ma}"
+                elif da_tra:
+                    tt, ten = "da_tra", "Đã trả"
+                elif r["trang_thai"] == "da_chot":
+                    tt, ten = "da_chot", "Đã chốt · chờ chi"
+                else:
+                    tt, ten = "du_kien", "Dự kiến" if th["dang_bat"] else "Tính thử"
+                ra.append({"ky": ky, "ma": x["booking"], "ten": x.get("ten_tour") or "", "doanh_so": x["doanh_so"],
+                           "gia_sau_giam": x.get("gia_sau_giam"), "vat_pct": x.get("vat_pct"),
+                           "bac_bps": x.get("bac_bps", []), "hoa_hong": x.get("hoa_hong", 0), "trang_thai": tt, "trang_thai_ten": ten})
+        if i == 0:
+            for c in th["chua_du"]:
+                if c["doi_tac_id"] == dt.id:
+                    ra.append({"ky": ky, "ma": c["booking"], "ten": "", "doanh_so": None, "hoa_hong": None, "bac_bps": [],
+                               "trang_thai": "tam_giu", "trang_thai_ten": f"Tạm giữ: {c['ly_do']}"})
+    return ra
+
+
+def nguon_cua_ctv(db: Session, tk: TaiKhoanNgoai) -> dict:
+    from app.services import nguon_don as ND
+    dt = _ctv(db, tk)
+    m = ND.ma_ctv(dt)
+    return {"ma_ctv": m, "link": f"https://kh.vietourist.vn/{m}", "giu_ngay": ND.GIU_NGAY, "nguon": ND.ds_cua_ctv(db, dt)}
+
+
+def khieu_nai_nguon(db: Session, tk: TaiKhoanNgoai, booking_ma: str, khach_sdt: str, noi_dung: str):
+    from app.services import nguon_don as ND
+    dt = doi_tac_cua(db, tk)
+    try:
+        v = ND.mo_vu_viec(db, dt, "nguon", noi_dung, booking_ma=booking_ma, khach_sdt=khach_sdt)
+    except ND.LoiNguon as ex:
+        raise LoiDoiTac(str(ex))
+    db.commit()
+    return v
+
+
+def vu_viec(db: Session, tk: TaiKhoanNgoai) -> list[dict]:
+    from app.services import nguon_don as ND
+    return ND.ds_vu_viec(db, doi_tac_cua(db, tk).id)
+
+
+def doi_soat(db: Session, tk: TaiKhoanNgoai) -> list[dict]:
+    from app.services import doi_soat_doi_tac as DS
+    return DS.cua_doi_tac(db, doi_tac_cua(db, tk))
+
+
+def doi_soat_dong_y(db: Session, tk: TaiKhoanNgoai, bang_id: int, dong_id: int | None):
+    from app.services import doi_soat_doi_tac as DS
+    try:
+        DS.dong_y(db, doi_tac_cua(db, tk), bang_id, dong_id)
+    except DS.LoiDoiSoat as ex:
+        raise LoiDoiTac(str(ex), ex.status)
+
+
+def doi_soat_khieu_nai(db: Session, tk: TaiKhoanNgoai, bang_id: int, dong_id: int, noi_dung: str):
+    from app.services import doi_soat_doi_tac as DS
+    try:
+        return DS.khieu_nai(db, doi_tac_cua(db, tk), bang_id, dong_id, noi_dung)
+    except DS.LoiDoiSoat as ex:
+        raise LoiDoiTac(str(ex), ex.status)
 
 
 def _bk_cua(db: Session, dt: DoiTacBanHang) -> list[Booking]:
@@ -459,13 +539,20 @@ def gioi_thieu(db: Session, tk: TaiKhoanNgoai, tour_id: int | None, ten_khach: s
     if sa is not None and lead.sales_id is None:
         lead.sales_id = sa.id
     dong = (f"[CTV giới thiệu {now:%d/%m/%Y %H:%M}] {dt.ten} ({dt.ma}, tài khoản #{tk.id}): {ten_tour} · {so_khach} khách"
-            + " · khách đã đồng ý chuyển liên hệ" + (" · CẦN TP KD XÉT NGUỒN: khách đã có Sales chăm" if da_co else "")
+            + " · khách đã đồng ý chuyển liên hệ" + (" · khách đã có Sales chăm (máy xét nguồn theo luật 7 ngày)" if da_co else "")
             + (f" · {ghi}" if ghi else ""))
     cu = (lead.note or "").strip()
     lead.note = (((cu + "\n") if cu else "") + dong)[-2000:]
     yc = YeuCauKhach(tai_khoan_id=tk.id, loai="gioi_thieu", tour_id=int(tour_id) if tour_id else None, ten_tour=ten_tour[:200],
                      so_khach=int(so_khach), dien_thoai=sdt, ghi_chu=ghi, lead_id=lead.id, ten_khach=ten_khach, tao_luc=now)
-    db.add(yc)
+    db.add(yc); db.flush()
+    # KS-16h: giữ nguồn 30 ngày theo luật máy tự xử (services/nguon_don.py). Ghi kết quả vào lead cho Sales thấy.
+    from app.services import nguon_don as ND
+    nd = ND.ghi_nguon(db, dt, sdt, "gioi_thieu", now, ten_khach, yc.id)
+    if nd is not None:
+        lead.note = (lead.note + ("\n" if lead.note else "") + (
+            f"[Nguồn đơn] Giữ nguồn CTV {dt.ten} ({ND.ma_ctv(dt)}) đến {nd.den:%d/%m/%Y} — booking của khách sẽ tự gắn CTV"
+            if nd.trang_thai == "giu" else f"[Nguồn đơn] CTV {dt.ten} không giữ được nguồn: {nd.ly_do}"))[-2000:]
     R.audit(db, f"cong:{tk.id}", "doi_tac", "ctv_gioi_thieu", f"lead:{lead.id}", after={"doi_tac": dt.ma, "tour": ten_tour[:80]})
     db.commit(); db.refresh(yc)
     return yc

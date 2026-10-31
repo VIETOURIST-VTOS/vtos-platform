@@ -26,7 +26,18 @@ export default function Cong() {
     setF((x: any) => ({ ...x, ho_ten: t.ho_ten || x.ho_ten, loai_doi_tac: t.loai_doi_tac || x.loai_doi_tac, ten_don_vi: t.ten_don_vi || x.ten_don_vi,
       ma_so_thue: t.ma_so_thue || x.ma_so_thue, tk_luu_ky: t.tk_luu_ky || x.tk_luu_ky, ghi_chu: t.ghi_chu_ho_so || x.ghi_chu }));
   }).catch(() => { xoaPhienCong(); location.replace("/login"); }), []);
-  useEffect(() => { if (!phienCong()) { location.replace("/login"); return; } tai(); }, [tai]);
+  useEffect(() => {
+    // KS-16h: link riêng của CTV kh.vietourist.vn/CTV-0012 → next.config chuyển về /cong?ctv=CTV-0012. Ghi mã
+    // (30 ngày) TRƯỚC khi chuyển sang đăng nhập; cổng khách gửi mã lên sau khi khách đăng nhập.
+    try {
+      const ctv = (new URLSearchParams(location.search).get("ctv") || "").toUpperCase();
+      if (/^CTV-\d{4,}$/.test(ctv)) {
+        localStorage.setItem("vtd_ctv", JSON.stringify({ ma: ctv, luc: Date.now() }));
+        history.replaceState(null, "", "/cong");
+      }
+    } catch { /* trình duyệt chặn lưu */ }
+    if (!phienCong()) { location.replace("/login"); return; } tai();
+  }, [tai]);
   const guiHoSo = async () => {
     setBusy(true); setErr(""); setMsg("");
     try { const r = await goiCong("/ho-so", f); setMsg(r.message); setToi(r.toi); } catch (x: any) { setErr(x.message); } finally { setBusy(false); }

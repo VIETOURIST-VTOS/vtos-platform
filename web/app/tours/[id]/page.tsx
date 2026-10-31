@@ -307,11 +307,12 @@ function TourDetail() {
         </>}
       </div>
     </div>}
+    {tab === "budget" && <PhuLucD06 t={t} role={user?.role || ""} toast={toast} xong={load} />}
 
     {tab === "bookings" && <>
       <div className="panel wrap"><h2>Booking ({t.bookings.length}) · doanh thu {vnd(bookedAmount)} · đã thu {vnd(sm.collected)}</h2>
         <table><thead><tr><th>Mã</th><th>Khách</th><th>Nguồn</th><th className="num">ADL/CHD/INF</th><th className="num">Tiền</th><th className="num">Đã thu</th><th className="num">Còn lại</th><th>TT</th><th>Sale</th><th>Chỉ tiêu</th></tr></thead>
-          <tbody>{t.bookings.length ? t.bookings.map((b: any) => <tr key={b.id} style={{ opacity: b.cancelled ? 0.5 : 1 }}><td>{b.code}{b.cancelled && <Tag cls="red">hủy</Tag>}</td><td>{b.customer_name} · {b.customer_phone}</td><td>{b.source}</td><td className="num">{b.adl}/{b.chd}/{b.inf}</td><td className="num">{vnd(b.amount - b.discount)}</td><td className="num">{vnd(b.paid)}</td><td className="num">{b.due > 0 ? <Tag cls="warn">{vnd(b.due)}</Tag> : <Tag cls="ok">Đủ</Tag>}</td><td>{b.pmt_status}</td><td>{b.sales_name}</td><td>{b.counts_for_target ? "có" : "không"}</td></tr>) : <tr><td colSpan={10} className="muted">Chưa có booking.</td></tr>}</tbody></table></div>
+          <tbody>{t.bookings.length ? t.bookings.map((b: any) => <tr key={b.id} style={{ opacity: b.cancelled ? 0.5 : 1 }}><td>{b.code}{b.cancelled && <Tag cls="red">hủy</Tag>}</td><td>{b.customer_name} · {b.customer_phone}</td><td>{b.source}{b.nguon_ctv && <div><Tag cls="navy">CTV {b.nguon_ctv.ma_ctv}</Tag> <span className="muted">{b.nguon_ctv.doi_tac} · máy gắn, khóa</span></div>}</td><td className="num">{b.adl}/{b.chd}/{b.inf}</td><td className="num">{vnd(b.amount - b.discount)}</td><td className="num">{vnd(b.paid)}</td><td className="num">{b.due > 0 ? <Tag cls="warn">{vnd(b.due)}</Tag> : <Tag cls="ok">Đủ</Tag>}</td><td>{b.pmt_status}</td><td>{b.sales_name}</td><td>{b.counts_for_target ? "có" : "không"}</td></tr>) : <tr><td colSpan={10} className="muted">Chưa có booking.</td></tr>}</tbody></table></div>
       <div className="panel wrap"><h2>Phiếu thu ({t.receipts.length})</h2>
         <table><thead><tr><th>Số PT</th><th>Booking</th><th className="num">Số tiền</th><th>Hình thức</th><th>Người nộp</th><th>Trạng thái</th><th>Lúc</th><th>Xác nhận</th></tr></thead>
           <tbody>{t.receipts.map((r: any) => <tr key={r.id}><td>{r.code}</td><td>{r.booking_code}</td><td className="num">{vnd(r.amount)}</td><td>{r.method === "tien_mat" ? "Tiền mặt" : "CK"}</td><td>{r.payer}</td><td>{r.status}</td><td>{fmtDT(r.created_at)}</td><td>{r.confirmed_by}</td></tr>)}</tbody></table></div>
@@ -534,3 +535,25 @@ function Settlement({ t, note, NoteBox, run, load, toast }: any) {
 }
 
 export default function Page() { return <Shell><TourDetail /></Shell>; }
+
+/** KS-16h · D06 theo đề xuất v3: tour có phụ lục hoa hồng thì CTV / đại lý mới được tính; doanh số D06 loại VAT. */
+function PhuLucD06({ t, role, toast, xong }: { t: any; role: string; toast: (m: string, l?: boolean) => void; xong: () => void }) {
+  const sua = ["ketoan", "gd_kd", "chutich", "tgd"].includes(role);
+  const [co, setCo] = useState<boolean>(!!t.d06_phu_luc);
+  const [vat, setVat] = useState<string>(String(t.vat_pct ?? 8));
+  const [busy, setBusy] = useState(false);
+  const luu = async () => {
+    setBusy(true);
+    try { const r = await api<any>(`/hoa-hong-d06/tour/${t.id}/phu-luc`, { method: "POST", json: { d06_phu_luc: co, vat_pct: Number(vat) } }); toast(r.message); xong(); }
+    catch (e) { toast(errMsg(e), true); } finally { setBusy(false); }
+  };
+  return (<div className="panel wrap"><h3 style={{ marginTop: 0 }}>Hoa hồng đối tác (D06) {t.d06_phu_luc ? <Tag cls="ok">có phụ lục</Tag> : <Tag cls="warn">chưa có phụ lục</Tag>}</h3>
+    <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+      <label style={{ display: "flex", flexDirection: "row", gap: 8, alignItems: "center" }}><input type="checkbox" style={{ width: "auto", margin: 0 }} checked={co} disabled={!sua || busy} onChange={(e) => setCo(e.target.checked)} />
+        <span>Có phụ lục hoa hồng D06 (CTV / đại lý được hưởng)</span></label>
+      <label style={{ display: "flex", flexDirection: "row", gap: 8, alignItems: "center" }}>% VAT trong giá bán<input type="number" min={0} max={20} step="0.5" style={{ width: 80 }} value={vat} disabled={!sua || busy} onChange={(e) => setVat(e.target.value)} /></label>
+      {sua && <button className="act teal" style={{ margin: 0 }} disabled={busy || (co === !!t.d06_phu_luc && Number(vat) === Number(t.vat_pct))} onClick={luu}>Lưu</button>}
+    </div>
+    <p className="muted">Từ kỳ áp D06 theo v3: doanh số D06 = giá sau giảm ÷ (1 + %VAT). Tour chưa tick → booking đối tác của tour hiện «Tạm giữ: tour chưa có phụ lục hoa hồng». {sua ? "" : "Kế toán / GĐ Kinh doanh đổi được."}</p></div>);
+}
+

@@ -518,7 +518,17 @@ def booking_out(b: Booking) -> dict:
             # VPM-8 – màn hình phải NHẬN được số phiên bản thì mới có cái để gửi lại khi lưu.
             # Thiếu dòng này thì khoá 409 vĩnh viễn không bao giờ chạm tới, vì không ai gửi số nào.
             "phien_ban": b.phien_ban,
+            "nguon_ctv": _nguon_ctv(b),       # KS-16h: nguồn CTV máy gắn (chỉ xem)
             **BK.booking_view(b)}
+
+
+def _nguon_ctv(b: Booking) -> dict | None:
+    if not getattr(b, "nguon_don_id", None):
+        return None
+    from sqlalchemy.orm import object_session
+    from app.services import nguon_don as ND
+    s = object_session(b)
+    return ND.nguon_cua_booking(s, b) if s is not None else None
 
 
 @router.get("/mang", tags=["bookings"])
