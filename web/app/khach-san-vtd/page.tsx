@@ -20,13 +20,13 @@ const TT_DN: Record<string, string> = { cho_tp: "chờ robot", cho_kt: "robot d�
 const KS0 = { ten: "", tinh_thanh: "", khu_vuc: "", dia_chi: "", sao: 0, loai: "khach_san", km_trung_tam: "", gan: "", noi_bat: "", mo_ta: "",
   tien_ich: [] as string[], gio_nhan: "14:00", gio_tra: "12:00", cs_tre_em: "", cs_giuong_phu: "", cs_vat_nuoi: "", cs_khac: "", thue_phi_pt: 0,
   lien_he_noi_bo: "", ghi_chu_noi_bo: "",
-  cs_nhan_tre_em: "chua_xac_nhan", cs_tre_tu_tuoi: "" as any, cs_moc_tuoi: [] as any[], cs_phi_giuong_phu: "" as any, cs_giuong_phu_an_sang: false, cs_noi: "" };
+  cs_nhan_tre_em: "chua_xac_nhan", cs_tre_tu_tuoi: "" as any, cs_moc_tuoi: [] as any[], cs_phi_giuong_phu: "" as any, cs_giuong_phu_an_sang: false, cs_noi: "",
+  cs_so_tre_mien_phi: "" as any, cs_tre_mp_tinh_suc_chua: false, cs_giuong_phu_kieu: "co_dinh" };
 // KS-16j (Chủ tịch duyệt bản xem thử 01/11/2026): trống = chưa xác nhận (null), khác 0; số phòng 0 là 0; không tự cắt đặc điểm.
 const LP0 = { ten: "", dien_tich: 0, giuong: "", mo_ta: "", toi_da_nguoi_lon: 2, toi_da_tre_em: "" as any, so_phong: 0, thu_tu: 0, dang_ban: false,
   mo_ta_dai: "", tien_nghi: [] as string[], giuong_phu_toi_da: "" as any, noi_cui: null as boolean | null, nguon: "", ky_doi_chieu: "", ma_hang: "",
   ten_tuong_duong: "", can_xac_nhan: [] as string[], ghi_chu_doi_chieu: "", trang_thai_dc: "dang_doi_chieu" };
 const soHoacNull = (v: any) => (v === "" || v === null || v === undefined ? null : Number(v));
-const MOC0 = { tu: "", den: "", cach: "mien_phi", phu_thu: "", an_sang: false };
 const MUA0 = { tu_ngay: "", den_ngay: "", gia_thuong: "", gia_cuoi_tuan: "", gia_niem_yet: "", ghi_chu: "" };
 const TT: Record<string, string> = { nhap: "", cho_duyet: "warn", da_duyet: "ok", tra_lai: "bad", an: "" };
 
@@ -108,9 +108,8 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
   const ta = (key: string, label: string, rows = 3, ph = "") => <label>{label}<textarea rows={rows} value={f[key] ?? ""} placeholder={ph} disabled={!nhap} onChange={(e) => setF({ ...f, [key]: e.target.value })} /></label>;
   const luu = async () => {
     const body = { ...f, sao: Number(f.sao) || 0, km_trung_tam: f.km_trung_tam === "" ? null : Number(f.km_trung_tam), thue_phi_pt: Number(f.thue_phi_pt) || 0,
-      cs_tre_tu_tuoi: soHoacNull(f.cs_tre_tu_tuoi), cs_phi_giuong_phu: soHoacNull(String(f.cs_phi_giuong_phu ?? "").replace(/\D/g, "")),
-      cs_moc_tuoi: (f.cs_moc_tuoi || []).filter((m: any) => m.tu !== "" || m.den !== "").map((m: any) => ({ ...m, tu: Number(m.tu), den: Number(m.den),
-        phu_thu: Number(String(m.phu_thu ?? "").replace(/\D/g, "")) || 0 })) };
+      cs_tre_tu_tuoi: soHoacNull(f.cs_tre_tu_tuoi), cs_phi_giuong_phu: soHoacNull(String(f.cs_phi_giuong_phu ?? "").replace(/[^\d.]/g, "")),
+      cs_so_tre_mien_phi: soHoacNull(f.cs_so_tre_mien_phi), cs_moc_tuoi: guiBang(f.cs_moc_tuoi) };   // KS-16k
     const r = await goi(kid === "moi" ? "/khach-san-vtd" : `/khach-san-vtd/${kid}`, body);
     if (r && kid === "moi") onMoi(r.id);
   };
@@ -215,40 +214,62 @@ function Album({ h, x, toast, onDoi }: { h: any; x: any; toast: (m: string, l?: 
   </div>;
 }
 
-/** KS-16j · Chính sách trẻ em kiểu Agoda — áp cả khách sạn; máy dùng để tính phụ thu khi khách đặt. */
+/** KS-16k · Bảng giá trẻ em theo nhóm tuổi (cách Agoda YCS) — dùng cho khách sạn (mặc định), loại phòng và gói (ghi đè).
+ *  Trên tuổi lớn nhất của bảng = người lớn. Ô ăn sáng trống = cần khách sạn xác nhận (không tự hiểu là miễn phí). */
+const BANG0 = [{ tu: 0, den: 1, nhom: "so_sinh", cach: "mien_phi", gia: "", an_sang: "" }, { tu: 2, den: 11, nhom: "tre_em", cach: "co_dinh", gia: "", an_sang: "" }];
+const soTien = (v: any) => (v === "" || v === null || v === undefined ? "" : tien(Number(String(v).replace(/\D/g, ""))));
+const guiBang = (b: any[]) => (b || []).filter((m: any) => m.tu !== "" || m.den !== "").map((m: any) => ({ ...m, tu: Number(m.tu), den: Number(m.den),
+  gia: m.cach === "mien_phi" ? 0 : Number(String(m.gia ?? "").replace(/[^\d.]/g, "")) || 0,
+  an_sang: m.an_sang === "" || m.an_sang === null || m.an_sang === undefined ? null : Number(String(m.an_sang).replace(/\D/g, "")) }));
+function BangTre({ bang, setBang, x, nhap }: { bang: any[]; setBang: (b: any[]) => void; x: any; nhap: boolean }) {
+  const sua = (i: number, k: string, v: any) => setBang(bang.map((m, j) => (j === i ? { ...m, [k]: v } : m)));
+  const tren = bang.length ? Math.max(...bang.map((m) => Number(m.den) || 0)) + 1 : null;
+  return <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div style={{ overflowX: "auto" }}><table><thead><tr><th>Nhóm</th><th>Từ tuổi</th><th>Đến tuổi</th><th>Ở chung, giường có sẵn</th><th>Giá / đêm</th><th>Ăn sáng / đêm (gói có bữa sáng)</th><th></th></tr></thead>
+      <tbody>{bang.map((m, i) => <tr key={i}>
+        <td><select value={m.nhom || "tre_em"} disabled={!nhap} onChange={(e) => sua(i, "nhom", e.target.value)} aria-label="Nhóm">{Object.entries(x.nhom_tuoi || {}).map(([k2, v]: any) => <option key={k2} value={k2}>{v}</option>)}</select></td>
+        <td><input type="number" min={0} max={17} style={{ width: 64 }} value={m.tu} disabled={!nhap} onChange={(e) => sua(i, "tu", e.target.value)} aria-label="Từ tuổi" /></td>
+        <td><input type="number" min={0} max={17} style={{ width: 64 }} value={m.den} disabled={!nhap} onChange={(e) => sua(i, "den", e.target.value)} aria-label="Đến tuổi" /></td>
+        <td><select value={m.cach} disabled={!nhap} onChange={(e) => sua(i, "cach", e.target.value)} aria-label="Cách tính">{Object.entries(x.cach_tinh_tre || {}).map(([k2, v]: any) => <option key={k2} value={k2}>{v}</option>)}</select></td>
+        <td>{m.cach === "mien_phi" ? "0 đ" : m.cach === "phan_tram"
+          ? <><input inputMode="decimal" style={{ width: 70 }} value={m.gia ?? ""} disabled={!nhap} onChange={(e) => sua(i, "gia", e.target.value.replace(/[^\d.]/g, ""))} aria-label="Phần trăm" /> %</>
+          : <input inputMode="numeric" style={{ width: 120 }} value={soTien(m.gia)} placeholder="150.000" disabled={!nhap} onChange={(e) => sua(i, "gia", e.target.value.replace(/\D/g, ""))} aria-label="Giá trẻ em" />}</td>
+        <td><input inputMode="numeric" style={{ width: 120 }} value={soTien(m.an_sang)} placeholder="trống = cần xác nhận" disabled={!nhap} onChange={(e) => sua(i, "an_sang", e.target.value.replace(/\D/g, ""))} aria-label="Giá ăn sáng" /></td>
+        <td>{nhap && <button className="act grey" onClick={() => setBang(bang.filter((_m, j) => j !== i))}>Bỏ</button>}</td></tr>)}</tbody></table></div>
+    {nhap && <button className="act grey" style={{ alignSelf: "flex-start" }} onClick={() => setBang([...bang, { tu: tren ?? 0, den: tren ?? 0, nhom: "tre_em", cach: "co_dinh", gia: "", an_sang: "" }])}>+ Thêm nhóm tuổi</button>}
+    {tren !== null && <span className="muted">Từ {tren} tuổi: tính như người lớn. Giá trẻ em chỉ tính khi trẻ vượt «số trẻ miễn phí» của phòng; ăn sáng tính cho mọi trẻ khi gói có bữa sáng (ghi 0 nếu miễn phí).</span>}
+  </div>;
+}
+
+/** KS-16j/16k · Chính sách tuổi + giá trẻ em mặc định của khách sạn — máy dùng để tính phụ thu khi khách đặt. */
 function CsTre({ f, setF, x, nhap }: { f: any; setF: (v: any) => void; x: any; nhap: boolean }) {
-  const moc: any[] = f.cs_moc_tuoi || [];
-  const sua = (i: number, k: string, v: any) => setF({ ...f, cs_moc_tuoi: moc.map((m, j) => (j === i ? { ...m, [k]: v } : m)) });
   const nhan = f.cs_nhan_tre_em || "chua_xac_nhan";
   return <fieldset style={{ border: "1px solid var(--line, #2a3b4d)", borderRadius: 8, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-    <legend>Chính sách trẻ em (kiểu Agoda)</legend>
+    <legend>Chính sách trẻ em (theo cách Agoda)</legend>
     <div className="grid">
       <label>Nhận trẻ em<select value={nhan} disabled={!nhap} onChange={(e) => setF({ ...f, cs_nhan_tre_em: e.target.value,
-        cs_moc_tuoi: (e.target.value === "moi_tuoi" || e.target.value === "tu_tuoi") && !moc.length
-          ? [{ tu: 0, den: 5, cach: "mien_phi", phu_thu: "", an_sang: false }, { tu: 6, den: 11, cach: "phu_thu", phu_thu: "", an_sang: false }, { tu: 12, den: 17, cach: "nguoi_lon", phu_thu: "", an_sang: false }] : moc })}>
-        {Object.entries(x.nhan_tre_em || {}).map(([k2, v]: any) => <option key={k2} value={k2}>{v}</option>)}</select></label>
-      {nhan === "tu_tuoi" && <label>Nhận trẻ từ (tuổi)<input type="number" min={0} max={17} value={f.cs_tre_tu_tuoi ?? ""} disabled={!nhap} onChange={(e) => setF({ ...f, cs_tre_tu_tuoi: e.target.value })} /></label>}
+        cs_moc_tuoi: (e.target.value === "moi_tuoi" || e.target.value === "tu_tuoi") && !(f.cs_moc_tuoi || []).length ? BANG0.map((m) => ({ ...m })) : f.cs_moc_tuoi })}>
+        {Object.entries(x.nhan_tre_em || {}).map(([k2, v]: any) => <option key={k2} value={k2}>{k2 === "tu_tuoi" ? "Chỉ nhận khách từ … tuổi" : v}</option>)}</select></label>
+      {nhan === "tu_tuoi" && <label>Tuổi tối thiểu của khách<input type="number" min={0} max={18} value={f.cs_tre_tu_tuoi ?? ""} disabled={!nhap} onChange={(e) => setF({ ...f, cs_tre_tu_tuoi: e.target.value })} /></label>}
     </div>
     {(nhan === "moi_tuoi" || nhan === "tu_tuoi") && <>
-      <div style={{ overflowX: "auto" }}><table><thead><tr><th>Từ tuổi</th><th>Đến tuổi</th><th>Cách tính</th><th>Phụ thu / đêm (chưa thuế phí)</th><th>Gồm ăn sáng</th><th></th></tr></thead>
-        <tbody>{moc.map((m, i) => <tr key={i}>
-          <td><input type="number" min={0} max={17} style={{ width: 70 }} value={m.tu} disabled={!nhap} onChange={(e) => sua(i, "tu", e.target.value)} aria-label="Từ tuổi" /></td>
-          <td><input type="number" min={0} max={17} style={{ width: 70 }} value={m.den} disabled={!nhap} onChange={(e) => sua(i, "den", e.target.value)} aria-label="Đến tuổi" /></td>
-          <td><select value={m.cach} disabled={!nhap} onChange={(e) => sua(i, "cach", e.target.value)} aria-label="Cách tính">{Object.entries(x.cach_tinh_tre || {}).map(([k2, v]: any) => <option key={k2} value={k2}>{v}</option>)}</select></td>
-          <td>{m.cach === "phu_thu" ? <input inputMode="numeric" style={{ width: 130 }} value={m.phu_thu === "" || m.phu_thu === null ? "" : tien(Number(String(m.phu_thu).replace(/\D/g, "")))} placeholder="150.000" disabled={!nhap}
-            onChange={(e) => sua(i, "phu_thu", e.target.value.replace(/\D/g, ""))} aria-label="Phụ thu" /> : "—"}</td>
-          <td>{m.cach !== "nguoi_lon" ? <input type="checkbox" checked={!!m.an_sang} disabled={!nhap} onChange={(e) => sua(i, "an_sang", e.target.checked)} aria-label="Gồm ăn sáng" /> : "—"}</td>
-          <td>{nhap && <button className="act grey" onClick={() => setF({ ...f, cs_moc_tuoi: moc.filter((_m, j) => j !== i) })}>Bỏ</button>}</td></tr>)}</tbody></table></div>
-      {nhap && <button className="act grey" style={{ alignSelf: "flex-start" }} onClick={() => setF({ ...f, cs_moc_tuoi: [...moc, { ...MOC0 }] })}>+ Thêm mốc tuổi</button>}
-    </>}
+      <b style={{ fontSize: 13 }}>Giá trẻ em mặc định (áp cho mọi phòng, mọi gói — phòng / gói có thể ghi đè)</b>
+      <BangTre bang={f.cs_moc_tuoi || []} setBang={(b) => setF({ ...f, cs_moc_tuoi: b })} x={x} nhap={nhap} />
+      <div className="grid">
+        <label>Số trẻ ở chung miễn phí mỗi phòng<input inputMode="numeric" value={f.cs_so_tre_mien_phi ?? ""} placeholder="trống = cần xác nhận" disabled={!nhap} onChange={(e) => setF({ ...f, cs_so_tre_mien_phi: e.target.value.replace(/\D/g, "") })} /></label>
+        <label>Trẻ miễn phí có tính vào sức chứa phòng<select value={f.cs_tre_mp_tinh_suc_chua ? "1" : "0"} disabled={!nhap} onChange={(e) => setF({ ...f, cs_tre_mp_tinh_suc_chua: e.target.value === "1" })}>
+          <option value="0">Không tính</option><option value="1">Có tính</option></select></label>
+      </div></>}
     <div className="grid">
-      <label>Phí giường phụ / đêm (chưa thuế phí)<input inputMode="numeric" value={f.cs_phi_giuong_phu === "" || f.cs_phi_giuong_phu === null || f.cs_phi_giuong_phu === undefined ? "" : tien(Number(String(f.cs_phi_giuong_phu).replace(/\D/g, "")))}
-        placeholder="trống = chưa xác nhận" disabled={!nhap} onChange={(e) => setF({ ...f, cs_phi_giuong_phu: e.target.value.replace(/\D/g, "") })} /></label>
-      <label style={{ display: "flex", gap: 6, alignItems: "center", flexDirection: "row" }}><input type="checkbox" checked={!!f.cs_giuong_phu_an_sang} disabled={!nhap} onChange={(e) => setF({ ...f, cs_giuong_phu_an_sang: e.target.checked })} />Giường phụ gồm ăn sáng</label>
-      <label>Nôi / cũi<input value={f.cs_noi ?? ""} placeholder="Miễn phí, theo yêu cầu" disabled={!nhap} onChange={(e) => setF({ ...f, cs_noi: e.target.value })} /></label>
+      <label>Giá giường phụ<select value={f.cs_giuong_phu_kieu || "co_dinh"} disabled={!nhap} onChange={(e) => setF({ ...f, cs_giuong_phu_kieu: e.target.value })}>
+        {Object.entries(x.kieu_gia || {}).map(([k2, v]: any) => <option key={k2} value={k2}>{v}</option>)}</select></label>
+      <label>{(f.cs_giuong_phu_kieu || "co_dinh") === "phan_tram" ? "Giường phụ (% giá phòng / đêm)" : "Giường phụ / đêm (chưa thuế phí)"}
+        <input inputMode="numeric" value={(f.cs_giuong_phu_kieu || "co_dinh") === "phan_tram" ? (f.cs_phi_giuong_phu ?? "") : soTien(f.cs_phi_giuong_phu)}
+          placeholder="trống = cần xác nhận" disabled={!nhap} onChange={(e) => setF({ ...f, cs_phi_giuong_phu: e.target.value.replace(/[^\d.]/g, "") })} /></label>
+      <label>Nôi / cũi (khách yêu cầu khi nhận phòng)<input value={f.cs_noi ?? ""} placeholder="Miễn phí" disabled={!nhap} onChange={(e) => setF({ ...f, cs_noi: e.target.value })} /></label>
     </div>
-    <span className="muted">Còn «Chưa xác nhận» thì khách có trẻ em vẫn xem được khách sạn nhưng không đặt ngay — máy mời gửi yêu cầu cho Điều hành.
-      Khách đặt có trẻ em: máy xếp trẻ theo mốc tuổi, ai vượt sức chứa loại phòng thì nằm giường phụ (trẻ lớn nhất trước) và tự cộng phụ thu vào tiền phòng.</span>
+    <span className="muted">Còn «Chưa xác nhận» thì cổng ghi «Cần khách sạn xác nhận»; khách có trẻ em gửi yêu cầu, không đặt ngay.
+      Khách đặt có trẻ em: trẻ nhỏ nhất ở chung miễn phí trong số trẻ miễn phí; vượt sức chứa cơ bản thì nằm giường phụ (trẻ lớn nhất trước) và trả giá giường phụ thay giá trẻ em; máy tự cộng vào tiền phòng.</span>
   </fieldset>;
 }
 
@@ -258,7 +279,10 @@ function Phong({ h, x, toast, goi, busy }: { h: any; x: any; toast: (m: string, 
   const kid = h.khach_san.id;
   const luuLp = async () => { const r = await goi(lp.id ? `/khach-san-vtd/${kid}/loai-phong/${lp.id}` : `/khach-san-vtd/${kid}/loai-phong`,
     { ...lp, dien_tich: Number(lp.dien_tich) || 0, toi_da_nguoi_lon: Number(lp.toi_da_nguoi_lon) || 1, toi_da_tre_em: soHoacNull(lp.toi_da_tre_em),
-      giuong_phu_toi_da: soHoacNull(lp.giuong_phu_toi_da), so_phong: Number(lp.so_phong) || 0, thu_tu: Number(lp.thu_tu) || 0 }); if (r) setLp(null); };
+      giuong_phu_toi_da: soHoacNull(lp.giuong_phu_toi_da), so_phong: Number(lp.so_phong) || 0, thu_tu: Number(lp.thu_tu) || 0,
+      // KS-16k
+      suc_chua: soHoacNull(lp.suc_chua), khach_them_toi_da: soHoacNull(lp.khach_them_toi_da), so_tre_mien_phi: soHoacNull(lp.so_tre_mien_phi),
+      phi_giuong_phu: soHoacNull(String(lp.phi_giuong_phu ?? "").replace(/[^\d.]/g, "")), gia_tre_rieng: lp.gia_tre_rieng ? guiBang(lp.gia_tre_rieng) : null }); if (r) setLp(null); };
   const [tnThem, setTnThem] = useState("");
   const bat = (k2: string, v: string) => setLp({ ...lp, [k2]: (lp[k2] || []).includes(v) ? lp[k2].filter((y: string) => y !== v) : [...(lp[k2] || []), v] });
   const chip = (on: boolean) => ({ padding: "3px 10px", borderRadius: 99, fontSize: 12, border: "1px solid var(--line, #2a3b4d)", cursor: "pointer",
@@ -267,7 +291,8 @@ function Phong({ h, x, toast, goi, busy }: { h: any; x: any; toast: (m: string, 
     const mua = g.mua.filter((m: any) => m.tu_ngay || m.den_ngay || m.gia_thuong).map((m: any) => ({ ...m, gia_thuong: Number(String(m.gia_thuong).replace(/\D/g, "")) || 0,
       gia_cuoi_tuan: m.gia_cuoi_tuan ? Number(String(m.gia_cuoi_tuan).replace(/\D/g, "")) : null, gia_niem_yet: m.gia_niem_yet ? Number(String(m.gia_niem_yet).replace(/\D/g, "")) : null }));
     const r = await goi(g.id ? `/khach-san-vtd/loai-phong/${g.lid}/goi/${g.id}` : `/khach-san-vtd/loai-phong/${g.lid}/goi`,
-      { ten: g.ten, bua_sang: g.bua_sang, huy_truoc_ngay: g.huy_truoc_ngay === "" || g.huy_truoc_ngay === null ? null : Number(g.huy_truoc_ngay), dang_ban: g.dang_ban, mua });
+      { ten: g.ten, bua_sang: g.bua_sang, huy_truoc_ngay: g.huy_truoc_ngay === "" || g.huy_truoc_ngay === null ? null : Number(g.huy_truoc_ngay), dang_ban: g.dang_ban, mua,
+        tre_em_che_do: g.tre_em_che_do || "", gia_tre: g.tre_em_che_do === "rieng" ? guiBang(g.gia_tre || []) : null });   // KS-16k
     if (r) setG(null);
   };
   const nhap = x.duoc_nhap;
@@ -299,11 +324,26 @@ function Phong({ h, x, toast, goi, busy }: { h: any; x: any; toast: (m: string, 
           <span className="muted">Để «Chưa xác nhận» thì lưu là chưa biết, không thành 0.</span></label>
         <label>Giường phụ tối đa<select value={lp.giuong_phu_toi_da === null || lp.giuong_phu_toi_da === undefined ? "" : String(lp.giuong_phu_toi_da)} onChange={(e) => setLp({ ...lp, giuong_phu_toi_da: e.target.value })}>
           <option value="">Chưa xác nhận</option><option value="0">0 — không kê thêm</option>{[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
+        <label>Sức chứa cơ bản<input inputMode="numeric" value={lp.suc_chua ?? ""} placeholder="trống = bằng tối đa người lớn" onChange={(e) => setLp({ ...lp, suc_chua: e.target.value.replace(/\D/g, "") })} /></label>
+        <label>Khách thêm tối đa (nằm giường phụ)<input inputMode="numeric" value={lp.khach_them_toi_da ?? ""} placeholder="trống = cần xác nhận" onChange={(e) => setLp({ ...lp, khach_them_toi_da: e.target.value.replace(/\D/g, "") })} /></label>
+        <label>Số trẻ ở chung miễn phí của phòng<input inputMode="numeric" value={lp.so_tre_mien_phi ?? ""} placeholder="trống = theo khách sạn" onChange={(e) => setLp({ ...lp, so_tre_mien_phi: e.target.value.replace(/\D/g, "") })} /></label>
+        <label>Giường phụ<select value={lp.giuong_phu_xac_nhan ? "1" : "0"} onChange={(e) => setLp({ ...lp, giuong_phu_xac_nhan: e.target.value === "1" })}>
+          <option value="0">Có sẵn — bán ngay</option><option value="1">Theo xác nhận của khách sạn — vẫn bán, Điều hành hỏi KS</option></select></label>
+        <label>Giá giường phụ của phòng<select value={lp.giuong_phu_kieu || ""} onChange={(e) => setLp({ ...lp, giuong_phu_kieu: e.target.value })}>
+          <option value="">Theo khách sạn</option>{Object.entries(x.kieu_gia || {}).map(([k2, v]: any) => <option key={k2} value={k2}>{v}</option>)}</select></label>
+        {lp.giuong_phu_kieu && <label>{lp.giuong_phu_kieu === "phan_tram" ? "% giá phòng / đêm" : "Giá giường phụ / đêm"}<input inputMode="numeric"
+          value={lp.giuong_phu_kieu === "phan_tram" ? (lp.phi_giuong_phu ?? "") : soTien(lp.phi_giuong_phu)} onChange={(e) => setLp({ ...lp, phi_giuong_phu: e.target.value.replace(/[^\d.]/g, "") })} /></label>}
         <label>Nôi / cũi em bé<select value={lp.noi_cui === null || lp.noi_cui === undefined ? "" : lp.noi_cui ? "1" : "0"} onChange={(e) => setLp({ ...lp, noi_cui: e.target.value === "" ? null : e.target.value === "1" })}>
           <option value="">Chưa xác nhận</option><option value="1">Có</option><option value="0">Không</option></select></label>
         <label>Số phòng VTD được bán mỗi đêm<input inputMode="numeric" value={lp.so_phong ?? ""} placeholder="0" onChange={(e) => setLp({ ...lp, so_phong: e.target.value.replace(/\D/g, "") })} />
           <span className="muted">Hồ sơ nháp được để 0. Lưu 0 thì mở lại vẫn là 0.</span></label>
       </div>
+      <fieldset style={{ border: "1px solid var(--line, #2a3b4d)", borderRadius: 8, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}><legend>Giá trẻ em của phòng</legend>
+        <label>Đổi giá trẻ em cho phòng này<select value={lp.gia_tre_rieng ? "1" : "0"} onChange={(e) => setLp({ ...lp, gia_tre_rieng: e.target.value === "1"
+          ? ((h.khach_san.cs_moc_tuoi || []).length ? h.khach_san.cs_moc_tuoi.map((m: any) => ({ ...m, an_sang: m.an_sang ?? "" })) : BANG0.map((m) => ({ ...m }))) : null })}>
+          <option value="0">Không — theo khách sạn</option><option value="1">Có — sao chép từ mặc định rồi sửa</option></select></label>
+        {lp.gia_tre_rieng && <BangTre bang={lp.gia_tre_rieng} setBang={(b) => setLp({ ...lp, gia_tre_rieng: b })} x={x} nhap />}
+      </fieldset>
       <fieldset style={{ border: "1px solid var(--line, #2a3b4d)", borderRadius: 8, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}><legend>Nguồn & đối chiếu (nội bộ)</legend>
         <div className="grid">
           <label>Nguồn<select value={lp.nguon ?? ""} onChange={(e) => setLp({ ...lp, nguon: e.target.value })}><option value="">— chọn —</option>
@@ -347,7 +387,12 @@ function Phong({ h, x, toast, goi, busy }: { h: any; x: any; toast: (m: string, 
           <label style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={g.bua_sang} onChange={(e) => setG({ ...g, bua_sang: e.target.checked })} />Có bữa sáng</label>
           <label>Hủy phòng<select value={g.huy_truoc_ngay === "" || g.huy_truoc_ngay === null ? "khong" : String(g.huy_truoc_ngay)} onChange={(e) => setG({ ...g, huy_truoc_ngay: e.target.value === "khong" ? "" : Number(e.target.value) })}>
             <option value="khong">Không hoàn tiền</option>{[0, 1, 2, 3, 5, 7, 14, 30].map((n) => <option key={n} value={n}>Miễn phí hủy trước {n} ngày</option>)}</select></label>
-          <label style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={g.dang_ban} onChange={(e) => setG({ ...g, dang_ban: e.target.checked })} />Đang bán</label></div>
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={g.dang_ban} onChange={(e) => setG({ ...g, dang_ban: e.target.checked })} />Đang bán</label>
+          <label>Giá trẻ em của gói<select value={g.tre_em_che_do || ""} onChange={(e) => {
+            const p = h.loai_phong.find((y: any) => y.id === g.lid); const goc = p?.gia_tre_rieng || h.khach_san.cs_moc_tuoi || [];
+            setG({ ...g, tre_em_che_do: e.target.value, gia_tre: e.target.value === "rieng" && !(g.gia_tre || []).length ? (goc.length ? goc.map((m: any) => ({ ...m, an_sang: m.an_sang ?? "" })) : BANG0.map((m) => ({ ...m }))) : g.gia_tre }); }}>
+            {Object.entries(x.che_do_tre_goi || {}).map(([k2, v]: any) => <option key={k2} value={k2}>{k2 === "rieng" ? "Riêng cho gói — sao chép từ mặc định rồi sửa" : v}</option>)}</select></label></div>
+        {g.tre_em_che_do === "rieng" && <BangTre bang={g.gia_tre || []} setBang={(b) => setG({ ...g, gia_tre: b })} x={x} nhap />}
         <div style={{ overflowX: "auto" }}><table><thead><tr><th>Từ ngày</th><th>Đến ngày (gồm)</th><th>Giá ngày thường</th><th>Giá T6–T7</th><th>Giá niêm yết KS</th><th>Ghi chú</th><th></th></tr></thead>
           <tbody>{g.mua.map((m: any, i: number) => { const s = (k2: string, v: any) => setG({ ...g, mua: g.mua.map((y: any, j: number) => j === i ? { ...y, [k2]: v } : y) });
             return <tr key={i}><td><input type="date" value={m.tu_ngay} onChange={(e) => s("tu_ngay", e.target.value)} aria-label="Từ ngày" /></td>
@@ -465,7 +510,8 @@ function PhongTrong({ kid, toast }: { kid: number; toast: (m: string, l?: boolea
 
 function DongDon({ d }: { d: any }) {
   return <><td><b>{d.ma}</b><div className="muted">{d.ho_ten} · {d.lien_he}</div></td>
-    <td>{d.khach_san?.ten}<div className="muted">{d.dong.map((x: any) => `${x.so} × ${x.loai_phong} · ${x.goi}`).join("; ")}</div></td>
+    <td>{d.khach_san?.ten}<div className="muted">{d.dong.map((x: any) => `${x.so} × ${x.loai_phong} · ${x.goi}${x.phu_thu ? ` · phụ thu trẻ em / giường phụ ${tien(x.phu_thu)} đ` : ""}`).join("; ")}</div>
+      {d.dong.some((x: any) => x.giuong_phu_cho_xac_nhan) && <Tag cls="warn">Giường phụ chờ KS xác nhận</Tag>}</td>
     <td style={{ whiteSpace: "nowrap" }}>{dm(d.vao)} – {dm(d.ra)}<div className="muted">{d.dem} đêm · {d.nguoi_lon} NL{d.tre_em ? ` + ${d.tre_em} TE` : ""}</div></td>
     <td style={{ whiteSpace: "nowrap" }}>₫ {tien(d.tong)}<div className="muted">đã trả {tien(d.da_tra)}{d.thanh_toan?.length ? ` · ${d.thanh_toan.map((t: any) => t.kenh === "qr" ? "QR" : "thẻ").join(", ")}` : ""}</div>
       {d.giam_voucher > 0 && <div className="muted" style={{ color: "#ffcf7a" }}>voucher {d.voucher?.ma} −{tien(d.giam_voucher)}{d.voucher?.trang_thai === "da_hoan" ? " · đã trả điểm" : " · VTD chịu"}</div>}</td></>;

@@ -122,6 +122,9 @@ class KsIn(BaseModel):
     cs_phi_giuong_phu: float | None = None
     cs_giuong_phu_an_sang: bool = False
     cs_noi: str = ""
+    cs_so_tre_mien_phi: int | None = None          # KS-16k
+    cs_tre_mp_tinh_suc_chua: bool = False
+    cs_giuong_phu_kieu: str = "co_dinh"
     thue_phi_pt: float = 0
     lien_he_noi_bo: str = ""
     ghi_chu_noi_bo: str = ""
@@ -181,6 +184,13 @@ class LoaiPhongIn(BaseModel):
     can_xac_nhan: list[str] = []
     ghi_chu_doi_chieu: str = ""
     trang_thai_dc: str = ""
+    suc_chua: int | None = None                    # KS-16k
+    khach_them_toi_da: int | None = None
+    so_tre_mien_phi: int | None = None
+    phi_giuong_phu: float | None = None
+    giuong_phu_kieu: str = ""
+    giuong_phu_xac_nhan: bool = False
+    gia_tre_rieng: list[dict] | None = None
 
 
 @router_vtos.post("/{kid:int}/loai-phong")
@@ -210,6 +220,8 @@ class GoiIn(BaseModel):
     huy_truoc_ngay: int | None = None
     dang_ban: bool = True
     mua: list[MuaIn] = []
+    tre_em_che_do: str = ""                        # KS-16k: "" | rieng | nhu_nguoi_lon
+    gia_tre: list[dict] | None = None
 
 
 @router_vtos.post("/loai-phong/{lid:int}/goi")

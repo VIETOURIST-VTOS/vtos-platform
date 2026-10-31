@@ -32,8 +32,10 @@ TRANG_THAI_ANH_KS = {"nhap": "Nháp", "cho_duyet": "Chờ duyệt", "da_duyet": 
 # KS-16j
 NHAN_TRE_EM = {"chua_xac_nhan": "Chưa xác nhận", "moi_tuoi": "Nhận trẻ em mọi lứa tuổi", "tu_tuoi": "Chỉ nhận trẻ từ … tuổi",
                "khong": "Không nhận trẻ em"}
-CACH_TINH_TRE = {"mien_phi": "Miễn phí nếu dùng giường có sẵn", "phu_thu": "Phụ thu (dùng giường có sẵn)",
-                 "nguoi_lon": "Tính như người lớn"}
+CACH_TINH_TRE = {"mien_phi": "Luôn miễn phí (giường có sẵn)", "co_dinh": "Giá cố định / đêm", "phan_tram": "% giá phòng / đêm"}
+NHOM_TUOI = {"so_sinh": "Trẻ sơ sinh", "tre_em": "Trẻ em"}
+KIEU_GIA = {"co_dinh": "Cố định (đ / đêm)", "phan_tram": "% giá phòng / đêm"}
+CHE_DO_TRE_GOI = {"": "Theo phòng / khách sạn", "rieng": "Giá trẻ em riêng cho gói", "nhu_nguoi_lon": "Tính trẻ em như người lớn"}
 TIEN_NGHI_PHONG = ("Máy lạnh", "Wifi", "Vòi sen", "Bồn tắm", "Ban công", "Hướng biển", "Không hút thuốc", "Minibar",
                    "Két sắt", "Bếp nhỏ", "Hồ bơi riêng", "TV", "Máy sấy tóc", "Bàn làm việc")
 NGUON_LP = {"agoda": "Agoda", "booking": "Booking.com", "ks_gui": "Khách sạn gửi", "hop_dong": "Hợp đồng", "khac": "Khác"}
@@ -72,6 +74,12 @@ class KhachSanVtd(Base):
     cs_phi_giuong_phu: Mapped[float | None] = mapped_column(TIEN, nullable=True)       # / đêm, chưa thuế phí; None = chưa xác nhận
     cs_giuong_phu_an_sang: Mapped[bool] = mapped_column(Boolean, default=False)
     cs_noi: Mapped[str] = mapped_column(String(120), default="")                       # «Miễn phí, theo yêu cầu»
+    # KS-16k (Chủ tịch duyệt 01/11/2026 — theo cách Agoda YCS): cs_moc_tuoi giờ là GIÁ TRẺ EM MẶC ĐỊNH theo nhóm tuổi
+    # [{tu, den, nhom: so_sinh|tre_em, cach: mien_phi|co_dinh|phan_tram, gia, an_sang (đ/đêm, None = cần xác nhận)}];
+    # trên tuổi «den» lớn nhất = người lớn. cs_tre_tu_tuoi = tuổi tối thiểu của khách (khi «tu_tuoi»).
+    cs_so_tre_mien_phi: Mapped[int | None] = mapped_column(Integer, nullable=True)     # mỗi phòng; None = cần xác nhận
+    cs_tre_mp_tinh_suc_chua: Mapped[bool] = mapped_column(Boolean, default=False)      # trẻ miễn phí có tính vào sức chứa
+    cs_giuong_phu_kieu: Mapped[str] = mapped_column(String(10), default="co_dinh")     # co_dinh (đ) | phan_tram (% giá phòng)
     # Giá Điều hành nhập là giá CHƯA gồm thuế phí; khách thấy «chưa gồm thuế và phí» và số thuế phí ở bước
     # thanh toán. Mức % theo từng khách sạn (VAT + phí phục vụ) — Điều hành nhập theo hợp đồng.
     thue_phi_pt: Mapped[float] = mapped_column(Float, default=0)
@@ -126,6 +134,14 @@ class LoaiPhongVtd(Base):
     toi_da_tre_em: Mapped[int | None] = mapped_column(Integer, nullable=True)   # KS-16j: None = chưa xác nhận (khác 0)
     giuong_phu_toi_da: Mapped[int | None] = mapped_column(Integer, nullable=True)  # None = chưa xác nhận
     noi_cui: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # KS-16k: sức chứa kiểu Agoda + ghi đè giá trẻ em / giường phụ của riêng phòng này (None = theo khách sạn)
+    suc_chua: Mapped[int | None] = mapped_column(Integer, nullable=True)            # sức chứa cơ bản; None = tối đa người lớn
+    khach_them_toi_da: Mapped[int | None] = mapped_column(Integer, nullable=True)   # khách thêm (nằm giường phụ); None = cần xác nhận
+    so_tre_mien_phi: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    phi_giuong_phu: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    giuong_phu_kieu: Mapped[str] = mapped_column(String(10), default="")            # "" = theo khách sạn
+    giuong_phu_xac_nhan: Mapped[bool] = mapped_column(Boolean, default=False)       # «theo xác nhận của KS» — vẫn bán ngay
+    gia_tre_rieng: Mapped[list | None] = mapped_column(JSON, nullable=True)         # None = theo khách sạn
     # KS-16j: nguồn & đối chiếu — NỘI BỘ, không ra cổng khách
     nguon: Mapped[str] = mapped_column(String(12), default="")          # NGUON_LP
     ky_doi_chieu: Mapped[str] = mapped_column(String(120), default="")
@@ -153,6 +169,9 @@ class GoiGiaVtd(Base):
     dang_ban: Mapped[bool] = mapped_column(Boolean, default=True)
     trang_thai: Mapped[str] = mapped_column(String(10), default="nhap", index=True)
     ly_do_tra_lai: Mapped[str] = mapped_column(String(300), default="")
+    # KS-16k: giá trẻ em của gói — "" theo phòng / khách sạn · "rieng" dùng gia_tre · "nhu_nguoi_lon"
+    tre_em_che_do: Mapped[str] = mapped_column(String(14), default="")
+    gia_tre: Mapped[list | None] = mapped_column(JSON, nullable=True)
     sua_boi: Mapped[str] = mapped_column(String(50), default="")
     sua_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     gui_boi: Mapped[str] = mapped_column(String(50), default="")

@@ -298,7 +298,6 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
             {(p.tien_nghi || []).length > 0 && <><br />{p.tien_nghi.join(" · ")}</>}
             <br />Tối đa {p.toi_da_nguoi_lon} người lớn{p.toi_da_tre_em ? ` + ${p.toi_da_tre_em} trẻ em` : ""}{p.giuong_phu_toi_da ? ` · kê được ${p.giuong_phu_toi_da} giường phụ` : ""}</span>
           {p.mo_ta_dai && <details><summary style={{ cursor: "pointer", fontSize: 13 }}>Xem thêm</summary><p className="ksv-muted" style={{ fontSize: 13, whiteSpace: "pre-line", margin: "4px 0 0" }}>{p.mo_ta_dai}</p></details>}
-          {p.vua && p.phu_thu_ky > 0 && <small style={{ fontWeight: 600 }}>+ phụ thu ₫ {vnd(p.phu_thu_ky)} cho {q.phong} phòng × {ks.dem} đêm ({(p.phu_thu_ct || []).join(", ")}) — máy cộng vào tổng</small>}
           {!p.vua && <small style={{ color: "var(--ksv-price)", fontWeight: 600 }}>{p.ly_do || `Không đủ chỗ cho ${q.nl} người lớn / ${q.phong} phòng — tăng số phòng`}</small>}
           {!p.vua && /gửi yêu cầu/.test(p.ly_do || "") && <button type="button" className="ksv-btn line" onClick={() => moYeuCauTrong(p.ten)}>Gửi yêu cầu giữ phòng</button>}</div>
         <div className="ksv-rates">{p.goi.length ? <><div className="ksv-rhd"><span>Lợi ích</span><span>Số khách</span><span>Giá mỗi đêm</span><span>Số phòng</span></div>
@@ -307,8 +306,12 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
               <li>{g.bua_sang ? "✓ Bữa sáng" : "Chỉ phòng"}{["chỉ phòng", "có bữa sáng", "bữa sáng"].includes(String(g.ten || "").trim().toLowerCase()) ? "" : ` · ${g.ten}`}</li><li>✓ Giá hợp đồng của Vietourist</li></ul></div>
             <div><b>{p.toi_da_nguoi_lon} người</b></div>
             <div>{g.niem_yet_dem && <><span className="ksv-old" style={{ fontSize: 13 }}>{vnd(g.niem_yet_dem)}</span><br /></>}<b className="ksv-big" style={{ fontSize: 20 }}>₫ {vnd(g.gia_dem)}</b><br /><small className="ksv-muted">chưa gồm thuế phí</small>
-              {ks.dem > 1 && <><br /><small className="ksv-muted">₫ {vnd(g.tong)} / {ks.dem} đêm</small></>}</div>
-            <div>{(p.con ?? p.so_phong) > 0 ? <><select className="ksv-sel" style={{ width: "100%" }} aria-label={`Số phòng ${p.ten} ${g.ten}`} disabled={!p.vua} value={chon[g.id] || 0}
+              {ks.dem > 1 && <><br /><small className="ksv-muted">₫ {vnd(g.tong)} / {ks.dem} đêm</small></>}
+              {g.vua !== false && g.phu_thu_ky > 0 && <><br /><small style={{ fontWeight: 600 }}>+ trẻ em / giường phụ ₫ {vnd(g.phu_thu_ky)}</small>
+                <br /><small className="ksv-muted">{(g.phu_thu_ct || []).filter((c: any) => c.tien > 0).map((c: any) => c.nhan).join(" · ")}</small></>}
+              {g.vua !== false && g.cho_xac_nhan && <><br /><small className="ksv-muted">Giường phụ chờ khách sạn xác nhận — không xếp được thì hoàn 100%</small></>}
+              {p.vua && g.vua === false && <><br /><small style={{ color: "var(--ksv-price)", fontWeight: 600 }}>{g.ly_do}</small></>}</div>
+            <div>{(p.con ?? p.so_phong) > 0 ? <><select className="ksv-sel" style={{ width: "100%" }} aria-label={`Số phòng ${p.ten} ${g.ten}`} disabled={!p.vua || g.vua === false} value={chon[g.id] || 0}
               onChange={(e) => setChon({ ...chon, [g.id]: Number(e.target.value) })}>{Array.from({ length: Math.min(conCho(p, g.id), 9) + 1 }, (_, n) => <option key={n} value={n}>{n} phòng</option>)}</select>
               {(p.con ?? 9) <= 3 && <small style={{ color: "var(--ksv-price)", fontWeight: 600 }}>Chỉ còn {p.con} phòng</small>}</>
               : <b style={{ color: "var(--ksv-price)" }}>Hết phòng</b>}</div>
@@ -327,7 +330,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
     <DanhGiaKsCong kid={ks.id} />
     {soChon > 0 && <div className="ksv-total"><span style={{ flex: 1, minWidth: 180 }}><b>{soChon} phòng · {ks.dem} đêm</b><br /><small className="ksv-muted">{dongChon.map((x: any) => `${x.n} × ${x.p.ten} (${x.g.ten})`).join(" · ")}</small></span>
       <span style={{ textAlign: "right" }}><b className="ksv-big" style={{ fontSize: 22 }}>₫ {vnd(tienChon)}</b><br /><small className="ksv-muted">+ thuế phí ₫ {vnd(tienChon * (ks.thue_phi_pt || 0) / 100)}</small>
-        {dongChon.some((x: any) => x.p.phu_thu_ky > 0) && <><br /><small className="ksv-muted">+ phụ thu trẻ em / giường phụ (tính ở bước sau)</small></>}</span>
+        {dongChon.some((x: any) => x.g.phu_thu_ky > 0) && <><br /><small className="ksv-muted">+ trẻ em / giường phụ (máy tính lại ở bước sau)</small></>}</span>
       <button type="button" className="ksv-btn" style={{ minHeight: 50, padding: "0 26px", fontSize: 16 }} disabled={busy} onClick={sangGui}>Đặt ngay</button></div>}
   </div>;
 
@@ -568,7 +571,9 @@ function TomTat({ ks, q, tinh, giam = 0, maVc, hang, diemDk = 0 }: { ks: any; q:
         <span style={{ padding: "12px 14px" }}><small className="ksv-muted">Trả phòng</small><br /><b>{ngay(q.ra)}</b><br /><small className="ksv-muted">trước {ks.gio_tra}</small></span></div>
       <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 4 }}>
         {tinh.dong.length ? tinh.dong.map((x: any, i: number) => <div key={i} style={{ display: "flex", flexDirection: "column" }}><b>{x.so} × {x.loai_phong}</b>
-          <span className="ksv-muted">{x.goi} · {tinh.dem} đêm{x.phu_thu ? ` · gồm phụ thu trẻ em / giường phụ ₫ ${vnd(x.phu_thu)}` : ""}</span>{x.huy_han ? <span className="ksv-okc">✓ Miễn phí hủy trước {x.huy_han.split("-").reverse().join("/")}</span> : <span className="ksv-muted">Không hoàn tiền</span>}</div>)
+          <span className="ksv-muted">{x.goi} · {tinh.dem} đêm</span>
+          {(x.phu_thu_ct || []).map((c: any, j: number) => <span key={j} className="ksv-sum" style={{ fontSize: 13 }}><span>{c.nhan}{c.tien ? ` (${vnd(c.tien / Math.max(1, c.dem))} × ${c.dem} đêm)` : ""}</span><span>{c.tien ? `₫ ${vnd(c.tien)}` : "Miễn phí"}</span></span>)}
+          {x.cho_xac_nhan && <small className="ksv-muted">Giường phụ chờ khách sạn xác nhận — không xếp được thì Vietourist hoàn 100%.</small>}{x.huy_han ? <span className="ksv-okc">✓ Miễn phí hủy trước {x.huy_han.split("-").reverse().join("/")}</span> : <span className="ksv-muted">Không hoàn tiền</span>}</div>)
           : <span>{tinh.loai_phong ? `Loại phòng: ${tinh.loai_phong} · ` : ""}{q.phong} phòng · {q.nl} người lớn · Vietourist báo giá</span>}</div></div>
     {tinh.tong > 0 && <div className="ksv-panel"><span className="ksv-sum"><span>Giá phòng ({tinh.so_phong} phòng × {tinh.dem} đêm){tinh.phu_thu ? " · gồm phụ thu" : ""}</span><span>₫ {vnd(tinh.tien_phong)}</span></span>
       <span className="ksv-sum"><span>Thuế và phí ({ks.thue_phi_pt || 0}%)</span><span>₫ {vnd(tinh.thue_phi)}</span></span>
