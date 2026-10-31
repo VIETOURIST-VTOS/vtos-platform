@@ -44,18 +44,18 @@ export function DiemUuDai({ x, tai, bao }: { x: any; tai: () => void; bao: (m: s
         <button type="button" className="v3-button v3-primary cursor-interaction" disabled={busy || !x.dang_bat || Number(n) < x.doi_toi_thieu} onClick={doi}><I n="gift" /><span>{busy ? "Đang đổi…" : "Đổi voucher"}</span></button>
       </section>
       <section className="v3-panel"><div className="v3-section-title"><h3>Voucher của tôi</h3></div>
-        {x.voucher.length ? <div className="v3-table-wrap"><table><thead><tr><th scope="col">Mã</th><th scope="col">Giá trị</th><th scope="col">Hạn dùng</th><th scope="col">Trạng thái</th></tr></thead>
-          <tbody>{x.voucher.map((v: any) => <tr key={v.ma}><th scope="row">{v.ma}<small>{v.loai_ten || "Đổi điểm"}{v.loai === "chao_mung" ? ` · tour đầu tiên từ ${trieu(v.don_toi_thieu)}` : ""}</small></th><td>{so(v.gia_tri)} đ</td><td>{ngay(v.han_dung)}</td>
-            <td><span className={`v3-badge ${v.trang_thai === "cho_dung" ? "demo" : v.trang_thai === "da_dung" ? "good" : "neutral"}`}>{v.trang_thai_ten}{v.booking ? ` · ${v.booking}` : ""}</span></td></tr>)}</tbody></table></div>
+        {x.voucher.length ? <div className="v3-table-wrap kh-bang-the"><table><thead><tr><th scope="col">Mã</th><th scope="col">Giá trị</th><th scope="col">Hạn dùng</th><th scope="col">Trạng thái</th></tr></thead>
+          <tbody>{x.voucher.map((v: any) => <tr key={v.ma}><th scope="row">{v.ma}<small>{v.loai_ten || "Đổi điểm"}{v.loai === "chao_mung" ? ` · tour đầu tiên từ ${trieu(v.don_toi_thieu)}` : ""}</small></th><td data-nhan="Giá trị">{so(v.gia_tri)} đ</td><td data-nhan="Hạn dùng">{ngay(v.han_dung)}</td>
+            <td data-nhan="Trạng thái"><span className={`v3-badge ${v.trang_thai === "cho_dung" ? "demo" : v.trang_thai === "da_dung" ? "good" : "neutral"}`}>{v.trang_thai_ten}{v.booking ? ` · ${v.booking}` : ""}</span></td></tr>)}</tbody></table></div>
           : <p>Chưa có voucher. Đọc mã cho Sales khi đặt tour, hoặc tự nhập khi thanh toán khách sạn.</p>}
         {x.luat === "v3" && <p>Voucher quà (chào mừng / sinh nhật) không dùng chung với voucher khác trên cùng đơn, không đổi ra điểm. Đơn hủy thì voucher quà mở lại nếu còn hạn.</p>}
       </section>
     </div>
     {x.luat === "v3" && x.qua && <QuaCuaBan q={x.qua} tai={tai} bao={bao} />}
     <section className="v3-panel"><div className="v3-section-title"><h3>Lịch sử điểm</h3></div>
-      {x.lich_su.length ? <div className="v3-table-wrap"><table><thead><tr><th scope="col">Ngày</th><th scope="col">Nội dung</th><th scope="col">Điểm</th><th scope="col">Hết hạn</th></tr></thead>
-        <tbody>{x.lich_su.map((r: any, i: number) => <tr key={i}><th scope="row">{ngay(r.luc)}</th><td>{r.nguon && <span className="v3-badge neutral" style={{ marginRight: 6 }}>{NGUON[r.nguon] || r.nguon}</span>}{r.loai}<small>{r.noi_dung}</small></td>
-          <td>{r.so_diem > 0 ? "+" : "−"}{so(Math.abs(r.so_diem))}</td><td>{r.het_han ? ngay(r.het_han) : "—"}</td></tr>)}</tbody></table></div>
+      {x.lich_su.length ? <div className="v3-table-wrap kh-bang-the"><table><thead><tr><th scope="col">Ngày</th><th scope="col">Nội dung</th><th scope="col">Điểm</th><th scope="col">Hết hạn</th></tr></thead>
+        <tbody>{x.lich_su.map((r: any, i: number) => <tr key={i}><th scope="row">{ngay(r.luc)}</th><td data-nhan="Nội dung">{r.nguon && <span className="v3-badge neutral" style={{ marginRight: 6 }}>{NGUON[r.nguon] || r.nguon}</span>}{r.loai}<small>{r.noi_dung}</small></td>
+          <td data-nhan="Điểm">{r.so_diem > 0 ? "+" : "−"}{so(Math.abs(r.so_diem))}</td><td data-nhan="Hết hạn">{r.het_han ? ngay(r.het_han) : "—"}</td></tr>)}</tbody></table></div>
         : <p>Chưa có giao dịch điểm.</p>}
       {(x.cho_cong || []).map((c: any) => <div key={c.ma} className="v3-notice"><I n="clock" /><span>Khách sạn {c.ma}: đã ở, chờ Vietourist chốt đơn — {c.du_kien == null ? "điểm tính theo hoa hồng Vietourist nhận, sẽ hiện sau khi chốt." : `dự kiến +${so(c.du_kien)} điểm.`}</span></div>)}
       {x.luat === "v3" ? <div className="v3-notice warn"><I n="info" /><span>Tour: 1 điểm cho mỗi 10.000 đ, cộng khi chuyến kết thúc và đã trả đủ. Khách sạn / nhà hàng: điểm = 20% hoa hồng Vietourist nhận ÷ 100 đ × hệ số, cộng sau khi chốt đơn. Đoàn trên 15 khách: trưởng đoàn tích trên phần của mình + {so(x.qua?.thuong_truong_doan)} điểm thưởng. Điểm cộng mới dùng được 18 tháng. Booking qua đại lý / CTV không tích điểm. Hủy hoặc hoàn tiền sau khi cộng → điểm tự trừ tương ứng.</span></div>
@@ -116,9 +116,9 @@ export function YeuThich({ mo }: { mo: (t: any) => void }) {
   const bo = async (id: number) => { await goiCong("/khach/yeu-thich", { tour_id: id, luu: false }).catch(() => null); tai(); };
   if (!x) return <section className="v3-panel"><p>Đang tải…</p></section>;
   return (<section className="v3-panel"><div className="v3-section-title"><h3>Tour đã lưu</h3></div>
-    {x.yeu_thich.length ? <div className="v3-table-wrap"><table><thead><tr><th scope="col">Tour</th><th scope="col">Khởi hành</th><th scope="col">Giá lúc lưu</th><th scope="col">Giá hiện tại</th><th scope="col"></th></tr></thead>
-      <tbody>{x.yeu_thich.map((t: any) => <tr key={t.tour_id}><th scope="row">{t.ten}</th><td>{ngay(t.khoi_hanh)}</td><td>{so(t.gia_luc_luu)} đ</td>
-        <td>{t.con_ban ? `${so(t.gia_hien_tai)} đ` : "—"}</td>
+    {x.yeu_thich.length ? <div className="v3-table-wrap kh-bang-the"><table><thead><tr><th scope="col">Tour</th><th scope="col">Khởi hành</th><th scope="col">Giá lúc lưu</th><th scope="col">Giá hiện tại</th><th scope="col"></th></tr></thead>
+      <tbody>{x.yeu_thich.map((t: any) => <tr key={t.tour_id}><th scope="row">{t.ten}</th><td data-nhan="Khởi hành">{ngay(t.khoi_hanh)}</td><td data-nhan="Giá lúc lưu">{so(t.gia_luc_luu)} đ</td>
+        <td data-nhan="Giá hiện tại">{t.con_ban ? `${so(t.gia_hien_tai)} đ` : "—"}</td>
         <td>{!t.con_ban ? <span className="v3-badge warn">Đã ngừng bán</span> : t.giam > 0 ? <span className="v3-badge good">Giá đã giảm {so(t.giam)} đ</span> : <span className="v3-badge neutral">Chưa đổi</span>}
           {" "}{t.con_ban && <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => mo(t.tour)}><span>Xem</span></button>}
           <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => bo(t.tour_id)}><span>Bỏ lưu</span></button></td></tr>)}</tbody></table></div>
