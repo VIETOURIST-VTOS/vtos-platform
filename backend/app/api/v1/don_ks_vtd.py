@@ -43,6 +43,7 @@ class DatIn(BaseModel):
     ra: date
     nguoi_lon: int = 2
     tre_em: int = 0
+    tuoi_tre_em: list[int] = []     # KS-16j: tuổi từng trẻ — máy tính phụ thu theo chính sách khách sạn
     chon: list[ChonIn]
     ho_ten: str
     lien_he: str
