@@ -51,6 +51,7 @@ export default function VideoNoiBo({ goc, oid, toast, loaiPhong = [], mon = [], 
   const [tien, setTien] = useState<{ da: number; tong: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [phat, setPhat] = useState<number | null>(null);
+  const [loiTai, setLoiTai] = useState("");      // KS-16f2: lỗi tải hiện ngay dưới nút, không chỉ thoáng qua
   const [lanTep, setLanTep] = useState(0);         // đổi key để làm trống ô chọn tệp sau khi tải xong
   const load = useCallback(() => { api<any>(`${goc}/${oid}/video`).then(setX).catch((e) => toast(errMsg(e), true)); }, [goc, oid, toast]);
   useEffect(() => { load(); }, [load]);
@@ -68,7 +69,7 @@ export default function VideoNoiBo({ goc, oid, toast, loaiPhong = [], mon = [], 
   };
   const tai = async () => {
     if (!f) return;
-    setBusy(true);
+    setBusy(true); setLoiTai("");
     try {
       const v = await api<any>(`${goc}/${oid}/video/bat-dau`, { method: "POST", json: {
         ten_tep: f.name, kich_thuoc: f.size, thoi_luong: doc?.thoi_luong || 0, loai: o.loai, tieu_de: o.tieu_de, nguon: o.nguon,
@@ -87,7 +88,7 @@ export default function VideoNoiBo({ goc, oid, toast, loaiPhong = [], mon = [], 
       if (doc?.anh) { const fd = new FormData(); fd.append("tep", doc.anh, "anh.jpg"); await guiTho(`${goc}/video/${v.id}/anh-dai-dien`, { method: "POST", body: fd }).catch(() => {}); }
       toast("Đã tải video — đang hiện"); setF(null); setDoc(null); setLanTep((n) => n + 1); setO({ loai: "", tieu_de: "", nguon: o.nguon, xac_nhan_quyen: false, gan: "" });
       load(); onDoi?.();
-    } catch (e) { toast(errMsg(e), true); load(); }
+    } catch (e) { const m = errMsg(e); setLoiTai(m); toast(m, true); load(); }
     finally { setBusy(false); setTien(null); }
   };
   const viec = async (id: number, v: string) => {
@@ -120,6 +121,7 @@ export default function VideoNoiBo({ goc, oid, toast, loaiPhong = [], mon = [], 
         <label style={{ display: "flex", flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "flex-start", fontSize: 13 }}><input type="checkbox" style={{ width: "auto", margin: 0 }} checked={o.xac_nhan_quyen} onChange={(e) => setO({ ...o, xac_nhan_quyen: e.target.checked })} /><span>Xác nhận Vietourist được phép dùng video này cho khách xem</span></label>
         <div><button className="act teal" disabled={busy || !f || !o.loai || !o.nguon.trim() || !o.xac_nhan_quyen} onClick={tai}>Tải video lên</button>
           {tien && <span className="muted" style={{ marginLeft: 8 }}>Đang tải {(tien.da / MB).toFixed(0)} / {(tien.tong / MB).toFixed(0)} MB</span>}</div>
+        {loiTai && <div role="alert" style={{ padding: "8px 10px", borderRadius: 6, background: "#fdecea", color: "#8a1c12", fontSize: 13 }}>Chưa tải được video: {loiTai}</div>}
         {tien && <div style={{ height: 8, background: "#dde3eb", borderRadius: 99, overflow: "hidden" }}><i style={{ display: "block", height: "100%", width: `${(100 * tien.da) / tien.tong}%`, background: "#0f7b74" }} /></div>}
       </>)}
     </div>

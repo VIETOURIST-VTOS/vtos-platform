@@ -8,7 +8,7 @@
 """
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -41,7 +41,8 @@ class VideoDichVu(Base):
     kich_thuoc: Mapped[int] = mapped_column(Integer, default=0)
     thoi_luong: Mapped[int] = mapped_column(Integer, default=0)              # giây, trình duyệt đọc lúc chọn tệp
     khoa_luu: Mapped[str] = mapped_column(String(200), default="")
-    ma_tai: Mapped[str] = mapped_column(String(300), default="")             # UploadId multipart
+    # UploadId multipart. KS-16f2: Cloudflare R2 trả mã rất dài (vượt 300 ký tự) → cột chữ không giới hạn.
+    ma_tai: Mapped[str] = mapped_column(Text, default="")
     phan: Mapped[list] = mapped_column(JSON, default=list)                   # [[số phần, etag], …]
     anh_id: Mapped[int | None] = mapped_column(ForeignKey("attachments.id"), nullable=True)   # ảnh đại diện (webp)
     thu_tu: Mapped[int] = mapped_column(Integer, default=0)
