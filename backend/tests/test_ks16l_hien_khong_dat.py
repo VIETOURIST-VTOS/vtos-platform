@@ -20,6 +20,10 @@ def test_bat_loat_va_link_ngoai(db):
         S.bat_hien_loat(db, _u(db, "dh"))                  # NV Điều hành không bật
     r = S.bat_hien_loat(db, _u(db, "tp"))
     assert r["bat"] == [a.ma] and c.ma not in r["bat"]
+    from sqlalchemy import select
+    from app.models.core import AuditLog
+    nk = db.execute(select(AuditLog).where(AuditLog.action == "ks_vtd_bat_loat")).scalars().one()
+    assert len(nk.entity) <= 60                         # cột entity String(60) — Postgres không cho dài hơn
     the = {k["ten"]: k for k in S.tim(db, "", VAO, RA, 2, 0, 1, HN)["khach_san"]}
     assert the["Khách sạn Không Phòng"]["dat_ngay"] is False and the["Khách sạn Không Phòng"]["link_ngoai"] == S.LINK_KS_NGOAI
     assert the["Khách sạn Có Phòng"]["dat_ngay"] is True

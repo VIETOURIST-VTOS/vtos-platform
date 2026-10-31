@@ -326,7 +326,8 @@ def bat_hien_loat(db: Session, u: User, now: datetime | None = None) -> dict:
             continue
         k.hien_cong, k.hien_boi, k.hien_luc, k.tat_ly_do = True, u.username, now, ""
         bat.append(k.ma)
-    _audit(db, u, "ks_vtd_bat_loat", ",".join(bat)[:300], None, {"bat": bat, "bo_qua": bo})
+    # entity của nhật ký chỉ 60 ký tự — danh sách mã để ở «after» (Postgres báo lỗi 500 khi dồn 32 mã vào entity)
+    _audit(db, u, "ks_vtd_bat_loat", "loat", None, {"bat": bat, "bo_qua": bo})
     db.commit()
     return {"bat": bat, "bo_qua": bo}
 
