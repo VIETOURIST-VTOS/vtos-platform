@@ -201,6 +201,20 @@ def xem_truoc_ket_chuyen(db: Session, ky: str) -> dict:
                            "so_du": du[ma]})
 
     du154 = du_154_khong_cong_trinh(db, ky)
+
+    # ĐỢT R2-KC1 — SỐ DƯ NGƯỢC CHIỀU PHẢI NÓI RA.
+    #
+    # Cờ `nguoc_chieu` đã có từ lâu và đã đúng: dòng ấy vẫn được kết chuyển, chỉ là nó được
+    # đánh dấu. Nhưng dấu ấy KHÔNG ĐI ĐÂU CẢ — không vào `canh_bao`, nên `tinh_trang_ky`
+    # không thấy, nên màn hình `/ket-so` không hiện, nên không người nào trên đời đọc được
+    # nó. Đo được 23/10/2026: `nguoc_chieu` xuất hiện ở ĐÚNG hai tệp backend và KHÔNG tệp
+    # web nào.
+    #
+    # Một dấu không ai đọc được thì bằng không có dấu. Và chỗ này là chỗ đắt: doanh thu ghi
+    # nhầm chiều vẫn kết chuyển trôi vào 911, sổ VẪN CÂN, báo cáo VẪN ra số — đúng hình của
+    # lỗi mà cả kho mã này được viết để chống.
+    nguoc = [{"buoc": b["buoc"], "tk": r["tk"], "ten": r["ten"], "so_tien": r["so_tien"]}
+             for b in buoc for r in b["dong"] if r.get("nguoc_chieu")]
     lai = round(tong_911, 0)
     ref4 = f"kc:{ky}:4"
     buoc.append({
@@ -213,13 +227,22 @@ def xem_truoc_ket_chuyen(db: Session, ky: str) -> dict:
         "ky": ky, "buoc": buoc, "lai_truoc_buoc_4": lai,
         "tai_khoan_khong_thuoc_buoc_nao": bo_sot,
         "du_154_khong_cong_trinh": du154,
+        "du_nguoc_chieu": nguoc,
         "canh_bao": ([f"{len(bo_sot)} tài khoản kết quả kinh doanh còn số dư mà KHÔNG bước kết chuyển "
                       f"nào nhận: {', '.join(x['tk'] for x in bo_sot[:8])}. Kết chuyển xong chúng vẫn "
                       "nằm lại trên sổ và báo cáo kết quả kinh doanh sẽ thiếu đúng phần đó."]
                      if bo_sot else [])
                     + ([f"154 đang giữ {du154['so_du']:,.0f} đ KHÔNG thuộc chuyến nào, mà số này lẽ ra "
                         "phải bằng 0. " + du154["viec_phai_quyet"]]
-                       if abs(du154["so_du"]) >= 1 else []),
+                       if abs(du154["so_du"]) >= 1 else [])
+                    + ([f"{len(nguoc)} tài khoản có SỐ DƯ NGƯỢC CHIỀU với bước kết chuyển của nó: "
+                        + ", ".join(f"{x['tk']} ({x['so_tien']:,.0f} đ)" for x in nguoc[:8])
+                        + ". VẪN kết chuyển được, và dòng ấy được ĐẢO CHIỀU khi ghi sổ — hàng bán "
+                          "bị trả lại nhiều hơn doanh thu là việc có thật. Nhưng nếu không phải "
+                          "thế thì có dòng ghi SAI CHIỀU, và kết chuyển xong nó nằm trong 911 "
+                          "ngược phía: sổ vẫn cân, báo cáo vẫn ra số, không ai tìm lại được. Rà "
+                          "chiều ghi của những tài khoản này TRƯỚC khi khóa kỳ."]
+                       if nguoc else []),
         "ghi_chu": ("Đây là bản XEM TRƯỚC – chưa ghi gì. Danh sách tài khoản lấy từ SỔ, không lấy từ "
                     "tên tài khoản viết trong quy ước: quy ước khai 5113 nhưng doanh thu có thể nằm ở "
                     "5111, 5112, và phần đó không được phép rơi."),
@@ -241,27 +264,53 @@ def ket_chuyen(db: Session, u: User, ky: str, buoc_chon: list[int] | None = None
         if info["da_ghi"]:
             bo_qua.append({"buoc": b, "ly_do": f"đã ghi ở chứng từ {info['chung_tu']}"}); continue
         if b < 4:
-            if not info["dong"] or abs(info["tong"]) < 1:
+            # ĐỢT R2-KC1 — HAI SỬA, CHỦ TỊCH KÝ 24/10/2026.
+            #
+            # (1) BỎ QUA THEO `abs(info["tong"]) < 1` LÀ MỘT LỖ IM LẶNG. Một bước có dòng thật
+            #     mà dòng thuận và dòng ngược triệt tiêu nhau đúng bằng 0 thì bước ấy bị bỏ qua,
+            #     và số dư HAI BÊN nằm lại trên sổ — không bút toán nào đóng chúng, không câu
+            #     nào báo. Nay chỉ bỏ qua khi KHÔNG CÓ DÒNG NÀO đáng ghi; nét 0 mà có dòng thì
+            #     VẪN GHI, và chứng từ ấy đóng hai bên vào nhau, không đụng tới 911.
+            #
+            # (2) DÒNG DƯ NGƯỢC CHIỀU PHẢI ĐẢO CHIỀU, KHÔNG ĐƯỢC GHI SỐ ÂM. `xem_truoc` để
+            #     `so_tien` âm cho dòng ngược chiều (đúng, vì nó đang kể một hiệu số), nhưng SỔ
+            #     thì không chứa số âm bao giờ. Bản cũ bê thẳng số âm vào `lines` và `post_entry`
+            #     chặn lại — nghĩa là quyết định "vẫn kết chuyển" của Chủ tịch 23/10/2026 CHƯA
+            #     TỪNG CHẠY ĐƯỢC, chỉ chưa ai biết vì không phép thử nào dựng sổ có dư ngược.
+            #
+            #     Đảo chiều thì mọi số vào sổ đều dương, và bước có cả dòng thuận lẫn dòng ngược
+            #     vẫn cân: dòng thuận cộng vào một bên, dòng ngược cộng vào bên kia, và dòng đối
+            #     ứng lấy đúng phần chênh. Nét 0 thì không cần dòng đối ứng nào.
+            dong_ghi = [r for r in info["dong"] if abs(r["so_tien"]) >= 1]
+            if not dong_ghi:
                 bo_qua.append({"buoc": b, "ly_do": "không có số dư để kết chuyển"}); continue
+            ben_co = BUOC_KET_CHUYEN[b]["ben_du"] == "co"
             lines = []
-            for r in info["dong"]:
-                if BUOC_KET_CHUYEN[b]["ben_du"] == "co":
-                    lines.append({"account": r["tk"], "debit": r["so_tien"], "note": f"kết chuyển kỳ {ky}"})
-                else:
-                    lines.append({"account": r["tk"], "credit": r["so_tien"], "note": f"kết chuyển kỳ {ky}"})
+            for r in dong_ghi:
+                so = r["so_tien"]
+                ben = "debit" if ((so > 0) == ben_co) else "credit"
+                lines.append({"account": r["tk"], ben: abs(so),
+                              "note": f"kết chuyển kỳ {ky}"
+                                      + (" – SỐ DƯ NGƯỢC CHIỀU, đã đảo chiều dòng" if so < 0 else "")})
+            net = round(sum(float(l.get("debit") or 0) - float(l.get("credit") or 0) for l in lines), 0)
             ve = BUOC_KET_CHUYEN[b]["ve_tk"]
-            if BUOC_KET_CHUYEN[b]["ben_du"] == "co":
-                lines.append({"account": ve, "credit": info["tong"]})
-            else:
-                lines.append({"account": ve, "debit": info["tong"]})
+            if net > 0:
+                lines.append({"account": ve, "credit": net})
+            elif net < 0:
+                lines.append({"account": ve, "debit": -net})
             if b == 0 and KC0_QUA_154:
                 # Chặng thứ hai, trong CÙNG một chứng từ: Nợ 632 / Có 154. Đi qua 154 chứ không
                 # nhảy thẳng 627 -> 632, vì Chủ tịch nói "cuối kỳ kết chuyển 154" và sổ phải đọc ra
                 # đúng câu ấy. Cùng một chứng từ chứ không phải hai, để không bao giờ có trạng thái
                 # "đã đẩy vào 154 mà chưa đẩy ra" — trạng thái ấy là số dư dở dang không ai dọn.
-                lines.append({"account": TK_GIA_VON, "debit": info["tong"],
+                # ĐỢT R2-KC1 — chặng này đi theo `net`, không theo `info["tong"]`.
+                # `info["tong"]` có thể âm (627 dư ngược chiều), và ghi số âm vào đây là dựng lại
+                # đúng chỗ hỏng mà bước trên vừa chữa.
+                _gv = "debit" if net < 0 else "credit"
+                _dd = "credit" if net < 0 else "debit"
+                lines.append({"account": TK_GIA_VON, _gv: abs(net),
                               "note": f"chi phí đội xe kỳ {ky} – không chia theo chuyến (Chủ tịch quyết 09/10/2026)"})
-                lines.append({"account": TK_CHI_PHI_DO_DANG, "credit": info["tong"]})
+                lines.append({"account": TK_CHI_PHI_DO_DANG, _dd: abs(net)})
         else:
             lai = xt["lai_truoc_buoc_4"]
             if abs(lai) < 1:
@@ -278,7 +327,12 @@ def ket_chuyen(db: Session, u: User, ky: str, buoc_chon: list[int] | None = None
                                NGUON_KET_CHUYEN, f"kc:{ky}:{b}", nghiep_vu="ket_chuyen_cuoi_ky")
         except ValueError as ex:
             raise KhongGhiDuoc(f"Bước {b} ({info['ten']}): {ex}")
-        ra.append({"buoc": b, "chung_tu": e.code, "so_tien": abs(info["tong"])})
+        # ĐỢT R2-KC1 — báo ra con số ĐÃ GHI VÀO SỔ, không báo `info["tong"]`.
+        # Với bước nét 0 thì `info["tong"]` bằng 0 trong khi chứng từ vừa ghi một số thật, và
+        # màn hình sẽ nói "đã kết chuyển 0 đ" cho một bút toán có tiền. Tổng Nợ của chính chứng
+        # từ ấy là con số đúng, và nó đúng cho cả bước 4 (lãi lỗ) y như trước.
+        ra.append({"buoc": b, "chung_tu": e.code,
+                   "so_tien": round(sum(float(l.get("debit") or 0) for l in lines), 0)})
     return {"ky": ky, "da_ghi": ra, "bo_qua": bo_qua,
             "tai_khoan_khong_thuoc_buoc_nao": xt["tai_khoan_khong_thuoc_buoc_nao"],
             "canh_bao": xt["canh_bao"],

@@ -199,7 +199,20 @@ def post_entry(db: Session, actor: str, role: str, entry_date: date, description
         raise ValueError(f"Kỳ {period} đã khóa – không ghi sổ được")
     td = round(sum(float(l.get("debit") or 0) for l in lines), 0)
     tc = round(sum(float(l.get("credit") or 0) for l in lines), 0)
-    if td <= 0 or abs(td - tc) >= 1:
+    # ĐỢT R2-KC1 — TÁCH HAI CHUYỆN RA HAI CÂU BÁO (Chủ tịch ký 24/10/2026).
+    #
+    # Trước đợt này hai điều kiện gộp vào một câu, và câu ấy chỉ kể chuyện thứ hai. Hậu quả đo
+    # được đêm 23/10/2026: `ket_chuyen` gọi vào đây với Nợ = Có = -40.000.000, `abs(td - tc)`
+    # BẰNG 0, cái chặn thật là `td <= 0` — mà câu báo in ra hai số BẰNG NHAU rồi bảo "≠". Người
+    # đọc đi tìm chỗ lệch tiền suốt một đêm, trong khi chỗ hỏng là một dòng ghi số âm.
+    #
+    # Một câu báo lỗi nói sai chỗ hỏng còn tệ hơn không có câu nào.
+    if td <= 0:
+        raise ValueError(
+            f"Bút toán không ghi được: tổng Nợ phải là số DƯƠNG, đang là {td:,.0f} đ "
+            f"(tổng Có {tc:,.0f} đ). Sổ không chứa số âm. Dòng nào mang số âm thì ĐẢO CHIỀU "
+            f"dòng ấy — ghi sang bên kia với trị tuyệt đối — chứ đừng ghi dấu trừ vào sổ.")
+    if abs(td - tc) >= 1:
         raise ValueError(f"Bút toán không cân: Nợ {td:,.0f} ≠ Có {tc:,.0f}")
     tcode = ""
     if tour_id:
