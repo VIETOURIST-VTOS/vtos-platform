@@ -9,8 +9,8 @@ không ký được phiên VTOS (khoá ký riêng — xem services/cong_ngoai), 
 vào một màn hình hay một cửa API nội bộ. Gộp vào `users` rồi "chặn bằng vai trò" là đặt cả mặt ngoài
 của công ty lên đúng một dòng `if`.
 """
-from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, Text, Index, ForeignKey
+from datetime import date, datetime
+from sqlalchemy import String, Integer, Date, DateTime, Text, Index, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 
@@ -47,6 +47,10 @@ class TaiKhoanNgoai(Base):
     nhan_tin_quang_cao: Mapped[bool] = mapped_column(default=False)   # không bao giờ tự bật
     kenh_ua_thich: Mapped[str] = mapped_column(String(10), default="")
     so_thich: Mapped[str] = mapped_column(String(40), default="")        # KH-1: sở thích khách tự chọn (cá nhân hoá gợi ý)
+    # KS-16g: ngày sinh khách tự khai MỘT lần (khoá sau khi lưu) — voucher sinh nhật; mã giới thiệu của chính tài khoản
+    ngay_sinh: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ngay_sinh_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ma_gioi_thieu: Mapped[str | None] = mapped_column(String(12), nullable=True, unique=True)
     # DT-1: tài khoản đối tác NỐI vào đúng một đối tác bán hàng trên VTOS — người duyệt xác nhận, máy
     # chỉ gợi ý (khớp MST trước, rồi SĐT). Rỗng = chưa nối: cổng không hiện số liệu nào.
     doi_tac_id: Mapped[int | None] = mapped_column(ForeignKey("doi_tac_ban_hang.id"), nullable=True, index=True)
