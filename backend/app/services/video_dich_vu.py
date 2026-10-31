@@ -197,8 +197,13 @@ def bat_dau(db: Session, u: User, doi: str, oid: int, d: dict, now: datetime | N
                     xac_nhan_quyen=True, ten_tep=ten, kieu=DUOI[duoi], kich_thuoc=kt,
                     thoi_luong=max(0, int(float(d.get("thoi_luong") or 0))), khoa_luu=key, ma_tai=ma, phan=[],
                     trang_thai="dang_tai", tai_boi=u.username, tai_luc=now or datetime.now())
-    db.add(v)
-    db.commit()
+    try:
+        db.add(v)
+        db.commit()
+    except Exception as ex:          # KS-16f2: lưu bản ghi lỗi → bỏ phiên tải trên kho, báo rõ thay vì «Lỗi 500»
+        db.rollback()
+        storage().mp_huy(key, ma)
+        raise LoiVideo(f"Không lưu được bản ghi video ({type(ex).__name__}) — báo IT", 500)
     db.refresh(v)
     return v
 
