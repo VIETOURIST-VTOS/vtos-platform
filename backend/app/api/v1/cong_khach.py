@@ -159,7 +159,40 @@ def qr(ma: str, muc: str = "", tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db:
 def diem(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
     _khach(tk)
     from app.services import rewards as RW
-    return RW.tong_quan(db, RW.chu_cua_tai_khoan(tk))
+    RW.phat_qua(db, tk)
+    ra = RW.tong_quan(db, RW.chu_cua_tai_khoan(tk))
+    ra["qua"] = RW.ho_so_qua(db, tk)
+    return ra
+
+
+class NgaySinhIn(BaseModel):
+    ngay_sinh: date
+
+
+@router.post("/diem/ngay-sinh")
+def khai_ngay_sinh(data: NgaySinhIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import rewards as RW
+    try:
+        RW.khai_ngay_sinh(db, tk, data.ngay_sinh)
+    except RW.LoiDiem as ex:
+        raise HTTPException(400, str(ex))
+    return {"message": "Đã lưu ngày sinh. Voucher sinh nhật phát từ tháng sinh kế tiếp."}
+
+
+class GioiThieuIn(BaseModel):
+    ma: str
+
+
+@router.post("/diem/gioi-thieu")
+def ghi_ma_gioi_thieu(data: GioiThieuIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    _khach(tk)
+    from app.services import rewards as RW
+    try:
+        RW.nhap_ma_gioi_thieu(db, tk, data.ma)
+    except RW.LoiDiem as ex:
+        raise HTTPException(400, str(ex))
+    return {"message": "Đã ghi mã giới thiệu. Người giới thiệu nhận thưởng khi tour đầu tiên của bạn hoàn tất."}
 
 
 class DoiIn(BaseModel):

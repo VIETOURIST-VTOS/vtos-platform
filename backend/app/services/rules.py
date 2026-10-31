@@ -300,6 +300,11 @@ DEFAULT_PARAMS = [
     # KH-3 (26/10/2026): VTD Rewards — Chủ tịch chốt số; CHƯA bật cho tới khi ký ngày. Rỗng = cổng khách chỉ hiện hạng
     # và chi tiêu, chưa cộng và chưa đổi điểm. Không hồi tố: chỉ chuyến đủ điều kiện từ ngày này mới được cộng.
     ("rewards_hieu_luc_tu", "", "VTD Rewards: cộng / đổi điểm từ ngày này (chuyến đủ điều kiện từ ngày này). Rỗng = chưa bật", "ngày DD-MM-YYYY", "KH-3, Chủ tịch chốt 26/10/2026"),
+    # KS-16g (31/10/2026): luật Rewards theo đề xuất v3 — Plus 40 tr, điểm 18 tháng, hạng 12 tháng, KS / nhà hàng tính
+    # 20% hoa hồng VTD, quà chào mừng / sinh nhật / trưởng đoàn, trần ưu đãi theo lãi gộp dự toán. Rỗng = vẫn luật cũ.
+    # Không hồi tố: khoản đủ điều kiện TRƯỚC ngày này giữ cách tính cũ.
+    ("rewards_v3_tu", "", "VTD Rewards: áp luật đề xuất v3 từ ngày này (khoản đủ điều kiện trước ngày này giữ luật cũ). Rỗng = luật cũ", "ngày DD-MM-YYYY", "KS-16g, Chủ tịch duyệt v3 31/10/2026"),
+    ("rewards_gioi_thieu_bat", "0", "VTD Rewards: mở chương trình giới thiệu khách (1 = mở, 0 = đóng — chờ pháp chế xác nhận)", "0/1", "KS-16g, đề xuất v3"),
     ("d06_hieu_luc_tu", "", "Hoa hồng D06 đại lý / CTV: có hiệu lực từ ngày này (đầu tháng). Rỗng = chưa bật, chỉ tính thử", "ngày DD-MM-YYYY", "DH-1, Chủ tịch chốt D06 26/10/2026"),
     ("dat_ban_doan_tu", "10", "Đặt bàn: từ bao nhiêu khách (đặt sẵn menu) thì là ĐOÀN", "khách", "DT-2, Chủ tịch chốt 28/10/2026"),
     ("dat_ban_coc_le_pct", "10", "Đặt bàn: % cọc của khách lẻ (hoặc trả đủ)", "%", "DT-2, Chủ tịch chốt 28/10/2026"),
@@ -562,7 +567,7 @@ DEFAULT_PARAMS = [
 # GHÉP LẠI 11/9/2026: khối này từng được commit rồi BIẾN MẤT – một phiên khác lưu đè tệp này bằng
 # bản mở từ trước. Thiếu nó thì routes.py vẫn gọi getattr(R, "THAM_SO_NGAY", ()) và nhận về rỗng,
 # nên cửa nhập ngày im lặng không bao giờ chạy: mã trông đủ, hàng rào thì không có.
-THAM_SO_NGAY = ("ngay_van_hanh_that", "ngay_du_lieu_that_vietrip", "bao_cao_ngay_han_0h_tu", "d06_hieu_luc_tu", "rewards_hieu_luc_tu")
+THAM_SO_NGAY = ("ngay_van_hanh_that", "ngay_du_lieu_that_vietrip", "bao_cao_ngay_han_0h_tu", "d06_hieu_luc_tu", "rewards_hieu_luc_tu", "rewards_v3_tu")
 
 
 

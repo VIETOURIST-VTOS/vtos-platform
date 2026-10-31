@@ -14,7 +14,9 @@ from app.db.session import Base
 # GIU: giữ điểm cho voucher · TRA_GIU: trả điểm (voucher hết hạn, booking dùng voucher bị hủy)
 # HET_HAN: điểm quá 12 tháng chưa dùng
 LOAI_DONG = {"CONG": "Cộng điểm", "DAO": "Trừ điểm (hủy / hoàn)", "GIU": "Đổi voucher", "TRA_GIU": "Trả điểm voucher",
-             "HET_HAN": "Điểm hết hạn"}
+             "HET_HAN": "Điểm hết hạn", "THUONG": "Thưởng (trưởng đoàn / giới thiệu)"}
+# KS-16g (Chủ tịch duyệt v3, 31/10/2026): voucher không đổi từ điểm — chào mừng 50.000 đ, sinh nhật 100.000 đ
+LOAI_VOUCHER = {"doi_diem": "Đổi điểm", "chao_mung": "Chào mừng", "sinh_nhat": "Sinh nhật"}
 TRANG_THAI_VOUCHER = {"cho_dung": "Chưa dùng", "da_dung": "Đã dùng", "het_han": "Hết hạn — đã trả điểm", "da_hoan": "Đơn hủy — đã trả điểm"}
 
 
@@ -54,6 +56,26 @@ class VoucherRewards(Base):
     ap_boi: Mapped[str] = mapped_column(String(50), default="")
     ap_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    # KS-16g: loại voucher · phạm vi dùng (tour / tat_ca) · giá trị đơn tối thiểu TRƯỚC voucher
+    loai: Mapped[str] = mapped_column(String(12), default="doi_diem", server_default="doi_diem")
+    pham_vi: Mapped[str] = mapped_column(String(10), default="tat_ca", server_default="tat_ca")
+    don_toi_thieu: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+
+
+class GioiThieuRewards(Base):
+    """KS-16g · Giới thiệu khách: mỗi tài khoản được giới thiệu MỘT lần, ghi mã TRƯỚC khi đặt tour đầu tiên.
+    Người giới thiệu nhận 1.000 điểm khi tour đầu tiên trực tiếp (≥ 5 triệu) của người được giới thiệu hoàn tất."""
+    __tablename__ = "gioi_thieu_rewards"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chu_gioi_thieu: Mapped[str] = mapped_column(String(80), index=True)
+    tai_khoan_gioi_thieu_id: Mapped[int] = mapped_column(ForeignKey("tai_khoan_ngoai.id"))
+    tai_khoan_id: Mapped[int] = mapped_column(ForeignKey("tai_khoan_ngoai.id"), unique=True)   # người được giới thiệu
+    chu_duoc: Mapped[str] = mapped_column(String(80), index=True)
+    ma: Mapped[str] = mapped_column(String(12))
+    trang_thai: Mapped[str] = mapped_column(String(12), default="cho")   # cho / da_thuong / khong_du
+    booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"), nullable=True)
+    ghi_chu: Mapped[str] = mapped_column(String(200), default="")
+    luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
 class YeuThich(Base):

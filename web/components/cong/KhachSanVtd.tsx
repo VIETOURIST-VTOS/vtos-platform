@@ -558,7 +558,8 @@ function TomTat({ ks, q, tinh, giam = 0, maVc, hang, diemDk = 0 }: { ks: any; q:
       <span className="ksv-sum"><span>Thuế và phí ({ks.thue_phi_pt || 0}%)</span><span>₫ {vnd(tinh.thue_phi)}</span></span>
       {giam > 0 && <span className="ksv-sum ksv-okc"><span>Voucher {maVc}</span><span>− ₫ {vnd(giam)}</span></span>}
       <span className="ksv-sum" style={{ borderTop: "1px solid var(--ksv-line)", paddingTop: 10, alignItems: "baseline" }}><b style={{ fontSize: 16 }}>{giam > 0 ? "Bạn trả" : "Tổng cộng"}</b><b className="ksv-big" style={{ fontSize: 22 }}>₫ {vnd(tinh.tong - giam)}</b></span>
-      {hang && diemDk > 0 && <span className="ksv-diem-box"><b>+ {vnd(diemDk)} điểm</b> sau khi trả phòng và Vietourist chốt đơn ({vnd(tinh.tong - giam)} ÷ {vnd(hang.dong_moi_diem)} × {String(hang.he_so).replace(".", ",")} hạng {hang.hang}). Kỳ ở này cũng tính vào chi tiêu xét hạng.</span>}
+      {hang?.cach_tinh === "hoa_hong" && tinh.tong - giam > 0 && <span className="ksv-diem-box">Đơn này tích điểm sau khi trả phòng và Vietourist chốt đơn: điểm = 20% hoa hồng Vietourist nhận ÷ 100 đ × {String(hang.he_so).replace(".", ",")} (hạng {hang.hang}). Không tính vào chi tiêu xét hạng.</span>}
+      {hang?.cach_tinh !== "hoa_hong" && hang && diemDk > 0 && <span className="ksv-diem-box"><b>+ {vnd(diemDk)} điểm</b> sau khi trả phòng và Vietourist chốt đơn ({vnd(tinh.tong - giam)} ÷ {vnd(hang.dong_moi_diem)} × {String(hang.he_so).replace(".", ",")} hạng {hang.hang}). Kỳ ở này cũng tính vào chi tiêu xét hạng.</span>}
       <small className="ksv-muted">{tinh.dong?.length ? "Đã gồm thuế phí. Giá do máy chủ tính lại lúc giữ phòng. Trả xong, Điều hành chốt với khách sạn trong 2 giờ làm việc — khách sạn hết phòng thì hoàn 100%."
         : "Giá Vietourist tính lúc bạn chọn. Điều hành xác nhận lại với khách sạn trước khi bạn trả tiền."}</small></div>}
   </aside>;

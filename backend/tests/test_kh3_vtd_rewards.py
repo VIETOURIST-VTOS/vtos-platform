@@ -70,7 +70,8 @@ CHU = "sdt:0901234567"
 
 def test_hang_va_giu_hang():
     from app.services import rewards as RW
-    assert RW.hang_theo_chi_tieu(29_999_999)[0] == "Member" and RW.hang_theo_chi_tieu(30_000_000)[0] == "Plus"
+    assert RW.hang_theo_chi_tieu(29_999_999, RW.HANG_CU)[0] == "Member" and RW.hang_theo_chi_tieu(30_000_000, RW.HANG_CU)[0] == "Plus"
+    assert RW.hang_theo_chi_tieu(39_999_999)[0] == "Member" and RW.hang_theo_chi_tieu(40_000_000)[0] == "Plus"
     assert RW.hang_theo_chi_tieu(100_000_000)[0] == "Premium" and float(RW.hang_theo_chi_tieu(100_000_000)[1]) == 1.5
 
 

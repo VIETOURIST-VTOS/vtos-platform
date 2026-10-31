@@ -198,6 +198,8 @@ CUA_TAY = (
     "khach_san_vtd", "anh_khach_san_vtd", "loai_phong_vtd", "goi_gia_vtd", "mua_gia_vtd",
     # KS-16f 31/10/2026: Điều hành / Marketing tải video ở thẻ «Video» màn /khach-san-vtd và /nha-hang.
     "video_dich_vu",
+    # KS-16g 31/10/2026: khách tự ghi mã người giới thiệu ở trang «Điểm & ưu đãi» trên cổng khách (/cong).
+    "gioi_thieu_rewards",
     # KS-14 (30/10/2026): khách đặt + trả trên cổng (phiên cổng, OnePay / QR khớp mã); Điều hành sửa số phòng bán,
     # chốt với khách sạn; Sales xác nhận hoàn; Kế toán ghi sổ / đối soát / hoàn / chốt hoa hồng — màn /khach-san-vtd.
     "phong_trong_vtd", "don_ks_vtd", "thanh_toan_ks_vtd",
