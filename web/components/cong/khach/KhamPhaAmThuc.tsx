@@ -6,7 +6,7 @@
    điểm» → màn đặt bàn sẵn có. Xem sau khi nhận mã OTP qua Zalo / email (Chủ tịch chốt 28/10/2026: không tạo tài
    khoản, không mật khẩu) — dùng chung cho cổng khách / cổ đông / đối tác. Ảnh tải qua cửa /api/v1/am-thuc/anh. */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { goiCong } from "@/lib/cong";
+import { goiCong, LINK_NGOAI, moNgoai } from "@/lib/cong";
 import AlbumKhach from "./AlbumKhach";
 import { SaoThe } from "./DanhGiaNhaHangKhach";
 import { BD_W, BD_H, BD_VN, BD_LANG_GIENG, BD_TP, BD_HOANG_SA, BD_TRUONG_SA, BD_NHAN_HS, BD_NHAN_TS } from "./banDoVN";
@@ -78,7 +78,10 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
   }, []);
   useEffect(() => { tai(loc); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
   const doi = (them: Partial<Loc>) => { const l = { ...loc, trang: "1", ...them }; setLoc(l); tai(l); };
-  const xemNh = async (id: number) => {
+  // KS-16m (Chủ tịch 01/11/2026): nhà hàng chưa mở đặt bàn qua Vietourist → mở www.vietourist.vn/restaurant ở tab mới.
+  // Nhà hàng đã mở đặt bàn giữ luồng đặt bàn cũ (tích điểm).
+  const xemNh = async (id: number, moDat?: boolean) => {
+    if (moDat === false) { moNgoai(LINK_NGOAI.restaurant); return; }
     try { const o = await goiCong(`/dat-ban/nha-hang/${id}`); if (o.mo_dat) onDat(o); else { setNh(o); setMon(null); window.scrollTo(0, 0); } }
     catch (x: any) { setLoi(x.message); }
   };
@@ -109,8 +112,8 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
           {mon.thanh_phan && <><dt>Thành phần chính</dt><dd>{mon.thanh_phan}</dd></>}{mon.cach_goi && <><dt>Cách gọi</dt><dd>{mon.cach_goi}</dd></>}</dl>}
         {mon.an_o_dau?.length > 0 && <><h3>Ăn ở đâu</h3><div className="at-an">{mon.an_o_dau.map((a: any) => <div key={a.id}>
           <span><b>{a.ten}</b>{a.khu_vuc || a.tinh_thanh ? ` · ${[a.khu_vuc, a.tinh_thanh].filter(Boolean).join(", ")}` : ""}</span>
-          {a.mo_dat ? <button type="button" className="v3-button v3-primary cursor-interaction" onClick={() => xemNh(a.id)}><span>Đặt bàn qua Vietourist · tích điểm</span></button>
-            : <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => xemNh(a.id)}><span>Xem nhà hàng</span></button>}</div>)}</div></>}
+          {a.mo_dat ? <button type="button" className="v3-button v3-primary cursor-interaction" onClick={() => xemNh(a.id, !!a.mo_dat)}><span>Đặt bàn qua Vietourist · tích điểm</span></button>
+            : <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => xemNh(a.id, !!a.mo_dat)}><span>Xem nhà hàng</span></button>}</div>)}</div></>}
       </div>
     </section>
   </div>);
@@ -195,7 +198,7 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
           <div className="at-dsdp-dau"><div><h2>Đặc sản địa phương</h2><div className="at-phu">Quán và nhà hàng nổi tiếng với món đặc trưng của vùng</div></div>
             <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => { doi({ loai: "dac_san", bac: "", tinh: "" }); document.getElementById("at-nh")?.scrollIntoView(); }}><span>Xem cả {ds.so_dac_san} →</span></button></div>
           <div className="at-luoi">{ds.dac_san_noi_bat.slice(0, 4).map((n: any) => <article key={n.id} className="at-the">
-            <button type="button" className="at-the-anh cursor-interaction" onClick={() => xemNh(n.id)} aria-label={`Xem ${n.ten}`}>{n.anh_nho || n.anh ? <Anh src={n.anh_nho || n.anh} nguon={n.anh_nguon} ten={n.ten} tl="4/3" /> : <OTrongNh n={n} mien={mienCua[n.tinh_thanh]} />}</button>
+            <button type="button" className="at-the-anh cursor-interaction" onClick={() => xemNh(n.id, !!n.mo_dat)} aria-label={`Xem ${n.ten}`}>{n.anh_nho || n.anh ? <Anh src={n.anh_nho || n.anh} nguon={n.anh_nguon} ten={n.ten} tl="4/3" /> : <OTrongNh n={n} mien={mienCua[n.tinh_thanh]} />}</button>
             <h3>{n.ten}</h3><div className="at-noi-o"><span className="at-ghim"><Ghim /></span>{n.tinh_thanh || n.dia_danh_nguon}</div>
             {n.mon_noi_bat && <div className="at-phu">Nổi tiếng với: <b>{n.mon_noi_bat}</b></div>}<NhanPl n={n} boDs /></article>)}</div>
         </section>}
@@ -217,14 +220,14 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
             <button type="button" className="at-tab cursor-interaction" aria-pressed={!loc.tinh} onClick={() => doi({ tinh: "" })}>Tất cả {tong}</button>
             {Object.entries(dem).sort((a, b) => b[1] - a[1]).map(([t, c]) => <button key={t} type="button" className="at-tab cursor-interaction" aria-pressed={loc.tinh === t} onClick={() => doi({ tinh: t })}>{t} {c}</button>)}</div>
           <div className="at-luoi">{ds.nha_hang.map((n: any) => <article key={n.id} className="at-the">
-            <button type="button" className="at-the-anh cursor-interaction" onClick={() => xemNh(n.id)} aria-label={`Xem ${n.ten}`}>{n.anh_nho || n.anh ? <Anh src={n.anh_nho || n.anh} nguon={n.anh_nguon} ten={n.ten} tl="4/3" /> : <OTrongNh n={n} mien={mienCua[n.tinh_thanh]} />}</button>
+            <button type="button" className="at-the-anh cursor-interaction" onClick={() => xemNh(n.id, !!n.mo_dat)} aria-label={`Xem ${n.ten}`}>{n.anh_nho || n.anh ? <Anh src={n.anh_nho || n.anh} nguon={n.anh_nguon} ten={n.ten} tl="4/3" /> : <OTrongNh n={n} mien={mienCua[n.tinh_thanh]} />}</button>
             <h3>{n.ten}</h3><div className="at-noi-o"><span className="at-ghim"><Ghim /></span>{[n.khu_vuc, n.tinh_thanh].filter(Boolean).join(", ") || n.dia_danh_nguon}</div>
             {n.mon_noi_bat && <div className="at-phu">Nổi tiếng với: <b>{n.mon_noi_bat}</b></div>}
             <NhanPl n={n} />
             <SaoThe sao={n.sao} />
             {n.mo_dat ? <><span className="at-vtd">★ Đặt qua Vietourist · tích điểm</span><div className="at-phu">Thực đơn từ <b>{tien(n.gia_tu)}</b>/người</div>
-              <button type="button" className="v3-button v3-primary cursor-interaction" onClick={() => xemNh(n.id)}><span>Đặt bàn qua Vietourist</span></button></>
-              : <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => xemNh(n.id)}><span>Xem nhà hàng</span></button>}
+              <button type="button" className="v3-button v3-primary cursor-interaction" onClick={() => xemNh(n.id, !!n.mo_dat)}><span>Đặt bàn qua Vietourist</span></button></>
+              : <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => xemNh(n.id, !!n.mo_dat)}><span>Xem nhà hàng</span></button>}
           </article>)}</div>
           {!ds.nha_hang.length && <p className="at-phu">Chưa có nhà hàng{loc.tinh || loc.q || loc.chi_dat || loc.loai || loc.bac ? " khớp bộ lọc" : ""}. Vietourist đang bổ sung danh mục.</p>}
           {soTrang > 1 && <div className="at-trang">
