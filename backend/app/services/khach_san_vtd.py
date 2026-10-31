@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from app.models.core import User
 from app.models.khach_san_vtd import (AnhKhachSanVtd, GoiGiaVtd, KhachSanVtd, LoaiPhongVtd, MuaGiaVtd, LOAI_CHO_O,
                                       NHOM_ANH_KS, TIEN_ICH, TRANG_THAI_ANH_KS, TRANG_THAI_GOI, CACH_TINH_TRE, CAN_XAC_NHAN,
-                                      NGUON_LP, NHAN_TRE_EM, TIEN_NGHI_PHONG, TRANG_THAI_DC)
+                                      NGUON_LP, NHAN_TRE_EM, TIEN_NGHI_PHONG, TRANG_THAI_DC, NHOM_TUOI, KIEU_GIA,
+                                      CHE_DO_TRE_GOI)
 from app.services.nha_hang import THANH_PHO, MIEN, _co, _khong_dau
 
 TOAN_QUYEN = ("chutich", "tgd")
@@ -102,7 +103,9 @@ TRUONG_KS = ("ten", "tinh_thanh", "khu_vuc", "dia_chi", "sao", "loai", "km_trung
              "tien_ich", "gio_nhan", "gio_tra", "cs_tre_em", "cs_giuong_phu", "cs_vat_nuoi", "cs_khac", "thue_phi_pt",
              "lien_he_noi_bo", "ghi_chu_noi_bo",
              # KS-16j
-             "cs_nhan_tre_em", "cs_tre_tu_tuoi", "cs_moc_tuoi", "cs_phi_giuong_phu", "cs_giuong_phu_an_sang", "cs_noi")
+             "cs_nhan_tre_em", "cs_tre_tu_tuoi", "cs_moc_tuoi", "cs_phi_giuong_phu", "cs_giuong_phu_an_sang", "cs_noi",
+             # KS-16k
+             "cs_so_tre_mien_phi", "cs_tre_mp_tinh_suc_chua", "cs_giuong_phu_kieu")
 TUOI_TRE_TOI_DA = 17
 MO_TA_NGAN = 300
 MO_TA_DAI = 3000
@@ -121,48 +124,93 @@ def _so_hoac_none(v, ten: str, lo: int, hi: int) -> int | None:
     return n
 
 
+def _tien_hoac_none(v, ten: str, hi: float = 50_000_000) -> float | None:
+    if v is None or (isinstance(v, str) and v.strip() == ""):
+        return None
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        raise LoiKhachSan(f"{ten} không hợp lệ")
+    if not 0 <= x <= hi:
+        raise LoiKhachSan(f"{ten} không hợp lệ")
+    return x
+
+
+def chuan_moc(m: dict) -> dict:
+    """KS-16k: một nhóm tuổi về dạng chuẩn. Đọc được cả dạng KS-16j (phu_thu / nguoi_lon / an_sang True-False)."""
+    cach = m.get("cach")
+    if cach == "phu_thu":                       # KS-16j
+        cach, gia = "co_dinh", m.get("phu_thu") or 0
+    else:
+        gia = m.get("gia") or 0
+    an = m.get("an_sang")
+    if isinstance(an, bool):                    # KS-16j: ô tick «gồm ăn sáng»
+        an = 0 if an else None
+    return {"tu": int(m["tu"]), "den": int(m["den"]), "nhom": m.get("nhom") or ("so_sinh" if int(m["den"]) <= 1 else "tre_em"),
+            "cach": cach, "gia": float(gia or 0), "an_sang": None if an is None else float(an)}
+
+
+def kiem_bang_tre(ds, ten: str = "Nhóm tuổi") -> list[dict]:
+    """KS-16k: bảng giá trẻ em theo nhóm tuổi (kiểu Agoda). Trên tuổi lớn nhất của bảng = người lớn."""
+    ra = []
+    for i, m in enumerate(ds or [], start=1):
+        try:
+            tu, den = int(m.get("tu")), int(m.get("den"))
+        except (TypeError, ValueError, AttributeError):
+            raise LoiKhachSan(f"{ten} dòng {i}: tuổi không hợp lệ")
+        cach = str(m.get("cach") or "")
+        if cach == "nguoi_lon":                 # KS-16j: «tính như người lớn» = ngoài bảng
+            continue
+        if cach not in CACH_TINH_TRE and cach != "phu_thu":
+            raise LoiKhachSan(f"{ten} dòng {i}: chọn cách tính")
+        if not 0 <= tu <= den <= TUOI_TRE_TOI_DA:
+            raise LoiKhachSan(f"{ten} dòng {i}: tuổi từ 0 đến {TUOI_TRE_TOI_DA}, «từ» không lớn hơn «đến»")
+        nhom = str(m.get("nhom") or "tre_em")
+        if nhom not in NHOM_TUOI:
+            raise LoiKhachSan(f"{ten} dòng {i}: nhóm tuổi không hợp lệ")
+        gia = _tien_hoac_none(m.get("gia") if cach != "phu_thu" else m.get("phu_thu"), f"{ten} dòng {i}: giá") or 0
+        if cach == "phan_tram" and not 0 < gia <= 100:
+            raise LoiKhachSan(f"{ten} dòng {i}: phần trăm giá phòng từ 1 đến 100")
+        if cach in ("co_dinh", "phu_thu") and gia <= 0:
+            raise LoiKhachSan(f"{ten} dòng {i}: ghi giá trẻ em mỗi đêm (miễn phí thì chọn «Luôn miễn phí»)")
+        an = m.get("an_sang")
+        an = (0 if an else None) if isinstance(an, bool) else _tien_hoac_none(an, f"{ten} dòng {i}: giá ăn sáng", 5_000_000)
+        ra.append({"tu": tu, "den": den, "nhom": nhom, "cach": "co_dinh" if cach == "phu_thu" else cach,
+                   "gia": gia if cach != "mien_phi" else 0, "an_sang": an})
+    ra.sort(key=lambda x: x["tu"])
+    for a, b in zip(ra, ra[1:]):
+        if b["tu"] <= a["den"]:
+            raise LoiKhachSan(f"Hai nhóm tuổi chồng nhau ({a['tu']}–{a['den']} và {b['tu']}–{b['den']})")
+        if b["tu"] != a["den"] + 1:
+            raise LoiKhachSan(f"Nhóm tuổi bị hở từ {a['den'] + 1} đến {b['tu'] - 1} tuổi")
+    return ra
+
+
 def _kiem_cs_tre(d: dict) -> dict:
-    """KS-16j: chính sách trẻ em kiểu Agoda."""
+    """KS-16j/16k: chính sách tuổi + giá trẻ em mặc định của khách sạn (theo cách Agoda YCS)."""
     o = {}
     o["cs_nhan_tre_em"] = str(d.get("cs_nhan_tre_em") or "chua_xac_nhan")
     if o["cs_nhan_tre_em"] not in NHAN_TRE_EM:
         raise LoiKhachSan("Chính sách nhận trẻ em không hợp lệ")
-    o["cs_tre_tu_tuoi"] = _so_hoac_none(d.get("cs_tre_tu_tuoi"), "Tuổi nhận trẻ", 0, TUOI_TRE_TOI_DA)
+    o["cs_tre_tu_tuoi"] = _so_hoac_none(d.get("cs_tre_tu_tuoi"), "Tuổi tối thiểu của khách", 0, 18)
     if o["cs_nhan_tre_em"] == "tu_tuoi" and o["cs_tre_tu_tuoi"] is None:
-        raise LoiKhachSan("Ghi khách sạn nhận trẻ từ mấy tuổi")
+        raise LoiKhachSan("Ghi tuổi tối thiểu của khách")
     if o["cs_nhan_tre_em"] != "tu_tuoi":
         o["cs_tre_tu_tuoi"] = None
-    moc = []
-    for i, m in enumerate(d.get("cs_moc_tuoi") or [], start=1):
-        try:
-            tu, den = int(m.get("tu")), int(m.get("den"))
-            pt = m.get("phu_thu")
-            pt = 0 if pt in (None, "") else int(float(pt))
-        except (TypeError, ValueError, AttributeError):
-            raise LoiKhachSan(f"Mốc tuổi dòng {i}: tuổi hoặc tiền không hợp lệ")
-        cach = str(m.get("cach") or "")
-        if cach not in CACH_TINH_TRE:
-            raise LoiKhachSan(f"Mốc tuổi dòng {i}: chọn cách tính")
-        if not 0 <= tu <= den <= TUOI_TRE_TOI_DA:
-            raise LoiKhachSan(f"Mốc tuổi dòng {i}: tuổi từ 0 đến {TUOI_TRE_TOI_DA}, «từ» không lớn hơn «đến»")
-        if cach == "phu_thu" and not 0 < pt <= 50_000_000:
-            raise LoiKhachSan(f"Mốc tuổi dòng {i}: ghi số tiền phụ thu mỗi đêm")
-        moc.append({"tu": tu, "den": den, "cach": cach, "phu_thu": pt if cach == "phu_thu" else 0,
-                    "an_sang": bool(m.get("an_sang")) and cach != "nguoi_lon"})
-    moc.sort(key=lambda x: x["tu"])
-    for a, b in zip(moc, moc[1:]):
-        if b["tu"] <= a["den"]:
-            raise LoiKhachSan(f"Hai mốc tuổi chồng nhau ({a['tu']}–{a['den']} và {b['tu']}–{b['den']})")
+    moc = kiem_bang_tre(d.get("cs_moc_tuoi"))
     if o["cs_nhan_tre_em"] in ("moi_tuoi", "tu_tuoi") and not moc:
-        raise LoiKhachSan("Nhận trẻ em thì ghi ít nhất một mốc tuổi (miễn phí / phụ thu / tính như người lớn)")
+        raise LoiKhachSan("Nhận trẻ em thì ghi ít nhất một nhóm tuổi (sơ sinh / trẻ em) và giá")
+    if o["cs_nhan_tre_em"] == "tu_tuoi" and moc and moc[0]["tu"] < o["cs_tre_tu_tuoi"]:
+        raise LoiKhachSan("Nhóm tuổi bắt đầu dưới tuổi tối thiểu của khách")
     o["cs_moc_tuoi"] = moc if o["cs_nhan_tre_em"] in ("moi_tuoi", "tu_tuoi") else []
-    g = d.get("cs_phi_giuong_phu")
-    try:
-        o["cs_phi_giuong_phu"] = None if g in (None, "") else float(g)
-    except (TypeError, ValueError):
-        raise LoiKhachSan("Phí giường phụ không hợp lệ")
-    if o["cs_phi_giuong_phu"] is not None and not 0 <= o["cs_phi_giuong_phu"] <= 50_000_000:
-        raise LoiKhachSan("Phí giường phụ không hợp lệ")
+    o["cs_giuong_phu_kieu"] = str(d.get("cs_giuong_phu_kieu") or "co_dinh")
+    if o["cs_giuong_phu_kieu"] not in KIEU_GIA:
+        raise LoiKhachSan("Kiểu giá giường phụ không hợp lệ")
+    o["cs_phi_giuong_phu"] = _tien_hoac_none(d.get("cs_phi_giuong_phu"), "Giá giường phụ")
+    if o["cs_giuong_phu_kieu"] == "phan_tram" and o["cs_phi_giuong_phu"] is not None and not 0 < o["cs_phi_giuong_phu"] <= 100:
+        raise LoiKhachSan("Giá giường phụ theo % giá phòng: từ 1 đến 100")
+    o["cs_so_tre_mien_phi"] = _so_hoac_none(d.get("cs_so_tre_mien_phi"), "Số trẻ miễn phí mỗi phòng", 0, 6)
+    o["cs_tre_mp_tinh_suc_chua"] = bool(d.get("cs_tre_mp_tinh_suc_chua"))
     o["cs_giuong_phu_an_sang"] = bool(d.get("cs_giuong_phu_an_sang"))
     o["cs_noi"] = str(d.get("cs_noi") or "").strip()[:120]
     return o
@@ -298,6 +346,20 @@ def luu_loai_phong(db: Session, u: User, kid: int, d: dict, lid: int | None = No
         raise LoiKhachSan("Số liệu loại phòng không hợp lệ")
     o["toi_da_tre_em"] = _so_hoac_none(d.get("toi_da_tre_em"), "Tối đa trẻ em", 0, 10)
     o["giuong_phu_toi_da"] = _so_hoac_none(d.get("giuong_phu_toi_da"), "Giường phụ tối đa", 0, 5)
+    # KS-16k: sức chứa kiểu Agoda + ghi đè của riêng phòng (trống = theo khách sạn)
+    o["suc_chua"] = _so_hoac_none(d.get("suc_chua"), "Sức chứa cơ bản", 1, 30)
+    o["khach_them_toi_da"] = _so_hoac_none(d.get("khach_them_toi_da"), "Khách thêm tối đa", 0, 10)
+    o["so_tre_mien_phi"] = _so_hoac_none(d.get("so_tre_mien_phi"), "Số trẻ miễn phí của phòng", 0, 6)
+    o["giuong_phu_kieu"] = str(d.get("giuong_phu_kieu") or "")
+    if o["giuong_phu_kieu"] and o["giuong_phu_kieu"] not in KIEU_GIA:
+        raise LoiKhachSan("Kiểu giá giường phụ không hợp lệ")
+    o["phi_giuong_phu"] = _tien_hoac_none(d.get("phi_giuong_phu"), "Giá giường phụ của phòng")
+    if o["phi_giuong_phu"] is not None and not o["giuong_phu_kieu"]:
+        o["giuong_phu_kieu"] = "co_dinh"
+    if o["giuong_phu_kieu"] == "phan_tram" and o["phi_giuong_phu"] is not None and not 0 < o["phi_giuong_phu"] <= 100:
+        raise LoiKhachSan("Giá giường phụ theo % giá phòng: từ 1 đến 100")
+    o["giuong_phu_xac_nhan"] = bool(d.get("giuong_phu_xac_nhan"))
+    o["gia_tre_rieng"] = kiem_bang_tre(d.get("gia_tre_rieng"), "Giá trẻ em của phòng") if d.get("gia_tre_rieng") else None
     nc = d.get("noi_cui")
     o["noi_cui"] = None if nc in (None, "") else bool(nc)
     tn = []
@@ -395,6 +457,12 @@ def luu_goi(db: Session, u: User, lid: int, d: dict, gid: int | None = None, now
     mua = _kiem_mua(d.get("mua") or [])
     if not mua:
         raise LoiKhachSan("Nhập ít nhất một mùa giá")
+    che_do = str(d.get("tre_em_che_do") or "")      # KS-16k
+    if che_do not in CHE_DO_TRE_GOI:
+        raise LoiKhachSan("Chế độ giá trẻ em của gói không hợp lệ")
+    gia_tre = kiem_bang_tre(d.get("gia_tre"), "Giá trẻ em của gói") if che_do == "rieng" else None
+    if che_do == "rieng" and not gia_tre:
+        raise LoiKhachSan("Giá trẻ em riêng cho gói: ghi ít nhất một nhóm tuổi")
     now = now or datetime.now()
     if gid is None:
         g = GoiGiaVtd(loai_phong_id=lid)
@@ -407,6 +475,7 @@ def luu_goi(db: Session, u: User, lid: int, d: dict, gid: int | None = None, now
             db.delete(m)
     truoc = g.trang_thai if gid else None
     g.ten, g.bua_sang, g.huy_truoc_ngay, g.dang_ban = ten, bool(d.get("bua_sang")), h, bool(d.get("dang_ban", True))
+    g.tre_em_che_do, g.gia_tre = che_do, gia_tre
     g.trang_thai, g.ly_do_tra_lai, g.duyet_boi, g.duyet_luc = "nhap", "", "", None
     g.sua_boi, g.sua_luc = u.username, now
     db.flush()
@@ -639,7 +708,7 @@ def _anh_out(x: AnhKhachSanVtd, cong: bool = False) -> dict:
 
 # ══ VTOS · ĐỌC ═════════════════════════════════════════════════════════════════════════════════════
 def _ks_noi_bo(k: KhachSanVtd) -> dict:
-    return {**{x: getattr(k, x) for x in TRUONG_KS}, "cs_moc_tuoi": k.cs_moc_tuoi or [],
+    return {**{x: getattr(k, x) for x in TRUONG_KS}, "cs_moc_tuoi": [chuan_moc(m) for m in (k.cs_moc_tuoi or []) if m.get("cach") != "nguoi_lon"],
             "cs_phi_giuong_phu": float(k.cs_phi_giuong_phu) if k.cs_phi_giuong_phu is not None else None, "id": k.id, "ma": k.ma, "hien_cong": k.hien_cong, "hien_boi": k.hien_boi,
             "tat_ly_do": k.tat_ly_do, "ngung": k.ngung, "sua_boi": k.sua_boi, "tao_boi": k.tao_boi,
             "sua_luc": k.sua_luc.isoformat(timespec="minutes") if k.sua_luc else None}
@@ -649,6 +718,7 @@ def _goi_out(g: GoiGiaVtd, mua: list[MuaGiaVtd]) -> dict:
     return {"id": g.id, "loai_phong_id": g.loai_phong_id, "ten": g.ten, "bua_sang": g.bua_sang, "huy_truoc_ngay": g.huy_truoc_ngay,
             "dang_ban": g.dang_ban, "trang_thai": g.trang_thai, "trang_thai_ten": TRANG_THAI_GOI.get(g.trang_thai, g.trang_thai),
             "ly_do_tra_lai": g.ly_do_tra_lai, "sua_boi": g.sua_boi, "duyet_boi": g.duyet_boi,
+            "tre_em_che_do": g.tre_em_che_do or "", "gia_tre": [chuan_moc(m) for m in (g.gia_tre or [])],   # KS-16k
             "mua": [{"id": m.id, "tu_ngay": m.tu_ngay.isoformat(), "den_ngay": m.den_ngay.isoformat(), "gia_thuong": float(m.gia_thuong),
                      "gia_cuoi_tuan": float(m.gia_cuoi_tuan) if m.gia_cuoi_tuan else None,
                      "gia_niem_yet": float(m.gia_niem_yet) if m.gia_niem_yet else None, "ghi_chu": m.ghi_chu} for m in mua]}
@@ -687,6 +757,7 @@ def ds_vtos(db: Session, u: User) -> dict:
             "loai": LOAI_CHO_O, "tien_ich": TIEN_ICH, "nhom_anh": NHOM_ANH_KS,
             "nhan_tre_em": NHAN_TRE_EM, "cach_tinh_tre": CACH_TINH_TRE, "tien_nghi_phong": TIEN_NGHI_PHONG,   # KS-16j
             "nguon_lp": NGUON_LP, "can_xac_nhan": CAN_XAC_NHAN, "trang_thai_dc": TRANG_THAI_DC,
+            "nhom_tuoi": NHOM_TUOI, "kieu_gia": KIEU_GIA, "che_do_tre_goi": CHE_DO_TRE_GOI,   # KS-16k
             "duoc_nhap": _co(u, VAI_NHAP), "duoc_duyet": _co(u, VAI_DUYET), "toi": u.username,
             "toan_quyen": _co(u, TOAN_QUYEN),
             "cho_duyet": {"anh": sum(d["anh_cho"] for d in dong), "goi": sum(d["goi_cho"] for d in dong)}}
@@ -712,7 +783,12 @@ def _lp_them(x: LoaiPhongVtd) -> dict:
     return {"mo_ta_dai": x.mo_ta_dai or "", "tien_nghi": x.tien_nghi or [], "giuong_phu_toi_da": x.giuong_phu_toi_da,
             "noi_cui": x.noi_cui, "nguon": x.nguon or "", "ky_doi_chieu": x.ky_doi_chieu or "", "ma_hang": x.ma_hang or "",
             "ten_tuong_duong": x.ten_tuong_duong or "", "can_xac_nhan": x.can_xac_nhan or [],
-            "ghi_chu_doi_chieu": x.ghi_chu_doi_chieu or "", "trang_thai_dc": x.trang_thai_dc or ""}
+            "ghi_chu_doi_chieu": x.ghi_chu_doi_chieu or "", "trang_thai_dc": x.trang_thai_dc or "",
+            # KS-16k
+            "suc_chua": x.suc_chua, "khach_them_toi_da": x.khach_them_toi_da, "so_tre_mien_phi": x.so_tre_mien_phi,
+            "phi_giuong_phu": float(x.phi_giuong_phu) if x.phi_giuong_phu is not None else None,
+            "giuong_phu_kieu": x.giuong_phu_kieu or "", "giuong_phu_xac_nhan": bool(x.giuong_phu_xac_nhan),
+            "gia_tre_rieng": [chuan_moc(m) for m in x.gia_tre_rieng] if x.gia_tre_rieng else None}
 
 
 def cho_duyet(db: Session, u: User) -> dict:
@@ -745,103 +821,176 @@ def doc_tuoi(tre_em: int, tuoi) -> list[int] | None:
     return ds
 
 
-def xep_tre(k: KhachSanVtd, nl: int, tuoi: list[int] | None, te: int) -> dict:
-    """Xếp trẻ theo mốc tuổi của khách sạn → {ok, ly_do, nl (gồm trẻ tính như người lớn), tre: [{tuoi, phu_thu, an_sang}]}.
-    ok=False nghĩa là KHÔNG đặt ngay được — khách gửi yêu cầu cho Điều hành (hoặc khách sạn không nhận)."""
-    if te <= 0:
-        return {"ok": True, "ly_do": "", "nl": nl, "tre": []}
-    if tuoi is None:
-        return {"ok": False, "ly_do": "Chọn tuổi từng trẻ em để xem giá", "nl": nl, "tre": []}
+def bang_ap_dung(k: KhachSanVtd, lp: LoaiPhongVtd | None, g: GoiGiaVtd | None) -> tuple[list[dict] | None, str]:
+    """KS-16k: bảng giá trẻ em máy dùng — gói (nếu có) → loại phòng (nếu có) → khách sạn. None = tính trẻ như người lớn."""
+    if g is not None and g.tre_em_che_do == "nhu_nguoi_lon":
+        return None, "goi"
+    if g is not None and g.tre_em_che_do == "rieng" and g.gia_tre:
+        return [chuan_moc(m) for m in g.gia_tre], "goi"
+    if lp is not None and lp.gia_tre_rieng:
+        return [chuan_moc(m) for m in lp.gia_tre_rieng], "phong"
+    return [chuan_moc(m) for m in (k.cs_moc_tuoi or []) if m.get("cach") != "nguoi_lon"], "ks"
+
+
+def _loai_tre(k: KhachSanVtd, bang: list[dict] | None, tuoi: list[int]) -> dict:
+    """Xếp từng trẻ vào nhóm tuổi → {ok, ly_do, them_nl, tre: [{tuoi, nhom, cach, gia, an_sang}]} — trên bảng = người lớn."""
     nhan = k.cs_nhan_tre_em or "chua_xac_nhan"
+    if not tuoi:
+        return {"ok": True, "ly_do": "", "them_nl": 0, "tre": []}
     if nhan == "chua_xac_nhan":
-        return {"ok": False, "ly_do": "Chính sách trẻ em đang được xác nhận với khách sạn — gửi yêu cầu để Vietourist báo", "nl": nl, "tre": []}
+        return {"ok": False, "ly_do": "Chính sách trẻ em cần khách sạn xác nhận — gửi yêu cầu để Vietourist báo"}
     if nhan == "khong":
-        return {"ok": False, "ly_do": "Khách sạn không nhận trẻ em", "nl": nl, "tre": [], "khong_nhan": True}
+        return {"ok": False, "ly_do": "Khách sạn không nhận trẻ em", "khong_nhan": True}
     if nhan == "tu_tuoi" and k.cs_tre_tu_tuoi is not None and min(tuoi) < k.cs_tre_tu_tuoi:
-        return {"ok": False, "ly_do": f"Khách sạn chỉ nhận trẻ từ {k.cs_tre_tu_tuoi} tuổi", "nl": nl, "tre": [], "khong_nhan": True}
-    them_nl, tre = 0, []
+        return {"ok": False, "ly_do": f"Khách sạn chỉ nhận khách từ {k.cs_tre_tu_tuoi} tuổi", "khong_nhan": True}
+    if bang is None:                         # gói tính trẻ như người lớn
+        return {"ok": True, "ly_do": "", "them_nl": len(tuoi), "tre": []}
+    tren = max((m["den"] for m in bang), default=-1)
+    them, tre = 0, []
     for t in tuoi:
-        m = next((x for x in (k.cs_moc_tuoi or []) if x["tu"] <= t <= x["den"]), None)
+        if t > tren:
+            them += 1
+            continue
+        m = next((x for x in bang if x["tu"] <= t <= x["den"]), None)
         if m is None:
-            return {"ok": False, "ly_do": f"Chưa có quy định cho trẻ {t} tuổi — gửi yêu cầu để Vietourist báo", "nl": nl, "tre": []}
-        if m["cach"] == "nguoi_lon":
-            them_nl += 1
+            return {"ok": False, "ly_do": f"Chưa có giá cho trẻ {t} tuổi — gửi yêu cầu để Vietourist báo"}
+        tre.append({"tuoi": t, **{x: m[x] for x in ("nhom", "cach", "gia", "an_sang")}})
+    return {"ok": True, "ly_do": "", "them_nl": them, "tre": tre}
+
+
+def _gia_kieu(kieu: str, gia: float, gia_dem: float) -> float:
+    return gia_dem * gia / 100 if kieu == "phan_tram" else gia
+
+
+def _mot_phong(k: KhachSanVtd, lp: LoaiPhongVtd, a: int, tre: list[dict], gia_dem: float, bua_sang: bool) -> dict:
+    """Một phòng theo cách Agoda: a người lớn + trẻ. Trẻ «luôn miễn phí» và số trẻ miễn phí của phòng (nhỏ nhất trước)
+    ở chung không mất tiền; vượt sức chứa cơ bản thì nằm giường phụ (trẻ lớn nhất trước, rồi người lớn) và trả giá
+    giường phụ thay cho giá trẻ em; còn lại trả giá trẻ em của nhóm. Gói có bữa sáng: trẻ trả giá ăn sáng của nhóm."""
+    ten = lp.ten
+    if tre and lp.toi_da_tre_em is None:
+        return {"ok": False, "ly_do": f"«{ten}»: số trẻ em của phòng cần khách sạn xác nhận — gửi yêu cầu"}
+    if len(tre) > (lp.toi_da_tre_em or 0) + max(0, lp.toi_da_nguoi_lon - a):
+        return {"ok": False, "ly_do": f"«{ten}» không đủ chỗ cho số trẻ em này", "vuot": True}
+    co_phi = sorted([x for x in tre if x["cach"] != "mien_phi"], key=lambda x: x["tuoi"])
+    so_mp = lp.so_tre_mien_phi if lp.so_tre_mien_phi is not None else k.cs_so_tre_mien_phi
+    if co_phi and so_mp is None:
+        return {"ok": False, "ly_do": f"«{ten}»: số trẻ miễn phí cần khách sạn xác nhận — gửi yêu cầu"}
+    mp = {id(x) for x in tre if x["cach"] == "mien_phi"} | {id(x) for x in co_phi[:so_mp or 0]}
+    dem_sc = a + len(tre) - (0 if k.cs_tre_mp_tinh_suc_chua else len(mp))
+    goc = lp.suc_chua or lp.toi_da_nguoi_lon
+    gp = max(0, dem_sc - goc)
+    if gp:
+        if lp.khach_them_toi_da is None or lp.giuong_phu_toi_da is None:
+            return {"ok": False, "ly_do": f"«{ten}»: khách thêm / giường phụ cần khách sạn xác nhận — gửi yêu cầu"}
+        if gp > min(lp.khach_them_toi_da, lp.giuong_phu_toi_da):
+            return {"ok": False, "ly_do": f"«{ten}» không đủ chỗ cho số khách này", "vuot": True}
+    kieu = lp.giuong_phu_kieu or k.cs_giuong_phu_kieu or "co_dinh"
+    phi = lp.phi_giuong_phu if lp.phi_giuong_phu is not None else k.cs_phi_giuong_phu
+    if gp and phi is None:
+        return {"ok": False, "ly_do": f"«{ten}»: giá giường phụ cần khách sạn xác nhận — gửi yêu cầu"}
+    # ai nằm giường phụ: trẻ phải trả tiền, lớn nhất trước; thiếu thì người lớn
+    tinh_sc = [x for x in tre if id(x) not in mp] if not k.cs_tre_mp_tinh_suc_chua else list(tre)
+    nam_gp = sorted(tinh_sc, key=lambda x: -x["tuoi"])[:gp]
+    gp_nl = gp - len(nam_gp)
+    dong, cong = [], 0.0
+    p_gp = _gia_kieu(kieu, float(phi or 0), gia_dem)
+    for x in sorted(tre, key=lambda x: -x["tuoi"]):
+        if any(x is y for y in nam_gp):
+            dong.append({"nhan": f"Bé {x['tuoi']} tuổi · giường phụ", "dem": p_gp}); cong += p_gp
+        elif id(x) in mp:
+            dong.append({"nhan": f"Bé {x['tuoi']} tuổi · ở chung miễn phí", "dem": 0.0})
         else:
-            tre.append({"tuoi": t, "phu_thu": int(m.get("phu_thu") or 0) if m["cach"] == "phu_thu" else 0,
-                        "an_sang": bool(m.get("an_sang"))})
-    return {"ok": True, "ly_do": "", "nl": nl + them_nl, "tre": sorted(tre, key=lambda x: -x["tuoi"])}
+            v = _gia_kieu(x["cach"], x["gia"], gia_dem)
+            dong.append({"nhan": f"Bé {x['tuoi']} tuổi · ở chung", "dem": v}); cong += v
+        if bua_sang:
+            if x["an_sang"] is None:
+                return {"ok": False, "ly_do": f"Giá ăn sáng cho trẻ {x['tuoi']} tuổi cần khách sạn xác nhận — gửi yêu cầu"}
+            dong.append({"nhan": f"Bé {x['tuoi']} tuổi · ăn sáng", "dem": float(x["an_sang"])}); cong += float(x["an_sang"])
+    if gp_nl:
+        dong.append({"nhan": f"{gp_nl} người lớn · giường phụ", "dem": p_gp * gp_nl}); cong += p_gp * gp_nl
+    return {"ok": True, "ly_do": "", "dem": cong, "giuong_phu": gp, "chi_tiet": dong,
+            "cho_xac_nhan": bool(gp and lp.giuong_phu_xac_nhan)}
 
 
-def _mot_phong(k: KhachSanVtd, lp: LoaiPhongVtd, a: int, tre: list[dict]) -> dict:
-    """Một phòng: a người lớn + trẻ (đã xếp, lớn trước). Ai vượt sức chứa thì nằm giường phụ (trẻ lớn nhất trước)."""
-    vuot_nl = max(0, a - lp.toi_da_nguoi_lon)
-    if lp.toi_da_tre_em is None and len(tre) > max(0, lp.toi_da_nguoi_lon - a):
-        return {"ok": False, "ly_do": f"«{lp.ten}»: số trẻ em ở chung chưa được xác nhận — gửi yêu cầu"}
-    cho_tre = max(0, lp.toi_da_nguoi_lon - a) + (lp.toi_da_tre_em or 0)
-    vuot_tre = max(0, len(tre) - cho_tre)
-    gp = vuot_nl + vuot_tre
-    if gp:
-        if lp.giuong_phu_toi_da is None or k.cs_phi_giuong_phu is None:
-            return {"ok": False, "ly_do": f"«{lp.ten}»: cần giường phụ nhưng giường phụ chưa được xác nhận — gửi yêu cầu"}
-        if gp > lp.giuong_phu_toi_da:
-            return {"ok": False, "ly_do": f"«{lp.ten}» không đủ chỗ cho số khách này", "vuot": True}
-    phi_gp = float(k.cs_phi_giuong_phu or 0)
-    dem = gp * phi_gp + sum(x["phu_thu"] for x in tre[vuot_tre:])
-    ct = []
-    if gp:
-        ct.append(f"{gp} giường phụ")
-    ct += [f"trẻ {x['tuoi']} tuổi" for x in tre[vuot_tre:] if x["phu_thu"]]
-    return {"ok": True, "ly_do": "", "dem": dem, "giuong_phu": gp, "chi_tiet": ct}
-
-
-def phan_khach(k: KhachSanVtd, phong: list[LoaiPhongVtd], nl: int, te: int, tuoi: list[int] | None) -> dict:
-    """Chia khách vào các phòng đã chọn (mỗi phần tử = một phòng) → phụ thu / đêm của từng phòng (cùng thứ tự)."""
-    x = xep_tre(k, nl, tuoi, te)
-    if not x["ok"]:
-        return {**x, "phong": []}
-    n = len(phong)
+def phan_khach(k: KhachSanVtd, don_vi: list[tuple], nl: int, te: int, tuoi: list[int] | None) -> dict:
+    """Chia khách vào các phòng đã chọn. don_vi = [(loại phòng, gói | None, giá phòng / đêm)] — mỗi phần tử một phòng.
+    Trả phụ thu / đêm và chi tiết từng phòng (cùng thứ tự)."""
+    if te > 0 and tuoi is None:
+        return {"ok": False, "ly_do": "Chọn tuổi từng trẻ em để xem giá", "phong": []}
+    n = len(don_vi)
     if n == 0:
         return {"ok": False, "ly_do": "Chọn ít nhất một phòng", "phong": []}
-    a = [x["nl"] // n + (1 if i < x["nl"] % n else 0) for i in range(n)]
-    tre: list[list] = [[] for _ in range(n)]
-    for t in x["tre"]:                       # trẻ lớn trước, vào phòng còn nhiều chỗ nhất
-        i = max(range(n), key=lambda j: (phong[j].toi_da_nguoi_lon + (phong[j].toi_da_tre_em or 0) - a[j] - len(tre[j]), -j))
-        tre[i].append(t)
+    # mỗi phòng có thể theo một bảng giá khác (gói / phòng) → xếp trẻ theo bảng của phòng đầu để chia, tính lại từng phòng
+    loai = [_loai_tre(k, bang_ap_dung(k, lp, g)[0], tuoi or []) for lp, g, _p in don_vi]
+    bad = next((x for x in loai if not x["ok"]), None)
+    if bad:
+        return {**bad, "phong": []}
+    so_nl = nl + loai[0]["them_nl"]
+    a = [so_nl // n + (1 if i < so_nl % n else 0) for i in range(n)]
+    tuoi_tre = sorted([x["tuoi"] for x in loai[0]["tre"]], reverse=True)
+    chia: list[list[int]] = [[] for _ in range(n)]
+    for t in tuoi_tre:
+        i = max(range(n), key=lambda j: ((don_vi[j][0].suc_chua or don_vi[j][0].toi_da_nguoi_lon) + (don_vi[j][0].toi_da_tre_em or 0)
+                                         - a[j] - len(chia[j]), -j))
+        chia[i].append(t)
     ra = []
-    for i, lp in enumerate(phong):
-        r = _mot_phong(k, lp, a[i], tre[i])
+    for i, (lp, g, gia_dem) in enumerate(don_vi):
+        x = _loai_tre(k, bang_ap_dung(k, lp, g)[0], chia[i])
+        if not x["ok"]:
+            return {**x, "phong": []}
+        r = _mot_phong(k, lp, a[i] + x["them_nl"], x["tre"], float(gia_dem or 0), bool(g.bua_sang) if g else False)
         if not r["ok"]:
             return {**r, "phong": []}
         ra.append(r)
-    return {"ok": True, "ly_do": "", "phong": ra, "dem": sum(r["dem"] for r in ra)}
+    return {"ok": True, "ly_do": "", "phong": ra, "dem": sum(r["dem"] for r in ra),
+            "cho_xac_nhan": any(r["cho_xac_nhan"] for r in ra)}
+
+
+def _vnd(x: float) -> str:
+    return f"{int(round(x)):,}".replace(",", ".")
+
+
+def _dong_bang(bang: list[dict]) -> list[str]:
+    ra = []
+    for m in bang:
+        tuoi = f"{m['tu']}–{m['den']} tuổi" + (" (sơ sinh)" if m.get("nhom") == "so_sinh" else "")
+        if m["cach"] == "mien_phi":
+            o = "ở chung miễn phí"
+        elif m["cach"] == "phan_tram":
+            o = f"{m['gia']:g}% giá phòng / đêm (trong số trẻ miễn phí thì không tính)"
+        else:
+            o = f"{_vnd(m['gia'])} đ / đêm (trong số trẻ miễn phí thì không tính)"
+        an = "ăn sáng: cần khách sạn xác nhận" if m.get("an_sang") is None else ("ăn sáng miễn phí" if not m["an_sang"] else f"ăn sáng {_vnd(m['an_sang'])} đ / đêm")
+        ra.append(f"{tuoi}: {o}; {an}.")
+    return ra
 
 
 def chinh_sach_tre_cong(k: KhachSanVtd) -> dict:
-    """Mục «Chính sách trẻ em» trên cổng khách — dòng chữ kiểu Agoda."""
+    """Mục «Chính sách trẻ em» trên cổng khách — dòng chữ kiểu Agoda. Chưa xác minh thì nói đúng như vậy."""
     nhan = k.cs_nhan_tre_em or "chua_xac_nhan"
+    bang = [chuan_moc(m) for m in (k.cs_moc_tuoi or []) if m.get("cach") != "nguoi_lon"]
     dong = []
     if nhan == "chua_xac_nhan":
-        dong.append("Chính sách trẻ em đang được Vietourist xác nhận với khách sạn.")
+        dong.append("Cần khách sạn xác nhận.")
     elif nhan == "khong":
         dong.append("Khách sạn không nhận trẻ em.")
     else:
-        dong.append("Nhận trẻ em mọi lứa tuổi." if nhan == "moi_tuoi" else f"Nhận trẻ từ {k.cs_tre_tu_tuoi} tuổi.")
-        for m in k.cs_moc_tuoi or []:
-            tuoi = f"{m['tu']}–{m['den']} tuổi" if m["den"] < TUOI_TRE_TOI_DA else f"Từ {m['tu']} tuổi"
-            if m["cach"] == "mien_phi":
-                dong.append(f"{tuoi}: miễn phí nếu dùng giường có sẵn{' (gồm ăn sáng)' if m.get('an_sang') else ''}.")
-            elif m["cach"] == "phu_thu":
-                dong.append(f"{tuoi}: phụ thu {int(m['phu_thu']):,} đ/đêm{' (gồm ăn sáng)' if m.get('an_sang') else ''}.".replace(",", "."))
-            else:
-                dong.append(f"{tuoi}: tính như người lớn.")
+        dong.append("Nhận khách mọi lứa tuổi." if nhan == "moi_tuoi" else f"Nhận khách từ {k.cs_tre_tu_tuoi} tuổi.")
+        dong += _dong_bang(bang)
+        if bang:
+            dong.append(f"Từ {max(m['den'] for m in bang) + 1} tuổi: tính như người lớn.")
+        dong.append("Số trẻ ở chung miễn phí mỗi phòng: cần khách sạn xác nhận." if k.cs_so_tre_mien_phi is None
+                    else f"Mỗi phòng tối đa {k.cs_so_tre_mien_phi} trẻ ở chung miễn phí (dùng giường có sẵn), tùy loại phòng.")
     if k.cs_phi_giuong_phu is not None:
-        dong.append(f"Giường phụ {int(k.cs_phi_giuong_phu):,} đ/đêm{' (gồm ăn sáng)' if k.cs_giuong_phu_an_sang else ''}, tùy loại phòng.".replace(",", "."))
+        g = f"{float(k.cs_phi_giuong_phu):g}% giá phòng" if (k.cs_giuong_phu_kieu or "co_dinh") == "phan_tram" else f"{_vnd(k.cs_phi_giuong_phu)} đ"
+        dong.append(f"Giường phụ {g} / đêm, tùy loại phòng.")
     if k.cs_noi:
-        dong.append(f"Nôi / cũi: {k.cs_noi}.")
+        dong.append(f"Nôi / cũi: {k.cs_noi} — yêu cầu khi nhận phòng.")
     for t in (k.cs_tre_em, k.cs_giuong_phu):
         if t:
             dong.append(t)
-    return {"nhan": nhan, "dong": dong, "moc": k.cs_moc_tuoi or [], "phi_giuong_phu": float(k.cs_phi_giuong_phu) if k.cs_phi_giuong_phu is not None else None}
+    return {"nhan": nhan, "dong": dong, "moc": bang,
+            "phi_giuong_phu": float(k.cs_phi_giuong_phu) if k.cs_phi_giuong_phu is not None else None}
 
 
 # ══ CỔNG KHÁCH ═════════════════════════════════════════════════════════════════════════════════════
@@ -850,6 +999,15 @@ def _hien(db: Session, tinh: str = "") -> list[KhachSanVtd]:
     if tinh:
         q = q.where(KhachSanVtd.tinh_thanh == tinh)
     return db.execute(q.order_by(KhachSanVtd.ten)).scalars().all()
+
+
+def _gop_ct(pk: dict, dem: int) -> list[dict]:
+    """Chi tiết phụ thu cả kỳ, gộp dòng trùng nhãn (nhiều phòng)."""
+    g: dict[str, float] = {}
+    for r in pk.get("phong", []):
+        for c in r["chi_tiet"]:
+            g[c["nhan"]] = g.get(c["nhan"], 0) + c["dem"] * dem
+    return [{"nhan": n, "tien": int(round(v)), "dem": dem} for n, v in g.items()]
 
 
 def _phong_ban_duoc(db: Session, kids: list[int], vao: date, ra: date, nl: int, te: int, so_phong: int,
@@ -867,7 +1025,9 @@ def _phong_ban_duoc(db: Session, kids: list[int], vao: date, ra: date, nl: int, 
     dem = (ra - vao).days
     ra_: dict[int, list] = {}
     for x in lps:
-        pk = phan_khach(ksd[x.khach_san_id], [x] * max(1, so_phong), nl, te, tuoi if te else [])   # KS-16j
+        k = ksd[x.khach_san_id]
+        sp = max(1, so_phong)
+        tu = tuoi if te else []
         gs = []
         for g in goi.get(x.id, []):
             if g.trang_thai != "da_duyet" or not g.dang_ban:
@@ -876,24 +1036,30 @@ def _phong_ban_duoc(db: Session, kids: list[int], vao: date, ra: date, nl: int, 
             if p is None:
                 continue
             hh = han_huy(g, vao)
+            pk = phan_khach(k, [(x, g, p["tong"] / max(1, dem))] * sp, nl, te, tu)   # KS-16k: theo bảng của từng gói
             gs.append({"id": g.id, "ten": g.ten, "bua_sang": g.bua_sang, "huy_truoc_ngay": g.huy_truoc_ngay,
                        "huy_han": hh.isoformat() if hh else None, "mien_phi_huy": g.huy_truoc_ngay is not None,
-                       **p, "con": con.get(x.id, 0)})
+                       **p, "con": con.get(x.id, 0),
+                       "vua": pk["ok"], "ly_do": pk["ly_do"], "phu_thu_ky": int(round(pk.get("dem", 0) * dem)),
+                       "phu_thu_ct": _gop_ct(pk, dem), "cho_xac_nhan": bool(pk.get("cho_xac_nhan"))})
         gs.sort(key=lambda o: o["tong"])
+        pk0 = phan_khach(k, [(x, None, 0)] * sp, nl, te, tu) if not gs else None
+        vua = any(g["vua"] for g in gs) if gs else pk0["ok"]
+        ly_do = "" if vua else (next((g["ly_do"] for g in gs if g["ly_do"]), "") if gs else pk0["ly_do"])
         ra_.setdefault(x.khach_san_id, []).append({
             "id": x.id, "ten": x.ten, "dien_tich": x.dien_tich, "giuong": x.giuong, "mo_ta": x.mo_ta,
             "toi_da_nguoi_lon": x.toi_da_nguoi_lon, "toi_da_tre_em": x.toi_da_tre_em, "so_phong": x.so_phong,
-            "vua": pk["ok"], "goi": gs, "con": con.get(x.id, 0),
-            # KS-16j: mô tả chi tiết, tiện nghi, giường phụ; phụ thu trẻ em / giường phụ cho cả kỳ ở (mọi phòng đã tìm)
+            "vua": vua, "goi": gs, "con": con.get(x.id, 0),
+            # KS-16j/16k: mô tả chi tiết, tiện nghi, sức chứa, giường phụ; phụ thu trẻ em / giường phụ ở từng gói
             "mo_ta_dai": x.mo_ta_dai or "", "tien_nghi": x.tien_nghi or [], "giuong_phu_toi_da": x.giuong_phu_toi_da,
-            "noi_cui": x.noi_cui, "ly_do": pk["ly_do"], "phu_thu_ky": int(round(pk.get("dem", 0) * dem)),
-            "phu_thu_ct": sorted({c for r in pk.get("phong", []) for c in r["chi_tiet"]})})
+            "suc_chua": x.suc_chua or x.toi_da_nguoi_lon, "khach_them_toi_da": x.khach_them_toi_da,
+            "noi_cui": x.noi_cui, "ly_do": ly_do})
     return ra_
 
 
 def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict], dg: dict | None = None) -> dict:
-    co_gia = [g for p in phong if p["vua"] for g in p["goi"]]
-    goi = [g for p in phong if p["vua"] and p.get("con", 1) > 0 for g in p["goi"]]   # KS-14: bỏ loại phòng đã hết
+    co_gia = [g for p in phong if p["vua"] for g in p["goi"] if g.get("vua", True)]
+    goi = [g for p in phong if p["vua"] and p.get("con", 1) > 0 for g in p["goi"] if g.get("vua", True)]   # KS-16k: theo từng gói   # KS-14: bỏ loại phòng đã hết
     re_nhat = min(goi, key=lambda g: g["gia_dem"]) if goi else None
     return {"id": k.id, "ten": k.ten, "sao": k.sao, "loai": k.loai, "loai_ten": LOAI_CHO_O.get(k.loai, k.loai),
             "tinh_thanh": k.tinh_thanh, "khu_vuc": k.khu_vuc, "km_trung_tam": k.km_trung_tam, "gan": k.gan,
@@ -964,17 +1130,29 @@ def _the_bat() -> bool:
     return SP.cong_the_bat()
 
 
-def phu_thu_dong(k: KhachSanVtd, dong: list[dict], lps: dict[int, LoaiPhongVtd], nl: int, te: int, tuoi, dem: int) -> list[int]:
-    """KS-16j: phụ thu trẻ em / giường phụ CẢ KỲ cho từng dòng (gói) — máy tự tính theo chính sách khách sạn.
-    Không đặt ngay được (chưa xác nhận / vượt sức chứa) thì báo lý do để khách gửi yêu cầu."""
-    don_vi = [(i, lps[x["loai_phong_id"]]) for i, x in enumerate(dong) for _ in range(int(x["so"]))]
-    pk = phan_khach(k, [lp for _i, lp in don_vi], max(1, int(nl or 1)), max(0, int(te or 0)), doc_tuoi(max(0, int(te or 0)), tuoi))
+def phu_thu_dong(k: KhachSanVtd, dong: list[dict], lps: dict[int, LoaiPhongVtd], goi: dict[int, GoiGiaVtd],
+                 nl: int, te: int, tuoi, dem: int) -> list[dict]:
+    """KS-16j/16k: phụ thu trẻ em / ăn sáng trẻ / giường phụ CẢ KỲ cho từng dòng (gói) — máy tự tính theo bảng giá trẻ em
+    của gói → phòng → khách sạn. Dòng cần: loai_phong_id, goi_id, so, gia_mot (giá một phòng cả kỳ).
+    Không đặt ngay được (cần xác nhận / vượt sức chứa) thì báo lý do để khách gửi yêu cầu."""
+    dem = max(1, dem)
+    don_vi, chi = [], []
+    for i, x in enumerate(dong):
+        for _ in range(int(x["so"])):
+            don_vi.append((lps[x["loai_phong_id"]], goi.get(x.get("goi_id")), float(x["gia_mot"]) / dem))
+            chi.append(i)
+    te = max(0, int(te or 0))
+    pk = phan_khach(k, don_vi, max(1, int(nl or 1)), te, doc_tuoi(te, tuoi))
     if not pk["ok"]:
         raise LoiKhachSan(pk["ly_do"])
-    ra = [0.0] * len(dong)
-    for (i, _lp), r in zip(don_vi, pk["phong"]):
-        ra[i] += r["dem"] * dem
-    return [int(round(x)) for x in ra]
+    ra = [{"phu_thu": 0.0, "ct": {}, "cho_xac_nhan": False} for _ in dong]
+    for i, r in zip(chi, pk["phong"]):
+        ra[i]["phu_thu"] += r["dem"] * dem
+        ra[i]["cho_xac_nhan"] = ra[i]["cho_xac_nhan"] or r["cho_xac_nhan"]
+        for c in r["chi_tiet"]:
+            ra[i]["ct"][c["nhan"]] = ra[i]["ct"].get(c["nhan"], 0) + c["dem"] * dem
+    return [{"phu_thu": int(round(x["phu_thu"])), "cho_xac_nhan": x["cho_xac_nhan"],
+             "phu_thu_ct": [{"nhan": n, "tien": int(round(v)), "dem": dem} for n, v in x["ct"].items()]} for x in ra]
 
 
 def tinh_lua_chon(db: Session, kid: int, vao, ra, chon: list[dict], hom_nay: date | None = None,
@@ -984,7 +1162,7 @@ def tinh_lua_chon(db: Session, kid: int, vao, ra, chon: list[dict], hom_nay: dat
     k = db.get(KhachSanVtd, kid)
     if k is None or not k.hien_cong or k.ngung:
         raise LoiKhachSan("Khách sạn này không còn hiện trên VTD", 404)
-    dong, lps = [], {}
+    dong, lps, goi_d = [], {}, {}
     for c in chon or []:
         n = int(c.get("so") or 0)
         if n <= 0:
@@ -999,18 +1177,20 @@ def tinh_lua_chon(db: Session, kid: int, vao, ra, chon: list[dict], hom_nay: dat
         if p is None:
             raise LoiKhachSan(f"«{lp.ten} · {g.ten}» chưa có giá cho các ngày này", 409)
         lps[lp.id] = lp
-        dong.append({"loai_phong_id": lp.id, "loai_phong": lp.ten, "goi": g.ten, "so": n, "tong": p["tong"] * n, "bua_sang": g.bua_sang,
+        goi_d[g.id] = g
+        dong.append({"loai_phong_id": lp.id, "goi_id": g.id, "loai_phong": lp.ten, "goi": g.ten, "so": n, "tong": p["tong"] * n,
+                     "gia_mot": p["tong"], "bua_sang": g.bua_sang,
                      "huy_han": (han_huy(g, vao).isoformat() if g.huy_truoc_ngay is not None else None)})
     dem = (ra - vao).days
     if dong:
-        for x, pt in zip(dong, phu_thu_dong(k, dong, lps, nguoi_lon, tre_em, tuoi, dem)):
-            x["phu_thu"] = pt
-            x["tong"] += pt
+        for x, pt in zip(dong, phu_thu_dong(k, dong, lps, goi_d, nguoi_lon, tre_em, tuoi, dem)):
+            x.update(pt)
+            x["tong"] += pt["phu_thu"]
     tien = sum(x["tong"] for x in dong)
     so = sum(x["so"] for x in dong)
     thue = round(tien * (k.thue_phi_pt or 0) / 100)
     return {"dong": dong, "so_phong": so, "tien_phong": tien, "phu_thu": sum(x.get("phu_thu", 0) for x in dong),
-            "thue_phi": thue, "tong": tien + thue, "dem": dem}
+            "thue_phi": thue, "tong": tien + thue, "dem": dem, "cho_xac_nhan": any(x.get("cho_xac_nhan") for x in dong)}
 
 
 def gui_yeu_cau_giu(db: Session, tk, kid: int, d: dict, hom_nay: date | None = None):

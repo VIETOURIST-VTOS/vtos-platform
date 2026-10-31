@@ -244,17 +244,22 @@ def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict]
         tien = int(p["tong"]) * n
         hh = S.han_huy(g, vao)
         dong.append({"goi_id": g.id, "loai_phong_id": lp.id, "loai_phong": lp.ten, "goi": g.ten, "so": n, "tien": tien,
-                     "bua_sang": bool(g.bua_sang), "huy_han": hh.isoformat() if hh else None, "_lp": lp})
-    # KS-16j: phụ thu trẻ em / giường phụ máy tự cộng vào dòng (chưa thuế phí, cùng tỷ lệ thuế phí như giá phòng)
+                     "bua_sang": bool(g.bua_sang), "huy_han": hh.isoformat() if hh else None, "gia_mot": int(p["tong"]),
+                     "_lp": lp, "_g": g})
+    # KS-16j/16k: phụ thu trẻ em / ăn sáng trẻ / giường phụ máy tự cộng vào dòng (chưa thuế phí, cùng tỷ lệ thuế phí)
     try:
-        pts = S.phu_thu_dong(k, dong, {x["loai_phong_id"]: x["_lp"] for x in dong}, nl, te, tuoi, (ra - vao).days)
+        pts = S.phu_thu_dong(k, dong, {x["loai_phong_id"]: x["_lp"] for x in dong}, {x["goi_id"]: x["_g"] for x in dong},
+                             nl, te, tuoi, (ra - vao).days)
     except S.LoiKhachSan as ex:
         raise LoiDon(str(ex))
     for x, pt in zip(dong, pts):
-        x.pop("_lp")
-        if pt:
-            x["phu_thu"] = pt
-            x["tien"] += pt
+        x.pop("_lp"); x.pop("_g"); x.pop("gia_mot")
+        if pt["phu_thu"] or pt["phu_thu_ct"]:
+            x["phu_thu"] = pt["phu_thu"]
+            x["phu_thu_ct"] = pt["phu_thu_ct"]
+            x["tien"] += pt["phu_thu"]
+        if pt["cho_xac_nhan"]:
+            x["giuong_phu_cho_xac_nhan"] = True     # Điều hành hỏi khách sạn; không xếp được → báo hết phòng, hoàn 100%
         x["thue"] = int(round(x["tien"] * float(k.thue_phi_pt or 0) / 100))
     return dong
 
