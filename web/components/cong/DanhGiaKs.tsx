@@ -3,7 +3,7 @@
    Chỉ khách đã đặt qua VTD và đã ở viết được (từ ngày trả phòng, 30 ngày); hiện ngay; tên khách đã che.
    Dùng trong KhachSanVtd (nằm trong khung .ksv, dùng chung CSS ở đó). */
 import { useCallback, useEffect, useState } from "react";
-import { goiCong, phienCong } from "@/lib/cong";
+import { goiCong, xemCong, phienCong } from "@/lib/cong";
 
 export const MUC_KS: [string, string][] = [["diem_sach", "Sạch sẽ"], ["diem_vi_tri", "Vị trí"], ["diem_phong", "Phòng"], ["diem_phuc_vu", "Phục vụ"], ["diem_gia", "Đáng giá tiền"]];
 const DI_CUNG: [string, string][] = [["", "— không ghi —"], ["mot_minh", "Đi một mình"], ["cap_doi", "Cặp đôi"], ["gia_dinh_tre_nho", "Gia đình có trẻ nhỏ"],
@@ -32,7 +32,7 @@ export function DanhGiaKsCong({ kid }: { kid: number }) {
   const [xep, setXep] = useState("moi");
   const [trang, setTrang] = useState(1);
   const tai = useCallback(() => {
-    goiCong(`/ks-vtd/${kid}/danh-gia?xep=${xep}&trang=${trang}`).then(setX).catch(() => setX({ bai: [], tong: 0, tom_tat: {} }));
+    xemCong(`/ks-vtd/${kid}/danh-gia?xep=${xep}&trang=${trang}`).then(setX).catch(() => setX({ bai: [], tong: 0, tom_tat: {} }));
   }, [kid, xep, trang]);
   useEffect(() => { tai(); }, [tai]);
   if (!x) return null;

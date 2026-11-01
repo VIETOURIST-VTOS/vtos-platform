@@ -6,7 +6,7 @@
    điểm» → màn đặt bàn sẵn có. Xem sau khi nhận mã OTP qua Zalo / email (Chủ tịch chốt 28/10/2026: không tạo tài
    khoản, không mật khẩu) — dùng chung cho cổng khách / cổ đông / đối tác. Ảnh tải qua cửa /api/v1/am-thuc/anh. */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { goiCong, LINK_NGOAI, moNgoai } from "@/lib/cong";
+import { duongRieng, moNgoai, xemCong } from "@/lib/cong";
 import AlbumKhach from "./AlbumKhach";
 import { SaoThe } from "./DanhGiaNhaHangKhach";
 import { BD_W, BD_H, BD_VN, BD_LANG_GIENG, BD_TP, BD_HOANG_SA, BD_TRUONG_SA, BD_NHAN_HS, BD_NHAN_TS } from "./banDoVN";
@@ -63,7 +63,8 @@ export function NhanPl({ n, boDs }: { n: any; boDs?: boolean }) {
     {n.dac_san && !boDs && <span style={{ ...s, background: "#fbeee0", color: "#7a4a22" }}>Đặc sản địa phương</span>}</div>;
 }
 
-export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
+// KS-16q: rieng = trang riêng kh.vietourist.vn/restaurant (có thể chưa đăng nhập); moId = /restaurant/<id>.
+export default function KhamPhaAmThuc({ onDat, rieng = false, moId }: { onDat: (n: any) => void; rieng?: boolean; moId?: number }) {
   const [ds, setDs] = useState<any>(null);
   const [loi, setLoi] = useState("");
   const [loc, setLoc] = useState<Loc>({ tinh: "", q: "", chi_dat: "", trang: "1", loai: "", bac: "" });
@@ -74,15 +75,15 @@ export default function KhamPhaAmThuc({ onDat }: { onDat: (n: any) => void }) {
   const [nh, setNh] = useState<any>(null);         // trang giới thiệu nhà hàng
   const tai = useCallback((l: Loc) => {
     const q = new URLSearchParams(Object.entries(l).filter(([k, v]) => v && !(k === "trang" && v === "1")) as any).toString();
-    goiCong(`/dat-ban/nha-hang${q ? `?${q}` : ""}`).then(setDs).catch((x) => setLoi(x.message));
+    xemCong(`/dat-ban/nha-hang${q ? `?${q}` : ""}`).then(setDs).catch((x) => setLoi(x.message));
   }, []);
-  useEffect(() => { tai(loc); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { tai(loc); if (moId) xemNh(moId); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
   const doi = (them: Partial<Loc>) => { const l = { ...loc, trang: "1", ...them }; setLoc(l); tai(l); };
   // KS-16m (Chủ tịch 01/11/2026): nhà hàng chưa mở đặt bàn qua Vietourist → mở www.vietourist.vn/restaurant ở tab mới.
   // Nhà hàng đã mở đặt bàn giữ luồng đặt bàn cũ (tích điểm).
   const xemNh = async (id: number, moDat?: boolean) => {
-    if (moDat === false) { moNgoai(LINK_NGOAI.restaurant); return; }
-    try { const o = await goiCong(`/dat-ban/nha-hang/${id}`); if (o.mo_dat) onDat(o); else { setNh(o); setMon(null); window.scrollTo(0, 0); } }
+    if (moDat === false && !rieng) { moNgoai(duongRieng("restaurant", id)); return; }   // KS-16q: trang riêng /restaurant/<id>
+    try { const o = await xemCong(`/dat-ban/nha-hang/${id}`); if (o.mo_dat) onDat(o); else { setNh(o); setMon(null); window.scrollTo(0, 0); } }
     catch (x: any) { setLoi(x.message); }
   };
   const nd = ds?.noi_dung || [];

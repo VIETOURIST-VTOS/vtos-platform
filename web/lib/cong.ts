@@ -21,6 +21,9 @@ export async function goiCong(path: string, json?: any): Promise<any> {
   if (json !== undefined) headers["Content-Type"] = "application/json";
   const r = await fetch(`/api/v1/cong${path}`, json === undefined ? { headers } : { method: "POST", headers, body: JSON.stringify(json) });
   const t = await r.text(); let d: any = null; try { d = t ? JSON.parse(t) : null; } catch { d = t; }
+  if (!r.ok && r.status === 401 && json !== undefined && !p) {
+    try { window.dispatchEvent(new CustomEvent(SU_KIEN_CAN_DANG_NHAP)); } catch { /* bỏ qua */ }
+  }
   if (!r.ok) { const x = d?.detail; throw { status: r.status, message: typeof x === "string" ? x : x?.message || `Lỗi ${r.status}`, ma: x?.ma || "" }; }
   return d;
 }
@@ -36,10 +39,40 @@ export function diCongThe(r: { url?: string; form?: { action: string; fields: [s
 }
 
 
-/** KS-16l/16m (Chủ tịch 01/11/2026): dịch vụ chưa mở đặt trực tuyến trên cổng thì bấm vào mở trang ngoài ở tab mới.
+/** KS-16l/16m (Chủ tịch 01/11/2026): dịch vụ chưa mở đặt trực tuyến trên cổng thì bấm vào mở trang riêng ở tab mới.
  *  Gọi ĐỒNG BỘ ngay trong sự kiện bấm (không sau await) để trình duyệt không chặn cửa sổ mới. */
-// KS-16n (Chủ tịch 01/11/2026): www.vietourist.vn/hotel, /restaurant, /tours chưa có (404, chuyển sang vietourist.com.vn)
-// → TẠM trỏ trang chủ. Web chính tạo xong ba trang thì đổi lại đúng đường dẫn ở đây (và LINK_KS_NGOAI phía máy chủ).
-const TRANG_CHU = "https://vietourist.com.vn/";
-export const LINK_NGOAI = { hotel: TRANG_CHU, restaurant: TRANG_CHU, tours: TRANG_CHU } as const;
-export function moNgoai(url: string): void { window.open(url, "_blank", "noopener,noreferrer"); }
+// KS-16q (Chủ tịch duyệt bản xem thử 01/11/2026): ba trang riêng kh.vietourist.vn/hotel, /restaurant, /tours (thay
+// cho trang chủ vietourist.com.vn tạm trỏ ở KS-16n). Trên tên miền cổng, next.config viết lại /hotel → /kham-pha/hotel;
+// ở tên miền khác (crm., bản thử) /tours là màn VTOS nên đi thẳng /kham-pha/…
+export type TrangRieng = "hotel" | "restaurant" | "tours";
+export function duongRieng(k: TrangRieng, id?: number | string): string {
+  return `${laTenMienCong() ? "" : "/kham-pha"}/${k}${id !== undefined && id !== null && id !== "" ? `/${id}` : ""}`;
+}
+export const LINK_NGOAI = {
+  get hotel() { return duongRieng("hotel"); }, get restaurant() { return duongRieng("restaurant"); }, get tours() { return duongRieng("tours"); },
+};
+export function moNgoai(url: string): void { window.open(url, "_blank", "noopener"); }
+
+/* KS-16q · khách CHƯA đăng nhập vẫn XEM được ba trang riêng: các lệnh GET xem (khách sạn, tour, nhà hàng) đi cửa
+   /cong/mo khi không có phiên. Đặt, gửi yêu cầu, đơn của tôi vẫn đi cửa cũ và đòi đăng nhập. */
+const CUA_MO: [RegExp, string][] = [
+  [/^\/ks-vtd\/(tim\b|\d+(\?|$)|\d+\/danh-gia\b)/, "/mo/ks-vtd/"],
+  [/^\/khach\/tour\b/, "/mo/tour"],
+  [/^\/dat-ban\/nha-hang\b/, "/mo/nha-hang"],
+];
+export async function xemCong(path: string): Promise<any> {
+  if (phienCong()) return goiCong(path);
+  for (const [re, moi] of CUA_MO) {
+    if (re.test(path)) {
+      const p = moi === "/mo/ks-vtd/" ? path.replace(/^\/ks-vtd\//, moi) : path.replace(/^\/khach\/tour|^\/dat-ban\/nha-hang/, moi);
+      return goiCong(p);
+    }
+  }
+  return goiCong(path);
+}
+
+/* Lệnh GHI bị 401 khi chưa có phiên → báo khung trang riêng hiện ô «Đăng nhập để tiếp tục». */
+export const SU_KIEN_CAN_DANG_NHAP = "vtd-can-dang-nhap";
+export function duongDangNhap(): string {
+  try { return `/login?ve=${encodeURIComponent(location.pathname + location.search)}`; } catch { return "/login"; }
+}

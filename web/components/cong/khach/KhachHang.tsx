@@ -8,7 +8,7 @@
      …) hiện «Sắp ra mắt» — KHÔNG hiện số mẫu như thật. KH-4 mở đánh giá, góp ý, hỗ trợ.
    · «Gửi yêu cầu» thay «Đặt thử»: chưa giữ chỗ, chưa thu tiền; Sales gọi lại và báo giá cuối. */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { goiCong, LINK_NGOAI, moNgoai } from "@/lib/cong";
+import { duongRieng, goiCong, moNgoai } from "@/lib/cong";
 import { svg } from "./icons";
 import NhaHangKhach from "./NhaHangKhach";
 import QrThanhToan from "./QrThanhToan";
@@ -18,6 +18,7 @@ import { DanhGiaKhach, GopYKhach, HoTroKhach } from "./ChamSocKhach";
 import KhachSanOta from "../KhachSanOta";
 import KhachSanVtd, { PhongCuaToi } from "../KhachSanVtd";
 import VeMayBayOta from "../VeMayBayOta";
+import KhamPhaBaMuc from "./KhamPhaBaMuc";
 
 type Tab = "home" | "deals" | "tour" | "request" | "bookings" | "booking" | "rewards" | "tier" | "favorites" | "reviews" | "feedback" | "support" | "profile";
 const MENU: [Tab, string, string][] = [
@@ -30,15 +31,15 @@ const TIEU_DE: Partial<Record<Tab, string>> = { tour: "Chi tiết dịch vụ", 
 // KH-4 (27/10/2026): đánh giá, góp ý lãnh đạo, hỗ trợ đã mở — không còn mục «Sắp ra mắt».
 const SAP_RA_MAT: Partial<Record<Tab, [string, string]>> = {};
 
-const I = ({ n, s }: { n: string; s?: number }) => <span style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: svg(n, s) }} />;
-const tien = (n?: number | null) => (n || n === 0 ? `${Math.round(n).toLocaleString("vi-VN")} đ` : "—");
-const ngay = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "");
+export const I = ({ n, s }: { n: string; s?: number }) => <span style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: svg(n, s) }} />;
+export const tien = (n?: number | null) => (n || n === 0 ? `${Math.round(n).toLocaleString("vi-VN")} đ` : "—");
+export const ngay = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "");
 const BIEN = /phú quốc|nha trang|quy nhơn|côn đảo|biển|đảo|vũng tàu|phan thiết|mũi né|hạ long|cát bà|bali|phuket/i;
 const DI_SAN = /huế|hội an|di sản|ninh bình|cố đô|mỹ sơn|tràng an|angkor|kyoto/i;
-const canh = (t: any): [string, string] => BIEN.test(t.ten) ? ["sea", "palmtree"] : DI_SAN.test(t.ten) ? ["heritage", "landmark"] : t.nuoc_ngoai ? ["city", "plane"] : ["city", "compass"];
+export const canh = (t: any): [string, string] => BIEN.test(t.ten) ? ["sea", "palmtree"] : DI_SAN.test(t.ten) ? ["heritage", "landmark"] : t.nuoc_ngoai ? ["city", "plane"] : ["city", "compass"];
 
-function Badge({ c, children }: { c?: string; children: any }) { return <span className={`v3-badge ${c || "neutral"}`}>{children}</span>; }
-function Nut({ i, children, kieu = "secondary", ...p }: any) {
+export function Badge({ c, children }: { c?: string; children: any }) { return <span className={`v3-badge ${c || "neutral"}`}>{children}</span>; }
+export function Nut({ i, children, kieu = "secondary", ...p }: any) {
   return <button type="button" className={`v3-button v3-${kieu} cursor-interaction`} {...p}>{i && <I n={i} />}<span>{children}</span></button>;
 }
 
@@ -51,7 +52,7 @@ function useYt() {
   return ids;
 }
 
-function TheTour({ t, mo }: { t: any; mo: (t: any) => void }) {
+export function TheTour({ t, mo, ngoai = true }: { t: any; mo: (t: any) => void; ngoai?: boolean }) {
   const ids = useYt(); const da = ids.includes(t.id);
   const doi = (e: React.MouseEvent) => { e.stopPropagation(); goiCong("/khach/yeu-thich", { tour_id: t.id, luu: !da }).then((r) => datYt(r.ids)).catch(() => null); };
   const [c, icon] = canh(t);
@@ -63,7 +64,7 @@ function TheTour({ t, mo }: { t: any; mo: (t: any) => void }) {
     <div className="v3-product-body"><small>{t.thoi_gian} · {ngay(t.khoi_hanh)}{t.noi_khoi_hanh ? ` · từ ${t.noi_khoi_hanh}` : ""}</small>
       <h3>{t.ma}{t.it_cho ? " · sắp hết chỗ" : ""}</h3>
       <div className="v3-price">{t.gia_goc && <del>{tien(t.gia_goc)}</del>}<strong>{tien(t.gia)}</strong><small>/khách · giá bán hiện hành</small></div>
-      <Nut i="arrow-up-right" onClick={() => mo(t)}>Xem hành trình ↗</Nut></div>
+      <Nut i={ngoai ? "arrow-up-right" : "arrow-right"} onClick={() => mo(t)}>{ngoai ? "Xem hành trình ↗" : "Xem hành trình"}</Nut></div>
   </article>);
 }
 
@@ -115,8 +116,8 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
     if (tab === "profile" && !hs) goiCong("/khach/ho-so").then(setHs).catch((x) => setErr(x.message));
   }, [tab, ds, don, hs, timTour]);
 
-  // KS-16m (Chủ tịch 01/11/2026): bấm vào tour mở www.vietourist.vn/tours ở tab mới (tour chưa đặt trực tuyến trên cổng)
-  const moTour = (_t: any) => { moNgoai(LINK_NGOAI.tours); };
+  // KS-16m → KS-16q (Chủ tịch duyệt 01/11/2026): bấm vào tour mở trang riêng kh.vietourist.vn/tours/<id> ở tab mới
+  const moTour = (t: any) => { moNgoai(duongRieng("tours", t?.id)); };
   const moYeuCau = (loai: "tour" | "tour_doan") => { setLoaiYc(loai); setYc({ so_khach: loai === "tour" ? 2 : 20, dien_thoai: "", ngay_mong_muon: "", ghi_chu: "", dong_y: false }); di("request"); };
   const guiYc = async () => {
     setBusy(true); setErr(""); setMsg("");
@@ -158,6 +159,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
         {err && <div className="v3-notice warn"><I n="info" /><span>{err}</span></div>}
 
         {tab === "home" && <>
+          <KhamPhaBaMuc />{/* KS-16q: ba trang riêng Tour / Khách sạn / Nhà hàng */}
           <section className="v3-hero customer"><div><span className="v3-eyebrow">VIETOURIST • HÀNH TRÌNH CỦA BẠN</span>
             <h2>Đi để trải nghiệm.<br />Trở về với nhiều điều hơn.</h2><p>Ưu đãi phù hợp, hành trình rõ ràng,<br />quyền lợi được giữ trong một tài khoản.</p>
             <Nut kieu="primary" i="compass" onClick={() => di("deals")}>Tìm chuyến đi tiếp theo</Nut></div>
@@ -179,8 +181,6 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
           <div className="v3-products">{(home?.tour || []).map((t: any) => <TheTour key={t.id} t={t} mo={moTour} />)}</div>
           {home && !home.tour.length && <section className="v3-panel"><p>Chưa có tour mở bán. Gửi yêu cầu tour đoàn để Sales thiết kế hành trình riêng.</p></section>}
           <div className="v3-shortcuts"><Nut i="users" onClick={() => moYeuCau("tour_doan")}>Tour đoàn theo yêu cầu</Nut><Nut i="luggage" onClick={() => di("bookings")}>Đơn của tôi</Nut><Nut i="user-round" onClick={() => di("profile")}>Hồ sơ & riêng tư</Nut></div>
-          <section className="v3-panel"><div className="v3-section-title"><h3>Thưởng thức một điểm đến</h3><Nut kieu="quiet" i="utensils" onClick={() => { setDv("nha_hang"); di("deals"); }}>Khám phá ẩm thực</Nut></div>
-            <p>Chọn nhà hàng, xem thực đơn và gửi yêu cầu đặt bàn trong cùng tài khoản VTD. Đặt phòng khách sạn qua đối tác OTA của Vietourist.</p></section>
         </>}
 
         {tab === "deals" && <>

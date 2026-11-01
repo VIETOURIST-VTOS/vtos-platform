@@ -69,7 +69,7 @@ function Ngoai({ man }: { man: Exclude<Man, "cong" | "noi"> }) {
     try {
       const r = await goi("/xac-thuc", { khoa: gui.khoa, ma, dong_y_dieu_khoan: dongY });
       luuPhienCong(r.phien);
-      location.replace("/cong");
+      location.replace(veSauDangNhap());   // KS-16q: quay lại trang riêng /hotel, /restaurant, /tours nếu đến từ đó
     } catch (x: any) {
       if (x.ma === "can_dong_y") setCanDongY(true);
       if (x.ma === "ma_het") setGui(null);
@@ -109,6 +109,14 @@ function Ngoai({ man }: { man: Exclude<Man, "cong" | "noi"> }) {
   </form>);
 }
 
+/* KS-16q: /login?ve=/hotel/12 — chỉ nhận đường dẫn trang riêng cùng tên miền (không mở chuyển hướng ra ngoài). Ghi vào
+   sessionStorage vì màn đăng nhập tự đổi địa chỉ khi chọn loại tài khoản. */
+const VE_HOP_LE = /^\/(kham-pha\/)?(hotel|restaurant|tours)(\/\d+)?(\?[^#]*)?$/;
+function veSauDangNhap(): string {
+  try { const v = sessionStorage.getItem("vtd_ve") || ""; sessionStorage.removeItem("vtd_ve"); if (VE_HOP_LE.test(v)) return v; } catch { /* bỏ qua */ }
+  return "/cong";
+}
+
 export default function Login() {
   const [man, setMan] = useState<Man>("cong");
   const [hoTro, setHoTro] = useState(false);
@@ -117,6 +125,7 @@ export default function Login() {
     // CG-3: trên kh./dt./ir. bỏ qua và xóa phiên VTOS — tên miền cổng ngoài không mở VTOS.
     if (laTenMienCong()) clearSession();
     else if (getUser()) { location.replace("/"); return; }
+    try { const ve = new URLSearchParams(location.search).get("ve") || ""; if (VE_HOP_LE.test(ve)) sessionStorage.setItem("vtd_ve", ve); } catch { /* bỏ qua */ }
     setXemIr(new URLSearchParams(location.search).get("xem") === "ir");
     const q = new URLSearchParams(location.search).get("cong") as Man | null;
     if (q === "noi" && laTenMienCong()) { location.replace(`${VTOS_GOC}/login`); return; }

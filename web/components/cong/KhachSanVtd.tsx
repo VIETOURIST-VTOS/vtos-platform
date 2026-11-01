@@ -13,7 +13,7 @@
 import { DaiVideo, VideoO } from "./VideoCong";   // KS-16f
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
-import { diCongThe, goiCong } from "@/lib/cong";
+import { diCongThe, duongRieng, goiCong, moNgoai, xemCong } from "@/lib/cong";
 import { DanhGiaKsCong, MUC_KS, OD, TomTatDg, VietDanhGiaKs, nhanDiem } from "./DanhGiaKs";
 
 type Q = { tinh: string; vao: string; ra: string; nl: number; te: number; phong: number; tuoi?: number[] };
@@ -99,7 +99,9 @@ function Album({ ks, dau, onDong }: { ks: any; dau?: { nhom?: string; lp?: numbe
     </div></div>;
 }
 
-export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string; ten?: string }) {
+// KS-16q: rieng = đang ở trang riêng kh.vietourist.vn/hotel (khách có thể chưa đăng nhập — xem qua cửa /cong/mo);
+// moId = đường dẫn /hotel/<id> mở thẳng khách sạn đó.
+export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId }: { lienHe?: string; ten?: string; rieng?: boolean; moId?: number }) {
   const homNay = iso(new Date());
   const [q, setQ] = useState<Q>({ tinh: "", vao: themNgay(homNay, 7), ra: themNgay(homNay, 9), nl: 2, te: 0, phong: 1 });
   const [ds, setDs] = useState<any>(null);
@@ -137,14 +139,14 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
     try {
       // Lấy mọi thành phố một lần (danh mục nhỏ) rồi lọc ngay trên màn — đổi thành phố không phải chờ máy chủ.
       const p = new URLSearchParams({ tinh: "", vao: qq.vao, ra: qq.ra, nguoi_lon: String(qq.nl), tre_em: String(qq.te), so_phong: String(qq.phong), tuoi: tuoiStr(qq) });
-      const r = await goiCong(`/ks-vtd/tim?${p}`);
+      const r = await xemCong(`/ks-vtd/tim?${p}`);
       setDs(r);
       if (!qq.tinh && r.thanh_pho?.length) setQ({ ...qq, tinh: r.thanh_pho[0].ten });
       setBuoc("ds");
       if (sang) { setDaTim(true); len(); }
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
   };
-  useEffect(() => { tim(); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { tim().then(() => { if (moId) moKs(moId); }); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
   // KS-14: quay về từ trang thẻ OnePay (?ks_vtd=…&the=ok|loi) → mở thẳng trang đơn.
   useEffect(() => {
     try {
@@ -164,12 +166,14 @@ export default function KhachSanVtd({ lienHe = "", ten = "" }: { lienHe?: string
     setLoi(""); setBusy(true);
     try {
       const p = new URLSearchParams({ vao: qq.vao, ra: qq.ra, nguoi_lon: String(qq.nl), tre_em: String(qq.te), so_phong: String(qq.phong), tuoi: tuoiStr(qq) });
-      setKs(await goiCong(`/ks-vtd/${id}?${p}`)); setChon({}); setLocP([]); setBuoc("ks"); len();
+      setKs(await xemCong(`/ks-vtd/${id}?${p}`)); setChon({}); setLocP([]); setBuoc("ks"); len();
+      if (rieng) { try { window.history.replaceState(null, "", duongRieng("hotel", id)); } catch { /* bỏ qua */ } }
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
   };
 
-  // KS-16l: khách sạn chưa có gói đặt được thì chưa book trên cổng — mở trang ngoài ở tab mới
-  const moThe = (k: any) => { if (k.dat_ngay === false && k.link_ngoai) { window.open(k.link_ngoai, "_blank", "noopener,noreferrer"); return; } moKs(k.id); };
+  // KS-16l → KS-16q: trên cổng, khách sạn chưa có gói đặt được mở trang riêng /hotel/<id> ở tab mới; ở chính trang
+  // riêng thì mở chi tiết ngay tại chỗ (gửi yêu cầu giữ phòng).
+  const moThe = (k: any) => { if (!rieng && k.dat_ngay === false && k.link_ngoai) { moNgoai(duongRieng("hotel", k.id)); return; } moKs(k.id); };
 
   const loc2 = useMemo(() => {
     if (!ds) return [];
@@ -1174,4 +1178,13 @@ const CSS = `
   .ksv-stp .ln{width:30px}.ksv-stp .s{min-width:70px;font-size:11.5px}
 }
 @media (max-width:600px){.ksv-fl2,.ksv-req{grid-template-columns:1fr}.ksv-hero h1{font-size:22px}.ksv-sbody{padding:14px 14px 0}.ksv-alb{padding:10px}.ksv-alb-big{height:46vh}}
+/* KS-16q: trong cổng (#vtd-access .v3-app) bộ CSS v3 đè màu chữ nút, tiêu đề, ô nhập — giữ đúng màu của giao diện khách sạn. */
+#vtd-access .ksv .ksv-hero h1{color:#fff;letter-spacing:0;line-height:1.25}
+/* «#vtd-access button{color:inherit}» của vtd.css mạnh hơn lớp .ksv-* → nút xanh ra chữ tối. Nhắc lại màu chữ nút ở đây. */
+#vtd-access .ksv button.ksv-btn-tim,#vtd-access .ksv button.ksv-btn,#vtd-access .ksv button.ksv-go,#vtd-access .ksv button.ksv-alb-x{color:#fff}
+#vtd-access .ksv button.ksv-btn.line,#vtd-access .ksv button.ksv-link{color:var(--ksv-ink)}
+#vtd-access .ksv button.ksv-ten{color:var(--ksv-fg)}#vtd-access .ksv button.ksv-ten:hover{color:var(--ksv-ink)}
+#vtd-access .ksv button.ksv-alb-nv{color:#111}
+#vtd-access .ksv button.ksv-chip{color:#3d4556}#vtd-access .ksv button.ksv-chip.on{color:var(--ksv-ink)}
+#vtd-access .ksv input[type=date]{color:inherit;-webkit-text-fill-color:currentColor}
 `;
