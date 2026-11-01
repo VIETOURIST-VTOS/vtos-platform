@@ -254,3 +254,90 @@ def dang_ky_xong(data: DangKyXongIn, ip: str = Depends(cong_cua_mo),
     except C.LoiCong as ex:
         _loi(ex)
     return {"phien": phien, "toi": C.toi_out(tk)}
+
+
+# ──────────────────────────────────────────── DK-2 · đăng nhập bằng mật khẩu, nhớ máy, quên mật khẩu
+# Bốn cửa đầu CÔNG KHAI (qua cong_cua_mo đã khai ở DK-1b); hai cửa cuối đòi PHIÊN CỔNG NGOÀI.
+
+class DangNhapIn(BaseModel):
+    loai: str
+    lien_he: str
+    mat_khau: str
+    dau_nho: str = ""
+    kenh: str = ""
+
+
+@router.post("/dang-nhap")
+def dang_nhap(data: DangNhapIn, ip: str = Depends(cong_cua_mo), db: Session = Depends(get_db)):
+    """Bước 1. Mọi kiểu sai trả CÙNG MỘT câu — màn này không được thành máy dò."""
+    try:
+        return C.dang_nhap(db, data.loai, data.lien_he, data.mat_khau, data.dau_nho, data.kenh, ip)
+    except C.LoiCong as ex:
+        _loi(ex)
+
+
+class DangNhapXacMinhIn(BaseModel):
+    khoa: str
+    ma: str
+    nho_may: bool = False
+    ten_may: str = ""
+
+
+@router.post("/dang-nhap/xac-minh")
+def dang_nhap_xac_minh(data: DangNhapXacMinhIn, ip: str = Depends(cong_cua_mo),
+                       db: Session = Depends(get_db)):
+    """Bước 2, chỉ khi máy lạ. Mã MỘT MÌNH không mở được gì — phải qua bước 1 trước."""
+    try:
+        return C.dang_nhap_xac_minh(db, data.khoa, data.ma, data.nho_may, data.ten_may, ip)
+    except C.LoiCong as ex:
+        _loi(ex)
+
+
+class QuenMaIn(BaseModel):
+    loai: str
+    lien_he: str
+    kenh: str
+
+
+@router.post("/quen-mat-khau/ma")
+def quen_mat_khau_ma(data: QuenMaIn, ip: str = Depends(cong_cua_mo),
+                     db: Session = Depends(get_db)):
+    """Câu trả lời KHÔNG đổi dù liên hệ có tài khoản hay không."""
+    try:
+        return C.quen_mat_khau_gui_ma(db, data.loai, data.lien_he, data.kenh, ip)
+    except C.LoiCong as ex:
+        _loi(ex)
+
+
+class QuenDatLaiIn(BaseModel):
+    khoa: str
+    ma: str
+    mat_khau: str
+
+
+@router.post("/quen-mat-khau/dat-lai")
+def quen_mat_khau_dat_lai(data: QuenDatLaiIn, ip: str = Depends(cong_cua_mo),
+                          db: Session = Depends(get_db)):
+    """Đặt lại xong: đăng xuất mọi nơi và quên mọi máy đã nhớ."""
+    try:
+        return C.quen_mat_khau_dat_lai(db, data.khoa, data.ma, data.mat_khau)
+    except C.LoiCong as ex:
+        _loi(ex)
+
+
+@router.get("/may")
+def may_cua_toi(tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    """Người dùng tự xem danh sách máy đã nhớ."""
+    return {"dong": C.may_cua_toi(db, tk), "nho_ngay": C.NHO_MAY_NGAY,
+            "toi_da": C.NHO_MAY_TOI_DA}
+
+
+@router.post("/may/{may_id}/go")
+def go_may(may_id: int, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai),
+           db: Session = Depends(get_db)):
+    """Và tự gỡ được từng máy — không phải gọi tổng đài."""
+    try:
+        C.go_may(db, tk, may_id)
+    except C.LoiCong as ex:
+        _loi(ex)
+    return {"message": "Đã gỡ máy này. Lần sau vào từ máy ấy phải xác minh lại."}
