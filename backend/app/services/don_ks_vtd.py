@@ -31,6 +31,10 @@ GIU_PHUT = 15                       # phòng giữ cho khách trong lúc trả t
 CHOT_GIO = 2                        # Điều hành chốt với khách sạn trong 2 giờ làm việc
 GIO_LAM = (time(8, 0), time(17, 30))  # thứ Hai – thứ Bảy
 DON_CHO_TRA_TOI_DA = 3              # một tài khoản giữ tối đa 3 đơn chưa trả cùng lúc
+# KS-16p: «Đặt giữ, trả sau» — hạn trả = hạn hủy miễn phí sớm nhất − 2 ngày; mỗi tài khoản giữ tối đa 1 đơn trả sau chưa trả
+TRA_SAU_TRUOC_HUY = 2
+TRA_SAU_TOI_DA = 1
+NHAC_TRUOC_NGAY = (3, 1)
 VAI_DH = S.VAI_NHAP
 VAI_KE_TOAN = ("ketoan",)
 VAI_SALES = ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "sales_admin")
@@ -220,7 +224,55 @@ def het_han_tat(db: Session, now: datetime | None = None) -> None:
     for d in db.execute(select(DonKsVtd).where(DonKsVtd.trang_thai == "cho_tra", DonKsVtd.giu_den <= now)).scalars().all():
         d.trang_thai = "het_han"
         _voucher_doi_chieu(db, d, now)
+    nhac_han_tra(db, now)
     db.flush()
+
+
+def _gui_nhac_email(d: DonKsVtd, ks_ten: str, con_ngay: int) -> bool:
+    """KS-16p: email nhắc hạn trả (nếu đơn có email và máy chủ đã cấu hình SMTP). Zalo chưa có mẫu tin duyệt → chưa gửi."""
+    from app.core.config import settings
+    if not (d.email and settings.SMTP_HOST and settings.SMTP_FROM):
+        return False
+    import smtplib
+    from email.message import EmailMessage
+    m = EmailMessage()
+    m["Subject"] = f"Nhắc hạn thanh toán đơn {d.ma} — còn {con_ngay} ngày"
+    m["From"], m["To"] = settings.SMTP_FROM, d.email
+    m.set_content(f"Chào {d.ho_ten},\n\nĐơn {d.ma} ({ks_ten}, {d.vao:%d/%m/%Y} – {d.ra:%d/%m/%Y}) đang được giữ phòng tới hết ngày "
+                  f"{d.han_tra:%d/%m/%Y}. Số tiền {_vnd(d.tong)} đ.\nVào «Phòng đã đặt của tôi» trên cổng Vietourist để trả bằng QR hoặc thẻ. "
+                  "Quá hạn chưa trả, đơn tự hủy và không mất phí.\n\n" + settings.COMPANY_NAME)
+    cls = smtplib.SMTP_SSL if settings.SMTP_SSL else smtplib.SMTP
+    with cls(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as sv:
+        if not settings.SMTP_SSL:
+            sv.starttls()
+        if settings.SMTP_USER:
+            sv.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        sv.send_message(m)
+    return True
+
+
+GUI_NHAC = _gui_nhac_email   # phép thử thay bằng hàm ghi lại
+
+
+def nhac_han_tra(db: Session, now: datetime | None = None) -> list[str]:
+    """KS-16p: đơn trả sau còn 3 / 1 ngày tới hạn → nhắc một lần mỗi mốc (ghi vào nhac_luc dù gửi được hay không,
+    để không gửi lặp; trang đơn của khách và danh sách VTOS luôn hiện hạn trả)."""
+    now = now or datetime.now()
+    ra = []
+    for d in db.execute(select(DonKsVtd).where(DonKsVtd.trang_thai == "cho_tra", DonKsVtd.cach_tra == "sau",
+                                               DonKsVtd.han_tra.is_not(None))).scalars().all():
+        con = (d.han_tra - now.date()).days
+        moc = min((m for m in NHAC_TRUOC_NGAY if con <= m), default=None)   # mốc gần hạn nhất đã tới
+        if moc is None or con < 0 or moc in (d.nhac_luc or []):
+            continue
+        try:
+            k = db.get(KhachSanVtd, d.khach_san_id)
+            GUI_NHAC(d, k.ten if k else "", max(con, 0))
+        except Exception:   # noqa: BLE001 — nhắc là phụ, không làm hỏng việc chính
+            pass
+        d.nhac_luc = sorted(set((d.nhac_luc or []) + [m for m in NHAC_TRUOC_NGAY if m >= moc]), reverse=True)
+        ra.append(d.ma)
+    return ra
 
 
 def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict], nl: int = 1, te: int = 0, tuoi=None) -> list[dict]:
@@ -262,6 +314,14 @@ def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict]
             x["giuong_phu_cho_xac_nhan"] = True     # Điều hành hỏi khách sạn; không xếp được → báo hết phòng, hoàn 100%
         x["thue"] = int(round(x["tien"] * float(k.thue_phi_pt or 0) / 100))
     return dong
+
+
+def han_tra_sau(dong: list[dict], hom_nay: date) -> date | None:
+    """KS-16p: hạn trả cho «Đặt giữ, trả sau». None = không cho trả sau (có gói không hoàn tiền, hoặc hạn đã qua)."""
+    if not dong or any(not x.get("huy_han") for x in dong):
+        return None
+    han = min(date.fromisoformat(str(x["huy_han"])[:10]) for x in dong) - timedelta(days=TRA_SAU_TRUOC_HUY)
+    return han if han > hom_nay else None
 
 
 def dat(db: Session, tk, kid: int, d: dict, now: datetime | None = None) -> DonKsVtd:
@@ -312,18 +372,31 @@ def dat(db: Session, tk, kid: int, d: dict, now: datetime | None = None) -> DonK
         except RW.LoiDiem as ex:
             raise LoiDon(str(ex))
     giam = int(v.gia_tri) if v else 0
+    cach_tra = "sau" if str(d.get("cach_tra") or "ngay") == "sau" else "ngay"
+    han_tra, giu_den = None, now + timedelta(minutes=GIU_PHUT)
+    if cach_tra == "sau":                                            # KS-16p
+        han_tra = han_tra_sau(dong, now.date())
+        if han_tra is None:
+            raise LoiDon("Gói này không cho đặt giữ trả sau (không hoàn tiền hoặc ngày nhận phòng quá gần) — chọn «Trả ngay»")
+        dang_sau = db.execute(select(func.count(DonKsVtd.id)).where(
+            DonKsVtd.tai_khoan_ngoai_id == tk.id, DonKsVtd.trang_thai == "cho_tra", DonKsVtd.cach_tra == "sau",
+            DonKsVtd.giu_den > now)).scalar() or 0
+        if dang_sau >= TRA_SAU_TOI_DA:
+            raise LoiDon("Bạn đang giữ một đơn trả sau chưa trả — trả hoặc hủy đơn đó trước, hoặc chọn «Trả ngay»", 409)
+        giu_den = datetime.combine(han_tra, datetime.max.time()).replace(microsecond=0)
     don = DonKsVtd(ma=_ma_moi(db, vao), khach_san_id=k.id, tai_khoan_ngoai_id=tk.id, cong=tk.loai, ho_ten=ho_ten,
                    lien_he=lien_he, email=email, yeu_cau=((f"Tuổi trẻ em: {', '.join(str(t) for t in tuoi)}\n" if tuoi else "")
                                                                    + str(d.get("yeu_cau") or "").strip())[:1500], vao=vao, ra=ra,
                    nguoi_lon=nl, tre_em=te, dong=dong, so_phong=so, tien_phong=tien, thue_phi=thue, tong=tien + thue - giam,
-                   trang_thai="cho_tra", giu_den=now + timedelta(minutes=GIU_PHUT), tao_luc=now,
-                   voucher_id=v.id if v else None, giam_voucher=giam)
+                   trang_thai="cho_tra", giu_den=giu_den, tao_luc=now,
+                   voucher_id=v.id if v else None, giam_voucher=giam, cach_tra=cach_tra, han_tra=han_tra, nhac_luc=[])
     db.add(don)
     db.flush()
     if v is not None:
         RW.ap_voucher_ks(db, tk, v, don, now)
     R.audit(db, f"cong:{tk.id}", tk.loai, "ks_vtd_dat", f"don_ks_vtd:{don.ma}",
-            after={"tong": tien + thue - giam, "so_phong": so, "giam_voucher": giam})
+            after={"tong": tien + thue - giam, "so_phong": so, "giam_voucher": giam, "cach_tra": cach_tra,
+                   "han_tra": han_tra.isoformat() if han_tra else None})
     db.flush()
     return don
 
@@ -405,6 +478,7 @@ def ra_khach(db: Session, d: DonKsVtd, now: datetime | None = None) -> dict:
             "trang_thai": d.trang_thai, "trang_thai_ten": TRANG_THAI_DON.get(d.trang_thai, d.trang_thai),
             "giu_den": d.giu_den.isoformat(timespec="seconds") if d.giu_den else None,
             "giay_con": max(0, int((d.giu_den - now).total_seconds())) if d.trang_thai == "cho_tra" and d.giu_den else 0,
+            "cach_tra": d.cach_tra or "ngay", "han_tra": d.han_tra.isoformat() if d.han_tra else None,   # KS-16p
             "tra_luc": d.tra_luc.isoformat(timespec="minutes") if d.tra_luc else None,
             "han_chot": d.han_chot.isoformat(timespec="minutes") if d.han_chot else None,
             "ma_xac_nhan_ks": d.ma_xac_nhan_ks, "xac_nhan_luc": d.xac_nhan_luc.isoformat(timespec="minutes") if d.xac_nhan_luc else None,

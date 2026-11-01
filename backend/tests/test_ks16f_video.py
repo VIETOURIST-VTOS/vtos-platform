@@ -66,9 +66,9 @@ def test_tai_len_tung_phan_va_luat(db, kho):
     # mức chuẩn chỉ nhắc
     o = V.ds(db, dh, "khach_san_vtd", k.id)
     assert [c["co"] for c in o["chuan"]] == [True, False, False] and not o["du_chuan"]
-    for i in range(4):
+    for i in range(2):                                                       # KS-16p: khách sạn tối đa 3 video
         _tai(db, dh, "khach_san_vtd", k.id, 1, loai="trai_nghiem")
-    with pytest.raises(V.LoiVideo, match="đủ 5"):
+    with pytest.raises(V.LoiVideo, match="đủ 3"):
         V.bat_dau(db, dh, "khach_san_vtd", k.id, {"ten_tep": "a.mp4", "kich_thuoc": MB, "nguon": "x", "xac_nhan_quyen": True})
     # người khác không xóa được; người tải xóa được; TP Điều hành xóa mọi video
     ds_ = V._cua(db, "khach_san_vtd", k.id)
@@ -77,12 +77,12 @@ def test_tai_len_tung_phan_va_luat(db, kho):
     V.xoa(db, dh, ds_[1].id)
     V.xoa(db, tp, v.id)                                                      # xóa video giới thiệu → video khác lên thay
     con = V._cua(db, "khach_san_vtd", k.id)
-    assert len(con) == 3 and sum(x.la_gioi_thieu for x in con) == 1
+    assert len(con) == 1 and sum(x.la_gioi_thieu for x in con) == 1
     V.dat_gioi_thieu(db, dh, con[-1].id)
     assert V._cua(db, "khach_san_vtd", k.id)[0].id == con[-1].id
     V.huy(db, dh, V.bat_dau(db, dh, "khach_san_vtd", k.id, {"ten_tep": "b.webm", "kich_thuoc": MB, "nguon": "x",
                                                            "xac_nhan_quyen": True}).id)
-    assert len(V._cua(db, "khach_san_vtd", k.id)) == 3
+    assert len(V._cua(db, "khach_san_vtd", k.id)) == 1
 
 
 def test_cong_chi_video_dang_hien_va_gan_loai_phong(db, kho):
