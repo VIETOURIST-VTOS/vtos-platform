@@ -74,19 +74,60 @@ LAN_TEP = {
 LAN_HOP_LE = tuple(LAN_TEP)
 
 
+def _la_md(ten: str) -> bool:
+    return ten.endswith(".md") and ten != "README.md"
+
+
+def _tep_trong_lan(slug: str) -> list[str]:
+    """Mọi tệp sổ của MỘT làn: tệp phẳng `<slug>.md`, rồi từng tệp trong thư mục `<slug>/`.
+
+    ĐỢT SO-DOT 02/11/2026 — mỗi ĐỢT một tệp. Tách làn (06/10) chữa xung đột GIỮA các làn; nó
+    không chữa được hai đợt của CÙNG một làn, vì cả hai vẫn nối vào cuối một tệp. Đo được
+    02/11: bốn nhánh R4c liên tiếp không gộp, và `phan-quyen.md` đã là 444 KB / 187 dòng /
+    16 dòng "đang làm" trong khi `vpm.md` là 334 byte.
+
+    Một đợt TẠO một tệp mới thì git không có gì để hoà — không phải hoà khéo hơn, mà là không có
+    xung đột nào tồn tại. Đó là khác biệt giữa chữa triệu chứng và bỏ nguyên nhân.
+
+    Hai dạng sống chung có chủ ý: làn cũ giữ tệp phẳng, làn mới dùng thư mục, và một làn dùng cả
+    hai cũng được. Ép dời là làm gãy nhánh đang bay — cùng lẽ với việc giữ `docs/DANG-LAM.md`.
+    """
+    ds = []
+    phang = os.path.join(THU_MUC, slug + ".md")
+    if os.path.exists(phang):
+        ds.append(phang)
+    thu_muc = os.path.join(THU_MUC, slug)
+    if os.path.isdir(thu_muc):
+        ds += [os.path.join(thu_muc, t) for t in sorted(os.listdir(thu_muc)) if _la_md(t)]
+    return ds
+
+
+def _lan_cua_tep(duong: str) -> str:
+    """Tệp này là sổ của làn nào — rỗng nếu không ứng với làn nào đã khai."""
+    r = os.path.relpath(duong, THU_MUC).replace("\\", "/")
+    slug = r.split("/")[0][:-3] if "/" not in r else r.split("/")[0]
+    for lan, s in LAN_TEP.items():
+        if s == slug:
+            return lan
+    return ""
+
+
 def _nguon() -> list[str]:
-    """Mọi tệp sổ, theo thứ tự cố định: quyển cũ trước, rồi từng tệp làn theo tên.
+    """Mọi tệp sổ, theo thứ tự cố định: quyển cũ trước, rồi từng làn theo tên làn.
 
     Thứ tự cố định chứ không theo `os.listdir` là có chủ ý: lời báo lỗi của phép thử chính liệt kê
     "dòng nào gặp trước" nên thứ tự đổi theo hệ tệp sẽ làm cùng một lỗi in ra hai kiểu trên hai máy.
+
+    ĐỢT SO-DOT: đi qua `LAN_TEP` chứ không qua `os.listdir(THU_MUC)`. Một thư mục lạ trong
+    `docs/dang-lam/` KHÔNG lặng lẽ thành nguồn — nó bị
+    `test_moi_lan_deu_co_mot_tep_va_khong_tep_nao_thua` chặn, và đó là chỗ nó phải kêu.
     """
     ds = []
     if os.path.exists(BANG_CU):
         ds.append(BANG_CU)
     if os.path.isdir(THU_MUC):
-        for ten in sorted(os.listdir(THU_MUC)):
-            if ten.endswith(".md") and ten != "README.md":
-                ds.append(os.path.join(THU_MUC, ten))
+        for slug in sorted(LAN_TEP.values()):
+            ds += _tep_trong_lan(slug)
     return ds
 
 
@@ -251,20 +292,17 @@ def test_dong_nam_trong_tep_cua_lan_nao_thi_phai_la_lan_ay():
     """
     if not os.path.isdir(THU_MUC):
         pytest.skip("Chưa tách tệp")
+    # ĐỢT SO-DOT: duyệt theo LAN_TEP nên bắt cả tệp phẳng lẫn tệp trong thư mục làn.
     sai = []
-    for ten in sorted(os.listdir(THU_MUC)):
-        if not ten.endswith(".md") or ten == "README.md":
-            continue
-        slug = ten[:-3]
+    for slug in sorted(LAN_TEP.values()):
         chu = [l for l, s in LAN_TEP.items() if s == slug]
-        assert chu, (
-            f"docs/dang-lam/{ten} không ứng với làn nào. Sáu tệp hợp lệ: "
-            f"{sorted(s + '.md' for s in LAN_TEP.values())}. Thêm làn mới thì khai vào LAN_TEP "
-            f"trong {os.path.basename(__file__)} TRƯỚC, rồi mới tạo tệp.")
-        for d in _doc_mot_tep(os.path.join(THU_MUC, ten)):
-            if d["lan"] != chu[0]:
-                sai.append(f"  · docs/dang-lam/{ten} dòng {d['so_dong']}: khai làn “{d['lan']}”, "
-                           f"nhưng tệp này là của làn “{chu[0]}”")
+        assert chu
+        for duong in _tep_trong_lan(slug):
+            ten = os.path.relpath(duong, ROOT).replace("\\", "/")
+            for d in _doc_mot_tep(duong):
+                if d["lan"] != chu[0]:
+                    sai.append(f"  · {ten} dòng {d['so_dong']}: khai làn “{d['lan']}”, "
+                               f"nhưng chỗ này là của làn “{chu[0]}”")
     assert not sai, (
         "DÒNG NẰM NHẦM TỆP LÀN:\n" + "\n".join(sai)
         + "\n\nMỗi làn ghi vào tệp của chính mình – đó là toàn bộ cái mua được khi tách sổ ngày "
@@ -291,12 +329,31 @@ def test_moi_lan_deu_co_mot_tep_va_khong_tep_nao_thua():
     """
     if not os.path.isdir(THU_MUC):
         pytest.skip("Chưa tách tệp")
-    co = {t[:-3] for t in os.listdir(THU_MUC) if t.endswith(".md") and t != "README.md"}
+    # ĐỢT SO-DOT 02/11/2026 — một làn có thể là MỘT TỆP `<slug>.md`, một THƯ MỤC `<slug>/`, hoặc
+    # cả hai. Tên ở đây là tên chỗ chứa, không còn là tên tệp.
+    co = set()
+    for t in os.listdir(THU_MUC):
+        duong = os.path.join(THU_MUC, t)
+        if os.path.isdir(duong):
+            co.add(t)
+        elif t.endswith(".md") and t != "README.md":
+            co.add(t[:-3])
     can = set(LAN_TEP.values())
     assert co == can, (
         f"docs/dang-lam/ không khớp danh sách làn.\n"
         f"  thiếu : {sorted(can - co)}\n  thừa  : {sorted(co - can)}\n"
-        f"Khai làn mới trong LAN_TEP rồi tạo đúng tệp cùng tên.")
+        f"Khai làn mới trong LAN_TEP rồi tạo đúng tệp — hoặc thư mục — cùng tên.")
+    # Thư mục của một làn KHÔNG được có thư mục con: `_tep_trong_lan` chỉ đọc một bậc, nên một
+    # bậc nữa là những dòng ấy biến mất khỏi tập gộp mà không gì kêu lên.
+    sau = []
+    for slug in can:
+        tm = os.path.join(THU_MUC, slug)
+        if os.path.isdir(tm):
+            sau += [f"docs/dang-lam/{slug}/{t}" for t in sorted(os.listdir(tm))
+                    if os.path.isdir(os.path.join(tm, t))]
+    assert not sau, (
+        "THƯ MỤC CON TRONG THƯ MỤC LÀN: " + ", ".join(sau)
+        + "\nBộ đọc chỉ đi MỘT bậc, nên mọi dòng nằm sâu hơn sẽ rơi khỏi tập gộp trong im lặng.")
 
 
 def test_tap_gop_khong_bo_sot_mot_tep_nguon_nao():
@@ -311,12 +368,18 @@ def test_tap_gop_khong_bo_sot_mot_tep_nguon_nao():
     thì bao giờ cũng nhận được câu “không bỏ sót gì” – thử lần đầu viết kiểu ấy, và cả hai phép
     phá (bỏ quyển cũ, bỏ các tệp làn) đều SỐNG. Danh sách nguồn ở đây dựng thẳng từ hệ tệp.
     """
+    # ĐỢT SO-DOT: danh sách này vẫn dựng THẲNG TỪ HỆ TỆP — `os.walk`, không gọi `_nguon()` và
+    # cũng không gọi `_tep_trong_lan()`. Hỏi chính cái hàm đang nghi ngờ xem nó bỏ sót gì thì bao
+    # giờ cũng nhận được câu “không bỏ sót gì”. Đi SÂU hơn một bậc có chủ ý: nếu ai đó để một
+    # tệp sổ ở bậc thứ hai, phép thử này phải THẤY nó và báo bộ đọc đang bỏ sót.
     can = []
     if os.path.exists(BANG_CU):
         can.append(BANG_CU)
     if os.path.isdir(THU_MUC):
-        can += [os.path.join(THU_MUC, t) for t in sorted(os.listdir(THU_MUC))
-                if t.endswith(".md") and t != "README.md"]
+        for goc, _tm, teps in os.walk(THU_MUC):
+            can += [os.path.join(goc, t) for t in sorted(teps)
+                    if t.endswith(".md") and t != "README.md"]
+        can.sort()
     assert can, "Không thấy tệp sổ nào trên đĩa"
 
     gop: dict[str, int] = {}

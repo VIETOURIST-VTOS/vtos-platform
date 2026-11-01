@@ -32,6 +32,22 @@ ghi vào tệp của chính nó.
 dời chúng là sửa sổ người khác không ai nhờ, và làm gãy đúng những nhánh ấy — cùng lẽ với
 luật 3 ở dưới. Làn nào muốn dời thì tự dời.
 
+**Bổ sung 02/11/2026 (lần hai) — mỗi ĐỢT một tệp.** Tách làn chữa xung đột *giữa* các làn.
+Nó không chữa được hai đợt của *cùng* một làn: cả hai vẫn nối vào cuối một tệp. Từ Đợt
+SO-DOT, một làn ghi theo **một trong hai cách, hoặc cả hai**:
+
+  · `docs/dang-lam/<làn>.md` — tệp phẳng, cách cũ, không ai bị ép dời;
+  · `docs/dang-lam/<làn>/<mã đợt>.md` — **một tệp cho một đợt**. Đợt tạo tệp mới, nên git
+    không có gì để hoà.
+
+Chỉ SÂU MỘT BẬC. Bộ đọc đi đúng một bậc; một bậc nữa thì những dòng ấy rơi khỏi tập gộp,
+nên `test_giu_cho_lan` chặn thư mục con và nói ra lý do.
+
+**Chỗ chặn thư mục lạ đã chuyển.** `la_tep_so` của N2 nay nhận một bậc, nên nó không còn là
+thứ chặn một thư mục lạ kiểu `docs/dang-lam/cu/`. Thứ chặn bây giờ là phép thử một-đổi-một
+trong `test_giu_cho_lan`: mọi chỗ chứa trong thư mục này phải khớp `LAN_TEP`. Phép thử
+`test_gn11b` đo lại đúng điều ấy, để nó là thứ đo được chứ không phải một câu hứa.
+
 ## Luật
 
 1. **Bảng vẫn y hệt cũ** — năm cột `Làn · Mã việc · Tệp sẽ đụng · Bắt đầu · Trạng thái`. Hai hàng

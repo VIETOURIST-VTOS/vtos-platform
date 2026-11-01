@@ -97,8 +97,14 @@ def test_lantckt_4_hang_rao_thu_hai_nhan_tep_moi_ma_khong_phai_sua():
 
     assert la_tep_so("docs/dang-lam/tc-kt.md"), "hàng rào N2 KHÔNG coi tc-kt.md là sổ"
     assert not la_tep_so("docs/dang-lam/README.md")
-    assert not la_tep_so("docs/dang-lam/tc-kt/R4c-3.md"), \
-        "N2 nhận cả tệp trong thư mục con — khuôn đường dẫn đã đổi, đọc lại trước khi tin"
+    # DOI BOI DOT SO-DOT 02/11/2026 — và đổi vì một lý do, không vì nó đang đỏ.
+    #
+    # Ý ĐỊNH GỐC của luật 4 là "N2 nhận tệp sổ theo KHUÔN ĐƯỜNG DẪN chứ không theo danh sách
+    # làn"; phần đo một-bậc chỉ là ghi lại hành vi lúc ấy. Từ Đợt SO-DOT, một bậc LÀ cách ghi sổ
+    # chính thức, nên câu cũ không còn đúng với ý định của hệ thống. Hai bậc vẫn phải bị từ chối.
+    assert la_tep_so("docs/dang-lam/tc-kt/R4c-3.md"), "N2 phải nhận một bậc"
+    assert not la_tep_so("docs/dang-lam/tc-kt/sau/nua.md"), \
+        "hai bậc thì bộ đọc của hàng rào kia không thấy"
 
 
 # ───────────────────────────────────────────────────────────────────── LUẬT 5
