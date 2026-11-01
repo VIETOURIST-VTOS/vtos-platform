@@ -19,7 +19,10 @@ def test_bon_ten_mien_dung_cong():
     assert m, "thiếu bảng tên miền → cổng"
     cap = dict(re.findall(r'"([a-z.]+)":\s*"(\w+)"', m.group(1)))
     assert cap == {"crm.vietourist.vn": "noi", "kh.vietourist.vn": "kh",
-                   "dt.vietourist.vn": "dt", "ir.vietourist.vn": "cd"}
+                   "dt.vietourist.vn": "dt", "ir.vietourist.vn": "cd",
+                   # TM-1 (Chủ tịch 02/11/2026): vietourist.com.vn song song, cùng cổng
+                   "crm.vietourist.com.vn": "noi", "kh.vietourist.com.vn": "kh",
+                   "dt.vietourist.com.vn": "dt", "ir.vietourist.com.vn": "cd"}
 
 
 def test_tham_so_cong_thang_ten_mien():
