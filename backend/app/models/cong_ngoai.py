@@ -60,6 +60,10 @@ class TaiKhoanNgoai(Base):
     phien: Mapped[int] = mapped_column(Integer, default=1)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     dang_nhap_cuoi: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # DK-1 (Chủ tịch chốt 01/11/2026): mật khẩu của tài khoản ngoài, băm bcrypt sau khi băm
+    # sha256 — xem services/cong_ngoai.bam_mat_khau. RỖNG = tài khoản tạo TRƯỚC DK-1, còn vào
+    # bằng mã một lần cho tới khi DK-3 đóng cửa ấy và buộc đặt mật khẩu.
+    mat_khau_bam: Mapped[str] = mapped_column(String(255), default="")
 
 
 class MaXacThucNgoai(Base):
@@ -75,4 +79,30 @@ class MaXacThucNgoai(Base):
     so_lan_sai: Mapped[int] = mapped_column(Integer, default=0)
     da_dung: Mapped[bool] = mapped_column(default=False)
     ip: Mapped[str] = mapped_column(String(64), default="")
+    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class DonDangKy(Base):
+    """DK-1 · ĐƠN ĐĂNG KÝ TẠM — ba bước đầu của việc tạo tài khoản, khi chưa có tài khoản nào.
+
+    Mã một lần đã xuống BƯỚC CUỐI (Chủ tịch chốt 01/11/2026), nên họ tên, liên hệ, băm mật khẩu và
+    mốc đồng ý điều khoản phải có chỗ đứng trước khi tài khoản ra đời. Đơn tự hết hạn sau 24 giờ.
+
+    KHÔNG BAO GIỜ lưu mật khẩu thô ở đây, kể cả tạm: `mat_khau_bam` đã là băm ngay từ lúc bước 2
+    nhận được chữ. Và tài khoản chỉ ra đời ở bước 4 khi mã đúng — không có mã đúng thì không tồn
+    tại tài khoản nào, kể cả một tài khoản "chờ".
+    """
+    __tablename__ = "don_dang_ky"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    khoa: Mapped[str] = mapped_column(String(64), unique=True, index=True)   # trả cho trình duyệt
+    loai: Mapped[str] = mapped_column(String(20))                            # khach_hang / doi_tac / co_dong
+    ho_ten: Mapped[str] = mapped_column(String(160), default="")
+    dien_thoai: Mapped[str] = mapped_column(String(20), default="")
+    email: Mapped[str] = mapped_column(String(160), default="")
+    mat_khau_bam: Mapped[str] = mapped_column(String(255), default="")
+    ma_khoa: Mapped[str] = mapped_column(String(64), default="")             # trỏ sang MaXacThucNgoai.khoa
+    dong_y_dieu_khoan_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    nhan_tin_quang_cao: Mapped[bool] = mapped_column(default=False)          # không bao giờ tự bật
+    ip: Mapped[str] = mapped_column(String(64), default="")
+    het_han: Mapped[datetime] = mapped_column(DateTime, index=True)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
