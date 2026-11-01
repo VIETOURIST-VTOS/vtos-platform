@@ -57,6 +57,15 @@ class QuyTacIn(BaseModel):
     ty_le_thue: float = 0
     doi_tuong: str = ""
     can_cong_trinh: bool = False
+    # DOT R4c-1 02/11/2026 — HAI O NAY `HT.de_xuat()` DA DOC tu Dot R2 (15/10/2026) qua
+    # `data.get(...)`, nhung mo hinh cua cua KHONG khai, nen qua API chung LUON rong/False.
+    # Hau qua nang hon "thieu mot o": BA phep kiem hinh thuc thanh toan trong `de_xuat`
+    # chi dung khi o ay khac rong, nen hai trong ba la MA CHET tren duong API — tu
+    # 15/10/2026 chung chua chan duoc gi. Va khong trinh duoc mot quy tac tien mat nao,
+    # nen sau dong tien mat cua Dot R2 chi them duoc bang cach sua ma.
+    # Mac dinh GIU NGUYEN hanh vi cu (rong / False) nen khong quy tac nao dang chay doi.
+    hinh_thuc_tt: str = ""
+    can_khoan_muc: bool = False
     dien_giai: str = ""
     uu_tien: int = 100
     can_cu: str = ""
