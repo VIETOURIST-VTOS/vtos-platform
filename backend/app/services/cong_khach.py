@@ -114,6 +114,7 @@ def tours(db: Session, q: str = "", tu_ngay: date | None = None, noi: str = "", 
         if con <= 0:
             continue
         o = _tour_out(t, con, hom_nay)
+        o["ten"] = _ten_ban(db, t)
         if ngan_sach and o["gia"] > ngan_sach:
             continue
         if nhom in ("promo", "last") and o["nhom"] != nhom:
@@ -139,7 +140,15 @@ def tour(db: Session, tour_id: int) -> dict:
     con = _con_cho(t, _da_ban(db, [t.id]).get(t.id, 0))
     if con <= 0:
         raise LoiKhach("Tour này đã hết chỗ — gửi yêu cầu tour đoàn để Sales tìm lịch khác")
-    return _tour_out(t, con, hom_nay)
+    return {**_tour_out(t, con, hom_nay), "ten": _ten_ban(db, t)}
+
+
+def _ten_ban(db: Session, t: Tour) -> str:
+    """TR-1: chuyến nhập từ Vietrip mang tên chung «Tour package» — khách thấy TÊN SẢN PHẨM (vd «Đà Lạt mộng mơ»)."""
+    from app.models.core import Product
+    p = db.get(Product, t.product_id) if t.product_id else (
+        db.execute(select(Product).where(Product.code == t.product_code)).scalars().first() if t.product_code else None)
+    return p.name if p is not None and p.name else t.name
 
 
 # ── yêu cầu ─────────────────────────────────────────────────────────────────────────────────────

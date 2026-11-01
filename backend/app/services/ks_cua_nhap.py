@@ -211,6 +211,9 @@ CUA_TAY = (
     "phong_trong_vtd", "don_ks_vtd", "thanh_toan_ks_vtd",
     # KS-15 (30/10/2026): khách đã ở tự viết qua cổng (Phòng đã đặt › Viết đánh giá); khách sạn trả lời qua cổng NCC.
     "danh_gia_ks_vtd",
+    # TR-1 (02/11/2026): khách đặt tour + trả trên cổng kh.vietourist.vn/tours (phiên cổng, QR khớp mã / SePay báo có
+    # chữ ký); Kế toán đánh dấu đã xuất GTGT ở màn /tour-online.
+    "don_tour_online", "thanh_toan_tour_online",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi

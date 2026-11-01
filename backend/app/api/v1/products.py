@@ -139,3 +139,83 @@ def tour_detail(tid: int, u: User = Depends(current_user), db: Session = Depends
     # từng bị che — tab bị ẩn trên màn hình nhưng tên NCC và đơn giá mua vẫn nằm trong phản hồi.
     # Cùng một hàm với `GET /tours/{id}`: xem `AC.che_gia_von`.
     return AC.che_gia_von(v, u, t, db)
+
+
+# ── TR-1 (Chủ tịch duyệt 01–02/11/2026) · màn «Tour trên cổng khách» (/tour-online) ──────────────────────────────
+# Ma trận quản lý khai ở chữ ký từng cửa (require_roles), hằng số ở services/tour_online.py.
+from pydantic import BaseModel as _BM          # noqa: E402
+from app.services import tour_online as TRO     # noqa: E402
+
+
+class _TrCongIn(_BM):
+    diem_den: str | None = None
+    noi_bat: list[str] | None = None
+    wellness: bool | None = None
+    phuong_tien_ds: list[str] | None = None
+
+
+class _TrGhepIn(_BM):
+    link_web: str = ""
+
+
+class _TrBatIn(_BM):
+    bat: bool
+
+
+def _tro(f, *a, **k):
+    try:
+        return f(*a, **k)
+    except TRO.LoiTour as ex:
+        raise HTTPException(ex.status, str(ex))
+
+
+@router.get("/tour-online")
+def tro_ds(u: User = Depends(require_roles(*TRO.VAI_XEM, mo_ta="Tour trên cổng khách")), db: Session = Depends(get_db)):
+    return _tro(TRO.ds_vtos, db, u)
+
+
+@router.get("/tour-online/web")
+def tro_web(u: User = Depends(require_roles(*(TRO.VAI_SUA_CONG + TRO.VAI_GHEP))), db: Session = Depends(get_db)):
+    return {"web": _tro(TRO.ds_web, db, u)}
+
+
+@router.put("/tour-online/{pid}/cong")
+def tro_sua(pid: int, data: _TrCongIn, u: User = Depends(require_roles(*TRO.VAI_SUA_CONG)), db: Session = Depends(get_db)):
+    p = _tro(TRO.sua_cong, db, u, pid, data.model_dump(exclude_none=True))
+    return {"message": f"Đã lưu hồ sơ cổng của {p.code}"}
+
+
+@router.post("/tour-online/{pid}/doc-web")
+def tro_doc(pid: int, u: User = Depends(require_roles(*TRO.VAI_SUA_CONG)), db: Session = Depends(get_db)):
+    nd = _tro(TRO.doc_lai, db, u, pid)
+    return {"noi_dung": nd, "message": f"Lỗi đọc web: {nd['loi']} — cổng giữ bản cũ" if nd.get("loi") else
+            f"Đã đọc lại: {len(nd.get('anh') or [])} ảnh · {len(nd.get('lich_trinh') or [])} ngày lịch trình"}
+
+
+@router.post("/tour-online/{pid}/ghep-web")
+def tro_ghep(pid: int, data: _TrGhepIn, u: User = Depends(require_roles(*TRO.VAI_GHEP)), db: Session = Depends(get_db)):
+    p = _tro(TRO.ghep, db, u, pid, data.link_web)
+    return {"message": f"Đã ghép {p.code} với tour trên web" if p.link_web else f"Đã bỏ ghép {p.code}"}
+
+
+@router.post("/tour-online/{pid}/thanh-toan")
+def tro_tt(pid: int, data: _TrBatIn, u: User = Depends(require_roles(*TRO.VAI_GHEP)), db: Session = Depends(get_db)):
+    p = _tro(TRO.bat_tt_sp, db, u, pid, data.bat)
+    return {"message": f"{'Đã mở' if p.mo_thanh_toan else 'Đã đóng'} thanh toán trực tuyến của {p.code}"}
+
+
+@router.post("/tour-online/thanh-toan-chung")
+def tro_tt_chung(data: _TrBatIn, u: User = Depends(require_roles(*TRO.VAI_TT_CHUNG)), db: Session = Depends(get_db)):
+    b = _tro(TRO.bat_tt_chung, db, u, data.bat)
+    return {"message": "Đã mở thanh toán trực tuyến tour (chung)" if b else "Đã đóng thanh toán trực tuyến tour (chung)"}
+
+
+@router.get("/tour-online/don")
+def tro_don(chi_vat: bool = False, u: User = Depends(require_roles(*TRO.VAI_XEM_DON)), db: Session = Depends(get_db)):
+    return {"don": _tro(TRO.ds_don, db, u, chi_vat)}
+
+
+@router.post("/tour-online/don/{did}/da-xuat-vat")
+def tro_vat(did: int, u: User = Depends(require_roles(*TRO.VAI_VAT)), db: Session = Depends(get_db)):
+    d = _tro(TRO.xuat_vat, db, u, did)
+    return {"message": f"Đã đánh dấu xuất hóa đơn GTGT cho {d.ma}"}

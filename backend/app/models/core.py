@@ -445,6 +445,17 @@ class Product(Base):
     source: Mapped[str] = mapped_column(String(20), default="vtos")              # vtos / vietrip
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+    # TR-1 (Chủ tịch duyệt bản xem thử 01/11/2026) — hồ sơ hiện trên cổng khách. Rỗng = cổng tự suy (điểm đến từ tên,
+    # phương tiện từ `transport`); Marketing / Điều hành sửa ở màn «Tour trên cổng khách» (/tour-online).
+    diem_den: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    noi_bat: Mapped[list | None] = mapped_column(JSON, nullable=True)           # ≤5 dòng ngắn
+    wellness: Mapped[bool] = mapped_column(Boolean, default=False, server_default=_false(), nullable=False)
+    phuong_tien_ds: Mapped[list | None] = mapped_column(JSON, nullable=True)    # ⊂ {xe, may_bay, tau_hoa, du_thuyen}
+    mo_thanh_toan: Mapped[bool] = mapped_column(Boolean, default=False, server_default=_false(), nullable=False)
+    # Nối nội dung web (Chủ tịch 02/11/2026): trang tour trên vietourist.com.vn là NGUỒN ảnh / lịch trình / bảng giá /
+    # bao gồm cho cổng khách — không gõ lại. `noi_dung_web` là bản đã đọc (bộ nhớ đệm), làm mới ≤ mỗi 24 giờ.
+    link_web: Mapped[str] = mapped_column(String(300), default="", server_default="")
+    noi_dung_web: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     def fixed_cost(self) -> float:
         return sum(float(l.get("so_tien") or (float(l.get("don_gia") or 0) * float(l.get("sl") or 1))) for l in (self.cost_lines or []) if l.get("kind") == "co_dinh")
