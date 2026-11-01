@@ -134,8 +134,27 @@ def la_tep_so(t: str) -> bool:
     t = t.strip()
     if t == SO_CU:
         return True
-    return (t.startswith(THU_MUC_SO) and t.endswith(".md")
-            and t != THU_MUC_SO + "README.md" and "/" not in t[len(THU_MUC_SO):])
+    if not (t.startswith(THU_MUC_SO) and t.endswith(".md")):
+        return False
+    duoi = t[len(THU_MUC_SO):]
+    # ĐỢT SO-DOT 02/11/2026 — nhận THÊM một bậc: `docs/dang-lam/<làn>/<mã đợt>.md`.
+    #
+    # Từ đợt này mỗi ĐỢT ghi vào tệp của chính nó, nên tệp sổ của một nhánh nằm sâu một bậc.
+    # Không nhận nó thì N2 chặn mọi nhánh dùng cách mới, bằng một lời «nhánh này chưa ghi sổ»
+    # không chỉ ra được nguyên nhân.
+    #
+    # ĐỔI NÀY LÀM N2 RỘNG RA MỘT CHÚT, và em nói thẳng chỗ ấy: một thư mục lạ như
+    # `docs/dang-lam/cu/` nay cũng qua được N2. Thứ chặn nó không còn là hàm này nữa mà là
+    # `test_giu_cho_lan.test_moi_lan_deu_co_mot_tep_va_khong_tep_nao_thua` — nó đòi mọi chỗ chứa
+    # trong `docs/dang-lam/` phải khớp một-đổi-một với `LAN_TEP`. Phép thử gn11 ở dưới đo lại
+    # đúng việc ấy, để tính an toàn này là thứ ĐO ĐƯỢC chứ không phải thứ hy vọng.
+    #
+    # Hai bậc trở lên vẫn KHÔNG nhận: bộ đọc của hàng rào kia chỉ đi một bậc.
+    if duoi.count("/") == 0:
+        return duoi != "README.md"
+    if duoi.count("/") == 1:
+        return not duoi.endswith("/README.md")
+    return False
 
 
 def phu(tep: str, khai: str) -> bool:
@@ -327,11 +346,43 @@ def test_gn11_README_va_tep_lac_khong_tinh_la_ghi_so():
     cũng không tính – ba kiểu viết nhầm dễ xảy ra nhất.
     """
     assert not la_tep_so("docs/dang-lam/README.md")
-    assert not la_tep_so("docs/dang-lam/cu/robot-a.md")
+    assert not la_tep_so("docs/dang-lam/tc-kt/README.md")
     assert not la_tep_so("docs/dang-lam/robot-a.txt")
+    # ĐỢT SO-DOT 02/11/2026 — dòng `cu/robot-a.md` CỐ Ý đổi nghĩa, và em nói ra chứ không lặng lẽ.
+    #
+    # Trước đợt này nó đo "tệp nằm sâu một bậc không tính". Từ đợt này một bậc LÀ cách ghi sổ
+    # chính thức (`docs/dang-lam/<làn>/<mã đợt>.md`), nên phép đo ấy không còn đúng với ý định
+    # của hệ thống nữa. Ý định GỐC của nó — "một thư mục lạ không được lặng lẽ thành sổ" — vẫn
+    # được giữ, nhưng chỗ canh chuyển sang hàng rào kia, và dòng ngay dưới đo lại điều đó.
+    assert la_tep_so("docs/dang-lam/tc-kt/SO-DOT.md"), "cách ghi sổ mới phải qua được N2"
+    assert not la_tep_so("docs/dang-lam/tc-kt/sau/nua.md"), "hai bậc thì bộ đọc kia không thấy"
     assert not la_tep_so("docs/Bao-cao-thang-9.md")
     assert not la_tep_so("backend/app/services/rules.py")
 
+
+def test_gn11b_thu_muc_la_van_bi_chan_nhung_o_hang_rao_kia():
+    """ĐỢT SO-DOT: N2 rộng ra một bậc, nên chỗ chặn thư mục lạ chuyển sang `test_giu_cho_lan`.
+
+    Phép thử này tồn tại để việc ấy là ĐO ĐƯỢC. Không có nó, lời giải thích trong `la_tep_so`
+    chỉ là một câu hứa: ai đó nới hàng rào kia ra thì `docs/dang-lam/cu/` lặng lẽ thành sổ hợp
+    lệ, và không một phép thử nào đỏ.
+    """
+    import os
+
+    from tests.test_giu_cho_lan import LAN_TEP, THU_MUC
+
+    assert la_tep_so("docs/dang-lam/cu/robot-a.md"), (
+        "N2 nay nhận một bậc — nếu dòng này đỏ thì `la_tep_so` đã đổi, đọc lại cả phép thử này")
+
+    co = set()
+    for t in os.listdir(THU_MUC):
+        if os.path.isdir(os.path.join(THU_MUC, t)):
+            co.add(t)
+        elif t.endswith(".md") and t != "README.md":
+            co.add(t[:-3])
+    assert co == set(LAN_TEP.values()), (
+        "hàng rào một-đổi-một đang KHÔNG khớp — đây mới là thứ chặn thư mục lạ từ Đợt SO-DOT")
+    assert "cu" not in co, "có thư mục `cu/` thật trong docs/dang-lam — nó không ứng với làn nào"
 
 def test_gn12_tep_so_van_khong_bi_canh_nhu_tep_ma():
     """Sổ nằm trong `docs/` nên điều 4 vẫn đúng với nó: không làn nào phải giữ chỗ cho quyển sổ.
