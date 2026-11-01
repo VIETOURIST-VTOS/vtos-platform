@@ -22,7 +22,7 @@ import KhamPhaBaMuc from "./KhamPhaBaMuc";
 
 type Tab = "home" | "deals" | "tour" | "request" | "bookings" | "booking" | "rewards" | "tier" | "favorites" | "reviews" | "feedback" | "support" | "profile";
 const MENU: [Tab, string, string][] = [
-  ["home", "Khám phá", "house"], ["deals", "Đặt dịch vụ", "compass"], ["bookings", "Đơn của tôi", "luggage"],
+  ["home", "Khám phá", "house"], ["bookings", "Đơn của tôi", "luggage"],   // KS-16r: bỏ «Đặt dịch vụ» (trùng Khám phá — Chủ tịch 01/11/2026)
   ["rewards", "Điểm & ưu đãi", "gift"], ["tier", "Hạng thành viên", "badge-check"], ["favorites", "Yêu thích & nhắc giá", "heart"],
   ["reviews", "Đánh giá", "star"], ["feedback", "Góp ý lãnh đạo", "message-square-heart"], ["support", "Hỗ trợ", "messages-square"],
   ["profile", "Hồ sơ & riêng tư", "user-round"],
@@ -135,7 +135,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
   const lienHe = toi.dien_thoai || toi.email;
   const tamTinh = useMemo(() => (tourMo ? tourMo.gia * Number(yc.so_khach || 0) : 0), [tourMo, yc.so_khach]);
   const coSdt = !!toi.dien_thoai;
-  const menuTab: Tab = tab === "tour" || tab === "request" ? "deals" : tab === "booking" ? "bookings" : tab;
+  const menuTab: Tab = tab === "deals" || tab === "tour" || tab === "request" ? "home" : tab === "booking" ? "bookings" : tab;
   const nhanMenu = MENU.find(([k]) => k === menuTab)?.[1] || "";
 
   return (<section className="v3-app" data-portal="khach-hang">
@@ -162,7 +162,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
           <KhamPhaBaMuc />{/* KS-16q: ba trang riêng Tour / Khách sạn / Nhà hàng */}
           <section className="v3-hero customer"><div><span className="v3-eyebrow">VIETOURIST • HÀNH TRÌNH CỦA BẠN</span>
             <h2>Đi để trải nghiệm.<br />Trở về với nhiều điều hơn.</h2><p>Ưu đãi phù hợp, hành trình rõ ràng,<br />quyền lợi được giữ trong một tài khoản.</p>
-            <Nut kieu="primary" i="compass" onClick={() => di("deals")}>Tìm chuyến đi tiếp theo</Nut></div>
+            <Nut kieu="primary" i="compass" onClick={() => moNgoai(duongRieng("tours"))}>Tìm chuyến đi tiếp theo</Nut></div>
             <div className="v3-hero-art" aria-hidden="true"><I n="plane" /><span>EXPLORE<br />VIETNAM</span></div></section>
           <div className="v3-metrics">
             <section><span><I n="gift" />Điểm khả dụng</span><strong>{diem.x ? (diem.x.dang_bat ? Math.round(diem.x.kha_dung).toLocaleString("vi-VN") : "—") : "…"}</strong><small>{diem.x?.dang_bat ? `= ${Math.round(diem.x.kha_dung * 100).toLocaleString("vi-VN")} đ ưu đãi` : "VTD Rewards sắp bắt đầu"}</small></section>
@@ -177,7 +177,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
               <Nut i="arrow-right" onClick={() => { setDonMo(home.chuyen_toi); di("booking"); }}>Xem đơn</Nut></div>
               : <p>{home ? "Chưa có chuyến sắp đi gắn với " + lienHe + "." : "Đang tải…"}{home?.yeu_cau_dang_cho ? ` Bạn có ${home.yeu_cau_dang_cho} yêu cầu đang chờ Sales liên hệ.` : ""}</p>}
           </section>
-          <div className="v3-section-title"><h2>Tour cho hành trình mới</h2><Nut kieu="quiet" i="arrow-right" onClick={() => di("deals")}>Xem tất cả</Nut></div>
+          <div className="v3-section-title"><h2>Tour cho hành trình mới</h2><Nut kieu="quiet" i="arrow-right" onClick={() => moNgoai(duongRieng("tours"))}>Xem tất cả</Nut></div>
           <div className="v3-products">{(home?.tour || []).map((t: any) => <TheTour key={t.id} t={t} mo={moTour} />)}</div>
           {home && !home.tour.length && <section className="v3-panel"><p>Chưa có tour mở bán. Gửi yêu cầu tour đoàn để Sales thiết kế hành trình riêng.</p></section>}
           <div className="v3-shortcuts"><Nut i="users" onClick={() => moYeuCau("tour_doan")}>Tour đoàn theo yêu cầu</Nut><Nut i="luggage" onClick={() => di("bookings")}>Đơn của tôi</Nut><Nut i="user-round" onClick={() => di("profile")}>Hồ sơ & riêng tư</Nut></div>
@@ -328,7 +328,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
         {SAP_RA_MAT[tab] && <SapRaMat tab={tab} />}
 
         <footer className="v3-bottom"><I n="shield-check" />Dữ liệu và yêu cầu được quản lý tập trung trong VTOS · Vietourist Holdings</footer>
-        <nav className="v3-bottom-nav" aria-label="Chức năng nhanh trên điện thoại">{([["home", "Khám phá", "compass"], ["bookings", "Đơn của tôi", "luggage"], ["deals", "Đặt dịch vụ", "plane"], ["support", "Hỗ trợ", "messages-square"], ["profile", "Tài khoản", "user-round"]] as [Tab, string, string][]).map(([k, t, i]) =>
+        <nav className="v3-bottom-nav" aria-label="Chức năng nhanh trên điện thoại">{([["home", "Khám phá", "compass"], ["bookings", "Đơn của tôi", "luggage"], ["rewards", "Điểm", "gift"], ["support", "Hỗ trợ", "messages-square"], ["profile", "Tài khoản", "user-round"]] as [Tab, string, string][]).map(([k, t, i]) =>
           <button key={k} type="button" className="cursor-interaction" aria-current={menuTab === k ? "page" : undefined} onClick={() => di(k)}><I n={i} /><span>{t}</span></button>)}</nav>
       </main>
     </div>
