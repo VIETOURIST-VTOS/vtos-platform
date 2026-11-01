@@ -143,6 +143,13 @@ CUA_TAY = (
     # KHÔNG phải máy sinh: máy chỉ băm mật khẩu và đóng dấu giờ. Đơn tự hết hạn sau 24 giờ; nó
     # biến mất khi mã đúng và tài khoản ra đời, nên không có màn quản trị nào sửa nó.
     "don_dang_ky",
+    # DK-2 (02/11/2026): MÁY ĐÃ NHỚ — người dùng tự tạo và tự gỡ. Dòng ra đời khi chính họ
+    # tích ô «Nhớ máy này 90 ngày» ở màn xác minh máy lạ, và họ đặt tên cho máy ngay dưới ô
+    # ấy; xem và GỠ từng máy ở màn «máy của tôi» (GET /cong/may, POST /cong/may/{id}/go).
+    # Chỗ máy làm mà người CỐ Ý không được làm là chính dấu nhớ: máy sinh ngẫu nhiên, lưu
+    # dạng BĂM, không có cửa nào sửa. Gõ tay được vào cột ấy thì dựng được một «máy đã xác
+    # minh» chưa ai từng xác minh — đúng thứ bảng này sinh ra để chống.
+    "may_da_nho",
     # DH-1 (26/10/2026): hình thức hưởng hoa hồng của đối tác — GĐ KD / Kế toán chọn ở màn /hoa-hong-d06.
     "hinh_thuc_hoa_hong",
     # KH-1 (26/10/2026): yêu cầu khách tự gửi ở cổng khách hàng (/cong) — tour có lịch hoặc tour đoàn; đi kèm một lead cho Sales.
