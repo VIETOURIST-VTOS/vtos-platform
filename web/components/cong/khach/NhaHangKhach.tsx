@@ -19,7 +19,7 @@ const mai = () => { const t = new Date(Date.now() + 7 * 3600e3 + 86400e3); retur
 
 const nghin = (x: number) => Math.ceil(Math.round(x) / 1000) * 1000;
 
-export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui, doiTac = false }: { ten: string; lienHe: string; coSdt: boolean; sdtCho: string; daGui: (msg: string) => void; doiTac?: boolean }) {
+export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui, doiTac = false, rieng = false, moId }: { ten: string; lienHe: string; coSdt: boolean; sdtCho: string; daGui: (msg: string) => void; doiTac?: boolean; rieng?: boolean; moId?: number }) {
   const [ts, setTs] = useState<any>(null);
   useEffect(() => { goiCong("/dat-ban").then((r) => setTs(r.tham_so)).catch(() => {}); }, []);
   const [mo, setMo] = useState<any>(null);
@@ -93,5 +93,5 @@ export default function NhaHangKhach({ ten, lienHe, coSdt, sdtCho, daGui, doiTac
     </div>
   </>);
 
-  return <KhamPhaAmThuc onDat={datBan} />;
+  return <KhamPhaAmThuc onDat={datBan} rieng={rieng} moId={moId} />;
 }
