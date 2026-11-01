@@ -400,7 +400,7 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
       </section>}
 
       <section className="ksv-panel" id="tra-lt" style={{ padding: 20 }}><h2 style={{ margin: 0, fontSize: 22 }}>Lịch trình</h2>
-        {ngayLt.length ? <ol className="tra-lt">{ngayLt.map((n: any) => <li key={n.ngay}><b>Ngày {n.ngay}{n.tieu_de ? ` · ${n.tieu_de}` : ""}</b>
+        {ngayLt.length ? <ol className="tra-lt">{ngayLt.map((n: any) => <li key={n.ngay}><b>Ngày {n.ngay}{n.tieu_de ? ` · ${String(n.tieu_de).replace(/^\s*ng[aà]y\s*0?\d+\s*[:.\-–·]?\s*/i, "")}` : ""}</b>
           {(n.bua?.length > 0 || n.khach_san) && <small className="ksv-muted">{n.bua?.length ? `Bữa: ${n.bua.map((b: string) => BUA[b] || b).join(", ")}` : ""}{n.khach_san ? ` · ${n.khach_san}` : ""}</small>}
           {n.noi_dung && <p>{n.noi_dung}</p>}
           {n.anh?.length > 0 && <div className="tra-lt-anh">{n.anh.slice(0, 3).map((a: string) => <img key={a} src={a} alt={`Ngày ${n.ngay}`} loading="lazy" referrerPolicy="no-referrer" />)}</div>}</li>)}</ol>
