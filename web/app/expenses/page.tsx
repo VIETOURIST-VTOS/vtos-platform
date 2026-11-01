@@ -48,7 +48,26 @@ function Expenses() {
   }, [f.category, dmMkt]);
   useEffect(() => { load(); }, [load]);
   const post = async (path: string, json?: any) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || "Xong"); load(); return r; } catch (x) { toast(errMsg(x), true); } };
-  const step = (r: any, action: string, reason = "") => post(`/payment-requests/${r.id}/step`, { action, reason });
+  const step = (r: any, action: string, reason = "", hinh_thuc_tt = "") =>
+    post(`/payment-requests/${r.id}/step`, { action, reason, hinh_thuc_tt });
+  // DOT R4c-3 02/11/2026 — HAI O ROI NHAU THAY MOT HOP `prompt()`.
+  //
+  // Hop cu hoi "Ma giao dich ngan hang (hoac 'TM' neu tien mat)" — tuc chinh loi trong hop
+  // DAY nguoi dung phep doan hai chu cai cua may chu. Hai thu khac nhau thi hai o: hinh thuc
+  // thanh toan quyet VE TIEN cua but toan, ma giao dich chi la so chung tu.
+  //
+  // Danh sach doc tu `httt` cua may chu (`/hach-toan/bang`), KHONG go lai bay nhan o day.
+  const [chi, setChi] = useState<any>(null);   // ho so dang bam da chi
+  const [httt, setHttt] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (chi && !Object.keys(httt).length)
+      api<any>("/hach-toan/bang").then((d) => setHttt(d?.hinh_thuc_tt || {})).catch(() => {});
+  }, [chi, httt]);
+  const ghiDaChi = async () => {
+    if (!chi?.hinh_thuc_tt) { toast("Chọn hình thức thanh toán", true); return; }
+    await step(chi.r, "pay", chi.ma || "", chi.hinh_thuc_tt);
+    setChi(null);
+  };
   // Gõ hoặc sửa ngày phải trả. Gửi rỗng = gỡ ngày, khoản ấy quay lại danh sách chưa có hạn — nhập
   // nhầm thì phải sửa lại được về "chưa biết", chứ không kẹt với một ngày sai.
   const datNgay = async (r: any) => {
@@ -100,7 +119,23 @@ function Expenses() {
 
   return (<>
     <h1>Đề nghị chi – Lệnh chi (robot R3) &amp; dòng tiền tour</h1>
-    <p className="muted">Đề nghị chi bắt buộc mã tour (chi phí tour), NCC có MST, chứng từ đính kèm. Robot xếp cấp duyệt: chi ngoài dự toán tour hoặc Marketing ≥ hạn mức → <b>Chủ tịch + TGĐ</b> (cổng 15). Luồng: bộ phận xác nhận → Kế toán kiểm tra → TGĐ duyệt → lệnh chi chờ → Kế toán chi trên ngân hàng (SePay tiền ra có mã DC… tự khớp). Duyệt → Nợ 154/641/642 – Có 331; chi → Nợ 331 – Có 112.</p>
+    <p className="muted">Đề nghị chi bắt buộc mã tour (chi phí tour), NCC có MST, chứng từ đính kèm. Robot xếp cấp duyệt: chi ngoài dự toán tour hoặc Marketing ≥ hạn mức → <b>Chủ tịch + TGĐ</b> (cổng 15). Luồng: bộ phận xác nhận → Kế toán kiểm tra → TGĐ duyệt → lệnh chi chờ → Kế toán chi trên ngân hàng (SePay tiền ra có mã DC… tự khớp). Duyệt → Nợ 154/641/642 – Có 331; chi → Nợ 331 – Có 1121 (tiền mặt: 1111).</p>
+    {chi && (<div style={{ border: "1px solid #0f6f5c", borderRadius: 8, padding: 14, margin: "12px 0", maxWidth: 420 }}>
+      <b>Ghi nhận đã chi – {chi.r.code}</b>
+      <label style={{ display: "block", marginTop: 10 }}>Hình thức thanh toán
+        <select value={chi.hinh_thuc_tt} onChange={(e) => setChi({ ...chi, hinh_thuc_tt: e.target.value })}>
+          <option value="">— chọn —</option>
+          {Object.entries(httt).filter(([k]) => k && k !== "chua_tt")
+            .map(([k, t]: any) => <option key={k} value={k}>{t}</option>)}
+        </select></label>
+      <label style={{ display: "block", marginTop: 8 }}>Mã giao dịch / số chứng từ
+        <input value={chi.ma} placeholder="để trống nếu không có"
+               onChange={(e) => setChi({ ...chi, ma: e.target.value })} /></label>
+      <div style={{ marginTop: 10 }}>
+        <button className="act" onClick={ghiDaChi}>Ghi nhận đã chi</button>
+        <button className="act grey" style={{ marginLeft: 8 }} onClick={() => setChi(null)}>Thôi</button>
+      </div>
+    </div>)}
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{[["requests", "Đề nghị chi"], ["thieu_ngay", "Chưa có ngày phải trả"], ["cashflow", "Dòng tiền tour"]].map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}</div>
 
     {tab === "requests" && <>
@@ -154,7 +189,7 @@ function Expenses() {
             {r.robot_ghi_chu && <div style={{ fontSize: 12, color: "#9a5b00" }}>{r.robot_ghi_chu}</div>}
             {r.status === "cho_chi" && !r.co_unc && <div style={{ fontSize: 12 }}><Tag cls="warn">Chưa có UNC</Tag> CK xong tải UNC rồi bấm «Đã chi»</div>}</td>
           <td className="muted">{r.created_by}{r.tp_by && ` → ${r.tp_by}`}{r.kt_by && ` → ${r.kt_by}`}{r.approved_by && ` → ${r.approved_by}`}</td>
-          <td>{actions(r).map(([l, a, c]) => <button key={a} className={"act " + c} style={{ margin: "0 4px 4px 0" }} disabled={a === "pay" && !r.co_unc} title={a === "pay" && !r.co_unc ? "Tải UNC trước" : ""} onClick={() => { if (a === "unc") { setTepUnc(true); setTepDN(r.code); return; } if (a === "robot") { post(`/payment-requests/${r.id}/robot-kiem`); return; } let reason = ""; if (a === "reject") { reason = prompt("Lý do từ chối (bắt buộc):") || ""; if (!reason) return; } if (a === "pay") { reason = prompt("Mã giao dịch ngân hàng (hoặc 'TM' nếu tiền mặt):") || ""; } step(r, a, reason); }}>{l}</button>)}
+          <td>{actions(r).map(([l, a, c]) => <button key={a} className={"act " + c} style={{ margin: "0 4px 4px 0" }} disabled={a === "pay" && !r.co_unc} title={a === "pay" && !r.co_unc ? "Tải UNC trước" : ""} onClick={() => { if (a === "unc") { setTepUnc(true); setTepDN(r.code); return; } if (a === "robot") { post(`/payment-requests/${r.id}/robot-kiem`); return; } let reason = ""; if (a === "reject") { reason = prompt("Lý do từ chối (bắt buộc):") || ""; if (!reason) return; } if (a === "pay") { setChi({ r, hinh_thuc_tt: "", ma: "" }); return; } step(r, a, reason); }}>{l}</button>)}
             {" "}<button className="act grey" style={{ margin: "0 4px 4px 0" }} title="Chứng từ kèm theo" onClick={() => { setTepUnc(false); setTepDN(r.code); }}>Chứng từ</button></td></tr>) : <tr><td colSpan={10} className="muted">Không có đề nghị chi.</td></tr>}</tbody></table></div>
       {tepDN && tepUnc && <DinhKem key={`unc-${tepDN}`} doiTuong="de_nghi_chi" doiTuongId={tepDN} loai="unc" tieuDe={`Tải UNC / phiếu chi của ${tepDN}`}
         goi="Chuyển khoản xong trên ngân hàng → tải ủy nhiệm chi (UNC) hoặc phiếu chi tiền mặt lên đây → nút «Đã chi» mở." onDoi={load} />}

@@ -734,3 +734,55 @@ def bbc_tu_choi(bid: int, data: BanBaoCaoTuChoiIn,
         return BBC.tu_choi(db, u, b, data.ly_do)
     except BBC.SaiBanBaoCao as ex:
         raise HTTPException(422, str(ex))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# ĐỢT R4c-3 02/11/2026 — MỘT CỬA ĐỌC: BÚT TOÁN ĐÃ GHI VÀO TÀI KHOẢN TIỀN CẤP CHA
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+#
+# Chủ tịch chốt 02/11/2026: KHÔNG sửa bút toán cũ. Sổ đã ghi là sổ đã ghi.
+#
+# Nên cửa này CHỈ ĐỌC — không nút sửa, không nút đảo, không sinh bút toán điều chỉnh. Nó chỉ ra
+# CHỖ PHẢI NHÌN để Kế toán trưởng tự quyết từng khoản, đúng lẽ của `cap_dinh_khoan.ngoai_luat`.
+#
+# Vì sao cần một cửa riêng thay vì đọc `ngoai_luat`: `ngoai_luat` trả về CẶP định khoản đã gộp
+# (331/112, bao nhiêu tiền), nó trả lời "cặp nào ngoài luật". Câu Kế toán trưởng hỏi ở đây khác:
+# "CHỨNG TỪ NÀO đã ghi tiền ở cấp cha" — từng chứng từ, để đi tìm hồ sơ gốc. Một bảng gộp không
+# trả lời được câu ấy.
+
+TIEN_CAP_CHA = ("111", "112", "113")
+
+
+@router.get("/tien-ghi-cap-cha")
+def tien_ghi_cap_cha(tu: date | None = None, den: date | None = None, gioi_han: int = 500,
+                     u: User = Depends(require_roles(*READ, mo_ta="bút toán ghi tiền ở cấp cha")),
+                     db: Session = Depends(get_db)):
+    """Từng dòng sổ có vế tiền là tài khoản CHA. CHỈ ĐỌC."""
+    from app.models.accounting import JournalEntry as _JE, JournalLine as _JL
+
+    q = (select(_JL, _JE).join(_JE, _JE.id == _JL.entry_id)
+         .where(_JL.account_code.in_(TIEN_CAP_CHA))
+         .order_by(_JE.entry_date.desc(), _JE.id.desc()))
+    if tu:
+        q = q.where(_JE.entry_date >= tu)
+    if den:
+        q = q.where(_JE.entry_date <= den)
+
+    het = db.execute(q).all()
+    dong = [{
+        "chung_tu": e.code, "ngay": str(e.entry_date), "dien_giai": (e.description or "")[:160],
+        "tai_khoan": l.account_code, "no": l.debit or 0, "co": l.credit or 0,
+        "nguon": e.source_type or "", "trang_thai": e.status or "",
+    } for l, e in het[:gioi_han]]
+
+    return {
+        "tu": str(tu) if tu else None, "den": str(den) if den else None,
+        "tai_khoan_cap_cha": list(TIEN_CAP_CHA),
+        "so_dong": len(het), "cat_bot": len(het) > gioi_han, "dong": dong,
+        "so_tien": round(sum((l.debit or 0) + (l.credit or 0) for l, _ in het), 0),
+        "ghi_chu": ("Mỗi dòng ở đây là tiền đã ghi vào một tài khoản CHA. Nó KHÔNG đương nhiên "
+                    "sai số: số tiền đúng, chỉ ghi chưa đủ sâu, nên sổ chi tiết tiền theo từng "
+                    "tài khoản không thấy nó, và phép đối chiếu bảng quy ước xếp nó vào rổ ngoài "
+                    "luật. Cửa này CHỈ ĐỌC: không sửa, không đảo. Chủ tịch chốt 02/11/2026 để "
+                    "nguyên bút toán cũ, Kế toán trưởng quyết từng khoản."),
+    }

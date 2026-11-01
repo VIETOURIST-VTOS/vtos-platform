@@ -63,7 +63,8 @@ def pay_request(cat, tid, ncc, mst, amount, desc):
     rid = r.json()["request"]["id"]
     _gan_unc(r.json()["request"]["code"])
     for a, w in (("confirm", "tp.dieuhanh"), ("check", "ketoan"), ("approve", "tgd"), ("pay", "ketoan")):
-        x = client.post(f"/api/v1/payment-requests/{rid}/step", json={"action": a, "reason": "CK 123" if a == "pay" else ""}, headers=login(w)); assert x.status_code == 200, x.text
+        x = client.post(f"/api/v1/payment-requests/{rid}/step", json={"action": a, "reason": "CK 123" if a == "pay" else "",
+                                      "hinh_thuc_tt": "chuyen_khoan" if a == "pay" else ""}, headers=login(w)); assert x.status_code == 200, x.text
     return rid
 
 

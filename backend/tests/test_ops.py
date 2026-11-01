@@ -148,7 +148,7 @@ def test_payment_request_gates_flow_and_journal():
     assert pr["status"] == "da_chi" and len(pr["entry_ids"]) == 2
     js = [e for e in client.get("/api/v1/journal", headers=login("ketoan")).json() if e["source_ref"] == f"dc:{r1['code']}"]
     pairs = {(l["account"], l["debit"], l["credit"]) for e in js for l in e["lines"]}
-    assert {("154", 20_000_000, 0), ("331", 0, 20_000_000), ("331", 20_000_000, 0), ("112", 0, 20_000_000)} <= pairs
+    assert {("154", 20_000_000, 0), ("331", 0, 20_000_000), ("331", 20_000_000, 0), ("1121", 0, 20_000_000)} <= pairs
     # r2 ngoài dự toán: Kế toán chặn vì thiếu chứng từ; 2 chữ ký
     st(r2["request"]["id"], "confirm")
     assert "chứng từ" in st(r2["request"]["id"], "check", who="ketoan").json()["detail"]

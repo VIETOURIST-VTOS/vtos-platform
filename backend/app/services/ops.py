@@ -10,6 +10,10 @@ from app.services import chu_ky as _CK   # bang chu ky, Dot LG2 - nhap o DAU TEP
 from app.models.hr import Employee
 from app.models.ops import DailyReport, PageShift, PaymentRequest, DailyReportVersion, ReportExtraForm
 from app.models.payments import Receipt
+# DOT R4c-3 02/11/2026 — nhap o DAU TEP: `models.hach_toan` la mot bang khai, khong nhap
+# `services.ops`, nen khong co vong tron. Va hai bang nay la NGUON DUY NHAT cua luat
+# "hinh thuc nao chay tren tai khoan ngan hang" — doc chu khong khai lai.
+from app.models.hach_toan import HINH_THUC_TT, HTTT_QUA_TIEN_MAT
 from app.services import ngoai_te_chi as NT
 from app.services import rules as R
 from app.services import accounting as ACC
@@ -676,7 +680,8 @@ VAI_KIEM_CHUNG_TU = ("ketoan", "ketoan_tt", "ketoan_truong")
 VAI_GHI_DA_CHI = ("ketoan", "thu_quy")
 
 
-def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "") -> str:
+def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "",
+         hinh_thuc_tt: str = "") -> str:
     """confirm (người phụ trách bộ phận) → check (Kế toán) → approve (TGĐ; +Chủ tịch nếu 2 chữ ký) → pay (Kế toán) | reject."""
     # ── Đợt E2a: tách bạch trách nhiệm THEO NGƯỜI ──────────────────────────────────────
     # Lớp cũ ở ngay dưới (`u.role != "ketoan"`) so hai VAI. Đo 19/9/2026: 6 người giữ từ hai
@@ -823,8 +828,36 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "")
         # KS-16d — Chủ tịch chốt 31/10/2026: MỌI loại chi phải có UNC / phiếu chi tải lên trước khi bấm «Đã chi».
         if not co_unc(db, r):
             raise ValueError(f"Tải ủy nhiệm chi (UNC) / phiếu chi của {r.code} lên trước rồi mới bấm «Đã chi»")
+        # ĐỢT R4c-3 02/11/2026 — HÌNH THỨC THANH TOÁN LÀ MỘT Ô, KHÔNG PHẢI MỘT PHÉP ĐOÁN.
+        #
+        # Dòng cũ ở đây: `paid_method = "tien_mat" if reason.lower().startswith("tm")`. `reason` là
+        # ô "mã giao dịch / lý do" Kế toán gõ TAY, nên vế tiền của bút toán chi được quyết bằng HAI
+        # CHỮ CÁI ĐẦU của một ô văn bản tự do:
+        #
+        #     "TM-0231"        -> tiền mặt
+        #     "Tien mat 0231"  -> CHUYỂN KHOẢN   (tiền ra khỏi quỹ, sổ ghi giảm tiền gửi)
+        #     "Chi TM cho NCC" -> CHUYỂN KHOẢN
+        #     "tmp ghi chu"    -> TIỀN MẶT
+        #
+        # Không gì kêu lên ở cả bốn trường hợp.
+        #
+        # VÀ KHÔNG CÓ MẶC ĐỊNH. Ô trống là CHƯA CÓ SỐ — quy ước 4 ngày 09/9/2026. Một mặc định
+        # `chuyen_khoan` ở đây y hệt phép đoán cũ, chỉ im lặng hơn: nó cũng điền một con số không
+        # ai nói, và lần này còn không có hai chữ cái nào để lần ra vì sao.
+        _ht = (hinh_thuc_tt or "").strip()
+        if not _ht:
+            raise ValueError(
+                "Thiếu hình thức thanh toán. Vế tiền của bút toán chi phụ thuộc hẳn vào nó "
+                "(tiền mặt ghi 1111, qua ngân hàng ghi 1121), nên không có ô này thì không đoán "
+                "được và cũng không được đoán. Chọn hình thức rồi bấm lại.")
+        if _ht not in HINH_THUC_TT or _ht == "chua_tt":
+            raise ValueError(
+                f"Hình thức thanh toán không hợp lệ: {_ht!r}. "
+                + ("Một khoản đang ghi nhận ĐÃ CHI thì không thể là chưa thanh toán."
+                   if _ht == "chua_tt"
+                   else "Chọn một trong: " + ", ".join(k for k in HINH_THUC_TT if k and k != "chua_tt")))
         r.status, r.paid_at, r.paid_ref = "da_chi", datetime.now(), reason
-        r.paid_method = "tien_mat" if reason.lower().startswith("tm") else "chuyen_khoan"
+        r.paid_method = _ht
         _post_payment(db, r)
         if r.category in LOAI_CHI_MAY_LAP:
             # KS-16e (Chủ tịch 31/10/2026): đã chi trả khách sạn / nhà hàng → ghi doanh thu hoa hồng của đơn gốc.
@@ -866,7 +899,27 @@ def _post_liability(db: Session, r: PaymentRequest):
 
 
 def _post_payment(db: Session, r: PaymentRequest):
-    cash = "111" if r.paid_method == "tien_mat" else "112"
+    # ĐỢT R4c-3 02/11/2026 — VẾ TIỀN GHI Ở CẤP CHI TIẾT, KHÔNG Ở CẤP CHA.
+    #
+    # Dòng cũ ghi `"111"` / `"112"`. Đo được: cả hai là tài khoản CHA (`111` "Tiền mặt",
+    # `112` "Tiền gửi không kỳ hạn"); `1111` / `1121` mới là tài khoản chi tiết. Và `post_entry`
+    # NHẬN bút toán vào tài khoản cha, không chặn — nên việc này im lặng suốt.
+    #
+    # Hậu quả đo được, chạy thật `cap_dinh_khoan.ngoai_luat` với đúng hai bút toán chỉ khác vế tiền:
+    #
+    #     331 / 112   -> NGOÀI LUẬT      vì quy tắc TRA_NCC khai vế Có là 1121, và phép đối chiếu
+    #                                    so bằng tiền tố: "112".startswith("1121") là SAI
+    #     331 / 1121  -> trong luật
+    #
+    # Tức là MỌI khoản đã chi đều rơi vào rổ "định khoản ngoài luật" — cái rổ Kế toán trưởng mở ra
+    # để tìm bút toán sai. Một rổ mà mọi khoản chi đều rơi vào thì nó không còn chỉ ra chỗ phải
+    # nhìn nữa. Thêm nữa: sổ chi tiết tiền gửi và số dư đầu kỳ đều làm việc ở cấp `1121`, nên tiền
+    # ghi ở cấp `112` không hiện ra ở đó.
+    #
+    # ĐỌC `HTTT_QUA_TIEN_MAT` CHỨ KHÔNG SO `== "tien_mat"`: séc tiền mặt vẫn rút trên tài khoản
+    # ngân hàng nên nó thuộc bên 112x, và luật ấy đã khai MỘT LẦN ở `models/hach_toan.py`. So chuỗi
+    # ở đây là khai lại nó lần thứ hai, và lần này sai.
+    cash = "1111" if r.paid_method in HTTT_QUA_TIEN_MAT else "1121"
     if r.category == "hoan_tien":
         lines = [{"account": "131", "debit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": r.amount, "partner": r.supplier_name}]
     elif r.category == "tam_ung":   # tạm ứng HDV/NCC trước tour: Nợ 141 – Có 111/112; hoàn ứng khi Kế toán xác nhận quyết toán
