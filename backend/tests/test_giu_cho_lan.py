@@ -64,6 +64,12 @@ LAN_TEP = {
     # Làn R2 — phân hệ Hướng dẫn. Khai ở ĐÂY trước, rồi mới tạo `docs/dang-lam/r2.md`:
     # `test_moi_lan_deu_co_mot_tep_va_khong_tep_nao_thua` đỏ nếu tạo tệp trước khi khai.
     "R2": "r2",
+    # Lan TC-KT — Chu tich chot 02/11/2026. Bon nhanh R4c lien tiep khong gop duoc vi ca
+    # bon khai lan "Phan quyen" roi cung noi vao CUOI mot tep. Do duoc hom ay:
+    # phan-quyen.md 444 KB / 187 dong / 16 dong "dang lam"; vpm.md 334 byte. Dung hong hoc
+    # ngay 06/10 lap lai o mot tang sau hon — khong phai giua cac lan nua, ma TRONG mot lan
+    # da phinh thanh sau lan doi lot mot.
+    "TC-KT": "tc-kt",
 }
 LAN_HOP_LE = tuple(LAN_TEP)
 

@@ -18,6 +18,19 @@ git không có gì để xung đột.
 | Kiểm soát | `docs/dang-lam/kiem-soat.md` |
 | Quyết toán | `docs/dang-lam/quyet-toan.md` |
 | R2 | `docs/dang-lam/r2.md` |
+| TC-KT | `docs/dang-lam/tc-kt.md` |
+
+**Bổ sung 02/11/2026 — làn TC-KT.** Việc tách ngày 06/10 chạy đúng: ngày 02/11 làn
+`at2-nha-hang-agoda` gộp vào main mà không đụng `phan-quyen.md`. Nhưng bốn nhánh R4c liên
+tiếp không gộp được, vì cả bốn khai làn «Phân quyền» rồi cùng nối vào cuối một tệp. Đo
+được hôm ấy: `phan-quyen.md` **444 KB · 187 dòng · 16 dòng «đang làm»**, trong khi
+`vpm.md` là 334 byte. Cùng một hỏng hóc, ở một tầng sâu hơn — không phải giữa các làn nữa,
+mà trong một làn đã phình thành sáu làn đội lốt một. Phân hệ Tài chính – Kế toán từ nay
+ghi vào tệp của chính nó.
+
+**Dòng cũ KHÔNG bị dời.** `phan-quyen.md` còn dòng của làn khác và của nhánh đang bay;
+dời chúng là sửa sổ người khác không ai nhờ, và làm gãy đúng những nhánh ấy — cùng lẽ với
+luật 3 ở dưới. Làn nào muốn dời thì tự dời.
 
 ## Luật
 
