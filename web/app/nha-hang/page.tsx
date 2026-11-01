@@ -55,6 +55,7 @@ function Trang() {
   const [f, setF] = useState<any>(NH_TRONG);
   const [td, setTd] = useState<any>(null);         // {id?, ...} gói đang sửa
   const [busy, setBusy] = useState(false);
+  const [ghim, setGhim] = useState("");   // AT-2: link Google Maps sửa ghim
   const [tabNh, setTabNh] = useState<"album" | "video" | "mon" | "tdnh" | "td" | "gt" | "hd" | "tt" | "dg" | "pl">("album");   // AT-2a: hồ sơ nội dung theo tab
   const [lan, setLan] = useState(0);   // AT-2c: làm mới danh mục kiểm sau mỗi lần dữ liệu đổi
   const load = useCallback(() => { setLan((v) => v + 1); api("/nha-hang").then(setX).catch((e) => toast(errMsg(e), true)); }, [toast]);
@@ -205,6 +206,13 @@ function Trang() {
     </section>}
 
     {nhap && <button className="act teal" onClick={() => { setSua("moi"); setF(NH_TRONG); setTd(null); }}>+ Thêm nhà hàng</button>}
+    {/* AT-2 (Chủ tịch duyệt 01/11/2026): công tắc chung + từng nhà hàng — cả hai bật khách mới đặt và trả được; bản đồ trên cổng */}
+    <div className="panel" style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", margin: "8px 0" }}>
+      <span>Thanh toán trực tuyến cổng nhà hàng: {x.tt_chung ? <Tag cls="ok">Đang MỞ</Tag> : <Tag cls="warn">Đang ĐÓNG</Tag>}</span>
+      {bat && <button className="act teal" disabled={busy} onClick={() => goi("/nha-hang/thanh-toan-chung", { bat: !x.tt_chung })}>{x.tt_chung ? "Đóng thanh toán toàn cổng" : "Mở thanh toán toàn cổng"}</button>}
+      <span className="muted">Khách chỉ đặt và trả được ở nhà hàng có cả công tắc chung và công tắc riêng («Thanh toán» trong bảng) đều bật.</span>
+      <span style={{ flex: 1 }} /><span className="muted">{x.chua_toa_do ?? 0} nhà hàng chưa có vị trí trên bản đồ</span>
+      {bat && (x.chua_toa_do ?? 0) > 0 && <button className="act grey" disabled={busy} onClick={() => goi("/nha-hang/toa-do-loat", {})}>Lấy tọa độ cho tất cả nhà hàng</button>}</div>
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "8px 0" }}>
       <input placeholder="Tìm tên, món, địa danh…" value={tim} onChange={(e) => setTim(e.target.value)} />
       <select value={locTinh} onChange={(e) => setLocTinh(e.target.value)}><option value="">Mọi tỉnh ({x.nha_hang.length})</option>
@@ -219,7 +227,7 @@ function Trang() {
     </div>
 
     <div className="panel wrap"><table><thead><tr>{bat && <th><input type="checkbox" aria-label="Chọn tất cả" checked={loc.length > 0 && chon.length === loc.length} onChange={(e) => setChon(e.target.checked ? loc.map((n: any) => n.id) : [])} /></th>}
-        <th>Nhà hàng</th><th>Địa điểm</th><th>Ẩm thực</th><th>Thực đơn đang bán</th><th>Ảnh</th><th>Trên web VTD</th><th>Đặt bàn qua VTD</th><th></th></tr></thead>
+        <th>Nhà hàng</th><th>Địa điểm</th><th>Ẩm thực</th><th>Thực đơn đang bán</th><th>Ảnh</th><th>Trên web VTD</th><th>Đặt bàn qua VTD</th><th>Thanh toán</th><th></th></tr></thead>
       <tbody>{loc.map((n: any) => <tr key={n.id}>
         {bat && <td><input type="checkbox" aria-label={`Chọn ${n.ten}`} checked={chon.includes(n.id)} onChange={(e) => setChon(e.target.checked ? [...chon, n.id] : chon.filter((i) => i !== n.id))} /></td>}
         <td><b>{n.ten}</b><div className="muted">{n.ma} · nhập bởi {n.tao_boi}{n.nguon ? ` · ${n.nguon}` : ""}</div></td>
@@ -230,11 +238,13 @@ function Trang() {
         <td>{n.ngung ? <Tag cls="red">Ngừng hợp tác</Tag> : n.hien_cong ? <><Tag cls="ok">Đang hiện</Tag><div className="muted">{n.hien_boi}</div></>
           : <><Tag cls="warn">Chưa hiện</Tag>{n.tat_ly_do && <div className="muted">{n.tat_ly_do}</div>}</>}</td>
         <td>{n.mo_dat ? <Tag cls="ok">Đang mở</Tag> : <><Tag>Chưa mở</Tag><div className="muted">{n.dieu_kien.filter((c: any) => c.ok).length}/5 điều kiện</div></>}</td>
+        <td>{n.mo_thanh_toan ? <Tag cls="ok">Mở</Tag> : <Tag>Đóng</Tag>}
+          {bat && !n.ngung && <div><button className="act grey" disabled={busy} onClick={() => goi(`/nha-hang/${n.id}/thanh-toan`, { bat: !n.mo_thanh_toan })}>{n.mo_thanh_toan ? "Đóng" : "Mở"}</button></div>}</td>
         <td style={{ whiteSpace: "nowrap" }}>
           <button className="act grey" onClick={() => { setSua(n.id); setTabNh("album"); setF({ ...NH_TRONG, ...n }); setTd(null); setHd(HD_TRONG); setTepHd(null); setGt({ mo_ta: n.mo_ta || "", mon_noi_bat: n.mon_noi_bat || "" }); }}>{nhap ? "Sửa" : "Xem"}</button>
           {bat && !n.ngung && <button className="act teal" disabled={busy} onClick={() => goi(`/nha-hang/${n.id}/hien-cong`, { bat: !n.hien_cong })}>{n.hien_cong ? "Tắt khỏi cổng" : "Bật hiện cổng"}</button>}
         </td></tr>)}
-        {!loc.length && <tr><td colSpan={9} className="muted">{x.nha_hang.length ? "Không có nhà hàng khớp bộ lọc." : "Chưa có nhà hàng nào. Điều hành nhập tệp hoặc bấm «Thêm nhà hàng»."}</td></tr>}</tbody></table></div>
+        {!loc.length && <tr><td colSpan={10} className="muted">{x.nha_hang.length ? "Không có nhà hàng khớp bộ lọc." : "Chưa có nhà hàng nào. Điều hành nhập tệp hoặc bấm «Thêm nhà hàng»."}</td></tr>}</tbody></table></div>
 
     {sua && <section className="panel" style={{ marginTop: 14 }}>
       {dang ? <>
@@ -265,6 +275,14 @@ function Trang() {
       <label>Giới thiệu cho khách<textarea rows={2} value={f.mo_ta} disabled={!nhap} onChange={(e) => setF({ ...f, mo_ta: e.target.value })} /></label>
       <label>Ghi chú nội bộ (không lên cổng)<textarea rows={2} value={f.ghi_chu_noi_bo} disabled={!nhap} onChange={(e) => setF({ ...f, ghi_chu_noi_bo: e.target.value })} /></label>
       {nhap && <button className="act teal" disabled={busy} onClick={async () => { const r = await goi(sua === "moi" ? "/nha-hang" : `/nha-hang/${sua}`, f); if (r && sua === "moi") { setSua(r.id); setTabNh("album"); } }}>Lưu nhà hàng</button>}
+      {dang && <div className="panel" style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+        <b>Vị trí trên bản đồ (cổng khách)</b>
+        <span className="muted">{dang.vi_do != null ? `${dang.vi_do}, ${dang.kinh_do} · ${dang.toa_do_nguon === "tay" ? "ghim tay (link Google Maps)" : "máy lấy từ địa chỉ"}`
+          : dang.toa_do_nguon === "khong_thay" ? "Máy không tìm thấy địa chỉ — dán link Google Maps" : "Chưa có — bấm «Lấy tọa độ cho tất cả nhà hàng» hoặc dán link Google Maps"}</span>
+        {nhap && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input style={{ flex: "1 1 320px" }} placeholder="Link Google Maps (sửa ghim) — link đầy đủ có @vĩ độ,kinh độ" value={ghim} onChange={(e) => setGhim(e.target.value)} />
+          <button className="act teal" disabled={busy || !ghim.trim()} onClick={async () => { const r = await goi(`/nha-hang/${dang.id}/ghim`, { link_ggmap: ghim }); if (r) setGhim(""); }}>Lưu ghim</button>
+          {dang.toa_do_nguon === "tay" && <button className="act grey" disabled={busy} onClick={() => goi(`/nha-hang/${dang.id}/ghim`, { link_ggmap: "" })}>Bỏ ghim tay</button>}</div>}</div>}
       {!dang && <button className="act grey" onClick={() => setSua(null)}>Đóng</button>}
       </>}
 

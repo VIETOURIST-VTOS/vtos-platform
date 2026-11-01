@@ -9,7 +9,7 @@ Chỉ có GIÁ BÁN cho khách. Giá vốn / phí nhà cung cấp đi theo hợp
 nên không có đường nào để chúng lọt ra cổng.
 """
 from datetime import date, datetime
-from sqlalchemy import JSON, String, Integer, Date, DateTime, Text, Boolean, ForeignKey
+from sqlalchemy import JSON, String, Integer, Date, DateTime, Text, Boolean, Float, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 from app.models.kieu_tien import TIEN
@@ -73,6 +73,12 @@ class NhaHang(Base):
     bac_de_xuat: Mapped[str] = mapped_column(String(12), default="")
     bac_de_xuat_boi: Mapped[str] = mapped_column(String(50), default="")
     bac_de_xuat_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # AT-2 (Chủ tịch duyệt bản xem thử 01/11/2026): ghim bản đồ + công tắc mở thanh toán trực tuyến của từng nhà hàng.
+    # toa_do_nguon: "" chưa lấy · tu_dong (OpenStreetMap từ địa chỉ) · tay (Điều hành dán link Google Maps) · khong_thay
+    vi_do: Mapped[float | None] = mapped_column(Float, nullable=True)
+    kinh_do: Mapped[float | None] = mapped_column(Float, nullable=True)
+    toa_do_nguon: Mapped[str] = mapped_column(String(12), default="")
+    mo_thanh_toan: Mapped[bool] = mapped_column(Boolean, default=False)      # cùng công tắc chung mới trả được
 
 
 class HopDongNhaHang(Base):

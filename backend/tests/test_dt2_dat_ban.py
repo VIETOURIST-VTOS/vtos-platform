@@ -38,7 +38,19 @@ def hop_dong_mau(s, n, bps=1000, tu=dt.date(2026, 1, 1), den=None):
     h = HopDongNhaHang(nha_hang_id=n.id, so_hd=f"HD-{n.ma}", ngay_ky=tu, tu_ngay=tu, den_ngay=den, hoa_hong_bps=bps,
                        attachment_id=a.id, con_dung=True, ghi_boi="nvdh")
     s.add(h); s.flush()
+    bat_thanh_toan(s, n)                                         # AT-2: đơn đặt bàn chỉ nhận khi đã mở thanh toán
     return h
+
+
+def bat_thanh_toan(s, n, chung=True, rieng=True):
+    """AT-2: bật công tắc chung + công tắc của nhà hàng (mặc định cả hai TẮT sau khi triển khai)."""
+    from app.models.khach_san_vtd import CaiDatKsVtd
+    from app.services import nha_hang as NH
+    r = s.get(CaiDatKsVtd, NH.KHOA_TT_NH) or CaiDatKsVtd(khoa=NH.KHOA_TT_NH)
+    r.gia_tri = "1" if chung else "0"
+    s.add(r)
+    n.mo_thanh_toan = rieng
+    s.flush()
 
 
 @pytest.fixture()

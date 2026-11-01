@@ -1286,3 +1286,4 @@ const CSS = `
 #vtd-access .ksv button.ksv-chip{color:#3d4556}#vtd-access .ksv button.ksv-chip.on{color:var(--ksv-ink)}
 #vtd-access .ksv input[type=date]{color:inherit;-webkit-text-fill-color:currentColor}
 `;
+export const CSS_KSV = CSS;   // AT-2: trang nhà hàng dùng chung ngôn ngữ giao diện

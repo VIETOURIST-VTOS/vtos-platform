@@ -91,3 +91,11 @@ def nh_mot(nid: int, db: Session = Depends(get_db)):
         return NH.mot_nha_hang_cong(db, nid)[1]
     except NH.LoiNhaHang as ex:
         raise HTTPException(404, str(ex))
+
+
+@router.get("/nha-hang/tat-ca")
+def nh_tat_ca(db: Session = Depends(get_db)):
+    """AT-2: mọi nhà hàng đang hiện trong một lần — trang riêng /restaurant lọc, đếm, vẽ bản đồ trên trình duyệt."""
+    from app.services import dat_ban as DB
+    from app.services import nha_hang as NH
+    return {**NH.tat_ca_cong(db), "tham_so": DB.tham_so(db), "the_bat": DB.SP.cong_the_bat()}

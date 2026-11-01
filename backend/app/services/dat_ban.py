@@ -111,6 +111,24 @@ def _nguoi_dat(db: Session, tk: TaiKhoanNgoai):
     return ("co_dong" if tk.loai == "co_dong" else "khach_hang"), None
 
 
+TT_CHUA_MO = "Thanh toán trực tuyến chưa mở cho nhà hàng này"
+
+
+def _mo_tt(db: Session, n) -> bool:
+    from app.services import nha_hang as NH
+    return NH.mo_thanh_toan_nh(db, n)
+
+
+def _kiem_mo_tt(db: Session, nha_hang_id: int) -> None:
+    """AT-2 (Chủ tịch 01/11/2026): mọi đơn đặt bàn đều trả trước (cọc / đủ) → chỉ nhận đơn và nhận tiền khi công tắc
+    chung VÀ công tắc của nhà hàng đều bật (TP Điều hành bật trên VTOS). Chưa mở: không tạo đơn, không giữ bàn."""
+    from app.models.nha_hang import NhaHang
+    from app.services import nha_hang as NH
+    n = db.get(NhaHang, nha_hang_id)
+    if n is None or not NH.mo_thanh_toan_nh(db, n):
+        raise LoiDatBan(TT_CHUA_MO, 409)
+
+
 def tao(db: Session, tk: TaiKhoanNgoai, d: dict, now: datetime | None = None) -> DonDatBan:
     from app.services import nha_hang as NH
     from app.services.leads import upsert_lead
@@ -133,6 +151,7 @@ def tao(db: Session, tk: TaiKhoanNgoai, d: dict, now: datetime | None = None) ->
     tam = int(round(tam))
     if tam <= 0:
         raise LoiDatBan("Gói này chưa có giá — gửi yêu cầu để Sales báo giá")
+    _kiem_mo_tt(db, o["id"])                                       # AT-2
     ten_khach = (d.get("ten_khach") or "").strip()[:120]
     sdt = K.norm_phone(d.get("dien_thoai") or ("" if dt else tk.dien_thoai))
     if dt is not None:
@@ -410,6 +429,7 @@ def ra(db: Session, d: DonDatBan, now: datetime | None = None, doi_tac: bool = F
          "cach_tt_ten": f"{CACH_TT[d.cach_tt]} {d.ty_le_coc}%" if d.cach_tt == "coc" else CACH_TT[d.cach_tt],
          "tam_tinh": int(d.tam_tinh), "phai_tra_truoc": int(d.phai_tra_truoc), "da_tra": tra,
          "con_phai_tra_truoc": max(0, int(d.phai_tra_truoc) - (tra - int(d.so_hoan or 0))),
+         "mo_thanh_toan": bool(nh) and _mo_tt(db, nh),                 # AT-2: khóa nút trả khi công tắc đóng
          "tra_tai_ban_du_kien": max(0, int(d.tam_tinh) - tra - vc_con_giu(db, d)),
          "giam_voucher": int(d.giam_voucher or 0), "voucher": _vc_out(db, d), "km_vtd": khuyen_mai(db, d), "km_but_toan": d.km_but_toan,
          "dung_voucher": d.doi_tac_id is None and d.trang_thai in ("cho_nhan", "cho_tra") and tra <= 0,
@@ -470,6 +490,7 @@ def qr(db: Session, tk: TaiKhoanNgoai, ma: str, now: datetime | None = None) -> 
     con = int(d.phai_tra_truoc) - (da_tra(db, d) - int(d.so_hoan or 0))
     if not _co_the_tra(d, da_tra(db, d)):
         raise LoiDatBan(f"Đơn đang «{TRANG_THAI[d.trang_thai]}» — không thanh toán" if con > 0 else "Đã đủ số phải trả trước", 409)
+    _kiem_mo_tt(db, d.nha_hang_id)                                 # AT-2
     ba = K.tai_khoan_qr(db)
     if ba is None or not ba.account_number:
         raise LoiDatBan("Thanh toán QR chưa mở — vui lòng liên hệ Sales", 409)
@@ -491,6 +512,7 @@ def onepay_bat_dau(db: Session, tk: TaiKhoanNgoai, ma: str, goc: str, ip: str, n
     if not _co_the_tra(d, da_tra(db, d)):
         db.commit()
         raise LoiDatBan(f"Đơn đang «{TRANG_THAI[d.trang_thai]}» — không thanh toán" if con > 0 else "Đã đủ số phải trả trước", 409)
+    _kiem_mo_tt(db, d.nha_hang_id)                                 # AT-2
     t = ThanhToanDatBan(don_id=d.id, kenh="onepay", so_tien=con, trang_thai="cho", luc=now, goc=goc[:80])
     db.add(t); db.flush()
     t.ma_gd = f"{d.ma}T{t.id}"
@@ -509,6 +531,7 @@ def the_bat_dau(db: Session, tk: TaiKhoanNgoai, ma: str, goc: str, ip: str, now:
     if not _co_the_tra(d, da_tra(db, d)):
         db.commit()
         raise LoiDatBan(f"Đơn đang «{TRANG_THAI[d.trang_thai]}» — không thanh toán" if con > 0 else "Đã đủ số phải trả trước", 409)
+    _kiem_mo_tt(db, d.nha_hang_id)                                 # AT-2
     t = ThanhToanDatBan(don_id=d.id, kenh="sepay", so_tien=con, trang_thai="cho", luc=now, goc=goc[:80])
     db.add(t); db.flush()
     t.ma_gd = f"{d.ma}T{t.id}"
