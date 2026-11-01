@@ -99,6 +99,9 @@ def match_transaction(db: Session, txn: BankTransaction) -> None:
     from app.services import don_ks_vtd as KV   # KS-14: nội dung có mã đặt phòng KS… → đơn khách sạn VTD nhận
     if KV.tu_khop(db, txn):
         return
+    from app.services import tour_online as TRO  # TR-1: đơn tour online — khớp cả số cọc lẫn số còn lại, rồi gửi email
+    if TRO.tu_khop(db, txn):
+        return
     m = BOOKING_RE.search(txn.content.replace(" ", "") if txn.content else "")
     if not m:
         return _match_by_tour_code(db, txn)

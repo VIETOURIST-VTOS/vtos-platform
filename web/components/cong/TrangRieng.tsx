@@ -6,9 +6,9 @@ import type { TrangRieng as Loai } from "@/lib/cong";
 import KhungRieng, { useToiRieng } from "./KhungRieng";
 import KhachSanVtd from "./KhachSanVtd";
 import NhaHangAgoda from "./NhaHangAgoda";   // AT-2: nhà hàng kiểu Agoda (thay Khám phá ẩm thực trên trang riêng)
-import ToursRieng from "./khach/ToursRieng";
+import ToursAgoda from "./ToursAgoda";   // TR-1: tour kiểu Agoda + đặt online (thay danh sách tour + gửi yêu cầu KS-16q)
 
-export default function TrangRieng({ dang, id }: { dang: Loai; id?: string }) {
+export default function TrangRieng({ dang, id, don }: { dang: Loai; id?: string; don?: string }) {
   const { toi, xong } = useToiRieng();
   const so = id && /^\d+$/.test(id) ? Number(id) : undefined;
   const ten = toi?.ho_ten || "";
@@ -18,6 +18,6 @@ export default function TrangRieng({ dang, id }: { dang: Loai; id?: string }) {
       : dang === "hotel" ? <section aria-label="Khách sạn"><KhachSanVtd rieng moId={so} ten={ten} lienHe={lienHe} /></section>
       : dang === "restaurant" ? <section aria-label="Nhà hàng & ẩm thực">
         <NhaHangAgoda moId={so} ten={ten} lienHe={lienHe} coSdt={!!toi?.dien_thoai} sdtCho={toi?.dien_thoai || ""} doiTac={toi?.loai === "doi_tac"} /></section>
-      : <ToursRieng toi={toi} moId={so} />}
+      : <ToursAgoda toi={toi} moId={so} moDon={don} />}
   </KhungRieng>;
 }

@@ -1,6 +1,7 @@
 """SP-1 · SePay gọi về (IPN cổng thanh toán). Không phiên; xác thực bằng đầu đề X-Secret-Key = khóa IPN trong cấu hình.
 
-Mã giao dịch (order_invoice_number) bắt đầu «KS» → đơn đặt phòng khách sạn VTD (KS-14); còn lại → đặt bàn (DT-2).
+Mã giao dịch (order_invoice_number) bắt đầu «KS» → đơn đặt phòng khách sạn VTD (KS-14); «TR» → đặt tour online (TR-1);
+còn lại → đặt bàn (DT-2).
 Sai khóa → 401, không đổi gì; mã lạ → 200 (để SePay thôi gọi lại) nhưng không ghi gì.
 """
 import time
@@ -44,5 +45,10 @@ async def ipn(request: Request, x_secret_key: str | None = Header(default=None),
     kq = SP.doc_ipn(p if isinstance(p, dict) else {})
     if not kq["ma_gd"]:
         return {"success": True, "ghi": False}
-    r = (KV.sepay_ket_qua if kq["ma_gd"].upper().startswith("KS") else DB.sepay_ket_qua)(db, kq)
+    ma = kq["ma_gd"].upper()
+    if ma.startswith("TR"):                               # TR-1: đặt tour online trên cổng khách
+        from app.services import tour_online as TRO
+        r = TRO.sepay_ket_qua(db, kq)
+    else:
+        r = (KV.sepay_ket_qua if ma.startswith("KS") else DB.sepay_ket_qua)(db, kq)
     return {"success": True, "ghi": r is not None}

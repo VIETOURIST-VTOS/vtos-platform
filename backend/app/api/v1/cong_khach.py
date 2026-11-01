@@ -1,6 +1,6 @@
 """KH-1 · Cổng khách hàng VTD — mọi cửa đòi PHIÊN CỔNG NGOÀI (không phải phiên VTOS) và loại khách hàng."""
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -332,3 +332,94 @@ def gui_ho_tro(data: HoTroIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: 
         raise HTTPException(400, str(ex))
     return {"ma": y.ma, "bo_phan": CK.BO_PHAN[y.bo_phan], "loai": CK.LOAI_HO_TRO[y.loai],
             "message": f"Đã gửi yêu cầu {y.ma} tới {CK.BO_PHAN[y.bo_phan]}. Người phụ trách sẽ trả lời tại đây."}
+
+
+# ── TR-1 (Chủ tịch duyệt 01–02/11/2026) · đặt tour online trên kh.vietourist.vn/tours ───────────────────────────
+class TourKhachIn(BaseModel):
+    ho_ten: str
+    ngay_sinh: str
+    gioi_tinh: str = ""
+    giay_to: str = ""
+
+
+class TourDatIn(BaseModel):
+    tour_id: int
+    nguoi_lon: int = 1
+    tre_em: int = 0
+    em_be: int = 0
+    cach_tra: str = "coc"
+    ho_ten: str = ""
+    dien_thoai: str = ""
+    email: str = ""
+    khach: list[TourKhachIn] = []
+    yeu_cau: str = ""
+    hoa_don_cong_ty: dict | None = None
+    dong_y: bool = False
+
+
+class TourDoanIn(BaseModel):
+    product_id: int | None = None
+    so_khach: int = 0
+    dien_thoai: str = ""
+    tu_ngay: str = ""
+    den_ngay: str = ""
+    noi_khoi_hanh: str = ""
+    ngan_sach: int = 0
+    hang_ks: str = ""
+    cong_ty: str = ""
+    hoa_don: bool = False
+    ghi_chu: str = ""
+    dong_y: bool = False
+
+
+class TourTheIn(BaseModel):
+    muc: str = ""
+
+
+def _tr(f, *a, **k):
+    from app.services import tour_online as TR
+    try:
+        return f(*a, **k)
+    except TR.LoiTour as ex:
+        raise HTTPException(ex.status, str(ex))
+
+
+@router.post("/tour-online/dat")
+def tr_dat(data: TourDatIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    from app.services import tour_online as TR
+    d = _tr(TR.dat, db, tk, data.model_dump())
+    return {"don": TR.ra_khach(db, d), "message": f"Đã giữ chỗ {TR.GIU_PHUT} phút — thanh toán để hoàn tất"}
+
+
+@router.get("/tour-online/don/{ma}")
+def tr_don(ma: str, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    from app.services import tour_online as TR
+    return _tr(TR.don_khach, db, tk, ma)
+
+
+@router.get("/tour-online/don/{ma}/qr")
+def tr_qr(ma: str, muc: str = "", tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    from app.services import tour_online as TR
+    return _tr(TR.qr, db, tk, ma, muc)
+
+
+@router.post("/tour-online/don/{ma}/the")
+def tr_the(ma: str, data: TourTheIn, request: Request, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    from app.services import tour_online as TR
+    goc = TR.goc_tra_ve(request.headers.get("origin") or "")
+    return _tr(TR.the_bat_dau, db, tk, ma, goc, data.muc)
+
+
+@router.get("/tour-online/don/{ma}/invoice")
+def tr_invoice(ma: str, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    from fastapi.responses import Response
+    from app.services import tour_online as TR
+    pdf = _tr(TR.tai_hoa_don, db, tk, ma)
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="Invoice-{ma}.pdf"'})
+
+
+@router.post("/tour-online/yeu-cau-doan")
+def tr_doan(data: TourDoanIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    from app.services import tour_online as TR
+    y = _tr(TR.gui_yeu_cau_doan, db, tk, data.model_dump())
+    return {"id": y.id, "message": "Đã gửi yêu cầu thiết kế tour — Sales liên hệ báo giá trong giờ làm việc"}

@@ -7,7 +7,7 @@ import time
 from collections import defaultdict
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -99,3 +99,59 @@ def nh_tat_ca(db: Session = Depends(get_db)):
     from app.services import dat_ban as DB
     from app.services import nha_hang as NH
     return {**NH.tat_ca_cong(db), "tham_so": DB.tham_so(db), "the_bat": DB.SP.cong_the_bat()}
+
+
+# ── TR-1 (Chủ tịch duyệt 01–02/11/2026) · tour kiểu Agoda trên kh.vietourist.vn/tours — XEM không cần đăng nhập ──
+def _tr(f, *a, **k):
+    from app.services import tour_online as TR
+    try:
+        return f(*a, **k)
+    except TR.LoiTour as ex:
+        raise HTTPException(ex.status, str(ex))
+
+
+def _lam_moi_nen(pid: int) -> None:
+    """Cache web cũ hơn 24 giờ → đọc lại SAU khi đã trả trang cho khách (phiên DB riêng). Hỏng thì giữ bản cũ."""
+    from app.db.session import SessionLocal
+    from app.models.core import Product
+    from app.services import tour_online as TR
+    db = SessionLocal()
+    try:
+        p = db.get(Product, pid)
+        if p is not None and TR.can_lam_moi(p):
+            TR.lam_moi(db, p)
+            db.commit()
+    finally:
+        db.close()
+
+
+@router.get("/tour-online/tim")
+def tr_tim(tab: str = "", q: str = "", noi: str = "", tu: date | None = None, den: date | None = None, nguoi_lon: int = 2,
+           tre_em: int = 0, loai: str = "", db: Session = Depends(get_db)):
+    from app.services import tour_online as TR
+    return _tr(TR.tim, db, tab, q, noi, tu, den, nguoi_lon, tre_em, loai)
+
+
+@router.get("/tour-online/san-pham/{pid:int}")
+def tr_mot(pid: int, background: BackgroundTasks, nguoi_lon: int = 2, tre_em: int = 0, db: Session = Depends(get_db)):
+    from app.models.core import Product
+    from app.services import tour_online as TR
+    p = db.get(Product, pid)
+    if p is not None and p.link_web and not p.noi_dung_web:
+        TR.lam_moi(db, p)                       # chưa có bản nào: đọc ngay (hỏng thì vẫn trả trang, chỉ thiếu ảnh)
+        db.commit()
+    elif p is not None and TR.can_lam_moi(p):
+        background.add_task(_lam_moi_nen, p.id)
+    return _tr(TR.chi_tiet, db, pid, nguoi_lon, tre_em)
+
+
+@router.get("/tour-online/san-pham/{pid:int}/lich-trinh/{tour_id:int}")
+def tr_lich(pid: int, tour_id: int, db: Session = Depends(get_db)):
+    from app.services import tour_online as TR
+    return _tr(TR.lich_trinh_chuyen, db, pid, tour_id)
+
+
+@router.get("/tour-online/tinh")
+def tr_tinh(tour_id: int, nguoi_lon: int = 1, tre_em: int = 0, em_be: int = 0, cach_tra: str = "coc", db: Session = Depends(get_db)):
+    from app.services import tour_online as TR
+    return _tr(TR.tinh, db, tour_id, nguoi_lon, tre_em, em_be, cach_tra)
