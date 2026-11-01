@@ -15,24 +15,33 @@ BỐN ĐIỀU KHÔNG ĐƯỢC LỎNG
 người có thẩm quyền trên VTOS duyệt (NGUOI_DUYET). Khách hàng lần đầu phải đồng ý điều khoản dịch vụ;
 không bao giờ tự bật nhận tin quảng cáo.
 """
+import base64
 import hashlib
 import hmac
 import re
 import secrets
+import unicodedata
 from datetime import datetime, timedelta, timezone
 
 from jose import jwt, JWTError
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.core import User, ROLES
-from app.models.cong_ngoai import (TaiKhoanNgoai, MaXacThucNgoai, LOAI_NGOAI, LOAI_DOI_TAC,
-                                   TRANG_THAI_NGOAI, KENH_MA)
+from app.models.cong_ngoai import (TaiKhoanNgoai, MaXacThucNgoai, DonDangKy, LOAI_NGOAI,
+                                   LOAI_DOI_TAC, TRANG_THAI_NGOAI, KENH_MA)
 from app.services import rules as R
 
 SONG_MA_PHUT = 5
 SAI_TOI_DA = 5
+# DK-1 · Chủ tịch chốt 01/11/2026: tối thiểu 5 ký tự, KHÔNG bắt viết hoa, không bắt trộn số
+# hay ký hiệu. Chuẩn NIST SP 800-63B đòi 15 cho mật khẩu đứng một mình — chỗ lệch ấy ghi
+# trong sổ và bù bằng luật hỏi mã ở máy lạ (DK-2). Luật "phải có một chữ hoa" BỎ có lý do:
+# ai cũng viết hoa chữ đầu, nên nó làm mật khẩu khó nhớ mà không khó đoán.
+MK_TOI_THIEU = 5
+MK_TOI_DA = 64
+DON_SONG_GIO = 24
 GUI_TOI_DA_MOI_GIO = 5
 PHIEN_GIO = 12
 AUD = "vtd-cong"
@@ -358,3 +367,236 @@ def xu_ly(db: Session, u: User, tk: TaiKhoanNgoai, hanh_dong: str, ly_do: str = 
             before={"trang_thai": truoc}, after={"trang_thai": den, "ly_do": ly_do})
     db.commit(); db.refresh(tk)
     return tk
+
+
+# ──────────────────────────────────────────────────────────────── DK-1 · MẬT KHẨU
+
+# Mức SÀN, không bao giờ rỗng. Máy chủ thật nạp thêm danh sách dài hơn; chỗ này là cái tối thiểu
+# phải chặn được, và phép thử đo đúng nó.
+MK_DA_LO = {
+    "12345", "123456", "1234567", "12345678", "123456789", "1234567890",
+    "111111", "000000", "121212", "123123", "654321", "11111", "00000",
+    "qwerty", "qwertyuiop", "asdfgh", "zxcvbn", "iloveyou", "password",
+    "passw0rd", "p@ssword", "admin", "administrator", "welcome", "letmein",
+    "monkey", "dragon", "sunshine", "princess", "football", "baseball",
+    "matkhau", "matkhau123", "vietnam", "hanoi", "saigon", "xinchao",
+    "anhyeuem", "emyeuanh", "tinhyeu", "hoahong", "88888888", "99999999",
+}
+
+
+def _chuan_mk(mk: str) -> str:
+    """Chuẩn hoá NFC — "cà" gõ liền một ký tự và "cà" gõ rời hai ký tự phải là MỘT mật khẩu."""
+    return unicodedata.normalize("NFC", mk or "")
+
+
+def _goi_bam(mk: str) -> str:
+    """bcrypt chỉ đọc 72 BYTE đầu rồi lặng lẽ bỏ phần sau. Tiếng Việt có dấu 3 byte một ký tự, nên
+    64 ký tự có thể thành 192 byte: hai mật khẩu khác hẳn nhau sẽ cùng một băm, và người đặt mật
+    khẩu dài lại hoá ra kém an toàn hơn người đặt ngắn. Băm sha256 trước, rồi mới bcrypt: mọi ký
+    tự đều được đếm, đúng như chuẩn đòi (verify the entire password, no truncation)."""
+    return base64.b64encode(hashlib.sha256(_chuan_mk(mk).encode()).digest()).decode()
+
+
+def kiem_mat_khau(mk: str, lien_he: str = "", ho_ten: str = "") -> str:
+    """Câu báo lỗi, hoặc chuỗi rỗng nếu đạt.
+
+    TỪ CHỐI THÌ PHẢI NÓI RÕ VÌ SAO. "Mật khẩu không hợp lệ" là câu để người ta thử mò, không phải
+    câu để sửa — chuẩn đòi nói lý do. Và KHÔNG có luật trộn hoa/số/ký hiệu nào ở đây.
+    """
+    s = _chuan_mk(mk)
+    if len(s) < MK_TOI_THIEU:
+        return f"Mật khẩu phải từ {MK_TOI_THIEU} ký tự trở lên"
+    if len(s) > MK_TOI_DA:
+        return f"Mật khẩu dài quá {MK_TOI_DA} ký tự — rút ngắn lại"
+    t = s.strip().lower()
+    if t in MK_DA_LO:
+        return "Mật khẩu này nằm trong danh sách mật khẩu đã bị lộ — chọn mật khẩu khác"
+    if "vietourist" in t or "vtourist" in t:
+        return "Mật khẩu không được chứa chữ «vietourist»"
+    lh = ""
+    if lien_he:
+        try:
+            lh = chuan_lien_he(lien_he)[1]
+        except LoiCong:
+            lh = str(lien_he).strip().lower()
+    goc = lh.split("@")[0] if lh else ""
+    if goc and len(goc) >= 4 and goc in t:
+        return "Mật khẩu không được chứa số điện thoại hoặc địa chỉ email của bạn"
+    hn = (ho_ten or "").strip().lower()
+    if hn and len(hn) >= 4 and hn in t:
+        return "Mật khẩu không được chứa chính họ tên của bạn"
+    return ""
+
+
+def bam_mat_khau(mk: str) -> str:
+    from app.core.security import hash_password
+    return hash_password(_goi_bam(mk))
+
+
+def dung_mat_khau(mk: str, bam: str) -> bool:
+    """Tài khoản chưa có mật khẩu (bam rỗng) thì KHÔNG mật khẩu nào đúng — kể cả chuỗi rỗng."""
+    from app.core.security import verify_password
+    if not bam:
+        return False
+    return verify_password(_goi_bam(mk), bam)
+
+
+# ─────────────────────────────────────────────────── DK-1 · ĐƠN ĐĂNG KÝ (bốn bước)
+# Mã một lần ở BƯỚC CUỐI. Ba bước trước phải có chỗ đứng mà chưa có tài khoản — đó là `don_dang_ky`.
+
+def _don(db: Session, khoa: str, now: datetime) -> DonDangKy:
+    d = db.execute(select(DonDangKy).where(DonDangKy.khoa == (khoa or ""))).scalars().first()
+    if d is None or d.het_han <= now:
+        raise LoiCong(f"Đơn đăng ký đã quá hạn {DON_SONG_GIO} giờ — bắt đầu lại từ bước 1",
+                      ma="don_het", status=410)
+    return d
+
+
+def _don_ra(d: DonDangKy, buoc: int) -> dict:
+    return {"khoa": d.khoa, "loai": d.loai, "buoc": buoc, "ho_ten": d.ho_ten,
+            "lien_he": che(d.dien_thoai or d.email), "het_han": d.het_han}
+
+
+def dang_ky_b1(db: Session, loai: str, ho_ten: str, dien_thoai: str = "", email: str = "",
+               ip: str = "", now: datetime | None = None) -> dict:
+    """Bước 1 — ai và liên hệ nào.
+
+    KHÔNG báo "số này đã đăng ký": nói ra là biến màn này thành máy dò — gõ một nghìn số là biết
+    một nghìn người có phải khách của Vietourist hay không. Bước 4 nhắn cho chủ số, không nhắn cho
+    người đang gõ.
+    """
+    now = now or datetime.now()
+    if loai not in LOAI_NGOAI:
+        raise LoiCong("Cổng không hợp lệ")
+    ho_ten = (ho_ten or "").strip()
+    if len(ho_ten) < 2:
+        raise LoiCong("Ghi họ tên của bạn")
+    dt = em = ""
+    if (dien_thoai or "").strip():
+        kieu, v = chuan_lien_he(dien_thoai)
+        if kieu != "dien_thoai":
+            raise LoiCong("Ô số điện thoại nhận số, không nhận email")
+        dt = v
+    if (email or "").strip():
+        kieu, v = chuan_lien_he(email)
+        if kieu != "email":
+            raise LoiCong("Ô email nhận địa chỉ email")
+        em = v
+    if not dt and not em:
+        raise LoiCong("Ghi ít nhất một liên hệ: số điện thoại hoặc email")
+    d = DonDangKy(khoa=secrets.token_urlsafe(24), loai=loai, ho_ten=ho_ten[:160], dien_thoai=dt,
+                  email=em, ip=(ip or "")[:64], het_han=now + timedelta(hours=DON_SONG_GIO),
+                  tao_luc=now)
+    db.add(d)
+    db.commit()
+    return _don_ra(d, 2)
+
+
+def dang_ky_b2(db: Session, khoa: str, mat_khau: str, now: datetime | None = None) -> dict:
+    """Bước 2 — mật khẩu. Băm NGAY tại đây; mật khẩu thô không bao giờ xuống đĩa."""
+    now = now or datetime.now()
+    d = _don(db, khoa, now)
+    loi = kiem_mat_khau(mat_khau, d.dien_thoai or d.email, d.ho_ten)
+    if loi:
+        raise LoiCong(loi, ma="mk_yeu")
+    d.mat_khau_bam = bam_mat_khau(mat_khau)
+    db.commit()
+    return _don_ra(d, 3)
+
+
+def dang_ky_b3(db: Session, khoa: str, dong_y: bool, nhan_tin: bool = False,
+               now: datetime | None = None) -> dict:
+    """Bước 3 — điều khoản. Không bao giờ TỰ BẬT nhận tin quảng cáo."""
+    now = now or datetime.now()
+    d = _don(db, khoa, now)
+    if not d.mat_khau_bam:
+        raise LoiCong("Chưa đặt mật khẩu — quay lại bước 2", ma="thieu_buoc")
+    if not dong_y:
+        raise LoiCong("Phải đồng ý điều khoản dịch vụ mới tạo được tài khoản", ma="can_dong_y")
+    d.dong_y_dieu_khoan_luc = now
+    d.nhan_tin_quang_cao = bool(nhan_tin)
+    db.commit()
+    return _don_ra(d, 4)
+
+
+def _don_du_ba_buoc(d: DonDangKy) -> None:
+    if not d.ho_ten or not (d.dien_thoai or d.email):
+        raise LoiCong("Chưa xong bước 1 — quay lại ghi họ tên và liên hệ", ma="thieu_buoc")
+    if not d.mat_khau_bam:
+        raise LoiCong("Chưa đặt mật khẩu — quay lại bước 2", ma="thieu_buoc")
+    if not d.dong_y_dieu_khoan_luc:
+        raise LoiCong("Chưa đồng ý điều khoản dịch vụ — quay lại bước 3", ma="thieu_buoc")
+
+
+def dang_ky_gui_ma(db: Session, khoa: str, kenh: str, ip: str = "",
+                   now: datetime | None = None) -> dict:
+    """Bước 4a — gửi mã. Ba bước trước phải xong hết thì mới gửi."""
+    now = now or datetime.now()
+    d = _don(db, khoa, now)
+    _don_du_ba_buoc(d)
+    if kenh not in KENH_MA:
+        raise LoiCong("Kênh nhận mã không hợp lệ")
+    lh = d.dien_thoai if kenh == "zalo" else d.email
+    if not lh:
+        raise LoiCong("Chưa có liên hệ hợp với kênh này — quay lại bước 1", ma="thieu_buoc")
+    r = gui_ma(db, d.loai, lh, kenh, ip, now)
+    d.ma_khoa = r["khoa"]
+    db.commit()
+    r = dict(r)
+    r["khoa"] = d.khoa          # trình duyệt chỉ cầm khoá ĐƠN, không cầm khoá lần gửi mã
+    return r
+
+
+def dang_ky_xong(db: Session, khoa: str, ma: str, now: datetime | None = None) -> tuple:
+    """Bước 4b — gõ mã. ĐÂY là chỗ tài khoản ra đời, và chỉ ở đây."""
+    now = now or datetime.now()
+    d = _don(db, khoa, now)
+    _don_du_ba_buoc(d)
+    c = db.execute(select(MaXacThucNgoai).where(
+        MaXacThucNgoai.khoa == (d.ma_khoa or ""))).scalars().first()
+    if c is None or c.da_dung or c.het_han <= now or c.so_lan_sai >= SAI_TOI_DA:
+        raise LoiCong("Mã đã hết hạn hoặc không còn dùng được — bấm Gửi lại mã", ma="ma_het")
+    if not hmac.compare_digest(c.ma_bam, _bam(c.khoa, (ma or "").strip())):
+        c.so_lan_sai += 1
+        db.commit()
+        con = SAI_TOI_DA - c.so_lan_sai
+        raise LoiCong(f"Mã chưa đúng — còn {con} lần thử" if con > 0
+                      else f"Sai quá {SAI_TOI_DA} lần — bấm Gửi lại mã",
+                      ma="ma_sai" if con > 0 else "ma_het")
+    c.da_dung = True
+    dk = []
+    if d.dien_thoai:
+        dk.append(TaiKhoanNgoai.dien_thoai == d.dien_thoai)
+    if d.email:
+        dk.append(TaiKhoanNgoai.email == d.email)
+    cu = db.execute(select(TaiKhoanNgoai).where(
+        TaiKhoanNgoai.loai == d.loai, or_(*dk))).scalars().first()
+    if cu is not None:
+        # Mã đúng KHÔNG mở được tài khoản đã có. Cho vào là để mã thay mật khẩu — đúng cái Chủ
+        # tịch cấm 01/11/2026. Người thật quên mật khẩu thì đi đường đặt lại, không đi đường này.
+        db.delete(d)
+        db.commit()
+        raise LoiCong("Liên hệ này đã có tài khoản ở cổng này — hãy đăng nhập, hoặc dùng "
+                      "«Quên mật khẩu» nếu không nhớ.", ma="da_co", status=409)
+    tk = TaiKhoanNgoai(loai=d.loai, ho_ten=d.ho_ten, dien_thoai=d.dien_thoai, email=d.email,
+                       mat_khau_bam=d.mat_khau_bam,
+                       trang_thai="hoat_dong" if d.loai == "khach_hang" else "ho_so",
+                       dong_y_dieu_khoan_luc=d.dong_y_dieu_khoan_luc,
+                       nhan_tin_quang_cao=d.nhan_tin_quang_cao, kenh_ua_thich=c.kenh,
+                       dang_nhap_cuoi=now, tao_luc=now)
+    db.add(tk)
+    db.delete(d)
+    db.commit()
+    db.refresh(tk)
+    return tk, cap_phien(tk)
+
+
+def don_qua_han(db: Session, now: datetime | None = None) -> int:
+    """Dọn đơn quá hạn. Đơn chưa thành tài khoản vẫn giữ họ tên và liên hệ thật — để lại là giữ
+    dữ liệu cá nhân của người chưa từng là khách."""
+    now = now or datetime.now()
+    ds = db.execute(select(DonDangKy).where(DonDangKy.het_han <= now)).scalars().all()
+    for d in ds:
+        db.delete(d)
+    db.commit()
+    return len(ds)
