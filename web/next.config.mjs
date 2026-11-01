@@ -14,7 +14,8 @@ const nextConfig = {
     const api = process.env.API_INTERNAL_URL || "http://localhost:8000";
     // KS-16q: ba trang riêng trên tên miền cổng — kh.vietourist.vn/hotel → /kham-pha/hotel (… /restaurant, /tours).
     // Phải chạy TRƯỚC hệ tệp (beforeFiles) vì /tours đã là màn VTOS; chỉ áp cho tên miền cổng ngoài.
-    const cong = [{ type: "host", value: "(kh|dt|ir)\\.vietourist\\.vn" }];
+    // TM-1 (Chủ tịch 02/11/2026): vietourist.com.vn chạy song song với vietourist.vn — kh./dt./ir. của cả hai.
+    const cong = [{ type: "host", value: "(kh|dt|ir)\\.vietourist\\.(vn|com\\.vn)" }];
     const rieng = ["hotel", "restaurant", "tours"].flatMap((k) => [
       { source: `/${k}`, has: cong, destination: `/kham-pha/${k}` },
       { source: `/${k}/:id(\\d+)`, has: cong, destination: `/kham-pha/${k}/:id` },

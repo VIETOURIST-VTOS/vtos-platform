@@ -979,7 +979,8 @@ def qr(db: Session, tk: TaiKhoanNgoai, ma: str, muc: str = "") -> dict:
 def goc_tra_ve(origin: str) -> str:
     """Địa chỉ cổng thẻ trả khách về. Chỉ tên miền Vietourist (không để «Origin» lạ biến trang trả về thành trang ngoài);
     trên tên miền cổng dùng /tours/don/…, nơi khác (crm, bản thử) dùng /kham-pha/tours/don/…"""
-    m = re.fullmatch(r"https://([a-z0-9-]+\.)?vietourist\.vn", (origin or "").strip().lower().rstrip("/"))
+    # TM-1 (02/11/2026): vietourist.com.vn song song — chỉ bốn tên cổng (gốc/www .com.vn là web cũ, không nhận).
+    m = re.fullmatch(r"https://(([a-z0-9-]+\.)?vietourist\.vn|(crm|kh|dt|ir)\.vietourist\.com\.vn)", (origin or "").strip().lower().rstrip("/"))
     if not m:
         return "https://kh.vietourist.vn/tours"
     o = origin.strip().lower().rstrip("/")
