@@ -106,6 +106,15 @@ def kiem_link(url: str) -> str:
     return u
 
 
+def ma_hoa_link(url: str) -> str:
+    """TR-1c: đường dẫn web có dấu cách / chữ có dấu («tour- bao-loc-963.html», «…-2N1Đ-952.html») → mã hóa %XX như trình
+    duyệt; phần đã mã hóa sẵn (%20, %C4%90) giữ nguyên."""
+    from urllib.parse import quote, urlsplit, urlunsplit
+    p = urlsplit(url)
+    return urlunsplit((p.scheme, p.netloc, quote(p.path, safe="/%:@-._~!$&'()*+,;="),
+                       quote(p.query, safe="=&%:@-._~!$'()*+,;/?"), p.fragment))
+
+
 def _tai_that(url: str) -> bytes:
     import urllib.request
 
@@ -115,7 +124,7 @@ def _tai_that(url: str) -> bytes:
             return super().redirect_request(req, fp, code, msg, headers, newurl)
 
     op = urllib.request.build_opener(_KhongRaNgoai())
-    req = urllib.request.Request(kiem_link(url), headers={"User-Agent": "VTOS/1.0 (+https://kh.vietourist.vn)", "Accept-Language": "vi"})
+    req = urllib.request.Request(ma_hoa_link(kiem_link(url)), headers={"User-Agent": "VTOS/1.0 (+https://kh.vietourist.vn)", "Accept-Language": "vi"})
     with op.open(req, timeout=WEB_HAN_GIAY) as r:
         kiem_link(r.geturl())
         data = r.read(WEB_TOI_DA_BYTE + 1)
@@ -177,8 +186,11 @@ def _chu(n) -> str:
     return ("\n" + s + "\n") if n.tag in _KHOI else s
 
 
+_KHONG_RONG = re.compile("[\u200b\u200c\u200d\u2060\ufeff]")   # TR-1c: web chèn ký tự rộng 0 trước «NGÀY 1:»
+
+
 def _sach(s: str) -> str:
-    return re.sub(r"[ \t ]+", " ", s or "").strip()
+    return re.sub(r"[ \t\u00a0]+", " ", _KHONG_RONG.sub("", s or "")).strip()
 
 
 def _duyet(n):
@@ -333,6 +345,7 @@ def phan_tich(html: str, url: str) -> dict:
     tab = {k: _tim(nut, lambda n, k=k: n.attrs.get("id") == k) for k in ("tabs-detail", "tabs-more", "tabs-adv")}
     # LỊCH TRÌNH
     lich: list[dict] = []
+    gioi_thieu = ""
     if tab["tabs-detail"] is not None:
         for t, imgs in _khoi(tab["tabs-detail"], url):
             m = _NGAY_RE.match(t)
@@ -345,6 +358,17 @@ def phan_tich(html: str, url: str) -> dict:
         so = [x["ngay"] for x in lich]
         if so != list(range(1, len(so) + 1)):
             lich = []                     # mốc ngày không liên tiếp → không tin cách tách
+        # TR-1c: ảnh chèn trong «Chương trình tour» (kceditor) cũng là ảnh của tour → thêm vào album (trùng tên tệp bỏ)
+        for _t, imgs in _khoi(tab["tabs-detail"], url):
+            for a in imgs:
+                day_du = a.replace("/thumbnail/", "/")
+                tep = day_du.rsplit("/", 1)[-1].lower()
+                if tep not in ten_tep:
+                    ten_tep[tep] = len(anh)
+                    anh.append(day_du)
+        # TR-1c: trang chỉ có bài giới thiệu (tour Du lịch Xanh…) → giữ chữ làm «Giới thiệu», không bịa mốc ngày
+        if not lich:
+            gioi_thieu = "\n".join(t for t, _ in _khoi(tab["tabs-detail"], url) if t).strip()[:6000]
     # BAO GỒM / KHÔNG BAO GỒM / QUY ĐỊNH
     bao: list[str] = []
     khong: list[str] = []
@@ -395,7 +419,8 @@ def phan_tich(html: str, url: str) -> dict:
                              "khach_san": (o[cot_ks] if cot_ks is not None and cot_ks < len(o) else "")[:80], "phu_thu_don": pt})
     return {"ten": ten[:200], "anh": anh[:40], "lich_trinh": lich, "bang_gia": bang_gia[:12], "bao_gom": bao[:40],
             "khong_bao_gom": khong[:40], "quy_dinh": quy_dinh, "khoi_hanh_text": khoi_hanh, "thoi_luong": thoi_luong,
-            "phuong_tien": phuong_tien, "phuong_tien_ma": ma_phuong_tien(phuong_tien), "gia_web": gia_web, "link": url}
+            "phuong_tien": phuong_tien, "phuong_tien_ma": ma_phuong_tien(phuong_tien), "gia_web": gia_web, "link": url,
+            "gioi_thieu": gioi_thieu}
 
 
 def doc_tour_web(url: str) -> dict:
@@ -663,7 +688,7 @@ def tach_ngay(van_ban: str) -> list[dict]:
     dong = (van_ban or "").replace("\r", "").split("\n")
     ra: list[dict] = []
     for d in dong:
-        m = _NGAY_RE.match(d)
+        m = _NGAY_RE.match(_KHONG_RONG.sub("", d))
         if m and len(d) < 300:
             ra.append({"ngay": int(m.group(1)), "tieu_de": _sach(m.group(2))[:200], "noi_dung": "", "anh": []})
         elif ra:
@@ -689,6 +714,9 @@ def lich_trinh(db: Session, p: Product, tour_id: int | None = None) -> dict:
     tn = tach_ngay(p.program or "")
     if tn:
         return {"nguon": "san_pham", "ngay": [{**x, "bua": [], "khach_san": ""} for x in tn], "van_ban": ""}
+    gt = ((p.noi_dung_web or {}).get("gioi_thieu") or "").strip()   # TR-1c: bài giới thiệu trên web trước văn bản sản phẩm
+    if gt:
+        return {"nguon": "web_gioi_thieu", "ngay": [], "van_ban": gt[:8000]}
     return {"nguon": "van_ban", "ngay": [], "van_ban": (p.program or "").strip()[:8000]}
 
 
