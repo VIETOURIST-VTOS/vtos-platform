@@ -14,6 +14,15 @@ export function phienCong(): string { try { return localStorage.getItem(KHOA_PHI
 export function luuPhienCong(p: string) { try { localStorage.setItem(KHOA_PHIEN_CONG, p); } catch { /* trình duyệt chặn lưu */ } }
 export function xoaPhienCong() { try { localStorage.removeItem(KHOA_PHIEN_CONG); } catch { /* bỏ qua */ } }
 
+/* DK-3 · DẤU NHỚC MÁY — lớp thứ hai giữ cho mật khẩu 5 ký tự đứng được (Chủ tịch chốt 01/11/2026).
+   MỖI CỔNG MỘT DẤU RIÊNG: mỗi cổng là một tài khoản riêng, dùng chung một dấu là lấy máy đã quen ở
+   cổng khách hàng mở cho cổng cổ đông. Dấu này KHÔNG phải phiên: tự nó không mở được tài khoản nào,
+   nó chỉ trả lời đúng một câu — «máy này đã xác minh chưa» — sau khi mật khẩu đã đúng. */
+export const KHOA_MAY_CONG = "vtd_cong_may";
+export function dauMay(loai: string): string { try { return localStorage.getItem(`${KHOA_MAY_CONG}:${loai}`) || ""; } catch { return ""; } }
+export function luuDauMay(loai: string, d: string) { try { if (d) localStorage.setItem(`${KHOA_MAY_CONG}:${loai}`, d); } catch { /* trình duyệt chặn lưu */ } }
+export function xoaDauMay(loai: string) { try { localStorage.removeItem(`${KHOA_MAY_CONG}:${loai}`); } catch { /* bỏ qua */ } }
+
 export async function goiCong(path: string, json?: any): Promise<any> {
   const headers: Record<string, string> = {};
   const p = phienCong();
