@@ -316,6 +316,16 @@ def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict]
     return dong
 
 
+# KS-16s (Chủ tịch duyệt bản xem thử 01/11/2026): giờ đến dự kiến (gửi khách sạn) + công tắc mở thanh toán.
+GIO_DEN = ("Chưa rõ",) + tuple(f"{h:02d}:00–{(h + 1) % 24:02d}:00" for h in range(14, 24)) + ("Sau nửa đêm",)
+TT_CHUA_MO = "Thanh toán trực tuyến chưa mở cho khách sạn này"
+
+
+def _kiem_mo_tt(db: Session, k: KhachSanVtd | None) -> None:
+    if k is None or not S.mo_thanh_toan(db, k):
+        raise LoiDon(TT_CHUA_MO, 409)
+
+
 def han_tra_sau(dong: list[dict], hom_nay: date) -> date | None:
     """KS-16p: hạn trả cho «Đặt giữ, trả sau». None = không cho trả sau (có gói không hoàn tiền, hoặc hạn đã qua)."""
     if not dong or any(not x.get("huy_han") for x in dong):
@@ -342,6 +352,10 @@ def dat(db: Session, tk, kid: int, d: dict, now: datetime | None = None) -> DonK
         raise LoiDon("Email chưa đúng")
     if not d.get("dong_y"):
         raise LoiDon("Đánh dấu đồng ý chính sách hủy và điều kiện đặt phòng")
+    _kiem_mo_tt(db, k)                                                 # KS-16s
+    gio_den = str(d.get("gio_den") or "").strip()
+    if gio_den and gio_den not in GIO_DEN:
+        raise LoiDon("Giờ đến dự kiến không hợp lệ")
     nl, te = max(1, int(d.get("nguoi_lon") or 1)), max(0, int(d.get("tre_em") or 0))
     dang = db.execute(select(func.count(DonKsVtd.id)).where(DonKsVtd.tai_khoan_ngoai_id == tk.id, DonKsVtd.trang_thai == "cho_tra",
                                                             DonKsVtd.giu_den > now)).scalar() or 0
@@ -389,7 +403,7 @@ def dat(db: Session, tk, kid: int, d: dict, now: datetime | None = None) -> DonK
                                                                    + str(d.get("yeu_cau") or "").strip())[:1500], vao=vao, ra=ra,
                    nguoi_lon=nl, tre_em=te, dong=dong, so_phong=so, tien_phong=tien, thue_phi=thue, tong=tien + thue - giam,
                    trang_thai="cho_tra", giu_den=giu_den, tao_luc=now,
-                   voucher_id=v.id if v else None, giam_voucher=giam, cach_tra=cach_tra, han_tra=han_tra, nhac_luc=[])
+                   voucher_id=v.id if v else None, giam_voucher=giam, cach_tra=cach_tra, han_tra=han_tra, nhac_luc=[], gio_den=gio_den)
     db.add(don)
     db.flush()
     if v is not None:
@@ -479,6 +493,7 @@ def ra_khach(db: Session, d: DonKsVtd, now: datetime | None = None) -> dict:
             "giu_den": d.giu_den.isoformat(timespec="seconds") if d.giu_den else None,
             "giay_con": max(0, int((d.giu_den - now).total_seconds())) if d.trang_thai == "cho_tra" and d.giu_den else 0,
             "cach_tra": d.cach_tra or "ngay", "han_tra": d.han_tra.isoformat() if d.han_tra else None,   # KS-16p
+            "gio_den": d.gio_den or "", "mo_thanh_toan": bool(k and S.mo_thanh_toan(db, k)),   # KS-16s
             "tra_luc": d.tra_luc.isoformat(timespec="minutes") if d.tra_luc else None,
             "han_chot": d.han_chot.isoformat(timespec="minutes") if d.han_chot else None,
             "ma_xac_nhan_ks": d.ma_xac_nhan_ks, "xac_nhan_luc": d.xac_nhan_luc.isoformat(timespec="minutes") if d.xac_nhan_luc else None,
@@ -534,6 +549,7 @@ def qr(db: Session, tk, ma: str, now: datetime | None = None) -> dict:
     con = int(d.tong) - da_tra(db, d)
     if d.trang_thai != "cho_tra" or con <= 0:
         raise LoiDon(f"Đơn đang «{TRANG_THAI_DON.get(d.trang_thai, d.trang_thai)}» — không thanh toán", 409)
+    _kiem_mo_tt(db, db.get(KhachSanVtd, d.khach_san_id))              # KS-16s
     ba = K.tai_khoan_qr(db)
     if ba is None or not ba.account_number:
         raise LoiDon("Thanh toán QR chưa mở — dùng thẻ hoặc liên hệ Vietourist", 409)
@@ -550,6 +566,7 @@ def onepay_bat_dau(db: Session, tk, ma: str, goc: str, ip: str, now: datetime | 
     if not OP.bat():
         raise LoiDon("Thanh toán thẻ chưa mở — dùng QR chuyển khoản", 409)
     d = cap_nhat(db, _cua(db, tk, ma), now)
+    _kiem_mo_tt(db, db.get(KhachSanVtd, d.khach_san_id))              # KS-16s
     con = int(d.tong) - da_tra(db, d)
     if d.trang_thai != "cho_tra" or con <= 0:
         db.commit()
@@ -569,6 +586,7 @@ def the_bat_dau(db: Session, tk, ma: str, goc: str, ip: str, now: datetime | Non
     if not SP.bat():
         return {"url": onepay_bat_dau(db, tk, ma, goc, ip, now)}
     d = cap_nhat(db, _cua(db, tk, ma), now)
+    _kiem_mo_tt(db, db.get(KhachSanVtd, d.khach_san_id))              # KS-16s
     con = int(d.tong) - da_tra(db, d)
     if d.trang_thai != "cho_tra" or con <= 0:
         db.commit()
@@ -756,7 +774,40 @@ def dh_xac_nhan(db: Session, u: User, did: int, ma_ks: str, now: datetime | None
     d.trang_thai, d.ma_xac_nhan_ks, d.xac_nhan_boi, d.xac_nhan_luc = "da_xac_nhan", ma_ks[:60], u.username, now
     R.audit(db, u.username, u.role, "ks_vtd_xac_nhan", f"don_ks_vtd:{d.ma}", after={"ma_ks": ma_ks[:60]})
     db.flush()
+    try:                                                               # KS-16s: email xác nhận cho khách
+        k = db.get(KhachSanVtd, d.khach_san_id)
+        GUI_XAC_NHAN(d, k.ten if k else "")
+    except Exception:   # noqa: BLE001 — email là phụ, không làm hỏng việc chốt
+        pass
     return d
+
+
+def _gui_xac_nhan_email(d: DonKsVtd, ks_ten: str) -> bool:
+    """KS-16s: email «Đặt phòng đã được xác nhận» khi Điều hành chốt — chỉ khi đơn có email và đã cấu hình SMTP."""
+    from app.core.config import settings
+    if not (d.email and settings.SMTP_HOST and settings.SMTP_FROM):
+        return False
+    import smtplib
+    from email.message import EmailMessage
+    m = EmailMessage()
+    m["Subject"] = f"Đặt phòng {d.ma} đã được xác nhận — {ks_ten}"
+    m["From"], m["To"] = settings.SMTP_FROM, d.email
+    m.set_content(f"Chào {d.ho_ten},\n\nKhách sạn {ks_ten} đã xác nhận đặt phòng của bạn.\n"
+                  f"Mã đơn Vietourist: {d.ma}\nMã xác nhận của khách sạn: {d.ma_xac_nhan_ks}\n"
+                  f"Nhận phòng {d.vao:%d/%m/%Y} · trả phòng {d.ra:%d/%m/%Y} · {d.so_phong} phòng"
+                  + (f"\nGiờ đến dự kiến: {d.gio_den}" if d.gio_den else "")
+                  + "\nXem đơn ở «Đơn của tôi» trên cổng Vietourist.\n\n" + settings.COMPANY_NAME)
+    cls = smtplib.SMTP_SSL if settings.SMTP_SSL else smtplib.SMTP
+    with cls(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as sv:
+        if not settings.SMTP_SSL:
+            sv.starttls()
+        if settings.SMTP_USER:
+            sv.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        sv.send_message(m)
+    return True
+
+
+GUI_XAC_NHAN = _gui_xac_nhan_email   # phép thử thay bằng hàm ghi lại
 
 
 def dh_het_phong(db: Session, u: User, did: int, ly_do: str, now: datetime | None = None) -> DonKsVtd:

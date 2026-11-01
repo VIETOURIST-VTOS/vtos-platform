@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.core import User
-from app.models.khach_san_vtd import (AnhKhachSanVtd, GoiGiaVtd, KhachSanVtd, LoaiPhongVtd, MuaGiaVtd, LOAI_CHO_O,
+from app.models.khach_san_vtd import (AnhKhachSanVtd, CaiDatKsVtd, GoiGiaVtd, KhachSanVtd, LoaiPhongVtd, MuaGiaVtd, LOAI_CHO_O,
                                       NHOM_ANH_KS, TIEN_ICH, TRANG_THAI_ANH_KS, TRANG_THAI_GOI, CACH_TINH_TRE, CAN_XAC_NHAN,
                                       NGUON_LP, NHAN_TRE_EM, TIEN_NGHI_PHONG, TRANG_THAI_DC, NHOM_TUOI, KIEU_GIA,
                                       CHE_DO_TRE_GOI)
@@ -264,6 +264,8 @@ def luu_ks(db: Session, u: User, d: dict, kid: int | None = None, now: datetime 
     _quyen(u, VAI_NHAP, "Chỉ Điều hành nhập và sửa khách sạn")
     o = _kiem_ks(d)
     now = now or datetime.now()
+    link = str(d.get("link_ggmap") or "").strip()
+    toa_tay = doc_link_ggmap(link) if link else None          # KS-16s: Điều hành dán link Google Maps để sửa ghim
     if kid is None:
         k = KhachSanVtd(ma=_ma_moi(db), tao_boi=u.username, tao_luc=now, **o)
         db.add(k)
@@ -275,6 +277,12 @@ def luu_ks(db: Session, u: User, d: dict, kid: int | None = None, now: datetime 
         for x, v in o.items():
             setattr(k, x, v)
         _audit(db, u, "ks_vtd_sua", k.ma, truoc, o)
+    if toa_tay:
+        k.vi_do, k.kinh_do, k.toa_do_nguon = toa_tay[0], toa_tay[1], "tay"
+        _audit(db, u, "ks_vtd_toa_do_tay", k.ma, None, {"vi_do": toa_tay[0], "kinh_do": toa_tay[1]})
+    elif k.toa_do_nguon != "tay" and (kid is None or truoc.get("dia_chi") != k.dia_chi or truoc.get("tinh_thanh") != k.tinh_thanh
+                                      or k.vi_do is None):
+        _tu_lay_toa_do(k)
     k.sua_boi, k.sua_luc = u.username, now
     db.commit()
     db.refresh(k)
@@ -285,6 +293,129 @@ def luu_ks(db: Session, u: User, d: dict, kid: int | None = None, now: datetime 
 # Chưa có gói đặt được thì chưa book trên cổng — bấm vào khách sạn mở trang ngoài LINK_KS_NGOAI ở tab mới.
 # KS-16n (Chủ tịch 01/11/2026): www.vietourist.vn/hotel chưa có (404) → TẠM trỏ trang chủ; web chính có trang thì đổi lại.
 LINK_KS_NGOAI = "/hotel"   # KS-16q: trang riêng kh.vietourist.vn/hotel (cùng tên miền cổng)
+
+
+# ══ KS-16s (Chủ tịch duyệt bản xem thử 01/11/2026): tọa độ cho «Xem trên bản đồ» ══════════════════════════
+# Máy tự lấy từ địa chỉ qua dịch vụ tra địa chỉ miễn phí của OpenStreetMap (Nominatim: ≤1 lượt/giây, có User-Agent).
+# Điều hành dán link Google Maps để sửa ghim lệch → nguồn «tay», máy không ghi đè.
+NOMINATIM = "https://nominatim.openstreetmap.org/search"
+NOMINATIM_UA = "VTOS/1.0 (vietourist.com.vn)"
+LOAT_TOI_DA = 60
+LOAT_NGHI_GIAY = 1.1
+
+
+def _nominatim(q: str) -> tuple[float, float] | None:
+    import json
+    import urllib.parse
+    import urllib.request
+    url = NOMINATIM + "?" + urllib.parse.urlencode({"format": "json", "limit": 1, "countrycodes": "vn", "q": q})
+    req = urllib.request.Request(url, headers={"User-Agent": NOMINATIM_UA, "Accept-Language": "vi"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        ds = json.loads(r.read().decode("utf-8"))
+    if not ds:
+        return None
+    return round(float(ds[0]["lat"]), 6), round(float(ds[0]["lon"]), 6)
+
+
+LAY_TOA_DO = _nominatim   # phép thử thay bằng hàm giả
+
+
+def _trong_vn(lat: float, lng: float) -> bool:
+    return 8.0 <= lat <= 23.6 and 102.0 <= lng <= 110.0
+
+
+def doc_link_ggmap(link: str) -> tuple[float, float]:
+    """Tách tọa độ từ link Google Maps đầy đủ: …/@16.06,108.24,17z · ?q=16.06,108.24 · !3d16.06!4d108.24."""
+    import re
+    import urllib.parse
+    t = urllib.parse.unquote(link.strip())
+    if re.search(r"(maps\.app\.goo\.gl|goo\.gl/maps)", t):
+        raise LoiKhachSan("Link rút gọn (maps.app.goo.gl) máy không đọc được — mở link trên máy tính, chép link đầy đủ trên thanh địa chỉ")
+    so = r"(-?\d{1,3}\.\d+)"
+    for mau in (r"!3d" + so + r"!4d" + so, r"[?&](?:q|query|ll|destination)=" + so + r",\s*" + so, r"@" + so + r"," + so):
+        m = re.search(mau, t)
+        if m:
+            lat, lng = round(float(m.group(1)), 6), round(float(m.group(2)), 6)
+            if not _trong_vn(lat, lng):
+                raise LoiKhachSan("Tọa độ trong link nằm ngoài Việt Nam — kiểm lại link")
+            return lat, lng
+    raise LoiKhachSan("Không thấy tọa độ trong link — mở khách sạn trên Google Maps, chép link đầy đủ (có @vĩ độ,kinh độ)")
+
+
+def _cau_tim(k: KhachSanVtd) -> list[str]:
+    tp = k.tinh_thanh or ""
+    ds = []
+    if k.dia_chi:
+        ds.append(", ".join(x for x in (k.dia_chi, tp, "Việt Nam") if x))
+    ds.append(", ".join(x for x in (k.ten, k.khu_vuc, tp) if x))
+    return list(dict.fromkeys(ds))
+
+
+def _tu_lay_toa_do(k: KhachSanVtd, nghi: float = 0) -> bool:
+    """Thử lần lượt địa chỉ rồi tên + khu vực. Lỗi mạng không làm hỏng việc lưu hồ sơ."""
+    import time
+    for i, q in enumerate(_cau_tim(k)):
+        if i and nghi:
+            time.sleep(nghi)
+        try:
+            kq = LAY_TOA_DO(q)
+        except Exception:   # noqa: BLE001 — mạng / dịch vụ ngoài lỗi: để trống, lần sau lấy lại
+            return False
+        if kq and _trong_vn(*kq):
+            k.vi_do, k.kinh_do, k.toa_do_nguon = kq[0], kq[1], "tu_dong"
+            return True
+    k.toa_do_nguon = "khong_thay"
+    return False
+
+
+def lay_toa_do_loat(db: Session, u: User, toi_da: int = LOAT_TOI_DA, nghi: float = LOAT_NGHI_GIAY) -> dict:
+    """Nút «Lấy tọa độ cho tất cả khách sạn»: khách sạn chưa có tọa độ (bỏ qua ghim tay), tối đa `toi_da` mỗi lần."""
+    import time
+    _quyen(u, VAI_DUYET, "Chỉ TP Điều hành / Chủ tịch / TGĐ chạy lấy tọa độ hàng loạt")
+    ds = db.execute(select(KhachSanVtd).where(KhachSanVtd.vi_do.is_(None), KhachSanVtd.toa_do_nguon != "tay",
+                                              KhachSanVtd.ngung.is_(False)).order_by(KhachSanVtd.ma)).scalars().all()
+    co, khong = [], []
+    for i, k in enumerate(ds[:toi_da]):
+        if i and nghi:
+            time.sleep(nghi)
+        (co if _tu_lay_toa_do(k, nghi) else khong).append(k.ma)
+    _audit(db, u, "ks_vtd_toa_do_loat", "loat", None, {"co": co, "khong_thay": khong})
+    db.commit()
+    return {"co": len(co), "khong_thay": khong, "con_lai": max(0, len(ds) - toi_da)}
+
+
+# ══ KS-16s: công tắc mở thanh toán trực tuyến — chung + từng khách sạn; chỉ trả được khi CẢ HAI bật ══════
+KHOA_TT = "mo_thanh_toan"
+
+
+def tt_chung(db: Session) -> bool:
+    r = db.get(CaiDatKsVtd, KHOA_TT)
+    return bool(r and r.gia_tri == "1")
+
+
+def mo_thanh_toan(db: Session, k: KhachSanVtd, chung: bool | None = None) -> bool:
+    return bool(k.mo_thanh_toan) and (tt_chung(db) if chung is None else chung)
+
+
+def bat_tt_chung(db: Session, u: User, bat: bool, now: datetime | None = None) -> bool:
+    _quyen(u, VAI_DUYET, "Chỉ TP Điều hành / Chủ tịch / TGĐ mở / đóng thanh toán trực tuyến")
+    r = db.get(CaiDatKsVtd, KHOA_TT)
+    if r is None:
+        r = CaiDatKsVtd(khoa=KHOA_TT)
+        db.add(r)
+    r.gia_tri, r.sua_boi, r.sua_luc = ("1" if bat else "0"), u.username, now or datetime.now()
+    _audit(db, u, "ks_vtd_tt_chung_mo" if bat else "ks_vtd_tt_chung_dong", "chung")
+    db.commit()
+    return bool(bat)
+
+
+def bat_tt_ks(db: Session, u: User, kid: int, bat: bool) -> KhachSanVtd:
+    _quyen(u, VAI_DUYET, "Chỉ TP Điều hành / Chủ tịch / TGĐ mở / đóng thanh toán của khách sạn")
+    k = _ks(db, kid)
+    k.mo_thanh_toan = bool(bat)
+    _audit(db, u, "ks_vtd_tt_mo" if bat else "ks_vtd_tt_dong", k.ma)
+    db.commit()
+    return k
 
 
 def dieu_kien_hien(db: Session, k: KhachSanVtd) -> list[dict]:
@@ -736,7 +867,8 @@ def _anh_out(x: AnhKhachSanVtd, cong: bool = False) -> dict:
 def _ks_noi_bo(k: KhachSanVtd) -> dict:
     return {**{x: getattr(k, x) for x in TRUONG_KS}, "cs_moc_tuoi": [chuan_moc(m) for m in (k.cs_moc_tuoi or []) if m.get("cach") != "nguoi_lon"],
             "cs_phi_giuong_phu": float(k.cs_phi_giuong_phu) if k.cs_phi_giuong_phu is not None else None, "id": k.id, "ma": k.ma, "hien_cong": k.hien_cong, "hien_boi": k.hien_boi,
-            "tat_ly_do": k.tat_ly_do, "ngung": k.ngung, "sua_boi": k.sua_boi, "tao_boi": k.tao_boi,
+            "tat_ly_do": k.tat_ly_do, "ngung": k.ngung,
+            "vi_do": k.vi_do, "kinh_do": k.kinh_do, "toa_do_nguon": k.toa_do_nguon or "", "mo_thanh_toan": bool(k.mo_thanh_toan),   # KS-16s "sua_boi": k.sua_boi, "tao_boi": k.tao_boi,
             "sua_luc": k.sua_luc.isoformat(timespec="minutes") if k.sua_luc else None}
 
 
@@ -785,7 +917,7 @@ def ds_vtos(db: Session, u: User) -> dict:
             "nguon_lp": NGUON_LP, "can_xac_nhan": CAN_XAC_NHAN, "trang_thai_dc": TRANG_THAI_DC,
             "nhom_tuoi": NHOM_TUOI, "kieu_gia": KIEU_GIA, "che_do_tre_goi": CHE_DO_TRE_GOI,   # KS-16k
             "duoc_nhap": _co(u, VAI_NHAP), "duoc_duyet": _co(u, VAI_DUYET), "toi": u.username,
-            "toan_quyen": _co(u, TOAN_QUYEN),
+            "toan_quyen": _co(u, TOAN_QUYEN), "tt_chung": tt_chung(db),   # KS-16s
             "cho_duyet": {"anh": sum(d["anh_cho"] for d in dong), "goi": sum(d["goi_cho"] for d in dong)}}
 
 
@@ -1115,6 +1247,34 @@ def _con_it(phong: list[dict]) -> int:
     return min(con) if con and min(con) <= CON_IT_TOI_DA else 0
 
 
+def _kieu_giuong(giuong: str) -> set[str]:
+    """KS-16s: lọc «Phòng & giường» — đọc chữ Điều hành ghi ở ô giường (1 giường đôi / 2 giường đơn / king / twin…)."""
+    t = _khong_dau(giuong or "")
+    o = set()
+    if any(x in t for x in ("doi", "double", "king", "queen")):
+        o.add("doi")
+    if "twin" in t or ("don" in t and any(x in t for x in ("2 ", "hai"))) or "2 giuong don" in t:
+        o.add("don2")
+    return o
+
+
+def _loc_them(phong: list[dict], hom_nay: date | None = None) -> dict:
+    """KS-16s: số liệu cho bộ lọc kiểu Agoda — tính từ phòng / gói đang bán được (số thật)."""
+    from app.services import don_ks_vtd as KV
+    hn = hom_nay or date.today()
+    goi = [g for p in phong if p["vua"] and p.get("con", 1) > 0 for g in p["goi"] if g.get("vua", True)]
+    giuong = set()
+    for p in phong:
+        giuong |= _kieu_giuong(p.get("giuong") or "")
+    return {"giuong_tom": sorted(giuong),
+            "gia_dinh": any((p.get("suc_chua") or p.get("toi_da_nguoi_lon") or 0) + (p.get("khach_them_toi_da") or 0) >= 4 for p in phong),
+            "co_chi_phong": any(not g["bua_sang"] for g in goi),
+            "co_uu_dai": any((g.get("niem_yet_dem") or 0) > (g.get("gia_dem") or 0) for g in goi),
+            "co_tra_sau": any(g.get("huy_han") and date.fromisoformat(g["huy_han"]) - timedelta(days=KV.TRA_SAU_TRUOC_HUY) > hn
+                              for g in goi),
+            "co_tra_ngay": bool(goi)}
+
+
 def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict], dg: dict | None = None, dat: int = 0) -> dict:
     co_gia = [g for p in phong if p["vua"] for g in p["goi"] if g.get("vua", True)]
     goi = [g for p in phong if p["vua"] and p.get("con", 1) > 0 for g in p["goi"] if g.get("vua", True)]   # KS-16k: theo từng gói   # KS-14: bỏ loại phòng đã hết
@@ -1134,6 +1294,7 @@ def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict], dg: 
             # KS-16p: chỉ số thật — đơn 24h (≥2 mới hiện) và «chỉ còn N phòng» (≤3, theo phòng rẻ nhất đặt được)
             "dat_24h": dat if dat >= DAT_24H_TOI_THIEU else 0,
             "con_it": _con_it(phong),
+            "vi_do": k.vi_do, "kinh_do": k.kinh_do, **_loc_them(phong),   # KS-16s: bản đồ + bộ lọc kiểu Agoda
             # KS-15: điểm thang 10 của khách đã ở — chỉ bài đang hiện; dưới 3 bài diem_tb = None («Mới»).
             "danh_gia": dg or {"so_bai": 0, "diem_tb": None, "du": False, "nhan": "", "muc": {}}}
 
@@ -1155,7 +1316,9 @@ def tim(db: Session, tinh: str, vao, ra, nguoi_lon: int = 2, tre_em: int = 0, so
     from app.services import danh_gia_ks as DGK
     dg = DGK.tom_tat(db, [k.id for k in ks])
     d24 = dat_24h(db, [k.id for k in ks])
-    the = [_the_cong(k, anh.get(k.id, []), phong.get(k.id, []), dg.get(k.id), d24.get(k.id, 0)) for k in ks]
+    chung = tt_chung(db)
+    the = [{**_the_cong(k, anh.get(k.id, []), phong.get(k.id, []), dg.get(k.id), d24.get(k.id, 0)),
+            "mo_thanh_toan": mo_thanh_toan(db, k, chung)} for k in ks]
     the.sort(key=lambda o: (o["gia_tu"] is None, o["ten"]))
     return {"khach_san": the, "tong": len(the), "dem": (ra - vao).days, "vao": vao.isoformat(), "ra": ra.isoformat(),
             "nguoi_lon": nl, "tre_em": te, "so_phong": sp, "tuoi": tu or [],
@@ -1186,7 +1349,8 @@ def chi_tiet_cong(db: Session, kid: int, vao, ra, nguoi_lon: int = 2, tre_em: in
             "anh": [_anh_out(a, True) for a in anh], "nhom_anh": NHOM_ANH_KS,
             "video": video, "so_video": len(video),
             "phong": phong, "dem": (ra - vao).days, "vao": vao.isoformat(), "ra": ra.isoformat(),
-            "nguoi_lon": nl, "tre_em": te, "so_phong": sp, "tuoi": tu or [], "the_bat": _the_bat()}
+            "nguoi_lon": nl, "tre_em": te, "so_phong": sp, "tuoi": tu or [], "the_bat": _the_bat(),
+            "mo_thanh_toan": mo_thanh_toan(db, k)}   # KS-16s: chỉ trả được khi công tắc chung + của khách sạn đều bật
 
 
 def _the_bat() -> bool:
@@ -1262,7 +1426,7 @@ def tinh_lua_chon(db: Session, kid: int, vao, ra, chon: list[dict], hom_nay: dat
     return {"dong": dong, "so_phong": so, "tien_phong": tien, "phu_thu": sum(x.get("phu_thu", 0) for x in dong),
             "thue_phi": thue, "tong": tien + thue, "dem": dem, "cho_xac_nhan": any(x.get("cho_xac_nhan") for x in dong),
             # KS-16p: «Đặt giữ, trả sau» được không, và hạn trả
-            "han_tra_sau": _han_tra_sau(dong, hom_nay),
+            "han_tra_sau": _han_tra_sau(dong, hom_nay), "mo_thanh_toan": mo_thanh_toan(db, k),   # KS-16s
             "huy_mien_phi_den": min((x["huy_han"] for x in dong if x.get("huy_han")), default=None) if dong and all(x.get("huy_han") for x in dong) else None}
 
 
@@ -1298,6 +1462,8 @@ def gui_yeu_cau_giu(db: Session, tk, kid: int, d: dict, hom_nay: date | None = N
     tu = doc_tuoi(int(d.get("tre_em") or 0), d.get("tuoi_tre_em"))
     if tu:
         dong.append("Tuổi trẻ em: " + ", ".join(str(t) for t in tu))
+    if str(d.get("gio_den") or "").strip():                         # KS-16s
+        dong.append("Giờ đến dự kiến: " + str(d["gio_den"]).strip()[:20])
     if str(d.get("yeu_cau_them") or "").strip():
         dong.append("Ghi chú của khách: " + str(d["yeu_cau_them"]).strip()[:1200])
     so_phong = (lc["so_phong"] if lc and lc["so_phong"] else int(d.get("so_phong") or 1))

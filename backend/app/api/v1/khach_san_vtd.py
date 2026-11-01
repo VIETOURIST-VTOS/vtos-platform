@@ -128,6 +128,7 @@ class KsIn(BaseModel):
     thue_phi_pt: float = 0
     lien_he_noi_bo: str = ""
     ghi_chu_noi_bo: str = ""
+    link_ggmap: str = ""            # KS-16s: dán link Google Maps để sửa ghim bản đồ
 
 
 @router_vtos.post("")
@@ -157,6 +158,29 @@ def hien_cong_loat(u: User = Depends(require_roles(*S.VAI_DUYET)), db: Session =
     r = _goi(S.bat_hien_loat, db, u)
     them = f" · bỏ qua {len(r['bo_qua'])} khách sạn bạn vừa sửa (người khác bật)" if r["bo_qua"] else ""
     return {**r, "message": f"Đã bật hiện {len(r['bat'])} khách sạn trên cổng khách{them}"}
+
+
+@router_vtos.post("/toa-do-loat")
+def toa_do_loat(u: User = Depends(require_roles(*S.VAI_DUYET)), db: Session = Depends(get_db)):
+    """KS-16s: lấy tọa độ (OpenStreetMap) cho khách sạn chưa có — tối đa 60 mỗi lần, 1 lượt / giây."""
+    r = _goi(S.lay_toa_do_loat, db, u)
+    them = f" · {len(r['khong_thay'])} không tìm thấy (dán link Google Maps)" if r["khong_thay"] else ""
+    con = f" · còn {r['con_lai']} — bấm lại" if r["con_lai"] else ""
+    return {**r, "message": f"Đã lấy tọa độ {r['co']} khách sạn{them}{con}"}
+
+
+@router_vtos.post("/thanh-toan-chung")
+def tt_chung(data: BatIn, u: User = Depends(require_roles(*S.VAI_DUYET)), db: Session = Depends(get_db)):
+    """KS-16s: công tắc chung mở thanh toán trực tuyến cổng khách sạn."""
+    bat = _goi(S.bat_tt_chung, db, u, data.bat)
+    return {"tt_chung": bat, "message": "Đã MỞ thanh toán trực tuyến (khách sạn nào cũng bật thì khách trả được)" if bat
+            else "Đã ĐÓNG thanh toán trực tuyến toàn cổng khách sạn"}
+
+
+@router_vtos.post("/{kid:int}/thanh-toan")
+def tt_ks(kid: int, data: BatIn, u: User = Depends(require_roles(*S.VAI_DUYET)), db: Session = Depends(get_db)):
+    k = _goi(S.bat_tt_ks, db, u, kid, data.bat)
+    return {"message": f"{k.ten}: " + ("đã mở thanh toán trực tuyến" if k.mo_thanh_toan else "đã đóng thanh toán trực tuyến")}
 
 
 @router_vtos.post("/{kid:int}/hien-cong")
@@ -396,6 +420,7 @@ class YeuCauIn(BaseModel):
     nguoi_nhan_phong: str = ""
     lien_he: str = ""
     yeu_cau_them: str = ""
+    gio_den: str = ""               # KS-16s
 
 
 @router_cong.post("/{kid:int}/yeu-cau")

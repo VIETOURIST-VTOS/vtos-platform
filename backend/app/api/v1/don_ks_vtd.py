@@ -52,6 +52,7 @@ class DatIn(BaseModel):
     dong_y: bool = False
     ma_voucher: str = ""            # KS-16: voucher VTD Rewards khách tự nhập (tối đa 5% đơn)
     cach_tra: str = "ngay"          # KS-16p: ngay | sau («Đặt giữ, trả sau» — chỉ gói miễn phí hủy)
+    gio_den: str = ""               # KS-16s: giờ đến dự kiến
 
 
 @router_cong.get("")

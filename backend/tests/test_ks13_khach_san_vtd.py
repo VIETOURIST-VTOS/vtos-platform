@@ -14,6 +14,10 @@ import pytest
 from tests.test_at1_am_thuc import db, _u  # noqa: F401
 
 HN = dt.date(2026, 12, 1)
+# KS-16s: phép thử không gọi dịch vụ tra địa chỉ thật (OpenStreetMap) — khách sạn mẫu để trống tọa độ.
+from app.services import khach_san_vtd as _KSV  # noqa: E402
+_KSV.LAY_TOA_DO = lambda q: None
+
 VAO, RA = dt.date(2026, 12, 18), dt.date(2026, 12, 21)      # đêm T6 18, T7 19, CN 20
 
 
@@ -43,6 +47,9 @@ def _mo_ban(s, k, gia=1_000_000, cuoi_tuan=1_400_000):
     S.gui_duyet_anh(s, _u(s, "dh"), [x.id])
     S.duyet_anh(s, _u(s, "tp"), [x.id], True)
     S.bat_hien(s, _u(s, "tp"), k.id, True)
+    # KS-16s: thanh toán trực tuyến chỉ mở khi công tắc chung + của khách sạn đều bật — mẫu mở sẵn cả hai
+    S.bat_tt_chung(s, _u(s, "tp"), True)
+    S.bat_tt_ks(s, _u(s, "tp"), k.id, True)
     return lp, g, x
 
 

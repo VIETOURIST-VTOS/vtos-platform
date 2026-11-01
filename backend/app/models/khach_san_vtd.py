@@ -87,6 +87,13 @@ class KhachSanVtd(Base):
     ghi_chu_noi_bo: Mapped[str] = mapped_column(Text, default="")         # KHÔNG ra cổng
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), nullable=True, index=True)
     hien_cong: Mapped[bool] = mapped_column(Boolean, default=False)
+    # KS-16s (Chủ tịch duyệt bản xem thử 01/11/2026): tọa độ cho «Xem trên bản đồ» — máy tự lấy từ địa chỉ
+    # (OpenStreetMap) hoặc Điều hành dán link Google Maps («tay» thì máy không ghi đè).
+    vi_do: Mapped[float | None] = mapped_column(Float, nullable=True)
+    kinh_do: Mapped[float | None] = mapped_column(Float, nullable=True)
+    toa_do_nguon: Mapped[str] = mapped_column(String(12), default="")      # "" | tu_dong | tay | khong_thay
+    # KS-16s: công tắc mở thanh toán trực tuyến riêng khách sạn — chỉ trả được khi CẢ công tắc chung cũng bật.
+    mo_thanh_toan: Mapped[bool] = mapped_column(Boolean, default=False)
     hien_boi: Mapped[str] = mapped_column(String(50), default="")
     hien_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     tat_ly_do: Mapped[str] = mapped_column(String(200), default="")
@@ -189,3 +196,12 @@ class MuaGiaVtd(Base):
     gia_cuoi_tuan: Mapped[float | None] = mapped_column(TIEN, nullable=True)   # đêm thứ Sáu, thứ Bảy
     gia_niem_yet: Mapped[float | None] = mapped_column(TIEN, nullable=True)    # giá niêm yết của khách sạn (hiện gạch)
     ghi_chu: Mapped[str] = mapped_column(String(200), default="")
+
+
+class CaiDatKsVtd(Base):
+    """KS-16s: cài đặt chung của cổng khách sạn VTD (khóa → giá trị). Hiện có: mo_thanh_toan = "1" | "0"."""
+    __tablename__ = "cai_dat_ks_vtd"
+    khoa: Mapped[str] = mapped_column(String(40), primary_key=True)
+    gia_tri: Mapped[str] = mapped_column(String(200), default="")
+    sua_boi: Mapped[str] = mapped_column(String(50), default="")
+    sua_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

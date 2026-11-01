@@ -19,7 +19,7 @@ const tien = (n?: number | null) => (n || n === 0 ? Math.round(n).toLocaleString
 const TT_DN: Record<string, string> = { cho_tp: "chờ robot", cho_kt: "robot dừng — bổ sung NCC", cho_duyet: "chờ TGĐ / CT duyệt", cho_chi: "lệnh chi chờ", da_chi: "đã chi", tu_choi: "từ chối" };   // KS-16d
 const KS0 = { ten: "", tinh_thanh: "", khu_vuc: "", dia_chi: "", sao: 0, loai: "khach_san", km_trung_tam: "", gan: "", noi_bat: "", mo_ta: "",
   tien_ich: [] as string[], gio_nhan: "14:00", gio_tra: "12:00", cs_tre_em: "", cs_giuong_phu: "", cs_vat_nuoi: "", cs_khac: "", thue_phi_pt: 0,
-  lien_he_noi_bo: "", ghi_chu_noi_bo: "",
+  lien_he_noi_bo: "", ghi_chu_noi_bo: "", link_ggmap: "",
   cs_nhan_tre_em: "chua_xac_nhan", cs_tre_tu_tuoi: "" as any, cs_moc_tuoi: [] as any[], cs_phi_giuong_phu: "" as any, cs_giuong_phu_an_sang: false, cs_noi: "",
   cs_so_tre_mien_phi: "" as any, cs_tre_mp_tinh_suc_chua: false, cs_giuong_phu_kieu: "co_dinh" };
 // KS-16j (Chủ tịch duyệt bản xem thử 01/11/2026): trống = chưa xác nhận (null), khác 0; số phòng 0 là 0; không tự cắt đặc điểm.
@@ -74,7 +74,15 @@ function Trang() {
         <span style={{ flex: 1 }} />
         {x.duoc_duyet && <button className="act grey" onClick={async () => { try { const r = await api<any>("/khach-san-vtd/hien-cong-loat", { method: "POST", json: {} }); toast(r.message); load(); } catch (e) { toast(errMsg(e), true); } }}
           title="KS-16l: bật mọi khách sạn đủ hồ sơ + ảnh + giới thiệu; chưa có gói đặt được thì cổng mở trang web chính ở tab mới">Bật hiện tất cả khách sạn đủ điều kiện</button>}
+        {x.duoc_duyet && <button className="act grey" onClick={async () => { toast("Đang lấy tọa độ — mỗi khách sạn khoảng 1 giây…"); try { const r = await api<any>("/khach-san-vtd/toa-do-loat", { method: "POST", json: {} }); toast(r.message); load(); } catch (e) { toast(errMsg(e), true); } }}
+          title="KS-16s: máy tra địa chỉ (OpenStreetMap) cho khách sạn chưa có tọa độ; ghim Điều hành dán tay không bị ghi đè">Lấy tọa độ cho tất cả khách sạn</button>}
         {x.duoc_nhap && <button className="act teal" onClick={() => setMo("moi")}>+ Thêm khách sạn</button>}</div>
+      {/* KS-16s: công tắc chung mở thanh toán trực tuyến — khách chỉ trả được khi công tắc chung VÀ công tắc của khách sạn đều bật */}
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", margin: "8px 0", borderRadius: 8, border: `1px solid ${x.tt_chung ? "#2bb39a" : "#d99a2b"}` }}>
+        <b>Thanh toán trực tuyến cổng khách sạn:</b><Tag cls={x.tt_chung ? "ok" : "warn"}>{x.tt_chung ? "Đang MỞ" : "Đang ĐÓNG"}</Tag>
+        <span className="muted" style={{ flex: 1, minWidth: 220 }}>Đóng: khách vẫn tìm, xem, chọn phòng, điền thông tin; bước thanh toán cuối bị khóa. Mở chung rồi bật từng khách sạn ở tab «Hiện trên cổng».</span>
+        {x.duoc_duyet && <button className={`act ${x.tt_chung ? "grey" : "teal"}`} onClick={async () => { try { const r = await api<any>("/khach-san-vtd/thanh-toan-chung", { method: "POST", json: { bat: !x.tt_chung } }); toast(r.message); load(); } catch (e) { toast(errMsg(e), true); } }}>
+          {x.tt_chung ? "Đóng thanh toán toàn cổng" : "Mở thanh toán toàn cổng"}</button>}</div>
       <div style={{ overflowX: "auto" }}><table><thead><tr><th></th><th>Khách sạn</th><th>Thành phố</th><th>Ảnh</th><th>Loại phòng</th><th>Gói giá</th><th>Cổng khách</th><th></th></tr></thead>
         <tbody>{ds.map((h: any) => <tr key={h.id} className="ksv-dong">
           <td style={{ width: 72 }}>{h.bia ? <AnhNoiBo src={h.bia} alt={h.ten} style={{ width: 64, height: 48, borderRadius: 6 }} /> : <span className="muted">—</span>}</td>
@@ -129,13 +137,17 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
         {o("ten", "Tên khách sạn")}
         <label>Thành phố<select value={f.tinh_thanh} disabled={!nhap} onChange={(e) => setF({ ...f, tinh_thanh: e.target.value })}><option value="">— chọn —</option>
           {x.thanh_pho.map((c: any) => <option key={c.ten} value={c.ten}>{c.ten} · {c.mien}</option>)}</select></label>
-        {o("khu_vuc", "Khu vực", "Mỹ Khê, Hải Châu…")}{o("dia_chi", "Địa chỉ")}
+        {o("khu_vuc", "Khu vực", "Mỹ Khê, Hải Châu…")}{o("dia_chi", "Địa chỉ (máy tự lấy vị trí bản đồ)")}
+        {o("link_ggmap", "Link Google Maps (sửa ghim)", "https://www.google.com/maps/place/…/@16.06,108.24,17z")}
         <label>Hạng sao<select value={f.sao} disabled={!nhap} onChange={(e) => setF({ ...f, sao: Number(e.target.value) })}>{[0, 1, 2, 3, 4, 5].map((s) => <option key={s} value={s}>{s ? `${s} sao` : "Chưa xếp hạng"}</option>)}</select></label>
         <label>Loại chỗ ở<select value={f.loai} disabled={!nhap} onChange={(e) => setF({ ...f, loai: e.target.value })}>{Object.entries(x.loai).map(([k2, v]: any) => <option key={k2} value={k2}>{v}</option>)}</select></label>
         {o("km_trung_tam", "Cách trung tâm (km)", "2.5", "number")}{o("gan", "Gần đâu (hiện trên thẻ)", "120 m tới biển · 3 km tới cầu Rồng")}
         {o("noi_bat", "Một dòng nổi bật", "Hồ bơi tầng thượng nhìn biển, bữa sáng buffet")}
         {o("gio_nhan", "Giờ nhận phòng", "14:00")}{o("gio_tra", "Giờ trả phòng", "12:00")}
         {o("thue_phi_pt", "Thuế phí cộng thêm (%)", "15", "number")}</div>
+      {h && <span className="muted" style={{ fontSize: 12 }}>Vị trí bản đồ: {h.khach_san.vi_do != null ? <>{h.khach_san.vi_do}, {h.khach_san.kinh_do} · {h.khach_san.toa_do_nguon === "tay" ? "Điều hành dán link" : "máy lấy từ địa chỉ"}
+        {" · "}<a href={`https://www.google.com/maps/search/?api=1&query=${h.khach_san.vi_do},${h.khach_san.kinh_do}`} target="_blank" rel="noopener noreferrer">kiểm tra trên Google Maps ↗</a></>
+        : h.khach_san.toa_do_nguon === "khong_thay" ? "máy không tìm thấy địa chỉ — dán link Google Maps" : "chưa có (lưu hồ sơ để máy lấy)"}</span>}
       {ta("mo_ta", "Giới thiệu cho khách", 4)}
       <fieldset style={{ border: "1px solid var(--line, #2a3b4d)", borderRadius: 8, padding: 10 }}><legend>Tiện nghi</legend>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(170px,1fr))", gap: 6 }}>{Object.entries(x.tien_ich).map(([k2, v]: any) =>
@@ -155,12 +167,17 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
     {h && t === "hien" && <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <b>Điều kiện bật «Hiện trên cổng»</b>
       {h.dieu_kien.map((c: any) => <span key={c.ma} style={{ color: c.ok ? "#2bb39a" : "#d99a2b" }}>{c.ok ? "✓" : "✗"} {c.ten}</span>)}
-      <span className="muted">Chưa có loại phòng đang bán với gói giá đã duyệt thì khách sạn vẫn hiện nhưng chưa đặt trên cổng — khách bấm vào sẽ mở trang web chính ở tab mới (KS-16l; tạm là trang chủ vietourist.com.vn cho tới khi có trang /hotel).</span>
+      <span className="muted">Chưa có loại phòng đang bán với gói giá đã duyệt thì khách sạn vẫn hiện nhưng chưa đặt trên cổng — khách xem và gửi yêu cầu giữ phòng ở kh.vietourist.vn/hotel.</span>
       {x.duoc_duyet && <div style={{ display: "flex", gap: 8 }}>
         {h.khach_san.hien_cong ? <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/${kid}/hien-cong`, { bat: false })}>Tắt hiện</button>
           : <button className="act teal" disabled={busy || h.khach_san.ngung} onClick={() => goi(`/khach-san-vtd/${kid}/hien-cong`, { bat: true })}>Bật hiện trên cổng</button>}
         <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/${kid}/ngung`, { bat: !h.khach_san.ngung })}>{h.khach_san.ngung ? "Hợp tác lại" : "Ngừng hợp tác"}</button></div>}
       {!x.duoc_duyet && <span className="muted">TP Điều hành bật hiện.</span>}
+      <b style={{ marginTop: 8 }}>Thanh toán trực tuyến của khách sạn này</b>
+      <span><Tag cls={h.khach_san.mo_thanh_toan ? "ok" : "warn"}>{h.khach_san.mo_thanh_toan ? "Đã bật" : "Chưa bật"}</Tag>{" "}
+        <span className="muted">Công tắc chung: {x.tt_chung ? "đang mở" : "đang đóng"} — khách chỉ trả được khi cả hai đều bật. Bật khi đã kiểm giá, phòng trống, chính sách.</span></span>
+      {x.duoc_duyet && <div><button className={`act ${h.khach_san.mo_thanh_toan ? "grey" : "teal"}`} disabled={busy} onClick={() => goi(`/khach-san-vtd/${kid}/thanh-toan`, { bat: !h.khach_san.mo_thanh_toan })}>
+        {h.khach_san.mo_thanh_toan ? "Đóng thanh toán khách sạn này" : "Mở thanh toán khách sạn này"}</button></div>}
     </div>}
   </section>;
 }
@@ -517,7 +534,8 @@ function DongDon({ d }: { d: any }) {
   return <><td><b>{d.ma}</b><div className="muted">{d.ho_ten} · {d.lien_he}</div></td>
     <td>{d.khach_san?.ten}<div className="muted">{d.dong.map((x: any) => `${x.so} × ${x.loai_phong} · ${x.goi}${x.phu_thu ? ` · phụ thu trẻ em / giường phụ ${tien(x.phu_thu)} đ` : ""}`).join("; ")}</div>
       {d.dong.some((x: any) => x.giuong_phu_cho_xac_nhan) && <Tag cls="warn">Giường phụ chờ KS xác nhận</Tag>}</td>
-    <td style={{ whiteSpace: "nowrap" }}>{dm(d.vao)} – {dm(d.ra)}<div className="muted">{d.dem} đêm · {d.nguoi_lon} NL{d.tre_em ? ` + ${d.tre_em} TE` : ""}</div></td>
+    <td style={{ whiteSpace: "nowrap" }}>{dm(d.vao)} – {dm(d.ra)}<div className="muted">{d.dem} đêm · {d.nguoi_lon} NL{d.tre_em ? ` + ${d.tre_em} TE` : ""}</div>
+      {d.gio_den && <div className="muted">đến {d.gio_den}</div>}</td>
     <td style={{ whiteSpace: "nowrap" }}>₫ {tien(d.tong)}<div className="muted">đã trả {tien(d.da_tra)}{d.thanh_toan?.length ? ` · ${d.thanh_toan.map((t: any) => t.kenh === "qr" ? "QR" : "thẻ").join(", ")}` : ""}</div>
       {d.giam_voucher > 0 && <div className="muted" style={{ color: "#ffcf7a" }}>voucher {d.voucher?.ma} −{tien(d.giam_voucher)}{d.voucher?.trang_thai === "da_hoan" ? " · đã trả điểm" : " · VTD chịu"}</div>}</td></>;
 }
