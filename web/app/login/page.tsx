@@ -23,6 +23,8 @@ type Man = "cong" | "noi" | "kh" | "dt" | "cd";
    `?cong=` trên đường dẫn vẫn thắng. Nút «← Bốn cổng truy cập» vẫn còn để đổi cổng. */
 const CONG_THEO_TEN_MIEN: Record<string, Man> = {
   "crm.vietourist.vn": "noi", "kh.vietourist.vn": "kh", "dt.vietourist.vn": "dt", "ir.vietourist.vn": "cd",
+  // TM-1 (Chủ tịch 02/11/2026): bốn tên song song trên vietourist.com.vn, cùng cổng.
+  "crm.vietourist.com.vn": "noi", "kh.vietourist.com.vn": "kh", "dt.vietourist.com.vn": "dt", "ir.vietourist.com.vn": "cd",
 };
 const VAI: Record<Exclude<Man, "cong">, { role: string; loai: string; ten: string; h2: string; p: string }> = {
   noi: { role: "nhan-vien", loai: "", ten: "Nội bộ Vietourist", h2: "Đăng nhập VTOS", p: "Dành cho Ban lãnh đạo, quản lý và nhân viên." },

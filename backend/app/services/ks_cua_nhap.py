@@ -138,6 +138,11 @@ CUA_TAY = (
     # CG-1 (26/10/2026): tài khoản bên ngoài — người ngoài tự tạo ở cổng kết nối (/login, bước xác thực
     # mã) và tự khai hồ sơ; VTOS duyệt ở màn /tai-khoan-ngoai.
     "tai_khoan_ngoai",
+    # DK-1 (01/11/2026): ĐƠN ĐĂNG KÝ TẠM — chính người đăng ký gõ vào, từng chữ một, qua bốn bước
+    # ở cổng (/cong/dang-ky/lien-he → mat-khau → dieu-khoan → ma → xong). Đây là cửa tay thật,
+    # KHÔNG phải máy sinh: máy chỉ băm mật khẩu và đóng dấu giờ. Đơn tự hết hạn sau 24 giờ; nó
+    # biến mất khi mã đúng và tài khoản ra đời, nên không có màn quản trị nào sửa nó.
+    "don_dang_ky",
     # DH-1 (26/10/2026): hình thức hưởng hoa hồng của đối tác — GĐ KD / Kế toán chọn ở màn /hoa-hong-d06.
     "hinh_thuc_hoa_hong",
     # KH-1 (26/10/2026): yêu cầu khách tự gửi ở cổng khách hàng (/cong) — tour có lịch hoặc tour đoàn; đi kèm một lead cho Sales.

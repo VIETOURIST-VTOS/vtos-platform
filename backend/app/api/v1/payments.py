@@ -191,7 +191,21 @@ class CashIn(BaseModel):
 
 
 @router.post("/receipts/cash", status_code=201)
-def cash_receipt(data: CashIn, u: User = Depends(require_roles("ketoan",)), db: Session = Depends(get_db)):
+# ĐỢT R4c-4 02/11/2026 — CỬA NÓI ĐÚNG NHƯ MENU ĐÃ NÓI.
+#
+# `access.MAN_HINH_THU_QUY` mở `/collections` cho `thu_quy` kèm lời chú thích ghi rõ bốn cửa của
+# thủ quỹ nằm sau nó, trong đó có **"phiếu thu tiền mặt"**. Nhưng cửa này gác bằng
+# `require_roles("ketoan",)`, và màn hình cũng chỉ hiện khối lập phiếu cho `ketoan`. Menu nói thủ
+# quỹ có, cửa nói chỉ kế toán — thủ quỹ bấm vào thì nhận 403 trên một màn hình menu vừa mời họ vào.
+#
+# ĐÂY KHÔNG PHẢI NỚI QUYỀN MỚI: bảng menu đã ký cấp màn hình này cho thủ quỹ từ Đợt E2b-0. Đợt này
+# chỉ làm cửa khớp với bảng ấy. Chủ tịch chốt 02/11/2026 ("cả hai vai đều lập được", không thêm
+# bước xác nhận).
+#
+# CÒN MỘT CỬA NỮA cùng lời chú thích ấy nhắc tới — `confirm_receipt` ("xác nhận phiếu thu"). Đợt
+# này KHÔNG đụng: mở cả lập lẫn xác nhận cho một vai là bỏ tách nhiệm, và đó là một quyết định
+# phải có chữ ký riêng chứ không phải hệ quả của câu trả lời hôm nay.
+def cash_receipt(data: CashIn, u: User = Depends(require_roles("ketoan", "thu_quy")), db: Session = Depends(get_db)):
     b = db.get(Booking, data.booking_id)
     if not b: raise HTTPException(404, "Không có booking")
     if (data.amount or 0) <= 0: raise HTTPException(422, "Số tiền phải > 0")

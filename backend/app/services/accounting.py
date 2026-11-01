@@ -11,6 +11,9 @@ from sqlalchemy.exc import IntegrityError          # Đợt E7 – hàng rào th
 from sqlalchemy.orm import Session
 from app.models.core import Tour, Booking, User
 from app.models.payments import Receipt
+# DOT R4c-4 02/11/2026 — doc `HTTT_QUA_TIEN_MAT` cua may chu chu khong so chuoi
+# `== "tien_mat"`: cung mot luat, khai mot lan, o `models/hach_toan.py`.
+from app.models.hach_toan import HTTT_QUA_TIEN_MAT
 from app.models.accounting import Account, JournalEntry, JournalLine, Invoice, PeriodLock
 from app.services import rules as R
 from app.services import chung_tu_loai as CTL   # Đợt E3 – loại chứng từ, loại nghiệp vụ, khoá sự kiện
@@ -285,11 +288,24 @@ def reverse_entry(db: Session, u: User, e: JournalEntry, reason: str) -> Journal
 
 # ---------- Bút toán tự động từ nghiệp vụ ----------
 def on_receipt_confirmed(db: Session, r: Receipt, actor: str, role: str) -> JournalEntry | None:
-    """Phiếu thu được Kế toán xác nhận → Nợ 111/112 – Có 131 (khách, booking)."""
+    """Phiếu thu được Kế toán xác nhận → Nợ 1111/1121 – Có 131 (khách, booking)."""
     if db.execute(select(JournalEntry).where(JournalEntry.source_ref == f"receipt:{r.code}")).scalars().first():
         return None
     b = db.get(Booking, r.booking_id)
-    cash = "111" if r.method == "tien_mat" else "112"
+    # ĐỢT R4c-4 02/11/2026 — VẾ TIỀN XUỐNG CẤP CHI TIẾT. Dòng cũ ghi `"111"` / `"112"`, là tài
+    # khoản CHA; `1111` / `1121` mới là chi tiết, và `post_entry` NHẬN cấp cha nên việc này im
+    # lặng suốt.
+    #
+    # Đây là đường tiền vào ĐÔNG NHẤT hệ thống — mỗi lần khách trả tiền. Chạy thật
+    # `cap_dinh_khoan.ngoai_luat` với hai bút toán chỉ khác vế tiền:
+    #
+    #     112 / 131   ->  NGOÀI LUẬT      vì quy tắc THU_KHACH khai vế Nợ là 1121, và phép đối
+    #                                     chiếu so bằng tiền tố: "112".startswith("1121") là SAI
+    #     1121 / 131  ->  trong luật
+    #
+    # Đợt R4c-3 đã chữa chỗ này ở đường CHI (`ops._post_payment`) và em báo nhầm là đã xong — nó
+    # mới là 1 trong 3 chỗ GHI. Đợt này vá hai chỗ còn lại: đây và `finance.py`.
+    cash = "1111" if r.method in HTTT_QUA_TIEN_MAT else "1121"
     d = (r.confirmed_at or r.created_at or datetime.now()).date()
     try:
         pc = b.tour.code if b and b.tour else ""
