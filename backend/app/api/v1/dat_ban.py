@@ -27,6 +27,7 @@ router_onepay = APIRouter(prefix="/api/v1/onepay", tags=["dat-ban"])
 router_vtos = APIRouter(prefix="/api/v1/dat-ban-nha-hang", tags=["dat-ban"])
 
 GOC_MAC_DINH = "https://kh.vietourist.vn"
+TEN_COM_VN = {"crm.vietourist.com.vn", "kh.vietourist.com.vn", "dt.vietourist.com.vn", "ir.vietourist.com.vn"}   # TM-1
 # Phanh cho hai cửa OnePay gọi về (không phiên): chữ ký sai thì không đổi gì, phanh chặn dội.
 CUA_SO_GIAY, TOI_DA_TRONG_CUA_SO = 600, 60
 _LUOT: dict = defaultdict(list)
@@ -54,7 +55,8 @@ def _goc(request: Request) -> str:
     """Tên miền cổng đang dùng — CHỈ nhận tên miền của Vietourist (không mở đường chuyển hướng tùy ý)."""
     o = (request.headers.get("origin") or "").rstrip("/")
     host = o.split("://", 1)[-1].split(":", 1)[0].lower()
-    if o.startswith("https://") and (host == "vietourist.vn" or host.endswith(".vietourist.vn")):
+    # TM-1 (02/11/2026): vietourist.com.vn song song — chỉ bốn tên cổng; tên gốc/www .com.vn là web cũ, không nhận.
+    if o.startswith("https://") and (host == "vietourist.vn" or host.endswith(".vietourist.vn") or host in TEN_COM_VN):
         return o
     if host in ("localhost", "127.0.0.1"):
         return o
