@@ -94,6 +94,7 @@ def luu_nha_hang(db: Session, u: User, d: dict, nha_hang_id: int | None = None, 
         nh = NhaHang(ma=_ma_moi(db), ten=ten, tao_boi=u.username, tao_luc=now)
         db.add(nh)
     doi = False
+    truoc_dc = {"khu_vuc": nh.khu_vuc or "", "tinh_thanh": nh.tinh_thanh or ""}
     for k in TRUONG_NH:
         if k in d and d[k] is not None:
             v = str(d[k]).strip()
@@ -101,6 +102,12 @@ def luu_nha_hang(db: Session, u: User, d: dict, nha_hang_id: int | None = None, 
                 setattr(nh, k, v); doi = True
     if "ghi_chu_noi_bo" in d and d["ghi_chu_noi_bo"] is not None:
         nh.ghi_chu_noi_bo = str(d["ghi_chu_noi_bo"]).strip()
+    # AT-2: đổi địa chỉ / thành phố thì ghim tự động cũ không còn đúng → xóa để nút «Lấy tọa độ» lấy lại.
+    # Ghim tay (link Google Maps) giữ nguyên. Lưu hồ sơ KHÔNG gọi dịch vụ ngoài (lưu không phụ thuộc mạng).
+    if nha_hang_id and nh.toa_do_nguon != "tay" and any(k in d and str(d.get(k) or "").strip() != truoc_dc.get(k, "")
+                                                     for k in ("khu_vuc", "tinh_thanh")):
+        nh.vi_do = nh.kinh_do = None
+        nh.toa_do_nguon = ""
     if nha_hang_id and doi:
         _tat(nh, f"Thông tin nhà hàng vừa sửa bởi {u.username} — chờ Kinh doanh bật lại")
     nh.sua_boi, nh.sua_luc = u.username, now
@@ -190,6 +197,138 @@ def bat_hien(db: Session, u: User, nha_hang_id: int, bat: bool, now: datetime | 
     return nh
 
 
+# ══ AT-2 (Chủ tịch duyệt bản xem thử 01/11/2026): bản đồ + công tắc mở thanh toán — cùng cách KS-16s ══════════
+# Tọa độ: máy lấy từ địa chỉ qua OpenStreetMap (dùng chung hàm của khách sạn), Điều hành dán link Google Maps để
+# sửa ghim lệch (nguồn «tay», máy không ghi đè). Thanh toán: công tắc chung + từng nhà hàng, CẢ HAI bật mới trả được.
+LAY_TOA_DO = None            # phép thử gán hàm giả; None = dùng hàm của khách sạn (khach_san_vtd.LAY_TOA_DO)
+KHOA_TT_NH = "mo_thanh_toan_nha_hang"
+
+
+def _ks_mod():
+    from app.services import khach_san_vtd as KS
+    return KS
+
+
+def _lay(q: str):
+    return (LAY_TOA_DO or _ks_mod().LAY_TOA_DO)(q)
+
+
+def doc_link_ggmap(link: str) -> tuple[float, float]:
+    KS = _ks_mod()
+    try:
+        return KS.doc_link_ggmap(link)
+    except KS.LoiKhachSan as ex:
+        raise LoiNhaHang(str(ex).replace("khách sạn", "nhà hàng"))
+
+
+def _cau_tim_nh(n: NhaHang) -> list[str]:
+    tp = (n.tinh_thanh or "").replace("TP. ", "")
+    ds = []
+    if n.khu_vuc:
+        kv = n.khu_vuc.strip()
+        ds.append(", ".join([kv] + [x for x in (tp, "Việt Nam") if x and _khong_dau(x) not in _khong_dau(kv)]))
+    ds.append(", ".join(x for x in (n.ten, tp, "Việt Nam") if x))
+    return list(dict.fromkeys(ds))
+
+
+def _tu_lay_toa_do_nh(n: NhaHang, nghi: float = 0) -> bool:
+    import time
+    KS = _ks_mod()
+    for i, q in enumerate(_cau_tim_nh(n)):
+        if i and nghi:
+            time.sleep(nghi)
+        try:
+            kq = _lay(q)
+        except Exception:   # noqa: BLE001 — mạng / dịch vụ ngoài lỗi: để trống, lần sau lấy lại
+            return False
+        if kq and KS._trong_vn(*kq):
+            n.vi_do, n.kinh_do, n.toa_do_nguon = kq[0], kq[1], "tu_dong"
+            return True
+    n.toa_do_nguon = "khong_thay"
+    return False
+
+
+def dat_ghim(db: Session, u: User, nha_hang_id: int, link: str, now: datetime | None = None) -> NhaHang:
+    """Điều hành dán link Google Maps để sửa ghim. Link trống = bỏ ghim tay, để máy lấy lại theo địa chỉ.
+    Không tắt hiện nhà hàng (ghim không đổi nội dung khách đọc)."""
+    if not _co(u, VAI_NHAP):
+        raise LoiNhaHang("Chỉ Điều hành sửa ghim bản đồ")
+    nh = db.get(NhaHang, nha_hang_id)
+    if nh is None:
+        raise LoiNhaHang("Không có nhà hàng này")
+    from app.services import rules as R
+    if (link or "").strip():
+        lat, lng = doc_link_ggmap(link)
+        nh.vi_do, nh.kinh_do, nh.toa_do_nguon = lat, lng, "tay"
+        R.audit(db, u.username, u.role, "nh_toa_do_tay", f"nha_hang:{nh.ma}", after={"vi_do": lat, "kinh_do": lng})
+    else:
+        nh.vi_do = nh.kinh_do = None
+        nh.toa_do_nguon = ""
+        R.audit(db, u.username, u.role, "nh_toa_do_bo_tay", f"nha_hang:{nh.ma}")
+    nh.sua_boi, nh.sua_luc = u.username, now or datetime.now()
+    db.commit(); db.refresh(nh)
+    return nh
+
+
+def lay_toa_do_loat(db: Session, u: User, toi_da: int | None = None, nghi: float | None = None) -> dict:
+    """Nút «Lấy tọa độ cho tất cả nhà hàng»: nơi chưa có tọa độ (bỏ qua ghim tay), tối đa 60 mỗi lần, 1 lượt / giây."""
+    import time
+    KS = _ks_mod()
+    toi_da = KS.LOAT_TOI_DA if toi_da is None else toi_da
+    nghi = KS.LOAT_NGHI_GIAY if nghi is None else nghi
+    if not _co(u, VAI_BAT):
+        raise LoiNhaHang("Chỉ TP Điều hành / Chủ tịch / TGĐ chạy lấy tọa độ hàng loạt")
+    ds = db.execute(select(NhaHang).where(NhaHang.vi_do.is_(None), NhaHang.toa_do_nguon != "tay",
+                                          NhaHang.ngung.is_(False)).order_by(NhaHang.hien_cong.desc(), NhaHang.ma)).scalars().all()
+    co, khong = [], []
+    for i, n in enumerate(ds[:toi_da]):
+        if i and nghi:
+            time.sleep(nghi)
+        (co if _tu_lay_toa_do_nh(n, nghi) else khong).append(n.ma)
+    from app.services import rules as R
+    R.audit(db, u.username, u.role, "nh_toa_do_loat", "nha_hang:loat", after={"co": co, "khong_thay": khong})
+    db.commit()
+    return {"co": len(co), "khong_thay": khong, "con_lai": max(0, len(ds) - toi_da)}
+
+
+def tt_chung_nh(db: Session) -> bool:
+    from app.models.khach_san_vtd import CaiDatKsVtd
+    r = db.get(CaiDatKsVtd, KHOA_TT_NH)
+    return bool(r and r.gia_tri == "1")
+
+
+def mo_thanh_toan_nh(db: Session, n: NhaHang, chung: bool | None = None) -> bool:
+    return bool(n.mo_thanh_toan) and (tt_chung_nh(db) if chung is None else chung)
+
+
+def bat_tt_chung_nh(db: Session, u: User, bat: bool, now: datetime | None = None) -> bool:
+    from app.models.khach_san_vtd import CaiDatKsVtd
+    from app.services import rules as R
+    if not _co(u, VAI_BAT):
+        raise LoiNhaHang("Chỉ TP Điều hành / Chủ tịch / TGĐ mở / đóng thanh toán trực tuyến nhà hàng")
+    r = db.get(CaiDatKsVtd, KHOA_TT_NH)
+    if r is None:
+        r = CaiDatKsVtd(khoa=KHOA_TT_NH)
+        db.add(r)
+    r.gia_tri, r.sua_boi, r.sua_luc = ("1" if bat else "0"), u.username, now or datetime.now()
+    R.audit(db, u.username, u.role, "nh_tt_chung_mo" if bat else "nh_tt_chung_dong", "nha_hang:chung")
+    db.commit()
+    return bool(bat)
+
+
+def bat_tt_nh(db: Session, u: User, nha_hang_id: int, bat: bool) -> NhaHang:
+    from app.services import rules as R
+    if not _co(u, VAI_BAT):
+        raise LoiNhaHang("Chỉ TP Điều hành / Chủ tịch / TGĐ mở / đóng thanh toán của nhà hàng")
+    nh = db.get(NhaHang, nha_hang_id)
+    if nh is None:
+        raise LoiNhaHang("Không có nhà hàng này")
+    nh.mo_thanh_toan = bool(bat)
+    R.audit(db, u.username, u.role, "nh_tt_mo" if bat else "nh_tt_dong", f"nha_hang:{nh.ma}")
+    db.commit(); db.refresh(nh)
+    return nh
+
+
 def ngung(db: Session, u: User, nha_hang_id: int, ngung_: bool) -> NhaHang:
     if not _co(u, VAI_BAT + ("tp_dh",)):
         raise LoiNhaHang("Chỉ TP Điều hành / Chủ tịch / TGĐ đánh dấu ngừng hợp tác")
@@ -233,11 +372,14 @@ def danh_sach_vtos(db: Session) -> dict:
                    "nguon": n.nguon, "nguon_ref": n.nguon_ref, "dia_danh_nguon": n.dia_danh_nguon, "mon_noi_bat": n.mon_noi_bat,
                    "lien_he_xac_minh": n.lien_he_xac_minh, "xac_minh_boi": n.xac_minh_boi, "supplier_id": n.supplier_id,
                    "dieu_kien": dieu_kien_mo_dat(db, n, mine, hn), "mo_dat": mo_dat(db, n, mine, hn),
+                   "vi_do": n.vi_do, "kinh_do": n.kinh_do, "toa_do_nguon": n.toa_do_nguon or "",   # AT-2
+                   "mo_thanh_toan": bool(n.mo_thanh_toan),
                    "hop_dong": [_hd_out(h) for h in hds.get(n.id, [])], "anh_id": n.anh_id, "anh_nguon": n.anh_nguon,
                    "anh_ht": ht.get(n.id, {"da_duyet": 0, "cho_duyet": 0, "nhap": 0, "an": 0, "co_bia": False, "mon": 0, "td": 0, "nd_cho": 0})})
     return {"nha_hang": ra, "am_thuc": list(AM_THUC), "loai_goi": LOAI_GOI, "noi_dung": ds_noi_dung(db), "loai_nd": LOAI_ND,
             "nhom_anh": NHOM_ANH, "can_cu_anh": CAN_CU_ANH, "so_anh_cho_duyet": sum(o["cho_duyet"] + o.get("nd_cho", 0) for o in ht.values()),
-            "thanh_pho": [{"ten": t, "mien": MIEN[m]} for t, (m, _k) in THANH_PHO.items()], "nhom_mon": list(NHOM_MON)}
+            "thanh_pho": [{"ten": t, "mien": MIEN[m]} for t, (m, _k) in THANH_PHO.items()], "nhom_mon": list(NHOM_MON),
+            "tt_chung": tt_chung_nh(db), "chua_toa_do": sum(1 for n in nhs if n.vi_do is None and not n.ngung)}   # AT-2
 
 
 # ── phía cổng khách ─────────────────────────────────────────────────────────────────────────────
@@ -288,7 +430,15 @@ def _nh_cong(db: Session, n: NhaHang, tds: list[ThucDonNhaHang], hn: date, anh: 
             **({"album": [_anh_cong_out(x) for x in anh], "mon": mon_cong(db, n.id), "thuc_don_nh": thuc_don_cong(db, n.id),
                 "danh_gia": _dg_cong(db, n.id), **_video_cong(db, n.id)}
                if du_album else {}),
-            "gia_tu": min(int(t.gia_nguoi_lon or 0) for t in ban) if ban else None, "thuc_don": [_td_out(t, False) for t in ban]}
+            "gia_tu": min(int(t.gia_nguoi_lon or 0) for t in ban) if ban else None, "thuc_don": [_td_out(t, False) for t in ban],
+            # AT-2: bản đồ, công tắc thanh toán (chỉ nơi mở đặt), ảnh cho băng chuyền thẻ, nhãn «Phù hợp» từ dữ liệu thật
+            "vi_do": n.vi_do, "kinh_do": n.kinh_do, "mo_thanh_toan": bool(dat) and mo_thanh_toan_nh(db, n),
+            "anh_ds": [_anh_cong_out(x)["nho"] for x in anh[:6]],
+            "phong_rieng": any(x.nhom == "phong_rieng" for x in anh) or "phòng riêng" in (n.tien_ich or "").lower()
+                           or any(t.loai == "tiec" for t in ban),
+            "gia_dinh": any(t.gia_tre_em is not None for t in ban) or "trẻ em" in (n.tien_ich or "").lower(),
+            "tiec": any(t.loai == "tiec" or (t.so_khach_toi_thieu or 1) >= 10 for t in ban),
+            "goi_mon": any(t.loai == "goi_mon" for t in ban)}
 
 
 def _video_cong(db: Session, nid: int) -> dict:
@@ -327,7 +477,7 @@ def _nh_hien(db: Session, hn: date) -> list[dict]:
 
 
 def danh_sach_cong(db: Session, tinh: str = "", am_thuc: str = "", gia_toi_da: int = 0, q: str = "", chi_dat: bool = False,
-                   trang: int = 1, so: int = 24, loai: str = "", bac: str = "") -> dict:
+                   trang: int = 1, so: int = 24, loai: str = "", bac: str = "", toi_da: int = 60) -> dict:
     """Trang Khám phá ẩm thực: mọi nhà hàng đang hiện giới thiệu (chỉ nơi mở đặt mới có thực đơn, giá), thành phố,
     nội dung Marketing đã bật. Nhà hàng xếp: nơi đặt được qua Vietourist lên trước, rồi theo tên."""
     hn = _hom_nay()
@@ -360,7 +510,7 @@ def danh_sach_cong(db: Session, tinh: str = "", am_thuc: str = "", gia_toi_da: i
         t = sao.get(o["id"], {})
         o["sao"] = {"so_bai": t.get("so_bai", 0), "diem_tb": t.get("diem_tb")}
     ra.sort(key=lambda o: (not o["mo_dat"], dm.get(o["id"], {"diem": 0})["diem"] < NGUONG_THIEU, o["ten"]))
-    trang, so = max(1, int(trang or 1)), max(1, min(int(so or 24), 60))
+    trang, so = max(1, int(trang or 1)), max(1, min(int(so or 24), toi_da))
     dem: dict = {}
     for n, _o in tat_ca:
         if n.tinh_thanh:
@@ -380,6 +530,18 @@ def danh_sach_cong(db: Session, tinh: str = "", am_thuc: str = "", gia_toi_da: i
             "tinh_thanh": sorted(dem), "dem_tinh": dem, "thanh_pho": tp, "mien": MIEN, "nhom_mon": list(NHOM_MON),
             "so_mo_dat": sum(1 for _n, o in tat_ca if o["mo_dat"]), "tong_nha_hang": len(tat_ca),
             "am_thuc": list(AM_THUC), "noi_dung": nd}
+
+
+def tat_ca_cong(db: Session) -> dict:
+    """AT-2 · trang riêng kh.vietourist.vn/restaurant: MỌI nhà hàng đang hiện trong một lần (lọc, đếm, bản đồ chạy trên
+    trình duyệt — như cổng khách sạn). Bỏ bớt phần nặng của thẻ: giới thiệu cắt ngắn; trang chi tiết tải đủ."""
+    r = danh_sach_cong(db, so=2000, toi_da=2000)
+    for o in r["nha_hang"]:
+        mt = (o.get("mo_ta") or "").strip()
+        o["mo_ta"] = (mt[:180].rsplit(" ", 1)[0] + "…") if len(mt) > 180 else mt
+    r.pop("noi_dung", None)
+    r["tt_chung"] = tt_chung_nh(db)
+    return r
 
 
 def mot_nha_hang_cong(db: Session, nha_hang_id: int) -> tuple[NhaHang, dict]:

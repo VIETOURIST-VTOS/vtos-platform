@@ -95,6 +95,52 @@ def hien_cong(nid: int, data: BatIn, u: User = Depends(require_roles(*N.VAI_BAT)
     return {"message": f"{nh.ten}: " + ("đang hiện trên cổng khách" if nh.hien_cong else "đã tắt khỏi cổng khách")}
 
 
+class GhimIn(BaseModel):
+    link_ggmap: str = ""            # AT-2: link Google Maps đầy đủ; trống = bỏ ghim tay
+
+
+@router.post("/{nid:int}/ghim")
+def ghim(nid: int, data: GhimIn, u: User = Depends(require_roles(*N.VAI_NHAP)), db: Session = Depends(get_db)):
+    try:
+        nh = N.dat_ghim(db, u, nid, data.link_ggmap)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"vi_do": nh.vi_do, "kinh_do": nh.kinh_do,
+            "message": f"{nh.ten}: " + (f"đã sửa ghim ({nh.vi_do}, {nh.kinh_do})" if nh.vi_do is not None else "đã bỏ ghim tay — bấm «Lấy tọa độ» để lấy lại")}
+
+
+@router.post("/toa-do-loat")
+def toa_do_loat(u: User = Depends(require_roles(*N.VAI_BAT)), db: Session = Depends(get_db)):
+    """AT-2: lấy tọa độ (OpenStreetMap) cho nhà hàng chưa có — tối đa 60 mỗi lần, 1 lượt / giây."""
+    try:
+        r = N.lay_toa_do_loat(db, u)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    them = f" · {len(r['khong_thay'])} không tìm thấy (dán link Google Maps)" if r["khong_thay"] else ""
+    con = f" · còn {r['con_lai']} — bấm lại" if r["con_lai"] else ""
+    return {**r, "message": f"Đã lấy tọa độ {r['co']} nhà hàng{them}{con}"}
+
+
+@router.post("/thanh-toan-chung")
+def tt_chung(data: BatIn, u: User = Depends(require_roles(*N.VAI_BAT)), db: Session = Depends(get_db)):
+    """AT-2: công tắc chung mở thanh toán trực tuyến (đặt bàn có cọc / trả đủ) cho cổng nhà hàng."""
+    try:
+        bat = N.bat_tt_chung_nh(db, u, data.bat)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"tt_chung": bat, "message": "Đã MỞ thanh toán trực tuyến nhà hàng (nhà hàng nào cũng bật thì khách đặt và trả được)"
+            if bat else "Đã ĐÓNG thanh toán trực tuyến toàn cổng nhà hàng"}
+
+
+@router.post("/{nid:int}/thanh-toan")
+def tt_nh(nid: int, data: BatIn, u: User = Depends(require_roles(*N.VAI_BAT)), db: Session = Depends(get_db)):
+    try:
+        nh = N.bat_tt_nh(db, u, nid, data.bat)
+    except N.LoiNhaHang as ex:
+        _loi(ex)
+    return {"message": f"{nh.ten}: " + ("đã mở thanh toán trực tuyến" if nh.mo_thanh_toan else "đã đóng thanh toán trực tuyến")}
+
+
 class NgungIn(BaseModel):
     ngung: bool
 

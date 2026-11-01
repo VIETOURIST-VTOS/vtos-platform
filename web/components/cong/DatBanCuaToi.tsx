@@ -107,7 +107,8 @@ export default function DatBanCuaToi({ doiTac = false, moMa = "" }: { doiTac?: b
           {d.thay_doi_ghi_chu && <small>{d.thay_doi_ghi_chu}</small>}</td>
         {doiTac && <td>{d.doanh_so != null ? <>{tien(d.doanh_so)}<small>tháng {String(d.ky_d06 || "").split("-").reverse().join("/")}</small></> : "—"}</td>}
         <td style={{ minWidth: 150 }}>
-          {d.co_the_tra && <button type="button" className="v3-button v3-primary cursor-interaction" onClick={() => setMo(mo === d.ma ? "" : d.ma)}><span>Thanh toán</span></button>}
+          {d.co_the_tra && (d.mo_thanh_toan === false ? <small>Thanh toán trực tuyến sắp mở cho nhà hàng này</small>   /* AT-2 */
+            : <button type="button" className="v3-button v3-primary cursor-interaction" onClick={() => setMo(mo === d.ma ? "" : d.ma)}><span>Thanh toán</span></button>)}
           {d.co_the_doi && <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => setDoi(doi?.ma === d.ma ? null : { ma: d.ma, ngay: d.ngay, gio: d.gio, nguoi_lon: d.nguoi_lon, tre_em: d.tre_em, so_lan_doi: d.so_lan_doi })}><span>Thay đổi</span></button>}
           {d.co_the_huy && <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => { setHuy(huy === d.ma ? "" : d.ma); setLyDo(""); }}><span>Hủy đặt bàn</span></button>}
           {d.danh_gia?.duoc_viet && <button type="button" className="v3-button v3-primary cursor-interaction" onClick={() => moDg(d)}><span>Đánh giá</span></button>}
@@ -115,7 +116,7 @@ export default function DatBanCuaToi({ doiTac = false, moMa = "" }: { doiTac?: b
           {d.danh_gia?.duoc_sua && <button type="button" className="v3-button v3-quiet cursor-interaction" onClick={() => moDg(d)}><span>Sửa đánh giá</span></button>}
         </td></tr>)}</tbody></table></div>}
 
-    {ds && ds.filter((d) => d.ma === mo && d.co_the_tra).map((d) => <div key={d.ma} className="v3-panel" style={{ marginTop: 12 }}>
+    {ds && ds.filter((d) => d.ma === mo && d.co_the_tra && d.mo_thanh_toan !== false).map((d) => <div key={d.ma} className="v3-panel" style={{ marginTop: 12 }}>
       <div className="v3-section-title"><h3>Thanh toán {d.ma} · {tien(d.con_phai_tra_truoc)}</h3></div>
       {!doiTac && d.dung_voucher && (d.voucher ? <div className="v3-notice info"><span>Đã áp voucher {d.voucher.ma} · trừ {tien(d.giam_voucher)} vào số trả trước.</span>
           <button type="button" className="v3-button v3-quiet cursor-interaction" disabled={busy} onClick={() => voucher(d.ma, true)}><span>Bỏ voucher</span></button></div>
