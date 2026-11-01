@@ -115,7 +115,8 @@ def test_cancel_with_charge_creates_retention_then_apply_refund_cancel():
     pr = next(x for x in client.get("/api/v1/payment-requests", headers=login("ketoan")).json() if x["code"] == code); assert pr["amount"] == 1_470_000 and pr["category"] == "hoan_tien"
     _gan_unc(pr["code"])
     for a, w in (("confirm", "tp.dieuhanh"), ("check", "ketoan"), ("approve", "tgd"), ("pay", "ketoan")):
-        x = client.post(f"/api/v1/payment-requests/{pr['id']}/step", json={"action": a, "reason": "CK 999" if a == "pay" else ""}, headers=login(w)); assert x.status_code == 200, x.text
+        x = client.post(f"/api/v1/payment-requests/{pr['id']}/step", json={"action": a, "reason": "CK 999" if a == "pay" else "",
+                                         "hinh_thuc_tt": "chuyen_khoan" if a == "pay" else ""}, headers=login(w)); assert x.status_code == 200, x.text
     rt3 = next(x for x in client.get("/api/v1/retentions?status=all", headers=login("ketoan")).json()["rows"] if x["id"] == rt["id"]); assert rt3["status"] == "tat_toan" and rt3["remaining"] == 0
     # bảo lưu khác: hủy → ghi 711
     b2 = make_booking("Vũ Văn Nghĩa", "0918273700"); cash(b2["id"], 2_690_000)

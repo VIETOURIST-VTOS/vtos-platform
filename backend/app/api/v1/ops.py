@@ -583,6 +583,9 @@ def create_pr(data: PRIn, u: User = Depends(require_roles("nv_dh", "tp_dh", "ptg
 class StepIn(BaseModel):
     action: str          # confirm / check / approve / pay / reject
     reason: str = ""
+    # DOT R4c-3 02/11/2026 — hinh thuc thanh toan cua buoc `pay`. RONG la CHUA CO SO:
+    # `services/ops.py::step` TU CHOI chu khong doan, va cung khong mac dinh chuyen khoan.
+    hinh_thuc_tt: str = ""
 
 
 @router.post("/payment-requests/{rid}/step")
@@ -590,7 +593,7 @@ def pr_step(rid: int, data: StepIn, u: User = Depends(current_user), db: Session
     r = db.get(PaymentRequest, rid)
     if not r: raise HTTPException(404, "Không có đề nghị chi")
     try:
-        msg = O.step(db, u, r, data.action, data.reason)
+        msg = O.step(db, u, r, data.action, data.reason, data.hinh_thuc_tt)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     return {"message": msg, "request": pr_out(r, db)}
