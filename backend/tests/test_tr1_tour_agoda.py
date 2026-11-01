@@ -172,7 +172,8 @@ def test_phan_tich_trang_tour_mau():
     g = "https://www.vietourist.com.vn/public/frontend/uploads/"
     assert o["ten"] == "Tour Du Lịch Hà Nội - Hà Giang 3 Ngày"
     # album: ảnh chính + thumbnail đổi sang đường dẫn đầy đủ, trùng tên tệp giữ một; KHÔNG ảnh tour liên quan / chấm sao / host lạ
-    assert o["anh"] == [g + "files/tour/ha-giang.jpg", g + "files/tour/dong-van.jpg"]
+    assert o["anh"] == [g + "files/tour/ha-giang.jpg", g + "files/tour/dong-van.jpg",          # TR-1c: + ảnh chèn trong lịch trình
+                        g + "kceditor/images/mau-1.jpg", g + "kceditor/images/mau-2.jpg"]
     assert [x["ngay"] for x in o["lich_trinh"]] == [1, 2, 3]
     n1, n2 = o["lich_trinh"][0], o["lich_trinh"][1]
     assert n1["tieu_de"] == "HÀ NỘI - HÀ GIANG (ĂN: T/C)" and n2["tieu_de"].startswith("HÀ GIANG - QUẢN BẠ")
@@ -377,3 +378,24 @@ def test_invoice_khong_co_phong_viet_van_ra_pdf(db, monkeypatch):
     _mo(db, p)
     d = _dat(db, _tk(db), t)
     assert TR.hoa_don_pdf(db, d, NOW)[:5] == b"%PDF-"
+
+
+def test_tr1c_ky_tu_rong_link_co_dau_va_trang_chi_gioi_thieu():
+    """TR-1c (đo trên trang thật 02/11/2026): web chèn U+200B trước «NGÀY 1:»; link có dấu cách / «Đ»; tour Du lịch Xanh
+    chỉ có bài giới thiệu (không mốc ngày) → giữ làm «Giới thiệu», ảnh chèn vẫn vào album."""
+    from app.services import tour_online as TR
+    url = "https://www.vietourist.com.vn/vn/tour/du-lich-nha-trang-135/tour-dao-diep-son-3n2d-989.html"
+    o = TR.phan_tich(TRANG.replace("NGÀY 01", "\u200bNGÀY 01").replace("NGÀY 02", "\u200bNGÀY 02"), url)
+    assert [x["ngay"] for x in o["lich_trinh"]] == [1, 2, 3] and o["gioi_thieu"] == ""
+    assert TR.ma_hoa_link("https://www.vietourist.com.vn/vn/tour/du-lich-tay-nguyen/tour- bao-loc-963.html") == \
+        "https://www.vietourist.com.vn/vn/tour/du-lich-tay-nguyen/tour-%20bao-loc-963.html"
+    assert TR.ma_hoa_link("https://www.vietourist.com.vn/vn/tour/du-lich-mien-tay/tour-mien-tay-2N1Đ-952.html").endswith("2N1%C4%90-952.html")
+    assert TR.ma_hoa_link("https://www.vietourist.com.vn/vn/tour/a/tour-%20b-1.html").endswith("tour-%20b-1.html")   # không mã hóa 2 lần
+    xanh = """<html><body><h1>Tour Du Lịch Xanh Mẫu</h1><div class="album-gallery"><img src="/public/frontend/uploads/files/tour/xanh.jpg"></div>
+    <div id="tabs-detail"><p>Bạn có đang mơ về một chuyến đi chạm vào thiên nhiên?</p>
+    <p><img src="/public/frontend/uploads/kceditor/images/rung-1.jpg"></p><p>Đạp xe xuyên rừng, thiền sáng bên sông.</p></div>
+    <div id="tabs-more"></div><div id="tabs-adv"></div></body></html>"""
+    o = TR.phan_tich(xanh, "https://www.vietourist.com.vn/vn/tour/du-lich-xanh/x-904.html")
+    g = "https://www.vietourist.com.vn/public/frontend/uploads/"
+    assert o["lich_trinh"] == [] and o["anh"] == [g + "files/tour/xanh.jpg", g + "kceditor/images/rung-1.jpg"]
+    assert o["gioi_thieu"] == "Bạn có đang mơ về một chuyến đi chạm vào thiên nhiên?\nĐạp xe xuyên rừng, thiền sáng bên sông."

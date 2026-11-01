@@ -1,0 +1,12 @@
+# Sổ giữ chỗ — làn Phân quyền · Đợt DỌN-TCKT
+
+Một đợt một tệp (Đợt SO-DOT 02/11/2026). Luật: [../README.md](../README.md).
+Mọi dòng trong tệp này PHẢI có cột `Làn` là `Phân quyền`.
+
+Đợt này ở làn «Phân quyền» chứ không phải «TC-KT»: việc của nó là quyển sổ `phan-quyen.md`, và
+chính tệp sổ ấy cũng là một tệp CÓ GIỮ CHỖ (SO-5 đang giữ). Khai nó ở làn TC-KT là tự tạo ra
+một chồng lấn GIỮA hai làn — đúng cái hàng rào vừa kêu.
+
+| Làn | Mã việc | Tệp sẽ đụng | Bắt đầu | Trạng thái |
+|---|---|---|---|---|
+| Phân quyền | **DỌN-TCKT — ĐÓNG NHỮNG DÒNG GIỮ CHỖ ĐÃ GỘP MÀ SỔ VẪN GIỮ** (Chủ tịch chốt 02/11/2026). Đợt LAN-TCKT dời bốn đợt R4c sang làn «TC-KT»; việc dời ấy biến chồng lấn TRONG một làn — thứ hàng rào cố ý im — thành chồng lấn GIỮA hai làn, thứ nó phải kêu: `ket_so.py` (R2-KC1 × R4c-2), `accounting.py` (R2-KC1 × R4c-4), `ops.py` + `api/v1/ops.py` (KS-16d / KS-16e × R4c-3). ĐỢT NÀY KHÔNG CHỐT TRƯỚC DÒNG NÀO SẼ ĐÓNG. Nó có một DANH SÁCH XÉT (KS-16d, KS-16e, R2-KC1) và một PHÉP ĐO BA LỚP: (1) tệp phép thử của đợt ấy có trên main, (2) dấu mã nằm trong TỪNG tệp mã mà dòng ấy khai, (3) tệp di trú của nó có trên main. Đủ ba lớp thì đóng, thiếu một lớp thì để nguyên — nên đợt này KHÔNG phụ thuộc thứ tự bấm. Đo được 02/11/2026: **KS-16d** và **KS-16e** đủ ba lớp (`test_ks16d_de_nghi_chi_ncc.py` / `test_ks16e_doanh_thu_hoa_hong.py`; dấu trong `ops.py`, `don_ks_vtd.py`, `dat_ban.py` và `api/v1/ops.py` / `chung_tu_loai.py`; di trú `ks16dc8e2b4f7a903…` / `ks16ea3c5e7f9b104…`) → ôi, đóng. **R2-KC1** lúc đo 07:10 chưa có lớp nào (PR #578 đã đẩy, chưa gộp) nên để nguyên; đến 02:00 ngày 02/11 thì #578 **đã gộp** (merge `fb0afe6`) và đủ cả hai lớp — `test_r2kc1_du_nguoc_chieu.py` 15 KB, dấu `R2-KC1` trong `accounting.py` 1 chỗ và `ket_so.py` 4 chỗ — nên bản vá tự đóng luôn dòng ấy. Đó chính là chỗ phép đo ba lớp trả công: dòng nào đóng là do ĐO lúc bấm quyết định, không do em chốt trước; luật 2 canh chiều ngược, đóng mà thiếu dấu thì đỏ. Hệ quả đo được: nhả `services/ops.py` và `api/v1/ops.py` → **R4c-1 và R4c-3 gộp được**; và khi R2-KC1 đóng theo thì nhả nốt `ket_so.py` + `accounting.py` → **R4c-2 và R4c-4 gộp được**; nếu #578 chưa gộp thì hai đợt ấy phải chờ, và đó là hàng rào làm đúng việc chứ không phải chỗ để sửa phép thử. KHÔNG đụng một tệp mã nào: chỉ ô cuối của những dòng chứng minh được; luật 4 so lại cả bốn cột còn lại của cả ba dòng. Bảy luật ở `test_dontckt_dong_hai_dong_oi.py`. | docs/dang-lam/phan-quyen.md, backend/tests/test_dontckt_dong_hai_dong_oi.py, docs/dang-lam/phan-quyen/DON-TCKT.md | 02-11-2026 07:10 | đang làm |
