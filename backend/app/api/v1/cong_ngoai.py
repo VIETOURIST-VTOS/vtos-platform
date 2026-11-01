@@ -159,3 +159,85 @@ def xu_ly(tid: int, data: XuLyIn, u: User = Depends(require_roles(*C.VAI_XEM)),
     except C.LoiCong as ex:
         _loi(ex)
     return {"message": f"Đã chuyển sang «{TRANG_THAI_NGOAI[t.trang_thai]}»", "dong": C.quan_tri_out(t, u)}
+
+
+# ──────────────────────────────────────────── DK-1 · tạo tài khoản bốn bước, mã ở bước CUỐI
+# Bốn cửa dưới đây đều CÔNG KHAI nên đều đi qua phanh theo địa chỉ mạng, như hai cửa cũ.
+
+class DangKyLienHeIn(BaseModel):
+    loai: str
+    ho_ten: str
+    dien_thoai: str = ""
+    email: str = ""
+
+
+@router.post("/dang-ky/lien-he")
+def dang_ky_lien_he(data: DangKyLienHeIn, request: Request, db: Session = Depends(get_db)):
+    """Bước 1. Câu trả lời KHÔNG đổi dù liên hệ đã có tài khoản hay chưa."""
+    ip = _phanh(request)
+    try:
+        return C.dang_ky_b1(db, data.loai, data.ho_ten, data.dien_thoai, data.email, ip)
+    except C.LoiCong as ex:
+        _loi(ex)
+
+
+class DangKyMatKhauIn(BaseModel):
+    khoa: str
+    mat_khau: str
+
+
+@router.post("/dang-ky/mat-khau")
+def dang_ky_mat_khau(data: DangKyMatKhauIn, request: Request, db: Session = Depends(get_db)):
+    """Bước 2. Từ chối thì nói rõ vì sao — câu ấy hiện thẳng dưới ô nhập."""
+    _phanh(request)
+    try:
+        return C.dang_ky_b2(db, data.khoa, data.mat_khau)
+    except C.LoiCong as ex:
+        _loi(ex)
+
+
+class DangKyDieuKhoanIn(BaseModel):
+    khoa: str
+    dong_y_dieu_khoan: bool = False
+    nhan_tin_quang_cao: bool = False
+
+
+@router.post("/dang-ky/dieu-khoan")
+def dang_ky_dieu_khoan(data: DangKyDieuKhoanIn, request: Request, db: Session = Depends(get_db)):
+    """Bước 3. Nhận tin quảng cáo mặc định TẮT, không bao giờ tự bật."""
+    _phanh(request)
+    try:
+        return C.dang_ky_b3(db, data.khoa, data.dong_y_dieu_khoan, data.nhan_tin_quang_cao)
+    except C.LoiCong as ex:
+        _loi(ex)
+
+
+class DangKyMaIn(BaseModel):
+    khoa: str
+    kenh: str
+
+
+@router.post("/dang-ky/ma")
+def dang_ky_ma(data: DangKyMaIn, request: Request, db: Session = Depends(get_db)):
+    """Bước 4a — gửi mã tới chủ liên hệ."""
+    ip = _phanh(request)
+    try:
+        return C.dang_ky_gui_ma(db, data.khoa, data.kenh, ip)
+    except C.LoiCong as ex:
+        _loi(ex)
+
+
+class DangKyXongIn(BaseModel):
+    khoa: str
+    ma: str
+
+
+@router.post("/dang-ky/xong")
+def dang_ky_xong(data: DangKyXongIn, request: Request, db: Session = Depends(get_db)):
+    """Bước 4b — gõ mã. Cửa duy nhất sinh ra một `TaiKhoanNgoai` có mật khẩu."""
+    _phanh(request)
+    try:
+        tk, phien = C.dang_ky_xong(db, data.khoa, data.ma)
+    except C.LoiCong as ex:
+        _loi(ex)
+    return {"phien": phien, "toi": C.toi_out(tk)}
