@@ -24,6 +24,11 @@ from app.services import rules as R
 from app.services.storage import StorageError, storage
 
 TOI_DA = 5
+TOI_DA_DOI = {"khach_san_vtd": 3}           # KS-16p: khách sạn tối đa 3 video (Chủ tịch 01/11/2026)
+
+
+def toi_da(doi: str) -> int:
+    return TOI_DA_DOI.get(doi, TOI_DA)
 TOI_DA_BYTE = 100 * 1024 * 1024
 PHAN_BYTE = 8 * 1024 * 1024
 DUOI = {"mp4": "video/mp4", "mov": "video/quicktime", "webm": "video/webm", "m4v": "video/mp4"}
@@ -162,7 +167,7 @@ def ds(db: Session, u: User, doi: str, oid: int) -> dict:
     vs = _cua(db, doi, oid)
     hien = [v for v in vs if v.trang_thai == "hien"]
     co = {v.loai for v in hien}
-    return {"video": [_out(v) for v in vs], "toi_da": TOI_DA, "toi_da_mb": TOI_DA_BYTE // (1024 * 1024),
+    return {"video": [_out(v) for v in vs], "toi_da": toi_da(doi), "toi_da_mb": TOI_DA_BYTE // (1024 * 1024),
             "phan_mb": PHAN_BYTE // (1024 * 1024), "duoi": sorted(DUOI), "loai": c["loai"],
             "chuan": [{"loai": k, "ten": c["loai"][k], "co": k in co} for k in c["chuan"]],
             "du_chuan": all(k in co for k in c["chuan"]), "duoc_nhap": _co(u, c["nhap"]), "duoc_quan": _co(u, c["quan"]),
@@ -180,8 +185,8 @@ def bat_dau(db: Session, u: User, doi: str, oid: int, d: dict, now: datetime | N
     kt = int(d.get("kich_thuoc") or 0)
     if kt <= 0 or kt > TOI_DA_BYTE:
         raise LoiVideo(f"Video tối đa {TOI_DA_BYTE // (1024 * 1024)} MB — tệp này {kt / 1048576:.0f} MB")
-    if len(_cua(db, doi, oid)) >= TOI_DA:
-        raise LoiVideo(f"Đã đủ {TOI_DA} video — xóa video cũ trước khi tải thêm")
+    if len(_cua(db, doi, oid)) >= toi_da(doi):
+        raise LoiVideo(f"Đã đủ {toi_da(doi)} video — xóa video cũ trước khi tải thêm")
     nguon = str(d.get("nguon") or "").strip()[:200]
     if not nguon:
         raise LoiVideo("Ghi nguồn video (khách sạn / nhà hàng gửi, VTD quay…)")
@@ -417,5 +422,7 @@ def video_cong(db: Session, doi: str, ids: list[int]) -> dict[int, list[dict]]:
     for v in db.execute(select(VideoDichVu).where(VideoDichVu.doi_tuong == doi, VideoDichVu.doi_tuong_id.in_(ids),
                                                   VideoDichVu.trang_thai == "hien")
                         .order_by(VideoDichVu.la_gioi_thieu.desc(), VideoDichVu.thu_tu, VideoDichVu.id)).scalars():
-        ra.setdefault(v.doi_tuong_id, []).append(_out(v, cong=True))
+        ds_ = ra.setdefault(v.doi_tuong_id, [])
+        if len(ds_) < toi_da(doi):                       # video cũ vượt mức mới: cổng chỉ hiện đủ mức
+            ds_.append(_out(v, cong=True))
     return ra

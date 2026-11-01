@@ -6,7 +6,7 @@ trình duyệt gửi lên.
 """
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.core import User
@@ -21,7 +21,8 @@ VAI_NHAP = ("tp_dh", "nv_dh") + TOAN_QUYEN
 VAI_DUYET = ("tp_dh",) + TOAN_QUYEN
 VAI_XEM = tuple(dict.fromkeys(VAI_NHAP + ("bks", "robot_ks", "gd_kd", "tp_kd", "nv_mkt", "ptgd_mkt")))
 VAI_XEM = tuple(dict.fromkeys(VAI_XEM + ("ketoan", "tn_kd", "nv_kd", "sales_admin")))   # KS-14: Kế toán, Sales đọc danh mục để xử lý đơn
-ANH_TOI_DA = 80
+ANH_TOI_DA = 50                # KS-16p (Chủ tịch 01/11/2026): mỗi khách sạn 30–50 ảnh — dưới 30 chỉ nhắc
+ANH_CHUAN = 30
 DEM_TOI_DA = 30
 NGAY_CUOI_TUAN = (4, 5)       # đêm thứ Sáu, thứ Bảy
 
@@ -588,7 +589,7 @@ def tai_anh(db: Session, u: User, kid: int, ten_tep: str, data: bytes, d: dict, 
         if a is not None and a.checksum == cs:
             return x, False
     if len(ds) >= ANH_TOI_DA:
-        raise LoiKhachSan(f"Album đã đủ {ANH_TOI_DA} ảnh — ẩn ảnh cũ trước khi tải thêm")
+        raise LoiKhachSan(f"Album đã đủ {ANH_TOI_DA} ảnh — xóa bớt ảnh cũ trước khi tải thêm")
     hien, nho, rong, cao = _lam_nhe(data)
     if hien is None and _co_pil():
         raise LoiKhachSan("Tệp không mở được như một ảnh — kiểm tra lại tệp")
@@ -777,7 +778,7 @@ def ds_vtos(db: Session, u: User) -> dict:
         dong.append({**_ks_noi_bo(k), "so_anh": len(a), "anh_duyet": sum(x.trang_thai == "da_duyet" for x in a),
                      "anh_cho": sum(x.trang_thai == "cho_duyet" for x in a), "so_loai_phong": len(lp.get(k.id, [])),
                      "goi_duyet": sum(g.trang_thai == "da_duyet" for g in gs), "goi_cho": sum(g.trang_thai == "cho_duyet" for g in gs),
-                     "bia": _anh_out(bia)["nho"] if bia else None})
+                     "bia": _anh_out(bia)["nho"] if bia else None, "thieu_anh": max(0, ANH_CHUAN - len(a))})
     return {"khach_san": dong, "thanh_pho": [{"ten": t, "mien": MIEN[m]} for t, (m, _k) in THANH_PHO.items()],
             "loai": LOAI_CHO_O, "tien_ich": TIEN_ICH, "nhom_anh": NHOM_ANH_KS,
             "nhan_tre_em": NHAN_TRE_EM, "cach_tinh_tre": CACH_TINH_TRE, "tien_nghi_phong": TIEN_NGHI_PHONG,   # KS-16j
@@ -786,6 +787,13 @@ def ds_vtos(db: Session, u: User) -> dict:
             "duoc_nhap": _co(u, VAI_NHAP), "duoc_duyet": _co(u, VAI_DUYET), "toi": u.username,
             "toan_quyen": _co(u, TOAN_QUYEN),
             "cho_duyet": {"anh": sum(d["anh_cho"] for d in dong), "goi": sum(d["goi_cho"] for d in dong)}}
+
+
+def album_nhac(n: int) -> dict:
+    """KS-16p: 30–50 ảnh / khách sạn. Dưới 30 chỉ NHẮC, không chặn bật hiện; đủ 50 thì chặn tải thêm."""
+    return {"so": n, "toi_da": ANH_TOI_DA, "chuan": ANH_CHUAN, "thieu": max(0, ANH_CHUAN - n),
+            "nhac": (f"Còn thiếu {ANH_CHUAN - n} ảnh để đạt {ANH_CHUAN}" if n < ANH_CHUAN else
+                     f"Album đã đủ {ANH_TOI_DA} ảnh" if n >= ANH_TOI_DA else "")}
 
 
 def mot_vtos(db: Session, u: User, kid: int) -> dict:
@@ -797,6 +805,7 @@ def mot_vtos(db: Session, u: User, kid: int) -> dict:
     from app.services import video_dich_vu as VD   # KS-16f
     return {"khach_san": _ks_noi_bo(k), "dieu_kien": dieu_kien_hien(db, k),
             "anh": [_anh_out(x) for x in _anh_cua(db, kid)], "so_video": len(VD._cua(db, "khach_san_vtd", kid, False)),
+            "video_toi_da": VD.toi_da("khach_san_vtd"), "album": album_nhac(len(_anh_cua(db, kid))),   # KS-16p
             "loai_phong": [{"id": x.id, "ten": x.ten, "dien_tich": x.dien_tich, "giuong": x.giuong, "mo_ta": x.mo_ta,
                             "toi_da_nguoi_lon": x.toi_da_nguoi_lon, "toi_da_tre_em": x.toi_da_tre_em, "so_phong": x.so_phong,
                             "thu_tu": x.thu_tu, "dang_ban": x.dang_ban, **_lp_them(x),
@@ -1082,7 +1091,31 @@ def _phong_ban_duoc(db: Session, kids: list[int], vao: date, ra: date, nl: int, 
     return ra_
 
 
-def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict], dg: dict | None = None) -> dict:
+DAT_24H_TOI_THIEU = 2          # KS-16p: chỉ số thật — dưới 2 đơn không hiện
+CON_IT_TOI_DA = 3
+
+
+def dat_24h(db: Session, ids: list[int], now: datetime | None = None) -> dict[int, int]:
+    """KS-16p: số đơn ĐÃ TRẢ / ĐÃ XÁC NHẬN tạo trong 24 giờ qua theo khách sạn (số thật, không cộng thêm)."""
+    if not ids:
+        return {}
+    from app.models.don_ks_vtd import DonKsVtd
+    tu = (now or datetime.now()) - timedelta(hours=24)
+    ra: dict[int, int] = {}
+    for kid, n in db.execute(select(DonKsVtd.khach_san_id, func.count(DonKsVtd.id))
+                             .where(DonKsVtd.khach_san_id.in_(ids), DonKsVtd.tao_luc >= tu,
+                                    DonKsVtd.trang_thai.in_(["da_tra", "da_xac_nhan"]))
+                             .group_by(DonKsVtd.khach_san_id)).all():
+        ra[kid] = int(n)
+    return ra
+
+
+def _con_it(phong: list[dict]) -> int:
+    con = [p["con"] for p in phong if p["vua"] and p["goi"] and p.get("con", 0) > 0]
+    return min(con) if con and min(con) <= CON_IT_TOI_DA else 0
+
+
+def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict], dg: dict | None = None, dat: int = 0) -> dict:
     co_gia = [g for p in phong if p["vua"] for g in p["goi"] if g.get("vua", True)]
     goi = [g for p in phong if p["vua"] and p.get("con", 1) > 0 for g in p["goi"] if g.get("vua", True)]   # KS-16k: theo từng gói   # KS-14: bỏ loại phòng đã hết
     re_nhat = min(goi, key=lambda g: g["gia_dem"]) if goi else None
@@ -1098,6 +1131,9 @@ def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict], dg: 
             "het_phong": bool(co_gia) and not goi,
             # KS-16l: chưa có gói đặt được → chưa book trên cổng; bấm vào mở trang ngoài ở tab mới
             "dat_ngay": any(p["goi"] for p in phong), "link_ngoai": LINK_KS_NGOAI,
+            # KS-16p: chỉ số thật — đơn 24h (≥2 mới hiện) và «chỉ còn N phòng» (≤3, theo phòng rẻ nhất đặt được)
+            "dat_24h": dat if dat >= DAT_24H_TOI_THIEU else 0,
+            "con_it": _con_it(phong),
             # KS-15: điểm thang 10 của khách đã ở — chỉ bài đang hiện; dưới 3 bài diem_tb = None («Mới»).
             "danh_gia": dg or {"so_bai": 0, "diem_tb": None, "du": False, "nhan": "", "muc": {}}}
 
@@ -1118,7 +1154,8 @@ def tim(db: Session, tinh: str, vao, ra, nguoi_lon: int = 2, tre_em: int = 0, so
     phong = _phong_ban_duoc(db, [k.id for k in ks], vao, ra, nl, te, sp, tu)
     from app.services import danh_gia_ks as DGK
     dg = DGK.tom_tat(db, [k.id for k in ks])
-    the = [_the_cong(k, anh.get(k.id, []), phong.get(k.id, []), dg.get(k.id)) for k in ks]
+    d24 = dat_24h(db, [k.id for k in ks])
+    the = [_the_cong(k, anh.get(k.id, []), phong.get(k.id, []), dg.get(k.id), d24.get(k.id, 0)) for k in ks]
     the.sort(key=lambda o: (o["gia_tu"] is None, o["ten"]))
     return {"khach_san": the, "tong": len(the), "dem": (ra - vao).days, "vao": vao.isoformat(), "ra": ra.isoformat(),
             "nguoi_lon": nl, "tre_em": te, "so_phong": sp, "tuoi": tu or [],
@@ -1142,7 +1179,7 @@ def chi_tiet_cong(db: Session, kid: int, vao, ra, nguoi_lon: int = 2, tre_em: in
         p["anh"] = [_anh_out(a, True) for a in anh if a.loai_phong_id == p["id"]][:6]
         p["video"] = [v for v in video if v["loai_phong_id"] == p["id"]]
     from app.services import danh_gia_ks as DGK
-    the = _the_cong(k, anh, phong, DGK.tom_tat(db, [k.id])[k.id])
+    the = _the_cong(k, anh, phong, DGK.tom_tat(db, [k.id])[k.id], dat_24h(db, [k.id]).get(k.id, 0))
     return {**the, "dia_chi": k.dia_chi, "mo_ta": k.mo_ta, "gio_nhan": k.gio_nhan, "gio_tra": k.gio_tra,
             "chinh_sach": {"tre_em": k.cs_tre_em, "giuong_phu": k.cs_giuong_phu, "vat_nuoi": k.cs_vat_nuoi, "khac": k.cs_khac,
                            "tre": chinh_sach_tre_cong(k)},   # KS-16j
@@ -1182,6 +1219,12 @@ def phu_thu_dong(k: KhachSanVtd, dong: list[dict], lps: dict[int, LoaiPhongVtd],
              "phu_thu_ct": [{"nhan": n, "tien": int(round(v)), "dem": dem} for n, v in x["ct"].items()]} for x in ra]
 
 
+def _han_tra_sau(dong: list[dict], hom_nay: date | None) -> str | None:
+    from app.services import don_ks_vtd as KV   # KS-16p
+    h = KV.han_tra_sau(dong, hom_nay or date.today())
+    return h.isoformat() if h else None
+
+
 def tinh_lua_chon(db: Session, kid: int, vao, ra, chon: list[dict], hom_nay: date | None = None,
                   nguoi_lon: int = 1, tre_em: int = 0, tuoi=None) -> dict:
     """Máy TÍNH LẠI phòng khách chọn từ giá đã duyệt. chon = [{goi_id, so}] — không nhận số tiền nào từ trình duyệt."""
@@ -1217,7 +1260,10 @@ def tinh_lua_chon(db: Session, kid: int, vao, ra, chon: list[dict], hom_nay: dat
     so = sum(x["so"] for x in dong)
     thue = round(tien * (k.thue_phi_pt or 0) / 100)
     return {"dong": dong, "so_phong": so, "tien_phong": tien, "phu_thu": sum(x.get("phu_thu", 0) for x in dong),
-            "thue_phi": thue, "tong": tien + thue, "dem": dem, "cho_xac_nhan": any(x.get("cho_xac_nhan") for x in dong)}
+            "thue_phi": thue, "tong": tien + thue, "dem": dem, "cho_xac_nhan": any(x.get("cho_xac_nhan") for x in dong),
+            # KS-16p: «Đặt giữ, trả sau» được không, và hạn trả
+            "han_tra_sau": _han_tra_sau(dong, hom_nay),
+            "huy_mien_phi_den": min((x["huy_han"] for x in dong if x.get("huy_han")), default=None) if dong and all(x.get("huy_han") for x in dong) else None}
 
 
 def gui_yeu_cau_giu(db: Session, tk, kid: int, d: dict, hom_nay: date | None = None):

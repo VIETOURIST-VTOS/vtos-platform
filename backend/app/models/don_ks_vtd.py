@@ -95,6 +95,11 @@ class DonKsVtd(Base):
     # `tong` = số khách phải trả (đã trừ voucher); khách sạn vẫn nhận như không có voucher.
     voucher_id: Mapped[int | None] = mapped_column(Integer, nullable=True)   # voucher_rewards.id (khoá ngoại ở phía voucher)
     giam_voucher: Mapped[float] = mapped_column(TIEN, default=0)
+    # KS-16p (Chủ tịch duyệt bản xem thử 01/11/2026): «Đặt giữ, trả sau» — chỉ gói miễn phí hủy. Đơn «cho_tra» giữ phòng tới
+    # cuối ngày han_tra (giu_den); quá hạn chưa trả → het_han như đơn trả ngay, nhả phòng, không thu phí. VTD không lưu thẻ.
+    cach_tra: Mapped[str] = mapped_column(String(6), default="ngay")       # ngay | sau
+    han_tra: Mapped[date | None] = mapped_column(Date, nullable=True)
+    nhac_luc: Mapped[list] = mapped_column(JSON, default=list)             # [số ngày còn lại đã nhắc] — 3, 1
     km_but_toan: Mapped[str] = mapped_column(String(30), default="")   # bút toán Nợ 641 / Có 3388 lúc chốt
     # KS-16d (Chủ tịch 31/10/2026): Kế toán chốt → máy lập ngay MỘT đề nghị chi trả khách sạn (loại tra_ncc_thu_ho)
     payment_request_id: Mapped[int | None] = mapped_column(ForeignKey("payment_requests.id"), nullable=True)

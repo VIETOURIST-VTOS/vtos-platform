@@ -51,6 +51,7 @@ class DatIn(BaseModel):
     yeu_cau: str = ""
     dong_y: bool = False
     ma_voucher: str = ""            # KS-16: voucher VTD Rewards khách tự nhập (tối đa 5% đơn)
+    cach_tra: str = "ngay"          # KS-16p: ngay | sau («Đặt giữ, trả sau» — chỉ gói miễn phí hủy)
 
 
 @router_cong.get("")
@@ -64,7 +65,9 @@ def dat(kid: int, data: DatIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db:
     _khach(tk)
     d = _goi(S.dat, db, tk, kid, data.model_dump())
     db.commit()
-    return {"don": S.ra_khach(db, d), "message": f"Đã giữ phòng {S.GIU_PHUT} phút — thanh toán để hoàn tất"}
+    msg = (f"Đã giữ phòng tới hết ngày {d.han_tra:%d/%m/%Y} — trả trước hạn để hoàn tất" if d.cach_tra == "sau"
+           else f"Đã giữ phòng {S.GIU_PHUT} phút — thanh toán để hoàn tất")
+    return {"don": S.ra_khach(db, d), "message": msg}
 
 
 class KiemVoucherIn(BaseModel):

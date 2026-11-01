@@ -80,7 +80,7 @@ function Trang() {
           <td style={{ width: 72 }}>{h.bia ? <AnhNoiBo src={h.bia} alt={h.ten} style={{ width: 64, height: 48, borderRadius: 6 }} /> : <span className="muted">—</span>}</td>
           <td><b>{h.ten}</b><div className="muted">{h.ma} · {"★".repeat(h.sao) || "chưa xếp sao"}</div></td>
           <td>{h.tinh_thanh}<div className="muted">{h.khu_vuc}</div></td>
-          <td>{h.anh_duyet} duyệt{h.anh_cho ? <> · <Tag cls="warn">{h.anh_cho} chờ</Tag></> : null}<div className="muted">{h.so_anh} ảnh</div></td>
+          <td>{h.anh_duyet} duyệt{h.anh_cho ? <> · <Tag cls="warn">{h.anh_cho} chờ</Tag></> : null}<div className="muted">{h.so_anh} ảnh{h.thieu_anh ? ` · thiếu ${h.thieu_anh}` : ""}</div></td>
           <td>{h.so_loai_phong}</td>
           <td>{h.goi_duyet} duyệt{h.goi_cho ? <> · <Tag cls="warn">{h.goi_cho} chờ</Tag></> : null}</td>
           <td>{h.ngung ? <Tag cls="bad">Ngừng hợp tác</Tag> : h.hien_cong ? <Tag cls="ok">Đang hiện</Tag> : <Tag cls="warn">Chưa hiện</Tag>}</td>
@@ -122,7 +122,7 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
       {h && <span className="muted">{h.khach_san.ma}</span>}{h && (h.khach_san.hien_cong ? <Tag cls="ok">Đang hiện trên cổng</Tag> : <Tag cls="warn">Chưa hiện</Tag>)}
       <span style={{ flex: 1 }} /><button className="act grey" onClick={onDong}>Đóng</button></div>
     {kid !== "moi" && <div style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: "1px solid var(--line, #2a3b4d)", margin: "10px 0" }}>
-      {([["tt", "Thông tin"], ["anh", `Album ảnh (${h?.anh.length ?? 0})`], ["video", `Video (${h?.so_video ?? 0}/5)`], ["phong", `Loại phòng & giá (${h?.loai_phong.length ?? 0})`], ["trong", "Phòng trống"], ["hien", "Hiện trên cổng"]] as const).map(([k2, t2]) =>
+      {([["tt", "Thông tin"], ["anh", `Album ảnh (${h?.anh.length ?? 0}/${h?.album?.toi_da ?? 50})`], ["video", `Video (${h?.so_video ?? 0}/${h?.video_toi_da ?? 3})`], ["phong", `Loại phòng & giá (${h?.loai_phong.length ?? 0})`], ["trong", "Phòng trống"], ["hien", "Hiện trên cổng"]] as const).map(([k2, t2]) =>
         <button key={k2} className={`act ${t === k2 ? "teal" : "grey"}`} onClick={() => setT(k2)}>{t2}</button>)}</div>}
     {(kid === "moi" || t === "tt") && <>
       <div className="grid">
@@ -213,6 +213,8 @@ function Album({ h, x, toast, onDoi }: { h: any; x: any; toast: (m: string, l?: 
             : <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/anh/${a.id}/an`, { bat: false })}>Bỏ ẩn</button>}
           {(a.tai_boi === x.toi || x.duoc_duyet) && <button className="act grey" disabled={busy} onClick={() => { if (window.confirm("Xóa ảnh này khỏi album?")) goi(`/khach-san-vtd/anh/${a.id}/xoa`, {}); }}>Xóa</button>}</div>}
       </div>)}
+      {h.album?.nhac && <p className="muted" style={{ gridColumn: "1 / -1", margin: 0, color: h.album.thieu ? "#d99a2b" : undefined }}>
+        {h.album.nhac} — khuyến nghị {h.album.chuan}–{h.album.toi_da} ảnh / khách sạn{h.album.thieu ? " (chỉ nhắc, vẫn bật hiện được)" : ""}.</p>}
       {!h.anh.length && <p className="muted">Chưa có ảnh. Ảnh do khách sạn gửi hoặc VTD tự chụp; tải lên là hiện trên cổng.</p>}</div>
   </div>;
 }
