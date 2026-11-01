@@ -100,6 +100,7 @@ class DonKsVtd(Base):
     cach_tra: Mapped[str] = mapped_column(String(6), default="ngay")       # ngay | sau
     han_tra: Mapped[date | None] = mapped_column(Date, nullable=True)
     nhac_luc: Mapped[list] = mapped_column(JSON, default=list)             # [số ngày còn lại đã nhắc] — 3, 1
+    gio_den: Mapped[str] = mapped_column(String(20), default="")          # KS-16s: giờ đến dự kiến khách chọn
     km_but_toan: Mapped[str] = mapped_column(String(30), default="")   # bút toán Nợ 641 / Có 3388 lúc chốt
     # KS-16d (Chủ tịch 31/10/2026): Kế toán chốt → máy lập ngay MỘT đề nghị chi trả khách sạn (loại tra_ncc_thu_ho)
     payment_request_id: Mapped[int | None] = mapped_column(ForeignKey("payment_requests.id"), nullable=True)

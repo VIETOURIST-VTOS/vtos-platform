@@ -198,6 +198,8 @@ CUA_TAY = (
     "khach_san_vtd", "anh_khach_san_vtd", "loai_phong_vtd", "goi_gia_vtd", "mua_gia_vtd",
     # KS-16f 31/10/2026: Điều hành / Marketing tải video ở thẻ «Video» màn /khach-san-vtd và /nha-hang.
     "video_dich_vu",
+    # KS-16s 01/11/2026: TP Điều hành / Chủ tịch / TGĐ bấm công tắc «Mở thanh toán toàn cổng» ở màn /khach-san-vtd.
+    "cai_dat_ks_vtd",
     # KS-16g 31/10/2026: khách tự ghi mã người giới thiệu ở trang «Điểm & ưu đãi» trên cổng khách (/cong).
     "gioi_thieu_rewards",
     # KS-16h 31/10/2026: nguồn đơn ghi khi CTV gửi «Giới thiệu khách» trên cổng dt. / khách mở link CTV trên cổng
