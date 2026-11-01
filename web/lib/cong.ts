@@ -4,8 +4,14 @@ export const KHOA_PHIEN_CONG = "vtd_cong_phien";
 
 /* CG-3 (Chủ tịch chốt 28/10/2026): ba tên miền cổng ngoài KHÓA CỨNG — không bao giờ mở VTOS ở đó. Phiên VTOS
    lỡ lưu trên kh./dt./ir. (vd từng đăng nhập nội bộ ở tên miền ấy) bị bỏ qua và xóa; VTOS chỉ mở ở crm. */
-export const TEN_MIEN_CONG = ["kh.vietourist.vn", "dt.vietourist.vn", "ir.vietourist.vn"];
-export const VTOS_GOC = "https://crm.vietourist.vn";
+export const TEN_MIEN_CONG = ["kh.vietourist.vn", "dt.vietourist.vn", "ir.vietourist.vn",
+  // TM-1 (Chủ tịch 02/11/2026): vietourist.com.vn chạy song song — cùng luật khóa cứng CG-3.
+  "kh.vietourist.com.vn", "dt.vietourist.com.vn", "ir.vietourist.com.vn"];
+// TM-1: đang ở họ .com.vn thì nội bộ mở crm.vietourist.com.vn, còn lại crm.vietourist.vn (máy chủ không có location → .vn).
+export const VTOS_GOC = (() => {
+  try { return location.hostname.toLowerCase().endsWith(".vietourist.com.vn") ? "https://crm.vietourist.com.vn" : "https://crm.vietourist.vn"; }
+  catch { return "https://crm.vietourist.vn"; }
+})();
 export function laTenMienCong(): boolean {
   try { return TEN_MIEN_CONG.includes(location.hostname.toLowerCase()); } catch { return false; }
 }
