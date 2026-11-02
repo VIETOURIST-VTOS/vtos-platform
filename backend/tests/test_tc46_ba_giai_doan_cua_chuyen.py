@@ -320,7 +320,10 @@ def test_man_hinh_khong_tu_chia_giai_doan():
     đúng hàng «Hoạt động tour». (Phần đầu tệp ấy có so giờ để báo «số cũ» của MỐC dữ liệu; đó
     không phải phép chia giai đoạn chuyến nên nằm ngoài vùng soát.)"""
     ma = _ma(VH.read_text(encoding="utf-8"))
-    khoi = ma[ma.index("Hoạt động tour"): ma.index("Tồn đọng công việc")]
+    # SUA-5 (02/11/2026): hàng «Tồn đọng công việc» đã rời mục Vận hành (anh Tuấn bỏ 24/10), nên vùng
+    # soát kết thúc ở cuối mục (`</section>`) chứ không ở tiêu đề đã không còn.
+    dau = ma.index("Hoạt động tour")
+    khoi = ma[dau: ma.index("</section>", dau)]
     for cam in ("start_date", "end_date", "new Date(", "Date.now"):
         assert cam not in khoi, f"Hàng thẻ đang tự so ngày ({cam}) — phép ấy thuộc về máy chủ."
 
@@ -338,7 +341,10 @@ def test_hai_the_khong_lay_cung_mot_con_so():
     """Chỗ hỏng số 1, canh ở phía màn hình: hai thẻ phải đọc hai trường khác nhau.
     SỬA 22/10/2026 (TQ-1): hai ô nay ở hàng «Hoạt động tour» của mục Vận hành."""
     ma = _ma(VH.read_text(encoding="utf-8"))
-    khoi = ma[ma.index("Hoạt động tour"): ma.index("Tồn đọng công việc")]
+    # SUA-5 (02/11/2026): hàng «Tồn đọng công việc» đã rời mục Vận hành (anh Tuấn bỏ 24/10), nên vùng
+    # soát kết thúc ở cuối mục (`</section>`) chứ không ở tiêu đề đã không còn.
+    dau = ma.index("Hoạt động tour")
+    khoi = ma[dau: ma.index("</section>", dau)]
     assert "gd.dang_ban" in khoi and "gd.dang_chay" in khoi
     assert "c.da_duyet" not in khoi, (
         "Thẻ 'Tour đang bán' còn đọc tổng đã duyệt — tức nó vẫn gồm cả những chuyến đang chạy, và "
