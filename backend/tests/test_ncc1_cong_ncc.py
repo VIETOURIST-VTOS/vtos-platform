@@ -50,7 +50,7 @@ def db():
                  ngan_hang="VCB", chu_tai_khoan="CTY BIEN XANH")
     b = Supplier(code="NCC0018", ten="Khách sạn Khác", loai="khach_san", ma_so_thue="0399999999")
     s.add_all([a, b]); s.flush()
-    pr = PaymentRequest(code="DC2610-0451", category="chi_tour", tour_id=t.id, supplier_name=a.ten, amount=9000000,
+    pr = PaymentRequest(code="DC-TEST-0451", category="chi_tour", tour_id=t.id, supplier_name=a.ten, amount=9000000,
                         description="x", status="da_chi", created_by="kt")
     s.add(pr); s.flush()
     for code, sup, st, tt, ngay, prid in (("DV-1", a.id, "da_gui", 14400000, dt.date(2026, 11, 20), None),
@@ -200,7 +200,7 @@ def test_de_nghi_dung_bo_phan(db):
     assert ex.value.status == 403
     with pytest.raises(S.LoiNcc, match="trả lời"):
         S.xu_ly_de_nghi(db, _u(db, "kt"), x.id, "dang_xu_ly", "")
-    S.xu_ly_de_nghi(db, _u(db, "kt"), x.id, "dang_xu_ly", "Đã lập DC2611-0012, chờ TGĐ duyệt"); db.commit()
+    S.xu_ly_de_nghi(db, _u(db, "kt"), x.id, "dang_xu_ly", "Đã lập DC-TEST-0012, chờ TGĐ duyệt"); db.commit()
     assert S.ds_de_nghi_cua(db, s)[0]["tra_loi"].startswith("Đã lập")
     y = S.gui_de_nghi(db, tk, s, "dieu_chinh", None, "Đổi loại phòng đoàn PQ1120"); db.commit()
     S.xu_ly_de_nghi(db, _u(db, "nvdh"), y.id, "xong", "Đã đổi"); db.commit()

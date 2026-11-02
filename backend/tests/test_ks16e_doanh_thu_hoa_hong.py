@@ -40,7 +40,7 @@ def test_ghi_khi_da_chi_tra_khach_san(db, k3, bat):
     r.status = "cho_chi"; db.commit()
     db.add(Attachment(doi_tuong="de_nghi_chi", doi_tuong_id=r.code, loai="unc", ten_tep="unc.pdf", checksum="u", khoa_luu="u"))
     db.commit()
-    O.step(db, _u(db, "kt"), r, "pay", "CK 7")
+    O.step(db, _u(db, "kt"), r, "pay", "CK 7", "chuyen_khoan")
     assert r.status == "da_chi" and d.dt_but_toan
     assert _ct(db, d.dt_but_toan) == [("3388", 400_000, 0), ("511", 0, 400_000)]
     with pytest.raises(S.LoiDon, match="Đã ghi"):

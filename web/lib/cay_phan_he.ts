@@ -130,6 +130,17 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "2.8.2", ten: "Đối chiếu lead, booking & chi phí", href: "/doi-soat-marketing" },
           { ma: "2.8.3", ten: "Chuẩn kỳ báo cáo & lịch sử cập nhật", href: "/doi-soat-marketing" }
         ] },
+      // SUA-3 · 02/11/2026 — sáu màn hình cổng khách / OTA mở 26–30/10 (KH-3, KH-4, KS-1, KS-2, KS-10) đã có
+      // trong menu nhóm Marketing & PR nhưng chưa vào cây, nên trang phân hệ đếm thiếu. v1.3 không có.
+      { ma: "2.9", ten: "Cổng khách & OTA", them: true,
+        con: [
+          { ma: "2.9.1", ten: "VTD Rewards", href: "/vtd-rewards", them: true },
+          { ma: "2.9.2", ten: "Yêu cầu khách (cổng)", href: "/yeu-cau-khach", them: true },
+          { ma: "2.9.3", ten: "Góp ý riêng lãnh đạo", href: "/gop-y-lanh-dao", them: true },
+          { ma: "2.9.4", ten: "OTA: khách sạn & vé máy bay", href: "/khach-san-ota", them: true },
+          { ma: "2.9.5", ten: "Đơn phòng OTA", href: "/don-khach-san-ota", them: true },
+          { ma: "2.9.6", ten: "Đối soát OTA", href: "/doi-soat-ota", them: true }
+        ] },
       { ma: "3.5", ten: "Chăm sóc khách hàng", chuyen: true,
         con: [
           { ma: "3.5.1", ten: "Chăm sóc sau tour", href: "/cham-soc", chuyen: true },
@@ -272,7 +283,12 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
         con: [
           { ma: "4.8.1", ten: "Nhà cung cấp", href: "/nha-cung-cap" },
           { ma: "4.8.2", ten: "Đặt dịch vụ", href: "/nha-cung-cap" },
-          { ma: "4.8.3", ten: "Hồ sơ visa", href: "/visa" }
+          { ma: "4.8.3", ten: "Hồ sơ visa", href: "/visa" },
+          // SUA-3 · 02/11/2026 — bốn màn hình cổng (NCC-1, KH-2, KS-13, TR-1) có trong menu «Dịch vụ & NCC».
+          { ma: "4.8.4", ten: "Cổng nhà cung cấp", href: "/cong-ncc", them: true },
+          { ma: "4.8.5", ten: "Nhà hàng (cổng khách)", href: "/nha-hang", them: true },
+          { ma: "4.8.6", ten: "Khách sạn (cổng khách)", href: "/khach-san-vtd", them: true },
+          { ma: "4.8.7", ten: "Tour (cổng khách)", href: "/tour-online", them: true }
         ] },
       { ma: "4.9", ten: "Quản lý đội xe",
         con: [
@@ -378,6 +394,8 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           // PC-1 · 19/10/2026: trưởng phòng tự gửi yêu cầu Pháp chế. Mã 5.9.4a — cùng việc Pháp chế,
           // không lấy số kế tiếp vì 5.9.5 trở đi đã có chủ.
           { ma: "5.9.4a", ten: "Gửi yêu cầu Pháp chế", href: "/gui-phap-che" },
+          // SUA-3 · 02/11/2026 — CD-1 (28/10): cổng cổ đông, cùng việc IR – Pháp chế.
+          { ma: "5.9.4b", ten: "Cổng cổ đông", href: "/ir-cong-co-dong", them: true },
           // 08/10/2026 — cùng một dạng với 5.6: hai mục, một trang. /tai-san có bốn tab — tài sản cố
           // định, khấu hao kỳ, chi phí trả trước, phân bổ kỳ — và không tab nào là ĐỀ NGHỊ MUA hay
           // BIÊN BẢN CẤP PHÁT. Đã mở `models/assets.py` ra đọc: `FixedAsset` có cột `department`
@@ -415,6 +433,9 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
               { ma: "6.2.3.4", ten: "Đối chiếu công nợ", tab: true }
             ] },
           { ma: "6.2.4", ten: "Tạm ứng & quyết toán" },
+          // SUA-3 · 02/11/2026 — DH-1 (26/10) và tiền đặt bàn nhà hàng (KH-2/AT): có trong menu Tài chính.
+          { ma: "6.2.6", ten: "Hoa hồng đối tác (D06)", href: "/hoa-hong-d06", them: true },
+          { ma: "6.2.7", ten: "Đặt bàn nhà hàng: tiền & hoàn", href: "/dat-ban-nha-hang", them: true },
           { ma: "6.2.5", ten: "Bảo lưu & hoàn tiền", href: "/bookings",
             con: [
               { ma: "6.2.5.1", ten: "Số dư bảo lưu", tab: true },
@@ -492,7 +513,9 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           // ĐỨNG DƯỚI 8.1 "Tổ chức & truy cập" chứ không dưới 8.2 "Nhập & đối chiếu", dù nó là
           // việc dọn dữ liệu: cái nó sửa là TÀI KHOẢN, và người đi tìm nó đi tìm ở chỗ quản lý
           // tài khoản. `them: true` vì v1.3 không liệt kê màn hình này.
-          { ma: "8.1.4", ten: "Tài khoản trùng", href: "/gop-tai-khoan", them: true }
+          { ma: "8.1.4", ten: "Tài khoản trùng", href: "/gop-tai-khoan", them: true },
+          // SUA-3 · 02/11/2026 — CG-1 (26/10): hàng chờ duyệt tài khoản đối tác / cổ đông đăng ký từ cổng.
+          { ma: "8.1.5", ten: "Tài khoản bên ngoài", href: "/tai-khoan-ngoai", them: true }
         ] },
       { ma: "8.2", ten: "Dữ liệu & kết nối",
         con: [

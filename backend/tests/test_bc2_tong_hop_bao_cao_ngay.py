@@ -11,7 +11,7 @@
   5. Vướng mắc chuyển phòng có trạng thái riêng, không đóng theo việc báo cáo đã xem.
   6. Giao hỗ trợ cho một người trong phòng mình, người ấy thấy và cập nhật được.
 """
-from datetime import date, datetime
+from datetime import date, timedelta, datetime
 from pathlib import Path
 
 import pytest
@@ -205,7 +205,7 @@ def test_giao_ho_tro_trong_phong(db, cty):
         X.giao_ho_tro(db, cty["tp"], r, cty["a"].id, "  ", None)
     with pytest.raises(PermissionError):
         X.giao_ho_tro(db, cty["kd"], r, cty["a"].id, "x", None)
-    f = X.giao_ho_tro(db, cty["tp"], r, cty["a"].id, "Hỗ trợ DH.B đặt xe đoàn 28/10", date(2026, 10, 28))
+    f = X.giao_ho_tro(db, cty["tp"], r, cty["a"].id, "Hỗ trợ DH.B đặt xe đoàn", date.today() + timedelta(days=7))  # hạn tương đối: hạn cứng hết hiệu lực theo lịch
     toi = X.viec_cua(db, cty["a"])["cua_toi"]
     assert len(toi) == 1 and toi[0]["loai"] == "ho_tro" and toi[0]["nguoi_nhan"] == "DH.A"
     X.cap_nhat_viec(db, cty["a"], f, "da_xong")

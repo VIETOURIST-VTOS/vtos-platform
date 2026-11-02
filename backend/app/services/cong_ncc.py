@@ -478,7 +478,7 @@ def xac_nhan_ban_ke(db: Session, tk: TaiKhoanNgoai, s: Supplier, bid: int) -> Ba
         raise LoiNcc("Còn dòng chênh lệch chờ Kế toán trả lời — chưa xác nhận được", 409)
     b.trang_thai, b.xac_nhan_tk_id, b.xac_nhan_luc = "da_xac_nhan", tk.id, datetime.now()
     db.flush()
-    R.audit(db, f"cong:ncc-{tk.id}", "doi_tac", "cong_ncc_xac_nhan_ban_ke", f"ban_ke_ncc:{b.ma}", after={"tong": b.tong})
+    R.audit(db, f"cong:ncc-{tk.id}", "doi_tac", "cong_ncc_xac_nhan_ban_ke", f"ban_ke_ncc:{b.ma}", after={"tong": (b.tong or 0)})
     return b
 
 

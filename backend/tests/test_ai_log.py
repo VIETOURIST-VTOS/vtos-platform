@@ -40,12 +40,14 @@ def test_moi_trang_giao_dien_deu_duoc_khai_quyen_hoac_co_trong_danh_sach_mo():
     # `/y-kien/[ma]` là trang CÔNG KHAI cho khách tự chấm điểm sau tour (25/9/2026): khách không
     # có tài khoản nên không có vai trò nào để khai. Nó không dùng Shell, không gọi hàm `api` của
     # kho, và cửa máy chủ của nó khai ở tools/ks2_khai_quyen.CONG_KHAI kèm lý do.
-    bo_qua = {"/login", "/tours/[id]", "/y-kien/[ma]"}   # đăng nhập · trang con của /tours · trang khách
+    # `/cong` (CG-1) là cổng NGOÀI cho khách hàng / đối tác / cổ đông: phiên riêng (goiCong), không
+    # dùng vai trò nhân viên nên không có gì để khai trong MENU_ROLES.
+    bo_qua = {"/login", "/tours/[id]", "/y-kien/[ma]", "/cong"}   # đăng nhập · trang con /tours · trang khách · cổng ngoài
     for d, _, fs in os.walk(app_dir):
         if "page.tsx" not in fs: continue
         rel = os.path.relpath(d, app_dir).replace(os.sep, "/")
         p = "/" if rel == "." else "/" + rel
-        if p in bo_qua: continue
+        if p in bo_qua or p.startswith("/kham-pha/"): continue   # /kham-pha/*: cửa hàng công khai cho khách
         assert p in AC.MENU_ROLES or p in AC.ALL_MENU_PATHS, (
             f"trang {p} chưa khai quyền trong MENU_ROLES và cũng không nằm trong ALL_MENU_PATHS – "
             f"nghĩa là mọi vai trò đăng nhập đều thấy mà không ai quyết định điều đó")

@@ -72,7 +72,7 @@ def gia_luu(goi: GoiGiaVtd, mua: list[MuaGiaVtd], vao: date, ra: date) -> dict |
         g = float(m.gia_cuoi_tuan) if (d.weekday() in NGAY_CUOI_TUAN and m.gia_cuoi_tuan) else float(m.gia_thuong)
         tien += g
         if m.gia_niem_yet:
-            niem += float(m.gia_niem_yet)
+            niem += float(m.gia_niem_yet or 0)
         else:
             co_niem = False
     so = (ra - vao).days

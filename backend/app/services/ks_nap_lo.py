@@ -86,6 +86,11 @@ CUA_NAP = (
     # đối chiếu chỉ kiểm những lô tự giác đăng ký là một bộ đối chiếu đi vòng được.
     ("bo_so_kiem_toan.tai_len", "app.services.bo_so_kiem_toan", True,
      "Nạp bộ số BCTC đã kiểm toán (Excel) – đáp án để chốt sổ, Chủ tịch ký mới dùng được"),
+    # Phép soi NL7 bắt tên `*_hang_loat` (02/11/2026). Đây KHÔNG nạp số liệu: TP Điều hành bật/tắt cờ
+    # hiện trên cổng của nhiều nhà hàng một lần; mỗi nhà hàng đi qua bat_hien nên có nhật ký từng dòng,
+    # không có nhật ký lô.
+    ("nha_hang.hien_hang_loat", "app.services.nha_hang", False,
+     "Bật/tắt hiện trên cổng nhiều nhà hàng một lần – đổi cờ, không nạp số liệu"),
 )
 
 
@@ -117,10 +122,10 @@ def bon_so_tien(r: IntakeRun) -> dict | None:
     if r.tong_tien_da_nap is None and r.tong_tien_bo_qua is None and r.tong_tien_loi is None:
         return None
     f = lambda v: float(v or 0)     # noqa: E731
-    tong = f((r.tong_tien_da_nap or 0)) + f((r.tong_tien_bo_qua or 0)) + f((r.tong_tien_loi or 0))  # k2-doc-an-toan: f tu ep rong thanh 0
+    tong = f(r.tong_tien_da_nap or 0) + f(r.tong_tien_bo_qua or 0) + f(r.tong_tien_loi or 0)  # k2-doc-an-toan: f tu ep rong thanh 0
     return {"trong_tep": f(r.tong_tien_tep), "da_nap": f(r.tong_tien_da_nap),
             "bo_qua_da_co": f(r.tong_tien_bo_qua), "dong_loi": f(r.tong_tien_loi),
-            "cong_lai": round(tong, 2), "lech": round(f((r.tong_tien_tep or 0)) - tong, 2),  # k2-doc-an-toan: f tu ep rong thanh 0
+            "cong_lai": round(tong, 2), "lech": round(f(r.tong_tien_tep or 0) - tong, 2),  # k2-doc-an-toan: f tu ep rong thanh 0
             "cot_da_cong": list(r.cot_tien or [])}
 
 

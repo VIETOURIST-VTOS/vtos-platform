@@ -135,7 +135,7 @@ def noi_khoi_hanh(db: Session) -> list[str]:
 def tour(db: Session, tour_id: int) -> dict:
     t = db.get(Tour, tour_id)
     hom_nay = _hom_nay()
-    if t is None or t.status != "da_duyet" or t.start_date <= hom_nay or not t.price_per_pax or t.tour_type in KHONG_BAN:
+    if t is None or t.status != "da_duyet" or t.start_date <= hom_nay or not (t.price_per_pax or 0) or t.tour_type in KHONG_BAN:
         raise LoiKhach("Tour này không còn mở bán trên cổng")
     con = _con_cho(t, _da_ban(db, [t.id]).get(t.id, 0))
     if con <= 0:

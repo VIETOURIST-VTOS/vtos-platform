@@ -69,7 +69,7 @@ def test_ks16e_dat_ban_ghi_doanh_thu_hoa_hong(db):
     r.status = "cho_chi"
     db.add(Attachment(doi_tuong="de_nghi_chi", doi_tuong_id=r.code, loai="unc", ten_tep="u.pdf", checksum="u", khoa_luu="u"))
     db.commit()
-    O.step(db, _u(db, "kt"), r, "pay", "CK 9")
+    O.step(db, _u(db, "kt"), r, "pay", "CK 9", "chuyen_khoan")
     assert _ct(db, d.dt_but_toan) == [("3388", 20_000, 0), ("511", 0, 20_000)]
     with pytest.raises(S.LoiDatBan, match="Đã ghi"):
         S.kt_ghi_dt_hoa_hong(db, _u(db, "kt"), d.id, ve)

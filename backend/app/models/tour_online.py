@@ -39,7 +39,7 @@ class DonTourOnline(Base):
     khach: Mapped[list] = mapped_column(JSON, default=list)                       # [{ho_ten, ngay_sinh, gioi_tinh, giay_to, loai}]
     email: Mapped[str] = mapped_column(String(160), default="")
     cach_tra: Mapped[str] = mapped_column(String(4), default="coc")               # coc | du
-    tong: Mapped[float] = mapped_column(TIEN, default=0)
+    tong: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     phai_tra: Mapped[float] = mapped_column(TIEN, default=0)                      # số trả NGAY (cọc hoặc toàn bộ)
     han_tra_con_lai: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     hoa_don_cong_ty: Mapped[dict | None] = mapped_column(JSON, nullable=True)     # {mst, ten, dia_chi, email} — Kế toán xuất
@@ -59,7 +59,7 @@ class ThanhToanTourOnline(Base):
     don_id: Mapped[int] = mapped_column(ForeignKey("don_tour_online.id"), index=True)
     kenh: Mapped[str] = mapped_column(String(8), default="sepay")                 # sepay | onepay
     ma_gd: Mapped[str] = mapped_column(String(40), default="", index=True)
-    so_tien: Mapped[float] = mapped_column(TIEN, default=0)
+    so_tien: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     trang_thai: Mapped[str] = mapped_column(String(12), default="cho")            # cho | thanh_cong | that_bai
     so_gd_cong: Mapped[str] = mapped_column(String(60), default="")
     ket_qua: Mapped[str] = mapped_column(String(40), default="")

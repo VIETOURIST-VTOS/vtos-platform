@@ -48,6 +48,9 @@ CUA_GAN_RIENG = {
     # AT-1c (28/10/2026): ảnh món / nhà hàng / thành phố gắn qua cửa riêng /nha-hang/anh/{doi}/{id} — bắt buộc
     # ghi nguồn ảnh, và Marketing / Điều hành không cần quyền cửa /tep chung.
     "am_thuc": ("app/nha-hang/page.tsx", "/nha-hang/anh/${doi}/${id}`"),
+    # Ảnh khách sạn web VTD gắn qua album riêng /khach-san-vtd/{kid}/anh: máy làm nhẹ ảnh, ghi nguồn,
+    # gửi duyệt rồi mới hiện; <DinhKem> chung sẽ đi vòng qua các bước ấy.
+    "khach_san_vtd": ("app/khach-san-vtd/page.tsx", "/khach-san-vtd/${kid}/anh`"),
 }
 
 

@@ -264,7 +264,7 @@ def ap_voucher(db: Session, tk: TaiKhoanNgoai, ma: str, ma_voucher: str, now: da
         raise LoiDatBan(str(ex))
     v.trang_thai, v.dat_ban_id, v.ap_boi, v.ap_luc = "da_dung", d.id, f"cong:{tk.id}", now
     d.voucher_id, d.giam_voucher = v.id, int(v.gia_tri)
-    d.phai_tra_truoc = int(d.phai_tra_truoc) - int(v.gia_tri)
+    d.phai_tra_truoc = int(d.phai_tra_truoc) - int(v.gia_tri or 0)
     R.audit(db, f"cong:{tk.id}", tk.loai, "ap_voucher_rewards", f"dat_ban:{d.ma}", after={"voucher": v.ma, "gia_tri": v.gia_tri})
     cap_nhat(db, d, now)
     db.commit()
@@ -313,7 +313,7 @@ def kt_ghi_km(db: Session, u: User, did: int, now: datetime | None = None) -> Do
 def ghi_dt_hoa_hong(db: Session, u: User, d: DonDatBan, ngay: date) -> str:
     """KS-16e — doanh thu hoa hồng nhà hàng: Nợ 3388 / Có 511 (chưa gồm VAT). Ghi khi đã chi trả nhà hàng, hoặc ngay
     lúc chốt nếu không còn gì phải trả."""
-    if d.dt_but_toan or not d.hoa_hong or int(d.hoa_hong) <= 0:
+    if d.dt_but_toan or not (d.hoa_hong or 0) or int(d.hoa_hong or 0) <= 0:
         return d.dt_but_toan
     ten, ma_dt = _doi_tuong_nh(db, d)
     hh = int(d.hoa_hong)
@@ -335,7 +335,7 @@ def kt_ghi_dt_hoa_hong(db: Session, u: User, did: int, now: datetime | None = No
     if d.dt_but_toan:
         raise LoiDatBan(f"Đã ghi doanh thu hoa hồng ({d.dt_but_toan})", 409)
     pr = db.get(PaymentRequest, d.payment_request_id) if d.payment_request_id else None
-    if not (d.hoa_hong and int(d.hoa_hong) > 0 and (pr is None or pr.status == "da_chi")):
+    if not ((d.hoa_hong or 0) and int(d.hoa_hong or 0) > 0 and (pr is None or pr.status == "da_chi")):
         raise LoiDatBan("Chỉ ghi khi đơn đã chốt có hoa hồng và khoản trả nhà hàng đã chi", 409)
     ghi_dt_hoa_hong(db, u, d, now.date())
     return d
@@ -348,7 +348,7 @@ def _sau_khi_tra(db: Session, d: DonDatBan, now: datetime) -> None:
         tra = da_tra(db, d)
         d.so_giu = min(int(d.so_giu or 0), tra)
         d.so_hoan = tra - int(d.so_giu or 0)
-        if d.so_hoan > int(d.da_hoan_tien or 0) and d.hoan_tt in ("", "khong_hoan", "da_hoan"):
+        if (d.so_hoan or 0) > int(d.da_hoan_tien or 0) and d.hoan_tt in ("", "khong_hoan", "da_hoan"):
             d.hoan_tt = "cho_sales"
         _vc_doi_chieu(db, d, now)
 
@@ -403,7 +403,7 @@ def _huy(db: Session, d: DonDatBan, boi: str, ly_do: str, now: datetime, mien_ph
     d.trang_thai, d.huy_luc, d.huy_boi, d.huy_ly_do = "huy", now, boi, (ly_do or "").strip()[:1000]
     d.so_giu, d.so_hoan = giu, tra - giu
     d.thay_doi = None
-    d.hoan_tt = "cho_sales" if d.so_hoan > int(d.da_hoan_tien or 0) else ("khong_hoan" if tra and not d.da_hoan_tien else d.hoan_tt or "")
+    d.hoan_tt = "cho_sales" if (d.so_hoan or 0) > int(d.da_hoan_tien or 0) else ("khong_hoan" if tra and not (d.da_hoan_tien or 0) else d.hoan_tt or "")
     _km_khi_dong(db, d, p)             # KS-16b: voucher dùng hẳn → nhà hàng nhận phần phạt còn thiếu từ voucher
     _vc_doi_chieu(db, d, now)
     return d
@@ -768,12 +768,12 @@ def ncc_khong_den(db: Session, tk: TaiKhoanNgoai, s, yid: int, now: datetime | N
     d.trang_thai = "khong_den"
     p = phat(db, d, now, khong_den=True)
     d.so_giu = min(p, tra)
-    d.so_hoan = tra - d.so_giu
-    d.hoan_tt = "cho_sales" if d.so_hoan > 0 else "khong_hoan"
+    d.so_hoan = tra - (d.so_giu or 0)
+    d.hoan_tt = "cho_sales" if (d.so_hoan or 0) > 0 else "khong_hoan"
     _km_khi_dong(db, d, p)
     _vc_doi_chieu(db, d, now)
     d.huy_luc, d.huy_boi, d.huy_ly_do = now, f"cong:ncc-{tk.id}", "Nhà hàng báo khách không đến"
-    R.audit(db, f"cong:ncc-{tk.id}", "ncc", "dat_ban_khong_den", f"dat_ban:{d.ma}", after={"giu": d.so_giu, "hoan": d.so_hoan})
+    R.audit(db, f"cong:ncc-{tk.id}", "ncc", "dat_ban_khong_den", f"dat_ban:{d.ma}", after={"giu": (d.so_giu or 0), "hoan": (d.so_hoan or 0)})
     db.flush()
     return d
 
@@ -900,11 +900,11 @@ def kt_doi_soat(db: Session, u: User, tt_id: int, phi: int | None = None, now: d
         raise LoiDatBan("Không có giao dịch thẻ này", 404)
     if t.trang_thai != "thanh_cong":
         raise LoiDatBan("Chỉ đối soát giao dịch OnePay báo thành công", 409)
-    if phi is None or int(phi) < 0 or int(phi) >= int(t.so_tien):
+    if phi is None or int(phi) < 0 or int(phi) >= int(t.so_tien or 0):
         raise LoiDatBan("Ghi phí thẻ theo sao kê OnePay / cổng thẻ (0 nếu không trừ phí)")
     d = db.get(DonDatBan, t.don_id)
     ten, ma_dt = _doi_tuong_nh(db, d)
-    dong = [{"account": TK_TIEN, "debit": int(t.so_tien) - int(phi), "note": t.so_gd_cong or d.ma}]
+    dong = [{"account": TK_TIEN, "debit": int(t.so_tien or 0) - int(phi), "note": t.so_gd_cong or d.ma}]
     if int(phi):
         dong.append({"account": TK_PHI, "debit": int(phi), "note": f"Phí thẻ {d.ma}"})
     dong.append({"account": TK_THU_HO, "credit": int(t.so_tien), "partner": ten, "partner_code": ma_dt, "note": d.ma})
@@ -997,9 +997,9 @@ def kt_chot(db: Session, u: User, did: int, doanh_so: int, now: datetime | None 
     R.audit(db, u.username, u.role, "dat_ban_chot_doanh_so", f"dat_ban:{d.ma}",
             after={"doanh_so": int(doanh_so), "bill": d.bill_thuc_te, "hoa_hong": hh, "phai_tra_nh": d.phai_tra_nh})
     db.flush()
-    if d.phai_tra_nh == 0 and hh > 0:          # KS-16e: không còn gì trả nhà hàng → ghi doanh thu hoa hồng ngay
+    if (d.phai_tra_nh or 0) == 0 and hh > 0:          # KS-16e: không còn gì trả nhà hàng → ghi doanh thu hoa hồng ngay
         ghi_dt_hoa_hong(db, u, d, now.date())
-    if d.phai_tra_nh > 0:
+    if (d.phai_tra_nh or 0) > 0:
         from app.services.don_ks_vtd import LoiDon, lap_de_nghi_chi_ncc
         nh = db.get(NhaHang, d.nha_hang_id)
         try:
@@ -1044,5 +1044,5 @@ def nguon_d06(db: Session, d0: date, d1: date) -> dict:
         nh = db.get(NhaHang, d.nha_hang_id)
         nhom.setdefault((d.doi_tac_id, 0), []).append({
             "booking_id": None, "booking": d.ma, "tour": "", "ten_tour": f"Đặt bàn {nh.ten if nh else ''}".strip(),
-            "ket_thuc": d.ngay.isoformat(), "thu_du": d.chot_luc.date().isoformat(), "doanh_so": int(round(float(d.doanh_so)))})
+            "ket_thuc": d.ngay.isoformat(), "thu_du": d.chot_luc.date().isoformat(), "doanh_so": int(round(float(d.doanh_so or 0)))})
     return nhom

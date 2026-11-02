@@ -138,7 +138,7 @@ def cua_doi_tac(db: Session, dt: DoiTacBanHang, hom_nay: date | None = None) -> 
         ra.append({"id": b.id, "ky": b.ky, "trang_thai": tt, "trang_thai_ten": TRANG_THAI_BANG[tt],
                    "gui_luc": b.gui_luc.isoformat(timespec="minutes"), "han_phan_hoi": b.han_phan_hoi.isoformat(),
                    "han_tra": b.han_tra.isoformat(), "con_han": hn <= b.han_phan_hoi,
-                   "tong_doanh_so": sum(d.doanh_so for d in ds), "tong_hoa_hong": sum(d.hoa_hong for d in ds),
+                   "tong_doanh_so": sum((d.doanh_so or 0) for d in ds), "tong_hoa_hong": sum((d.hoa_hong or 0) for d in ds),
                    "dong": [{"id": d.id, "ma_don": d.ma_don, "ten": d.ten, "doanh_so": d.doanh_so, "hoa_hong": d.hoa_hong,
                              "y_kien": d.y_kien or ("dong_y" if hn > b.han_phan_hoi else ""),
                              "vu_viec": ({"ma": vv[d.id].ma, "trang_thai": vv[d.id].trang_thai, "han": vv[d.id].han.isoformat(),

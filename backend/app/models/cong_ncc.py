@@ -99,7 +99,7 @@ class BanKeNcc(Base):
     supplier_id: Mapped[int] = mapped_column(ForeignKey("suppliers.id"), index=True)
     ky: Mapped[str] = mapped_column(String(7))                           # YYYY-MM
     trang_thai: Mapped[str] = mapped_column(String(14), default="cho_ncc", index=True)
-    tong: Mapped[float] = mapped_column(TIEN, default=0)
+    tong: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     lap_boi: Mapped[str] = mapped_column(String(50), default="")
     lap_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     xac_nhan_tk_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

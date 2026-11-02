@@ -181,3 +181,4 @@ from app.models.video_dich_vu import *  # noqa   KS-16f video khách sạn / nh�
 from app.models.nguon_doi_soat import *  # noqa   KS-16h nguồn đơn CTV, đối soát đối tác
 from app.models.tour_online import *  # noqa   TR-1 đặt tour online trên cổng khách
 from app.models.thanh_toan_doan import *  # noqa   TR-1d link thanh toán tour đoàn riêng
+from app.models.don_khach_san_ota import *  # noqa   KS-2 đơn khách sạn OTA (ks7: bảng phải vào Base.metadata)

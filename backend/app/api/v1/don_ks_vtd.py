@@ -82,10 +82,10 @@ def kiem_voucher(data: KiemVoucherIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoa
     from app.services import rewards as RW
     _khach(tk)
     try:
-        v = RW.kiem_voucher_ks(db, tk, data.ma, max(0, int(data.tong)))
+        v = RW.kiem_voucher_ks(db, tk, data.ma, max(0, int(data.tong or 0)))
     except RW.LoiDiem as ex:
         raise HTTPException(400, str(ex))
-    return {"ma": v.ma, "gia_tri": int(v.gia_tri), "tran": int(int(data.tong) * RW.TRAN_VOUCHER)}
+    return {"ma": v.ma, "gia_tri": int(v.gia_tri or 0), "tran": int(int(data.tong or 0) * RW.TRAN_VOUCHER)}
 
 
 @router_cong.get("/{ma}")

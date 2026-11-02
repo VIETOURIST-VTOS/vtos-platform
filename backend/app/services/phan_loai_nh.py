@@ -63,7 +63,7 @@ def nhan_michelin(n: NhaHang) -> str:
 
 
 def muc_chi(tds: list[ThucDonNhaHang], hn: date) -> int | None:
-    g = [float(t.gia_nguoi_lon) for t in tds if _con_ban(t, hn) and t.gia_nguoi_lon and float(t.gia_nguoi_lon) > 0]
+    g = [float(t.gia_nguoi_lon or 0) for t in tds if _con_ban(t, hn) and (t.gia_nguoi_lon or 0) and float(t.gia_nguoi_lon or 0) > 0]
     return int(median(g)) if g else None
 
 
