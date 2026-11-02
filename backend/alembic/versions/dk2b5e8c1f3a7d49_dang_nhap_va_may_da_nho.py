@@ -9,7 +9,16 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "dk2b5e8c1f3a7d49"
-down_revision = "dk1a7c3e5b9d2f41"
+# ĐỢT P2-2 02/11/2026 — ĐỔI CHA ĐỂ MẠCH CÒN MỘT ĐẦU.
+#
+# Bản này và `tr1d4b6c8e0a2f13` (TR-1d, PR #613) cùng sinh ra từ `dk1a7c3e5b9d2f41`, nên main
+# có HAI đầu mạch. Dockerfile chạy `alembic upgrade head`: hai đầu là lệnh ấy báo lỗi và
+# container không khởi động — hỏng máy chủ thật, không phải hỏng một phép thử.
+#
+# TR-1d gộp trước, nên bản này nối sau nó: dk1a → tr1d → dk2b. KHÔNG dựng merge revision,
+# đúng như `test_mach_migration` dặn. Vì `upgrade head` đang hỏng nên chưa bản nào trong hai
+# bản này chạy được trên máy chủ, đổi cha lúc này không bỏ lại `alembic_version` lệch.
+down_revision = "tr1d4b6c8e0a2f13"
 branch_labels = None
 depends_on = None
 

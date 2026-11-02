@@ -278,8 +278,8 @@ def test_lg9_ba_vai_tien_vao_moi_nhan_vien_chi_mo_them_don_tu():
         pv = set(AC.pham_vi_day_du(vai))
         thieu = [m for m in DON_TU_CUA_NGUOI if m not in pv]
         assert not thieu, f"{vai} la nguoi di lam ma khong gui duoc don tu: {thieu}"
-    assert len(AC.pham_vi_day_du("ketoan_tt")) == 31
-    assert len(AC.pham_vi_day_du("thu_quy")) == 27
+    assert len(AC.pham_vi_day_du("ketoan_tt")) == 32
+    assert len(AC.pham_vi_day_du("thu_quy")) == 28
     # Kế toán trưởng KHÔNG hẹp hơn Kế toán. Từ 20/10/2026 rộng hơn đúng MỘT cửa (Chủ tịch chốt): tự
     # gửi yêu cầu Pháp chế — việc của trưởng phòng trở lên; kế toán viên nhờ Kế toán trưởng gửi.
     ktt, kt = set(AC.pham_vi_day_du("ketoan_truong")), set(AC.pham_vi_day_du("ketoan"))
