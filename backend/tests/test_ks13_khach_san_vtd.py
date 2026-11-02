@@ -30,6 +30,7 @@ def _anh(so=1):
 def _ks(s, ten="Khách sạn Biển Xanh", nguoi="dh"):
     from app.services import khach_san_vtd as S
     return S.luu_ks(s, _u(s, nguoi), {"ten": ten, "tinh_thanh": "Đà Nẵng", "sao": 4, "khu_vuc": "Mỹ Khê", "thue_phi_pt": 15,
+                                      "thue_phi_xac_nhan": True,          # KS-17: chưa xác nhận thuế thì không duyệt giá
                                       "mo_ta": "Khách sạn 4 sao trên trục Võ Nguyên Giáp, đi bộ hai phút ra biển Mỹ Khê.",
                                       "tien_ich": ["ho_boi", "wifi"]})
 
@@ -68,7 +69,7 @@ def test_gia_tung_dem_va_cuoi_tuan(db):
 def test_hai_nguoi_va_sua_ve_nhap(db):
     from app.services import khach_san_vtd as S
     k = _ks(db)
-    lp = S.luu_loai_phong(db, _u(db, "dh"), k.id, {"ten": "Deluxe", "so_phong": 2})
+    lp = S.luu_loai_phong(db, _u(db, "dh"), k.id, {"ten": "Deluxe", "toi_da_nguoi_lon": 2, "so_phong": 2})   # KS-17
     with pytest.raises(S.LoiKhachSan, match="chồng ngày"):
         S.luu_goi(db, _u(db, "dh"), lp.id, {"ten": "Chỉ phòng", "mua": [
             {"tu_ngay": "2026-12-01", "den_ngay": "2026-12-20", "gia_thuong": 900000},
@@ -90,7 +91,8 @@ def test_hai_nguoi_va_sua_ve_nhap(db):
         S.bat_hien(db, _u(db, "tp"), k.id, True)
     x, _ = S.tai_anh(db, _u(db, "tp"), k.id, "a.jpg", _anh(), {"nhom": "phong", "loai_phong_id": lp.id})
     assert x.trang_thai == "da_duyet"                                   # KS-16c (31/10/2026): bỏ duyệt ảnh — tải là hiện
-    k2 = S.luu_ks(db, _u(db, "tp"), {"ten": k.ten, "tinh_thanh": "Đà Nẵng", "sao": 4, "mo_ta": k.mo_ta}, k.id)
+    k2 = S.luu_ks(db, _u(db, "tp"), {"ten": k.ten, "tinh_thanh": "Đà Nẵng", "sao": 4, "mo_ta": k.mo_ta,
+                                     "thue_phi_pt": 15, "thue_phi_xac_nhan": True}, k.id)   # KS-17
     with pytest.raises(S.LoiKhachSan, match="không tự bật"):
         S.bat_hien(db, _u(db, "tp"), k2.id, True)
     S.bat_hien(db, _u(db, "tp2"), k2.id, True)

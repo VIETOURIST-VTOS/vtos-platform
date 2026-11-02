@@ -125,7 +125,8 @@ class KsIn(BaseModel):
     cs_so_tre_mien_phi: int | None = None          # KS-16k
     cs_tre_mp_tinh_suc_chua: bool = False
     cs_giuong_phu_kieu: str = "co_dinh"
-    thue_phi_pt: float = 0
+    thue_phi_pt: float | None = 0
+    thue_phi_xac_nhan: bool = False                 # KS-17
     lien_he_noi_bo: str = ""
     ghi_chu_noi_bo: str = ""
     link_ggmap: str = ""            # KS-16s: dán link Google Maps để sửa ghim bản đồ
@@ -200,7 +201,8 @@ class LoaiPhongIn(BaseModel):
     dien_tich: int = 0
     giuong: str = ""
     mo_ta: str = ""
-    toi_da_nguoi_lon: int = 2
+    toi_da_nguoi_lon: int | None = 2               # KS-17: null = chưa xác nhận
+    tong_khach_toi_da: int | None = None            # KS-17
     toi_da_tre_em: int | None = None        # KS-16j: None = chưa xác nhận (khác 0)
     so_phong: int | None = 1                # KS-16j: 0 là 0
     thu_tu: int = 0
@@ -254,6 +256,9 @@ class GoiIn(BaseModel):
     mua: list[MuaIn] = []
     tre_em_che_do: str = ""                        # KS-16k: "" | rieng | nhu_nguoi_lon
     gia_tre: list[dict] | None = None
+    huy_gio_chot: str = ""                         # KS-17: HH:MM trong ngày hạn hủy; "" = hết ngày
+    huy_mui_gio: str = "Asia/Ho_Chi_Minh"
+    cho_tra_sau: bool = True
 
 
 @router_vtos.post("/loai-phong/{lid:int}/goi")
@@ -306,6 +311,7 @@ class SuaAnhIn(BaseModel):
     nhom: str | None = None
     loai_phong_id: int | None = None
     chu_thich: str | None = None
+    mo_ta_thay_the: str | None = None              # KS-17
     thu_tu: int | None = None
     la_bia: bool = False
 

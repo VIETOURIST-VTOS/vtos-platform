@@ -53,7 +53,7 @@ const khongDau = (s: string) => (s || "").toLowerCase().normalize("NFD").replace
 const nhan = (d?: number | null) => nhanDiem(d);
 const phay = (x: number) => String(x).replace(".", ",");
 // Ước đoán trên màn: gói miễn phí hủy thì có thể «đặt giữ, trả sau» (hạn = hạn hủy − 2 ngày). Máy chủ tính lại ở bước sau.
-const traSauGoi = (g: any, homNay: string) => { if (!g?.mien_phi_huy || !g?.huy_han) return ""; const h = themNgay(String(g.huy_han).slice(0, 10), -2); return h > homNay ? h : ""; };
+const traSauGoi = (g: any, homNay: string) => { if (!g?.mien_phi_huy || !g?.huy_han || g?.cho_tra_sau === false) return ""; /* KS-17 */ const h = themNgay(String(g.huy_han).slice(0, 10), -2); return h > homNay ? h : ""; };
 
 const Ico = ({ d, s = 16, fill = false }: { d: string; s?: number; fill?: boolean }) =>
   <svg width={s} height={s} viewBox="0 0 24 24" fill={fill ? "currentColor" : "none"} stroke={fill ? "none" : "currentColor"} strokeWidth="1.9" aria-hidden="true" style={{ flex: "none" }}><path d={d} /></svg>;
@@ -107,7 +107,7 @@ function Album({ ks, dau, onDong }: { ks: any; dau?: { nhom?: string; lp?: numbe
         {nhom.map(([k, t, n]) => <button key={k} type="button" className={tab === k ? "on" : ""} onClick={() => chon(k)}>{t} {n}</button>)}</div>
       {tab === "video" ? <div className="ksv-alb-vid">{video.map((v) => <div key={v.id ?? v.xem} style={{ aspectRatio: "16 / 9" }}><VideoO v={v} ten={ks.ten} /></div>)}</div>
         : a ? <>
-          <div className="ksv-alb-big"><img src={a.hien} alt={a.chu_thich || `${ks.ten} — ${a.nhom_ten}`} />
+          <div className="ksv-alb-big"><img src={a.hien} alt={a.mo_ta_thay_the || a.chu_thich || `${ks.ten} — ${a.nhom_ten}`} />
             {ds.length > 1 && <><button type="button" className="ksv-alb-nv l" aria-label="Ảnh trước" onClick={() => setI((i - 1 + ds.length) % ds.length)}><Ico d={P.trai} s={20} /></button>
               <button type="button" className="ksv-alb-nv r" aria-label="Ảnh tiếp" onClick={() => setI((i + 1) % ds.length)}><Ico d={P.phai} s={20} /></button></>}
             <span className="ksv-alb-cap">{Math.min(i, ds.length - 1) + 1} / {ds.length}{a.chu_thich ? ` · ${a.chu_thich}` : ` · ${a.nhom_ten}`}</span></div>
@@ -461,7 +461,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
       <button type="button" className="ksv-link" onClick={() => setBuoc("ds")}>← Khách sạn ở {ks.tinh_thanh}</button>
       <div className="ksv-gal">{anh.length || video.length ? <>
         {anh.slice(0, 7).map((a: any, i: number) => <button type="button" key={a.id} onClick={() => setAlbum({ nhom: "" })} aria-label={`Xem ảnh ${i + 1}`}>
-          <img src={i ? a.nho : a.hien} alt={a.chu_thich || `${ks.ten} — ${a.nhom_ten}`} loading={i ? "lazy" : undefined} />
+          <img src={i ? a.nho : a.hien} alt={a.mo_ta_thay_the || a.chu_thich || `${ks.ten} — ${a.nhom_ten}`} loading={i ? "lazy" : undefined} />
           {i === 0 && <span className="ksv-see"><Ico d={P.may} s={15} />Xem tất cả ảnh</span>}
           {i === 1 && video.length > 0 && <span className="ksv-ct" onClick={(e) => { e.stopPropagation(); setAlbum({ nhom: "video" }); }}>▶ Video</span>}
           {i === Math.min(6, anh.length - 1) && i > 0 && <span className="ksv-see">{anh.length > 7 ? `+${anh.length - 7} ảnh` : `${anh.length} ảnh`}{video.length ? ` · ${video.length} video` : ""}</span>}</button>)}
@@ -538,7 +538,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
               <span><Ico d={P.nguoi} s={14} /> {p.toi_da_nguoi_lon} người lớn{p.toi_da_tre_em ? ` + ${p.toi_da_tre_em} trẻ em` : ""}</span>
               {g.bua_sang ? <span className="ksv-okc"><Ico d={P.coc} s={14} /> Bao gồm bữa sáng</span> : <span>Chỉ phòng</span>}
               {["chỉ phòng", "có bữa sáng", "bữa sáng"].includes(String(g.ten || "").trim().toLowerCase()) ? null : <span>{g.ten}</span>}
-              {g.mien_phi_huy ? <span className="ksv-okc"><Ico d={P.khien} s={14} fill /> Miễn phí hủy trước {dmy(g.huy_han)}</span> : <span className="ksv-muted">Không hoàn tiền</span>}
+              {g.mien_phi_huy ? <span className="ksv-okc"><Ico d={P.khien} s={14} fill /> Miễn phí hủy trước {g.huy_gio_chot ? `${g.huy_gio_chot} ` : ""}{dmy(g.huy_han)}{g.huy_gio_chot && g.huy_mui_gio ? ` (${g.huy_mui_gio})` : ""}</span> : <span className="ksv-muted">Không hoàn tiền</span>}
               {ts ? <span className="ksv-okc">✓ Đặt giữ, trả trước {dmy(ts)}</span> : <span className="ksv-muted">Trả ngay khi đặt</span>}
               {diem?.dang_bat && diem.cach_tinh !== "hoa_hong" && duKien(g.tong) > 0 && <span className="ksv-diem">✦ Tích khoảng {vnd(duKien(g.tong))} điểm VTD</span>}
               {g.vua !== false && (g.phu_thu_ct || []).filter((c: any) => c.tien > 0).map((c: any, j: number) => <span key={j} className="ksv-muted">{c.nhan}</span>)}
@@ -666,7 +666,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
           return <article key={k.id} id={`ksv-the-${k.id}`} className={`ksv-card ${ghimChon === k.id ? "ksv-card-on" : ""}`} onMouseEnter={() => banDo && setGhimChon(k.id)}>
             {g && <div className="ksv-banner"><b>Giá hợp đồng Vietourist</b>{diem?.dang_bat ? " — tích điểm VTD sau kỳ ở" : ""}{k.co_mien_phi_huy ? " · có gói miễn phí hủy" : ""}</div>}
             <div className="ksv-crow">
-              <div className="ksv-ph">{a ? <button type="button" className="ksv-phbtn" onClick={() => moThe(k)} aria-label={`Xem ${k.ten}`}><img src={a.nho} alt={a.chu_thich || k.ten} loading="lazy" /></button>
+              <div className="ksv-ph">{a ? <button type="button" className="ksv-phbtn" onClick={() => moThe(k)} aria-label={`Xem ${k.ten}`}><img src={a.nho} alt={a.mo_ta_thay_the || a.chu_thich || k.ten} loading="lazy" /></button>
                 : <button type="button" className="ksv-phbtn" onClick={() => moThe(k)} aria-label={`Xem ${k.ten}`}><AnhTrong k={k} /></button>}
                 {(k.danh_gia?.diem_tb || 0) >= 9 && <span className="ksv-b navy aw"><Ico d={P.sao} s={12} fill /> Khách chấm 9+</span>}
                 <button type="button" className={`ksv-ico ksv-heart ${thich[k.id] ? "on" : ""}`} aria-label={thich[k.id] ? "Bỏ yêu thích" : "Lưu vào yêu thích"} aria-pressed={!!thich[k.id]} onClick={() => setThich({ ...thich, [k.id]: !thich[k.id] })}><Ico d={P.tim} s={20} /></button>

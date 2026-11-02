@@ -14,7 +14,7 @@ Các bảng bắt đầu RỖNG — máy không nạp sẵn khách sạn nào.
 """
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, false, true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -83,6 +83,9 @@ class KhachSanVtd(Base):
     # Giá Điều hành nhập là giá CHƯA gồm thuế phí; khách thấy «chưa gồm thuế và phí» và số thuế phí ở bước
     # thanh toán. Mức % theo từng khách sạn (VAT + phí phục vụ) — Điều hành nhập theo hợp đồng.
     thue_phi_pt: Mapped[float | None] = mapped_column(Float, default=0, nullable=True)
+    # KS-17: 0% mặc định KHÔNG phải xác nhận «khách sạn không thu thuế». Chưa xác nhận thì không duyệt được gói giá
+    # và không mở được thanh toán của khách sạn.
+    thue_phi_xac_nhan: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     lien_he_noi_bo: Mapped[str] = mapped_column(String(300), default="")  # KHÔNG ra cổng
     ghi_chu_noi_bo: Mapped[str] = mapped_column(Text, default="")         # KHÔNG ra cổng
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), nullable=True, index=True)
@@ -116,6 +119,7 @@ class AnhKhachSanVtd(Base):
     cao: Mapped[int] = mapped_column(Integer, default=0)
     nhom: Mapped[str] = mapped_column(String(12), default="khac")
     chu_thich: Mapped[str] = mapped_column(String(200), default="")
+    mo_ta_thay_the: Mapped[str] = mapped_column(String(200), default="", server_default="")   # KS-17: chữ thay ảnh (alt)
     nguon: Mapped[str] = mapped_column(String(200), default="")      # ghi nội bộ: khách sạn gửi / VTD chụp …
     thu_tu: Mapped[int] = mapped_column(Integer, default=0)
     la_bia: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -137,7 +141,8 @@ class LoaiPhongVtd(Base):
     mo_ta: Mapped[str] = mapped_column(String(300), default="")         # đặc điểm ngắn — quá 300 thì báo lỗi, không cắt
     mo_ta_dai: Mapped[str] = mapped_column(Text, default="")            # KS-16j: mô tả chi tiết (≤3.000), khách bấm «Xem thêm»
     tien_nghi: Mapped[list] = mapped_column(JSON, default=list)         # KS-16j: tên tiện nghi (chọn sẵn hoặc gõ thêm)
-    toi_da_nguoi_lon: Mapped[int] = mapped_column(Integer, default=2)
+    toi_da_nguoi_lon: Mapped[int | None] = mapped_column(Integer, nullable=True)   # KS-17: None = chưa xác nhận
+    tong_khach_toi_da: Mapped[int | None] = mapped_column(Integer, nullable=True)   # KS-17: tổng NL + TE một phòng; None = chưa xác nhận
     toi_da_tre_em: Mapped[int | None] = mapped_column(Integer, nullable=True)   # KS-16j: None = chưa xác nhận (khác 0)
     giuong_phu_toi_da: Mapped[int | None] = mapped_column(Integer, nullable=True)  # None = chưa xác nhận
     noi_cui: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
@@ -173,6 +178,10 @@ class GoiGiaVtd(Base):
     ten: Mapped[str] = mapped_column(String(80), default="Chỉ phòng")
     bua_sang: Mapped[bool] = mapped_column(Boolean, default=False)
     huy_truoc_ngay: Mapped[int | None] = mapped_column(Integer, nullable=True)   # None = không hoàn tiền
+    # KS-17: giờ chốt hủy trong ngày hạn hủy («» = hết ngày), múi giờ của giờ ấy, và gói có cho trả sau không.
+    huy_gio_chot: Mapped[str] = mapped_column(String(5), default="", server_default="")
+    huy_mui_gio: Mapped[str] = mapped_column(String(40), default="Asia/Ho_Chi_Minh", server_default="Asia/Ho_Chi_Minh")
+    cho_tra_sau: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     dang_ban: Mapped[bool] = mapped_column(Boolean, default=True)
     trang_thai: Mapped[str] = mapped_column(String(10), default="nhap", index=True)
     ly_do_tra_lai: Mapped[str] = mapped_column(String(300), default="")

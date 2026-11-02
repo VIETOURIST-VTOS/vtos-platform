@@ -18,12 +18,13 @@ import DanhGiaKsNoiBo from "@/components/khach-san-vtd/DanhGiaKsNoiBo";
 const tien = (n?: number | null) => (n || n === 0 ? Math.round(n).toLocaleString("vi-VN") : "");
 const TT_DN: Record<string, string> = { cho_tp: "chờ robot", cho_kt: "robot dừng — bổ sung NCC", cho_duyet: "chờ TGĐ / CT duyệt", cho_chi: "lệnh chi chờ", da_chi: "đã chi", tu_choi: "từ chối" };   // KS-16d
 const KS0 = { ten: "", tinh_thanh: "", khu_vuc: "", dia_chi: "", sao: 0, loai: "khach_san", km_trung_tam: "", gan: "", noi_bat: "", mo_ta: "",
-  tien_ich: [] as string[], gio_nhan: "14:00", gio_tra: "12:00", cs_tre_em: "", cs_giuong_phu: "", cs_vat_nuoi: "", cs_khac: "", thue_phi_pt: 0,
+  tien_ich: [] as string[], gio_nhan: "14:00", gio_tra: "12:00", cs_tre_em: "", cs_giuong_phu: "", cs_vat_nuoi: "", cs_khac: "", thue_phi_pt: "" as any, thue_phi_xac_nhan: false,
   lien_he_noi_bo: "", ghi_chu_noi_bo: "", link_ggmap: "",
   cs_nhan_tre_em: "chua_xac_nhan", cs_tre_tu_tuoi: "" as any, cs_moc_tuoi: [] as any[], cs_phi_giuong_phu: "" as any, cs_giuong_phu_an_sang: false, cs_noi: "",
   cs_so_tre_mien_phi: "" as any, cs_tre_mp_tinh_suc_chua: false, cs_giuong_phu_kieu: "co_dinh" };
 // KS-16j (Chủ tịch duyệt bản xem thử 01/11/2026): trống = chưa xác nhận (null), khác 0; số phòng 0 là 0; không tự cắt đặc điểm.
-const LP0 = { ten: "", dien_tich: 0, giuong: "", mo_ta: "", toi_da_nguoi_lon: 2, toi_da_tre_em: "" as any, so_phong: 0, thu_tu: 0, dang_ban: false,
+// KS-17: người lớn tối đa và tổng khách để trống = CHƯA XÁC NHẬN (bản cũ tự gán 2 / 1).
+const LP0 = { ten: "", dien_tich: 0, giuong: "", mo_ta: "", toi_da_nguoi_lon: "" as any, tong_khach_toi_da: "" as any, toi_da_tre_em: "" as any, so_phong: 0, thu_tu: 0, dang_ban: false,
   mo_ta_dai: "", tien_nghi: [] as string[], giuong_phu_toi_da: "" as any, noi_cui: null as boolean | null, nguon: "", ky_doi_chieu: "", ma_hang: "",
   ten_tuong_duong: "", can_xac_nhan: [] as string[], ghi_chu_doi_chieu: "", trang_thai_dc: "dang_doi_chieu" };
 const soHoacNull = (v: any) => (v === "" || v === null || v === undefined ? null : Number(v));
@@ -118,7 +119,7 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
   const o = (key: string, label: string, ph = "", type = "text") => <label>{label}<input type={type} value={f[key] ?? ""} placeholder={ph} disabled={!nhap} onChange={(e) => setF({ ...f, [key]: e.target.value })} /></label>;
   const ta = (key: string, label: string, rows = 3, ph = "") => <label>{label}<textarea rows={rows} value={f[key] ?? ""} placeholder={ph} disabled={!nhap} onChange={(e) => setF({ ...f, [key]: e.target.value })} /></label>;
   const luu = async () => {
-    const body = { ...f, sao: Number(f.sao) || 0, km_trung_tam: f.km_trung_tam === "" ? null : Number(f.km_trung_tam), thue_phi_pt: Number(f.thue_phi_pt) || 0,
+    const body = { ...f, sao: Number(f.sao) || 0, km_trung_tam: f.km_trung_tam === "" ? null : Number(f.km_trung_tam), thue_phi_pt: soHoacNull(f.thue_phi_pt), thue_phi_xac_nhan: !!f.thue_phi_xac_nhan,   // KS-17
       cs_tre_tu_tuoi: soHoacNull(f.cs_tre_tu_tuoi), cs_phi_giuong_phu: soHoacNull(String(f.cs_phi_giuong_phu ?? "").replace(/[^\d.]/g, "")),
       cs_so_tre_mien_phi: soHoacNull(f.cs_so_tre_mien_phi), cs_moc_tuoi: guiBang(f.cs_moc_tuoi) };   // KS-16k
     const r = await goi(kid === "moi" ? "/khach-san-vtd" : `/khach-san-vtd/${kid}`, body);
@@ -144,7 +145,11 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
         {o("km_trung_tam", "Cách trung tâm (km)", "2.5", "number")}{o("gan", "Gần đâu (hiện trên thẻ)", "120 m tới biển · 3 km tới cầu Rồng")}
         {o("noi_bat", "Một dòng nổi bật", "Hồ bơi tầng thượng nhìn biển, bữa sáng buffet")}
         {o("gio_nhan", "Giờ nhận phòng", "14:00")}{o("gio_tra", "Giờ trả phòng", "12:00")}
-        {o("thue_phi_pt", "Thuế phí cộng thêm (%)", "15", "number")}</div>
+        {o("thue_phi_pt", "Thuế phí cộng thêm (%)", "15", "number")}
+        {/* KS-17: 0% mặc định không phải xác nhận. Chưa xác nhận → không duyệt giá, không mở thanh toán. */}
+        <label style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={!!f.thue_phi_xac_nhan} disabled={!nhap}
+          onChange={(e) => setF({ ...f, thue_phi_xac_nhan: e.target.checked })} />Đã xác nhận thuế phí với khách sạn (theo hợp đồng)</label>
+        {!f.thue_phi_xac_nhan && <span className="muted" style={{ color: "#d99a2b", fontSize: 12 }}>Thuế phí chưa xác nhận — chưa duyệt giá, chưa mở thanh toán được.</span>}</div>
       {h && <span className="muted" style={{ fontSize: 12 }}>Vị trí bản đồ: {h.khach_san.vi_do != null ? <>{h.khach_san.vi_do}, {h.khach_san.kinh_do} · {h.khach_san.toa_do_nguon === "tay" ? "Điều hành dán link" : "máy lấy từ địa chỉ"}
         {" · "}<a href={`https://www.google.com/maps/search/?api=1&query=${h.khach_san.vi_do},${h.khach_san.kinh_do}`} target="_blank" rel="noopener noreferrer">kiểm tra trên Google Maps ↗</a></>
         : h.khach_san.toa_do_nguon === "khong_thay" ? "máy không tìm thấy địa chỉ — dán link Google Maps" : "chưa có (lưu hồ sơ để máy lấy)"}</span>}
@@ -190,6 +195,7 @@ function Album({ h, x, toast, onDoi }: { h: any; x: any; toast: (m: string, l?: 
   const [tien, setTien] = useState("");
   const [chon, setChon] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
+  const [sua, setSua] = useState<any>(null);   // KS-17: ảnh đang sửa {id, nhom, loai_phong_id, chu_thich, mo_ta_thay_the}
   const kid = h.khach_san.id;
   const tai = async () => {
     if (!teps.length || !nhom) { toast("Chọn tệp ảnh và nhóm ảnh", true); return; }
@@ -208,6 +214,11 @@ function Album({ h, x, toast, onDoi }: { h: any; x: any; toast: (m: string, l?: 
     catch (e) { toast(errMsg(e), true); } finally { setBusy(false); }
   };
   const tenLp: Record<number, string> = Object.fromEntries(h.loai_phong.map((p: any) => [p.id, p.ten]));
+  const luuSua = async () => {   // KS-17: sửa ảnh đã có — không phải xóa rồi tải lại
+    await goi(`/khach-san-vtd/anh/${sua.id}`, { nhom: sua.nhom, loai_phong_id: sua.loai_phong_id === "" ? null : Number(sua.loai_phong_id),
+      chu_thich: sua.chu_thich, mo_ta_thay_the: sua.mo_ta_thay_the });
+    setSua(null);
+  };
   return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
     {x.duoc_nhap && <div className="panel" style={{ margin: 0 }}>
       <div className="grid">
@@ -219,12 +230,24 @@ function Album({ h, x, toast, onDoi }: { h: any; x: any; toast: (m: string, l?: 
     <p className="muted" style={{ margin: 0, fontSize: 12 }}>Ảnh tải lên là hiện ngay trên cổng (Chủ tịch bỏ khâu duyệt ảnh 31/10/2026). Ảnh sai: người tải tự xóa, TP Điều hành xóa được mọi ảnh.</p>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 10 }}>{h.anh.map((a: any) =>
       <div key={a.id} className="panel" style={{ margin: 0, padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-        <AnhNoiBo src={a.nho} alt={a.chu_thich || a.nhom_ten} style={{ width: "100%", aspectRatio: "4 / 3", borderRadius: 6 }} />
+        <AnhNoiBo src={a.nho} alt={a.mo_ta_thay_the || a.chu_thich || a.nhom_ten} style={{ width: "100%", aspectRatio: "4 / 3", borderRadius: 6 }} />
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <Tag cls={TT[a.trang_thai]}>{a.trang_thai === "da_duyet" ? "Đang hiện" : a.trang_thai_ten}</Tag>{a.la_bia && <Tag cls="ok">Bìa</Tag>}<span className="muted" style={{ fontSize: 12 }}>{a.nhom_ten}{a.loai_phong_id ? ` · ${tenLp[a.loai_phong_id] || ""}` : ""}</span></div>
         {a.ly_do_tra_lai && <small style={{ color: "#d99a2b" }}>Trả lại: {a.ly_do_tra_lai}</small>}
         <small className="muted">tải: {a.tai_boi}{a.duyet_boi && a.duyet_boi !== "tu_dong" ? ` · duyệt: ${a.duyet_boi}` : ""}</small>
+        {a.chu_thich && <small>{a.chu_thich}</small>}
+        {a.mo_ta_thay_the ? <small className="muted">Mô tả thay thế: {a.mo_ta_thay_the}</small> : <small className="muted" style={{ color: "#d99a2b" }}>Chưa có mô tả thay thế</small>}
+        {sua && sua.id === a.id && <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 12 }}>Nhóm ảnh<select value={sua.nhom} onChange={(e) => setSua({ ...sua, nhom: e.target.value })}>
+            {Object.entries(x.nhom_anh).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
+          <label style={{ fontSize: 12 }}>Loại phòng<select value={sua.loai_phong_id ?? ""} onChange={(e) => setSua({ ...sua, loai_phong_id: e.target.value })}>
+            <option value="">— không —</option>{h.loai_phong.map((p: any) => <option key={p.id} value={p.id}>{p.ten}</option>)}</select></label>
+          <label style={{ fontSize: 12 }}>Chú thích (khách thấy)<input value={sua.chu_thich} maxLength={200} onChange={(e) => setSua({ ...sua, chu_thich: e.target.value })} /></label>
+          <label style={{ fontSize: 12 }}>Mô tả thay thế (cho người không xem được ảnh)<input value={sua.mo_ta_thay_the} maxLength={200} placeholder="vd: Giường đôi lớn, cửa kính nhìn ra biển" onChange={(e) => setSua({ ...sua, mo_ta_thay_the: e.target.value })} /></label>
+          <div style={{ display: "flex", gap: 4 }}><button className="act teal" disabled={busy} onClick={luuSua}>Lưu</button><button className="act grey" onClick={() => setSua(null)}>Thôi</button></div></div>}
         {x.duoc_nhap && <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {!(sua && sua.id === a.id) && <button className="act grey" disabled={busy} onClick={() => setSua({ id: a.id, nhom: a.nhom, loai_phong_id: a.loai_phong_id ?? "",
+            chu_thich: a.chu_thich || "", mo_ta_thay_the: a.mo_ta_thay_the || "" })}>Sửa</button>}
           {a.trang_thai === "da_duyet" && !a.la_bia && <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/anh/${a.id}`, { la_bia: true })}>Đặt bìa</button>}
           {a.trang_thai !== "an" ? <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/anh/${a.id}/an`, { bat: true })}>Ẩn</button>
             : <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/anh/${a.id}/an`, { bat: false })}>Bỏ ẩn</button>}
@@ -300,7 +323,8 @@ function Phong({ h, x, toast, goi, busy }: { h: any; x: any; toast: (m: string, 
   const [g, setG] = useState<any>(null);   // {lid, id?, ten, bua_sang, huy_truoc_ngay, dang_ban, mua:[]}
   const kid = h.khach_san.id;
   const luuLp = async () => { const r = await goi(lp.id ? `/khach-san-vtd/${kid}/loai-phong/${lp.id}` : `/khach-san-vtd/${kid}/loai-phong`,
-    { ...lp, dien_tich: Number(lp.dien_tich) || 0, toi_da_nguoi_lon: Number(lp.toi_da_nguoi_lon) || 1, toi_da_tre_em: soHoacNull(lp.toi_da_tre_em),
+    { ...lp, dien_tich: Number(lp.dien_tich) || 0, toi_da_nguoi_lon: soHoacNull(lp.toi_da_nguoi_lon), tong_khach_toi_da: soHoacNull(lp.tong_khach_toi_da),   // KS-17
+      toi_da_tre_em: soHoacNull(lp.toi_da_tre_em),
       giuong_phu_toi_da: soHoacNull(lp.giuong_phu_toi_da), so_phong: Number(lp.so_phong) || 0, thu_tu: Number(lp.thu_tu) || 0,
       // KS-16k
       suc_chua: soHoacNull(lp.suc_chua), khach_them_toi_da: soHoacNull(lp.khach_them_toi_da), so_tre_mien_phi: soHoacNull(lp.so_tre_mien_phi),
@@ -314,7 +338,8 @@ function Phong({ h, x, toast, goi, busy }: { h: any; x: any; toast: (m: string, 
       gia_cuoi_tuan: m.gia_cuoi_tuan ? Number(String(m.gia_cuoi_tuan).replace(/\D/g, "")) : null, gia_niem_yet: m.gia_niem_yet ? Number(String(m.gia_niem_yet).replace(/\D/g, "")) : null }));
     const r = await goi(g.id ? `/khach-san-vtd/loai-phong/${g.lid}/goi/${g.id}` : `/khach-san-vtd/loai-phong/${g.lid}/goi`,
       { ten: g.ten, bua_sang: g.bua_sang, huy_truoc_ngay: g.huy_truoc_ngay === "" || g.huy_truoc_ngay === null ? null : Number(g.huy_truoc_ngay), dang_ban: g.dang_ban, mua,
-        tre_em_che_do: g.tre_em_che_do || "", gia_tre: g.tre_em_che_do === "rieng" ? guiBang(g.gia_tre || []) : null });   // KS-16k
+        tre_em_che_do: g.tre_em_che_do || "", gia_tre: g.tre_em_che_do === "rieng" ? guiBang(g.gia_tre || []) : null,   // KS-16k
+        huy_gio_chot: g.huy_gio_chot || "", huy_mui_gio: g.huy_mui_gio || "Asia/Ho_Chi_Minh", cho_tra_sau: g.cho_tra_sau !== false });   // KS-17
     if (r) setG(null);
   };
   const nhap = x.duoc_nhap;
@@ -340,7 +365,9 @@ function Phong({ h, x, toast, goi, busy }: { h: any; x: any; toast: (m: string, 
             {tnThem.trim() && <button type="button" className="act grey" onClick={() => { setLp({ ...lp, tien_nghi: [...(lp.tien_nghi || []), tnThem.trim()] }); setTnThem(""); }}>Thêm</button>}</div></div>
       </fieldset>
       <div className="grid">
-        <label>Tối đa người lớn<input value={lp.toi_da_nguoi_lon ?? ""} placeholder="2" onChange={(e) => setLp({ ...lp, toi_da_nguoi_lon: e.target.value })} /></label>
+        <label>Tối đa người lớn<input inputMode="numeric" value={lp.toi_da_nguoi_lon ?? ""} placeholder="trống = chưa xác nhận" onChange={(e) => setLp({ ...lp, toi_da_nguoi_lon: e.target.value.replace(/\D/g, "") })} />
+          <span className="muted">Chưa xác nhận thì phòng chưa bán, chưa duyệt giá được.</span></label>
+        <label>Tổng khách tối đa (người lớn + trẻ em)<input inputMode="numeric" value={lp.tong_khach_toi_da ?? ""} placeholder="trống = chưa xác nhận" onChange={(e) => setLp({ ...lp, tong_khach_toi_da: e.target.value.replace(/\D/g, "") })} /></label>
         <label>Tối đa trẻ em ở chung<select value={lp.toi_da_tre_em === null || lp.toi_da_tre_em === undefined ? "" : String(lp.toi_da_tre_em)} onChange={(e) => setLp({ ...lp, toi_da_tre_em: e.target.value })}>
           <option value="">Chưa xác nhận</option><option value="0">0 — không nhận trẻ em ở chung</option>{[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}</select>
           <span className="muted">Để «Chưa xác nhận» thì lưu là chưa biết, không thành 0.</span></label>
@@ -386,7 +413,8 @@ function Phong({ h, x, toast, goi, busy }: { h: any; x: any; toast: (m: string, 
       <div><button className="act teal" disabled={busy} onClick={luuLp}>Lưu loại phòng</button> <button className="act grey" onClick={() => setLp(null)}>Thôi</button></div></div>}
     {h.loai_phong.map((p: any) => <div key={p.id} className="panel" style={{ margin: 0 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}><b style={{ fontSize: 16 }}>{p.ten}</b>
-        <span className="muted">{[p.dien_tich ? `${p.dien_tich} m²` : "", p.giuong, `tối đa ${p.toi_da_nguoi_lon} NL`,
+        <span className="muted">{[p.dien_tich ? `${p.dien_tich} m²` : "", p.giuong, p.toi_da_nguoi_lon == null ? "người lớn chưa xác nhận" : `tối đa ${p.toi_da_nguoi_lon} NL`,
+          p.tong_khach_toi_da ? `tổng ${p.tong_khach_toi_da} khách` : "",
           p.toi_da_tre_em === null ? "trẻ em chưa xác nhận" : p.toi_da_tre_em ? `${p.toi_da_tre_em} TE` : "không nhận TE ở chung",
           p.giuong_phu_toi_da ? `${p.giuong_phu_toi_da} giường phụ` : "", `${p.so_phong} phòng / đêm`].filter(Boolean).join(" · ")}</span>
         {!p.dang_ban && <Tag cls="warn">Ngừng bán</Tag>}
@@ -396,7 +424,7 @@ function Phong({ h, x, toast, goi, busy }: { h: any; x: any; toast: (m: string, 
           <button className="act grey" onClick={() => setG({ lid: p.id, ten: "Chỉ phòng", bua_sang: false, huy_truoc_ngay: 2, dang_ban: true, mua: [{ ...MUA0 }] })}>+ Gói giá</button></>}</div>
       <div style={{ overflowX: "auto" }}><table><thead><tr><th>Gói</th><th>Mùa giá (giá / đêm, chưa thuế phí)</th><th>Trạng thái</th><th></th></tr></thead>
         <tbody>{p.goi.map((q: any) => <tr key={q.id} className="ksv-goi">
-          <td><b>{q.ten}</b><div className="muted">{q.bua_sang ? "Có bữa sáng" : "Chỉ phòng"} · {q.huy_truoc_ngay === null ? "Không hoàn tiền" : `Miễn phí hủy trước ${q.huy_truoc_ngay} ngày`}{q.dang_ban ? "" : " · ngừng bán"}</div></td>
+          <td><b>{q.ten}</b><div className="muted">{q.bua_sang ? "Có bữa sáng" : "Chỉ phòng"} · {q.huy_truoc_ngay === null ? "Không hoàn tiền" : `Miễn phí hủy trước ${q.huy_truoc_ngay} ngày${q.huy_gio_chot ? `, trước ${q.huy_gio_chot} (${x.mui_gio_huy?.[q.huy_mui_gio] || q.huy_mui_gio})` : ""}`}{q.cho_tra_sau === false ? " · không trả sau" : ""}{q.dang_ban ? "" : " · ngừng bán"}</div></td>
           <td>{q.mua.map((m: any) => <div key={m.id}>{m.tu_ngay.split("-").reverse().join("/")} – {m.den_ngay.split("-").reverse().join("/")}: <b>{tien(m.gia_thuong)}</b>{m.gia_cuoi_tuan ? ` · T6-T7 ${tien(m.gia_cuoi_tuan)}` : ""}{m.gia_niem_yet ? <span className="muted"> · niêm yết {tien(m.gia_niem_yet)}</span> : null}</div>)}</td>
           <td><Tag cls={TT[q.trang_thai]}>{q.trang_thai_ten}</Tag><div className="muted" style={{ fontSize: 12 }}>nhập: {q.sua_boi}{q.duyet_boi ? ` · duyệt: ${q.duyet_boi}` : ""}</div>
             {q.ly_do_tra_lai && <small style={{ color: "#d99a2b" }}>Trả lại: {q.ly_do_tra_lai}</small>}</td>
@@ -409,6 +437,12 @@ function Phong({ h, x, toast, goi, busy }: { h: any; x: any; toast: (m: string, 
           <label style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={g.bua_sang} onChange={(e) => setG({ ...g, bua_sang: e.target.checked })} />Có bữa sáng</label>
           <label>Hủy phòng<select value={g.huy_truoc_ngay === "" || g.huy_truoc_ngay === null ? "khong" : String(g.huy_truoc_ngay)} onChange={(e) => setG({ ...g, huy_truoc_ngay: e.target.value === "khong" ? "" : Number(e.target.value) })}>
             <option value="khong">Không hoàn tiền</option>{[0, 1, 2, 3, 5, 7, 14, 30].map((n) => <option key={n} value={n}>Miễn phí hủy trước {n} ngày</option>)}</select></label>
+          {/* KS-17: giờ chốt + múi giờ của hạn hủy, và gói có cho «đặt giữ, trả sau» không */}
+          <label>Giờ chốt hủy (trong ngày hạn hủy)<input value={g.huy_gio_chot || ""} placeholder="trống = hết ngày · vd 18:00" disabled={g.huy_truoc_ngay === "" || g.huy_truoc_ngay === null}
+            onChange={(e) => setG({ ...g, huy_gio_chot: e.target.value.replace(/[^\d:]/g, "").slice(0, 5) })} /></label>
+          <label>Múi giờ của giờ chốt<select value={g.huy_mui_gio || "Asia/Ho_Chi_Minh"} onChange={(e) => setG({ ...g, huy_mui_gio: e.target.value })}>
+            {Object.entries(x.mui_gio_huy || { "Asia/Ho_Chi_Minh": "Giờ Việt Nam (GMT+7)" }).map(([k2, v]: any) => <option key={k2} value={k2}>{v}</option>)}</select></label>
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={g.cho_tra_sau !== false} onChange={(e) => setG({ ...g, cho_tra_sau: e.target.checked })} />Cho khách đặt giữ, trả sau</label>
           <label style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={g.dang_ban} onChange={(e) => setG({ ...g, dang_ban: e.target.checked })} />Đang bán</label>
           <label>Giá trẻ em của gói<select value={g.tre_em_che_do || ""} onChange={(e) => {
             const p = h.loai_phong.find((y: any) => y.id === g.lid); const goc = p?.gia_tre_rieng || h.khach_san.cs_moc_tuoi || [];
