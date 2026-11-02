@@ -66,6 +66,10 @@ CHO_DA_KHAI_BA_VAI = [
     #   trên main rồi. Khai ở đây để lần sau còn ĐẾM ĐƯỢC. Ai thấy việc mở quyền ấy là sai
     #   thì sửa ở `payments.py`, chứ đừng xoá dòng này — xoá dòng này chỉ làm hàng rào mù.
     "api/v1/payments.py: thu_quy",
+    # ── SUA-2, 02/11/2026 ─────────────────────────────────────────────────────────────────
+    # `api/v1/hach_toan.py` — cửa ĐỌC `GET /hach-toan/bang`: chỉ danh mục hình thức thanh toán cho nút ĐÃ CHI ở
+    #   /expenses; thủ quỹ là người bấm ĐÃ CHI. Không mở bảng quy ước (`XEM` không đổi).
+    "api/v1/hach_toan.py: thu_quy",
     "api/v1/tai_xe.py: ketoan_truong",
     # `api/v1/routes.py` — Đợt E4a 12/10/2026: Kế toán trưởng nằm trong hai bộ vai XEM và TRÌNH
     #   của cửa điều khoản thanh toán, cùng bộ vai với Kế toán. Đợt E4a thêm mà quên khai, nên
