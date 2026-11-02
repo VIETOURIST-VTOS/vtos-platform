@@ -102,6 +102,9 @@ def match_transaction(db: Session, txn: BankTransaction) -> None:
     from app.services import tour_online as TRO  # TR-1: đơn tour online — khớp cả số cọc lẫn số còn lại, rồi gửi email
     if TRO.tu_khop(db, txn):
         return
+    from app.services import thanh_toan_doan as TTD  # TR-1d: link thanh toán tour đoàn — mã TD…, khớp đúng số của link
+    if TTD.tu_khop(db, txn):
+        return
     m = BOOKING_RE.search(txn.content.replace(" ", "") if txn.content else "")
     if not m:
         return _match_by_tour_code(db, txn)
@@ -158,6 +161,8 @@ def accountant_assign(db: Session, u: User, txn: BankTransaction, booking: Booki
     txn.match_status, txn.booking_id, txn.match_note = "da_khop", booking.id, f"Kế toán gán: {r.code}"
     R.audit(db, u.username, u.role, "ke_toan_gan_giao_dich", f"receipt:{r.code}", after={"booking": booking.code, "so_tien": txn.amount, "ghi_chu": note})
     ACC.on_receipt_confirmed(db, r, u.username, u.role)
+    from app.services import thanh_toan_doan as TTD  # TR-1d: đợt của link đoàn nay đã đủ → «đã trả» + email hóa đơn
+    TTD.sau_phieu_thu(db, booking.id, r.id)
     db.commit(); db.refresh(r)
     return r
 

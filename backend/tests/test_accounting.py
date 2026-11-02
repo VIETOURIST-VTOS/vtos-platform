@@ -56,13 +56,15 @@ def test_accounts_seeded_and_read_roles():
     assert client.get("/api/v1/journal", headers=login("kd.hoa")).status_code == 403
 
 
-def test_cash_receipt_posts_111_131():
+def test_cash_receipt_posts_1111_131():
     b = booking(ma_bk(3))
     r = client.post("/api/v1/receipts/cash", json={"booking_id": b["id"], "amount": 1000000, "payer": "Lê C", "note": "quầy"}, headers=login("ketoan")).json()
     e = next(x for x in journal() if x["source_ref"] == f"receipt:{r['receipt']['code']}")
     assert e["status"] == "da_ghi_so" and e["source_type"] == "thu_tien"
     d = {(l["account"], l["debit"], l["credit"]) for l in e["lines"]}
-    assert ("111", 1000000, 0) in d and ("131", 0, 1000000) in d
+    # DOT R4c-4 02/11/2026 — ve tien ve cap CHI TIET. `111` la tai khoan CHA; doi chieu bang
+    # quy uoc so bang tien to nen cap `111/131` roi vao ro "ngoai luat".
+    assert ("1111", 1000000, 0) in d and ("131", 0, 1000000) in d
 
 
 def test_invoice_flow_and_vat_split():

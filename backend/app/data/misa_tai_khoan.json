@@ -902,6 +902,46 @@
    "pl_code": "01"
   },
   {
+   "code": "521",
+   "name": "Các khoản giảm trừ doanh thu",
+   "kind": "DT",
+   "parent": "",
+   "level": 1,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "02"
+  },
+  {
+   "code": "5211",
+   "name": "Chiết khấu thương mại",
+   "kind": "DT",
+   "parent": "521",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "02"
+  },
+  {
+   "code": "5212",
+   "name": "Hàng bán bị trả lại",
+   "kind": "DT",
+   "parent": "521",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "02"
+  },
+  {
+   "code": "5213",
+   "name": "Giảm giá hàng bán",
+   "kind": "DT",
+   "parent": "521",
+   "level": 2,
+   "bs_debit": null,
+   "bs_credit": null,
+   "pl_code": "02"
+  },
+  {
    "code": "515",
    "name": "Doanh thu hoạt động tài chính",
    "kind": "DT",

@@ -371,7 +371,15 @@ MAN_HINH_API = {
     # Và Trưởng phòng Hướng dẫn – người ký đơn của hướng dẫn viên – không có màn hình này. Cả hai
     # người ký cùng có /xe-hdv, nên hàng đợi nằm ở đó, cạnh chính những người làm đơn.
     "/doi-xe": ("/api/v1/fleet", "/api/v1/vehicles", "/api/v1/drivers"),
-    "/expenses": ("/api/v1/cashflow", "/api/v1/payment-requests", "/api/v1/tours"),
+    # ĐỢT P2-1 02/11/2026 — `web/app/expenses/page.tsx` dòng 64 gọi `api("/hach-toan/bang")`
+    # để đọc `hinh_thuc_tt`; bản đồ thiếu đúng đường ấy nên `test_p2` đỏ, và cái đỏ ấy chặn
+    # MỌI PR của MỌI làn vì `hang-rao-gop` là hàng rào bắt buộc.
+    #
+    # KHAI ĐƯỜNG HẸP, KHÔNG KHAI CẢ NHÓM. `"/api/v1/hach-toan"` sẽ phủ mọi nhánh con, tức là
+    # trao toàn bộ hạch toán cho mọi vai mở được màn đề nghị chi. Màn này chỉ cần MỘT cửa đọc
+    # danh mục hình thức thanh toán, nên bản đồ nói đúng chừng ấy.
+    "/expenses": ("/api/v1/cashflow", "/api/v1/payment-requests", "/api/v1/tours",
+                  "/api/v1/hach-toan/bang"),
     # `/api/v1/bank-transactions` vào đây ngày 13/10/2026 theo Đợt E6, và nó SỬA MỘT CHỖ ĐỎ DO
     # ĐỢT E5 ĐỂ LẠI TRÊN MAIN cùng ngày: E5 thêm khối phân bổ tiền RA vào `web/app/finance/
     # page.tsx`, khối ấy gọi bốn lần `/bank-transactions`, và `test_p2` đỏ đúng một dòng. Bản ghi
@@ -383,7 +391,17 @@ MAN_HINH_API = {
     # `/finance` đều đã mở được `/collections`, nơi `/api/v1/bank-transactions` đã khai từ trước.
     # Hàng rào TRONG của bốn cửa phân bổ vẫn là `require_roles("ketoan", "cntt")`, không đổi.
     "/finance": ("/api/v1/fin", "/api/v1/cashflow", "/api/v1/bank-transactions"),
-    "/hach-toan": ("/api/v1/hach-toan",),
+    # ĐỢT P2-1 02/11/2026 (Chủ tịch chốt) — `/api/v1/tien-ghi-cap-cha` của vòng R4c-4 (PR #590,
+    # gộp 02/11) đọc bút toán ghi tiền vào TK 111/112/113. Tìm cả kho chỉ có ĐÚNG MỘT chỗ nhắc
+    # tới nó: chính dòng định nghĩa ở `backend/app/api/v1/accounting.py`. Không màn hình nào
+    # gọi, nên hàng rào NGOÀI chặn nó và `test_khong_nhom_api_nao_mo_coi` đỏ.
+    #
+    # DÒNG NÀY KHÔNG MỞ THÊM MỘT CẶP QUYỀN NÀO, và con số đếm được: hàng rào TRONG của cửa là
+    # `require_roles("ketoan","cntt","tgd","chutich","bks","ptgd_doan","hcns")` và vòng này
+    # KHÔNG chạm nó. Màn `/hach-toan` mở cho BASE_VIEW + ketoan, cntt, tp_dh, hcns; giao hai
+    # tập là ketoan, cntt, hcns — ba vai vốn đã đọc được hạch toán. tp_dh thấy màn nhưng cửa
+    # vẫn chặn. Khi làn R4c dựng xong màn hình thật cho cửa này thì dời dòng sang màn ấy.
+    "/hach-toan": ("/api/v1/hach-toan", "/api/v1/tien-ghi-cap-cha"),
     # ĐỢT R4b-2b 23/10/2026 — màn hình chỉ gọi một nhóm cửa: /api/v1/books.
     "/hoa-don-thieu": ("/api/v1/books",),
     # V7 Đợt 3 (10/9/2026). Sự cố tour đọc thêm /tours, /bookings, /suppliers và /payment-requests: màn

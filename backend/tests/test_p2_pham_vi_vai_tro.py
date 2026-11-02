@@ -693,7 +693,7 @@ PHAM_VI_DA_CHOT = {
     #
     # Vòng HD-DG3 đầu (PR #378) KHÔNG cập nhật bảng này. Không ai thấy, vì PR ấy chết ở bước
     # ruff chạy TRƯỚC mọi phép thử — bảng chốt chưa từng được hỏi. Ghép lại 17/10 mới lộ ra.
-    "chutich": 150, "tgd": 150, "bks": 150, "cntt": 133, "ir_phapche": 22,   # +1 KS-10 29/10/2026: /api/v1/don-khach-san-ota (cả tp_dh, robot_ks) — màn Đơn phòng OTA của Điều hành   # +1 NCC-1 28/10/2026: /api/v1/cong-ncc (cả tp_dh, nv_dh, gd_kd, ketoan, ketoan_truong, nv_mkt, ptgd_mkt, robot_ks); +1 CD-1 28/10/2026: /api/v1/ir-cong-co-dong (cả ir_phapche, robot_ks); +1 KS-2 28/10/2026: /api/v1/doi-soat-ota (cả ketoan, ketoan_truong); +1 KS-1 28/10/2026: /api/v1/khach-san-ota; +2 KH-4 27/10/2026: /api/v1/yeu-cau-khach, /api/v1/gop-y-lanh-dao; +1 CG-1 26/10/2026: /api/v1/tai-khoan-ngoai; +1 DH-1 26/10/2026: /api/v1/hoa-hong-d06; +1 KH-2 26/10/2026: /api/v1/nha-hang; +1 KH-3 26/10/2026: /api/v1/rewards (Kinh doanh, Sale Admin, Kế toán, Marketing)
+    "chutich": 152, "tgd": 152, "bks": 152, "cntt": 135, "ir_phapche": 22,   # +1 KS-10 29/10/2026: /api/v1/don-khach-san-ota (cả tp_dh, robot_ks) — màn Đơn phòng OTA của Điều hành   # +1 NCC-1 28/10/2026: /api/v1/cong-ncc (cả tp_dh, nv_dh, gd_kd, ketoan, ketoan_truong, nv_mkt, ptgd_mkt, robot_ks); +1 CD-1 28/10/2026: /api/v1/ir-cong-co-dong (cả ir_phapche, robot_ks); +1 KS-2 28/10/2026: /api/v1/doi-soat-ota (cả ketoan, ketoan_truong); +1 KS-1 28/10/2026: /api/v1/khach-san-ota; +2 KH-4 27/10/2026: /api/v1/yeu-cau-khach, /api/v1/gop-y-lanh-dao; +1 CG-1 26/10/2026: /api/v1/tai-khoan-ngoai; +1 DH-1 26/10/2026: /api/v1/hoa-hong-d06; +1 KH-2 26/10/2026: /api/v1/nha-hang; +1 KH-3 26/10/2026: /api/v1/rewards (Kinh doanh, Sale Admin, Kế toán, Marketing)
     # ── 17/10/2026 · hcns 71 → 72, ĐỢT R3b ───────────────────────────────────────────
     # Nhóm duy nhất thêm là "/api/v1/hach-toan", và chỉ vì một lẽ: danh mục BỘ PHẬN nằm ở
     # màn ấy. Cơ cấu phòng ban là việc của Hành chính – Nhân sự, không phải Kế toán; cho
@@ -702,7 +702,7 @@ PHAM_VI_DA_CHOT = {
     # KH-2 26/10/2026: +1 /api/v1/nha-hang cho tp_dh, nv_dh (nhập nhà hàng), tp_kd, gd_kd (bật hiện cổng khách).
     # AT-1 (28/10/2026, Chủ tịch duyệt «Hương vị Việt Nam») — +1 cho BỐN vai: màn /nha-hang mở thêm cho Marketing
     # (nv_mkt, ptgd_mkt viết món / thành phố / ảnh) và Kế toán (ketoan, ketoan_truong xem tệp hợp đồng nhà hàng).
-    "ketoan": 118, "tp_dh": 107, "ptgd_doan": 81, "nv_dh": 75, "hcns": 73, "gd_kd": 83,   # +1 KH-4: /api/v1/yeu-cau-khach
+    "ketoan": 120, "tp_dh": 109, "ptgd_doan": 82, "nv_dh": 76, "hcns": 75, "gd_kd": 84,   # +1 KH-4: /api/v1/yeu-cau-khach
     # ── 24/9/2026 · VAI MỚI `sales_admin` (Sale Admin phòng Đoàn) ─────────────────────────────
     # Mở theo Bản mô tả công việc hiệu lực 01/9/2026. 34 nhóm API — HẸP HƠN nhân viên kinh doanh
     # (46), và đó là ĐÚNG hình của vị trí: chị ấy đọc sâu hơn ở phần hồ sơ, công nợ và quyết toán,
@@ -723,7 +723,7 @@ PHAM_VI_DA_CHOT = {
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 61, "nv_kd": 59, "tn_kd": 59, "tp_kd": 63, "nv_mkt": 46,   # +1 KH-4: /api/v1/yeu-cau-khach
+    "ptgd_mkt": 62, "nv_kd": 59, "tn_kd": 59, "tp_kd": 63, "nv_mkt": 46,   # +1 KH-4: /api/v1/yeu-cau-khach
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
@@ -751,7 +751,7 @@ PHAM_VI_DA_CHOT = {
     # được loại đối tượng và phòng ban của mình, hai cửa dữ liệu khách thì không mở. Bảng
     # này đếm MÀN HÌNH chạm tới đâu, nên nó không thấy phần bó ấy — xem
     # `test_q1_bang_diem_theo_pham_vi` để biết cửa thật hẹp tới đâu.
-    "gd_doi_xe": 36, "hanh_chinh": 33, "tp_hd": 32, "tai_xe": 23, "hdv": 23, "nv_visa": 22,
+    "gd_doi_xe": 36, "hanh_chinh": 34, "tp_hd": 32, "tai_xe": 23, "hdv": 23, "nv_visa": 22,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng
@@ -792,8 +792,8 @@ PHAM_VI_DA_CHOT = {
     #
     # HÀNG RÀO NÀY REO LÀ ĐÚNG VIỆC CỦA NÓ: em nới `MOI_NHAN_VIEN` cho một mục đích (đơn nghỉ
     # phép) và nó bắt em đếm lại CẢ phạm vi, kể cả ba màn hình em không nghĩ tới lúc sửa.
-    "ketoan_truong": 119, "ketoan_tt": 31, "thu_quy": 27,
-    "robot_pq": 18, "robot_ks": 150, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "ketoan_truong": 121, "ketoan_tt": 32, "thu_quy": 28,
+    "robot_pq": 18, "robot_ks": 152, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 

@@ -155,3 +155,29 @@ def tr_lich(pid: int, tour_id: int, db: Session = Depends(get_db)):
 def tr_tinh(tour_id: int, nguoi_lon: int = 1, tre_em: int = 0, em_be: int = 0, cach_tra: str = "coc", db: Session = Depends(get_db)):
     from app.services import tour_online as TR
     return _tr(TR.tinh, db, tour_id, nguoi_lon, tre_em, em_be, cach_tra)
+
+
+# ── TR-1d (Chủ tịch duyệt 02/11/2026) · link thanh toán tour đoàn riêng kh.vietourist.vn/thanh-toan/TD… ─────────
+# Khách mở link KHÔNG cần đăng nhập: mã link là thứ Sale Admin gửi riêng cho khách. Chỉ GET; tiền vào đi qua
+# khớp giao dịch ngân hàng (robot + Kế toán), không có cửa ghi nào ở đây. Phanh chung của router chặn dò mã.
+def _ttd(f, *a, **k):
+    from app.services import thanh_toan_doan as TTD
+    try:
+        return f(*a, **k)
+    except TTD.LoiTTD as ex:
+        raise HTTPException(ex.status, str(ex))
+
+
+@router.get("/tt-doan/{ma}")
+def ttd_xem(ma: str, db: Session = Depends(get_db)):
+    from app.services import thanh_toan_doan as TTD
+    return _ttd(TTD.xem_cong, db, ma)
+
+
+@router.get("/tt-doan/{ma}/hoa-don")
+def ttd_hoa_don(ma: str, db: Session = Depends(get_db)):
+    from fastapi.responses import Response
+    from app.services import thanh_toan_doan as TTD
+    pdf = _ttd(TTD.tai_hoa_don, db, ma)
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="HoaDon-{ma.upper()}.pdf"'})

@@ -25,6 +25,9 @@ XEM = ("chutich", "tgd", "bks", "cntt", "ptgd_mkt", "gd_kd", "tp_kd", "tn_kd", "
 SOAN = ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "ptgd_mkt", "tgd", "chutich", "cntt")
 # Ai đặt BẢNG GIÁ: chính sách bán không phải việc của từng sale.
 DAT_GIA = ("gd_kd", "tp_kd", "ptgd_mkt", "tgd", "chutich", "cntt")
+# TR-1d (Chủ tịch 02/11/2026): Sale Admin phòng Đoàn tạo link thanh toán theo đợt — nên ĐỌC được danh sách hợp
+# đồng, lịch thanh toán và link của nó. Chỉ ba cửa đọc ấy; báo giá / bảng giá vẫn như cũ.
+XEM_HD = XEM + ("sales_admin",)
 
 
 class BangGiaIn(BaseModel):
@@ -280,7 +283,7 @@ def _hd_ra(hd: HopDongKhach) -> dict:
 
 
 @router.get("/hop-dong")
-def ds_hop_dong(trang_thai: str = "", u: User = Depends(require_roles(*XEM)),
+def ds_hop_dong(trang_thai: str = "", u: User = Depends(require_roles(*XEM_HD)),
                 db: Session = Depends(get_db)):
     q = select(HopDongKhach).order_by(HopDongKhach.id.desc())
     if trang_thai: q = q.where(HopDongKhach.trang_thai == trang_thai)
@@ -336,7 +339,7 @@ def _hd(db: Session, hid: int) -> HopDongKhach:
 
 
 @router.get("/hop-dong/{hid}/lich-thanh-toan")
-def xem_lich(hid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+def xem_lich(hid: int, u: User = Depends(require_roles(*XEM_HD)), db: Session = Depends(get_db)):
     from app.services import lich_thanh_toan as LTT
     hd = _hd(db, hid)
     b = LTT.bang(db, hd)
@@ -370,6 +373,54 @@ def doi_han(did: int, data: DoiHanIn, u: User = Depends(require_roles(*SOAN, "ke
         return LTT.doi_han(db, u, d, data.han, data.ly_do)
     except ValueError as e:
         raise HTTPException(422, str(e))
+
+
+# ── TR-1d · link thanh toán tour đoàn riêng (Chủ tịch duyệt 02/11/2026) ─────────────────────────────────────────
+class LinkTTIn(BaseModel):
+    lich_id: int
+    email: str = ""
+    dien_thoai: str = ""
+    gui_email: bool = True
+
+
+class HuyLinkIn(BaseModel):
+    ly_do: str
+
+
+def _ttd(f, *a, **k):
+    from app.services import thanh_toan_doan as TTD
+    try:
+        return f(*a, **k)
+    except TTD.LoiTTD as e:
+        raise HTTPException(e.status, str(e))
+
+
+@router.get("/hop-dong/{hid}/link-thanh-toan")
+def ds_link_tt(hid: int, u: User = Depends(require_roles(*XEM_HD)), db: Session = Depends(get_db)):
+    from app.services import thanh_toan_doan as TTD
+    _hd(db, hid)
+    return TTD.ds_theo_hop_dong(db, hid)
+
+
+@router.post("/link-thanh-toan")
+def tao_link_tt(data: LinkTTIn, u: User = Depends(require_roles("sales_admin", mo_ta="tạo link thanh toán tour đoàn")),
+                db: Session = Depends(get_db)):
+    from app.services import thanh_toan_doan as TTD
+    return _ttd(TTD.tao, db, u, data.lich_id, data.email, data.dien_thoai, data.gui_email)
+
+
+@router.post("/link-thanh-toan/{ma}/huy")
+def huy_link_tt(ma: str, data: HuyLinkIn, u: User = Depends(require_roles("sales_admin", mo_ta="hủy link thanh toán tour đoàn")),
+                db: Session = Depends(get_db)):
+    from app.services import thanh_toan_doan as TTD
+    return _ttd(TTD.huy, db, u, ma, data.ly_do)
+
+
+@router.post("/link-thanh-toan/{ma}/gui-lai")
+def gui_lai_link_tt(ma: str, u: User = Depends(require_roles("sales_admin", mo_ta="gửi lại email link thanh toán tour đoàn")),
+                    db: Session = Depends(get_db)):
+    from app.services import thanh_toan_doan as TTD
+    return _ttd(TTD.gui_lai, db, u, ma)
 
 
 @router.get("/hop-dong-qua-han")
