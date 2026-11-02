@@ -111,16 +111,9 @@ CONG_KHAI: dict[str, str] = {
         "theo địa chỉ mạng. Cửa CHỈ RÚT: nó không trả về nhận xét, không trả về tên hướng dẫn "
         "viên, không trả về một trường dữ liệu nào — nên dù ai cầm được đường dẫn cũng không đọc "
         "được gì. Mã sai và mã đã dùng trả về ĐÚNG MỘT câu giống nhau, để cửa không thành máy dò."),
-    # CG-1 · 26/10/2026 — cổng kết nối VTD. Hai cửa ĐĂNG NHẬP của khách hàng, đối tác, cổ đông: họ
-    # không có tài khoản VTOS nên không có vai trò để khai — cùng lý do với POST /auth/login.
-    "POST /api/v1/cong/ma": (
-        "Gửi MÃ MỘT LẦN qua Zalo hoặc Email cho người ở cổng ngoài. Thay cho đăng nhập: phanh theo địa "
-        "chỉ mạng (30 lượt/10 phút), tối đa 5 mã mỗi liên hệ mỗi giờ, trả CÙNG một câu dù liên hệ đã có "
-        "tài khoản hay chưa nên cửa không thành máy dò. Không đọc ra dữ liệu nào."),
-    "POST /api/v1/cong/xac-thuc": (
-        "Đổi mã một lần lấy PHIÊN CỔNG NGOÀI. Mã lưu dạng băm HMAC, sống 5 phút, sai 5 lần là chết, "
-        "dùng một lần; kèm phanh theo địa chỉ mạng. Phiên cấp ra ký bằng khoá RIÊNG nên không mở được "
-        "bất kỳ cửa nội bộ nào (deps.current_user giải mã bằng SECRET_KEY → 401)."),
+    # CG-1 · 26/10/2026 đã khai hai cửa `POST /api/v1/cong/ma` và `POST /api/v1/cong/xac-thuc` ở đây.
+    # DK-4 · 02/11/2026 XOÁ cả hai khỏi máy chủ (tạo tài khoản không mật khẩu bằng mã một lần — trái
+    # điều 5 Chủ tịch chốt 01/11/2026), nên hai dòng khai cũng rút theo.
     "POST /api/v1/tong-dai/cuoc-goi/{ma}": (
         "Tổng đài gọi vào khi có cuộc gọi tới, xác thực bằng mã đường dẫn bí mật cấp riêng cho nhà "
         "cung cấp tổng đài. Không có người dùng ở đầu kia nên không có vai trò để khai."),

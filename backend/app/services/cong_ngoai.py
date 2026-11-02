@@ -214,36 +214,8 @@ def doc_phien(db: Session, token: str) -> TaiKhoanNgoai | None:
     return tk
 
 
-def xac_thuc(db: Session, khoa: str, ma: str, dong_y: bool = False, now: datetime | None = None) -> tuple[TaiKhoanNgoai, str]:
-    now = now or datetime.now()
-    c = db.execute(select(MaXacThucNgoai).where(MaXacThucNgoai.khoa == (khoa or ""))).scalars().first()
-    if c is None or c.da_dung or c.het_han <= now or c.so_lan_sai >= SAI_TOI_DA:
-        raise LoiCong("Mã đã hết hạn hoặc không còn dùng được — bấm Gửi lại mã", ma="ma_het")
-    if not hmac.compare_digest(c.ma_bam, _bam(c.khoa, (ma or "").strip())):
-        c.so_lan_sai += 1
-        db.commit()
-        con = SAI_TOI_DA - c.so_lan_sai
-        raise LoiCong(f"Mã chưa đúng — còn {con} lần thử" if con > 0 else "Sai quá 5 lần — bấm Gửi lại mã",
-                      ma="ma_sai" if con > 0 else "ma_het")
-    cot = TaiKhoanNgoai.email if "@" in c.lien_he else TaiKhoanNgoai.dien_thoai
-    tk = db.execute(select(TaiKhoanNgoai).where(TaiKhoanNgoai.loai == c.loai, cot == c.lien_he)).scalars().first()
-    if tk is not None and tk.trang_thai in ("khoa", "tu_choi"):
-        c.da_dung = True; db.commit()
-        raise LoiCong("Tài khoản này đang bị khoá hoặc hồ sơ đã bị từ chối — liên hệ Vietourist", ma="bi_khoa", status=403)
-    if tk is None:
-        if not dong_y:
-            # KHÔNG tiêu mã: người dùng đồng ý điều khoản rồi gửi lại đúng mã này.
-            raise LoiCong("Lần đầu dùng liên hệ này — đọc và đồng ý điều khoản dịch vụ để tạo tài khoản",
-                          ma="can_dong_y", status=409)
-        tk = TaiKhoanNgoai(loai=c.loai, trang_thai="hoat_dong" if c.loai == "khach_hang" else "ho_so",
-                           dong_y_dieu_khoan_luc=now, tao_luc=now)
-        if "@" in c.lien_he: tk.email = c.lien_he
-        else: tk.dien_thoai = c.lien_he
-        db.add(tk)
-    c.da_dung = True
-    tk.dang_nhap_cuoi, tk.kenh_ua_thich = now, c.kenh
-    db.commit(); db.refresh(tk)
-    return tk, cap_phien(tk)
+# DK-4 (02/11/2026): `xac_thuc()` — tạo tài khoản KHÔNG MẬT KHẨU bằng mã một lần — đã xoá cùng hai cửa
+# /ma và /xac-thuc. Tài khoản chỉ ra đời ở `dang_ky_xong()`, sau khi đã đặt mật khẩu.
 
 
 def dang_xuat(db: Session, tk: TaiKhoanNgoai) -> None:

@@ -6,6 +6,7 @@ import KhachHang from "@/components/cong/khach/KhachHang";
 import DoiTac from "@/components/cong/doi-tac/DoiTac";
 import CoDong from "@/components/cong/co-dong/CoDong";
 import CongNcc from "@/components/cong/ncc/CongNcc";
+import TrangThaiHoSo from "@/components/cong/TrangThaiHoSo";
 
 /* CG-1 · KHÔNG GIAN SAU ĐĂNG NHẬP của cổng ngoài (khách hàng, đối tác, cổ đông).
    Đợt này làm cổng và tài khoản. Các phân hệ (đặt dịch vụ, đơn, điểm, ưu đãi cổ đông…) là đợt sau —
@@ -63,7 +64,9 @@ export default function Cong() {
             <main className="vtd-login" style={{ gridTemplateColumns: "1fr" }}>
               <section className="vtd-form">
                 <h2>Xin chào{toi.ho_ten ? `, ${toi.ho_ten}` : ""}</h2>
-                <p>Trạng thái tài khoản: <b>{toi.trang_thai_ten}</b>{toi.ly_do && <> — {toi.ly_do}</>}</p>
+                {/* DK-4: đối tác / cổ đông thấy mình đang ở bước nào trong sáu trạng thái hồ sơ. */}
+                {toi.loai !== "khach_hang" ? <TrangThaiHoSo toi={toi} />
+                  : <p>Trạng thái tài khoản: <b>{toi.trang_thai_ten}</b>{toi.ly_do && <> — {toi.ly_do}</>}</p>}
                 {msg && <div className="cong-ok">{msg}</div>}{err && <div className="cong-loi">{err}</div>}
 
                 {canHoSo && <>
@@ -78,7 +81,7 @@ export default function Cong() {
                   <label className="v3-field">Ghi chú<textarea rows={3} value={f.ghi_chu} onChange={(e) => setF({ ...f, ghi_chu: e.target.value })} /></label>
                   <div className="v4-actions"><button type="button" className="v3-button v3-primary cursor-interaction" disabled={busy} onClick={guiHoSo}>{busy ? "Đang gửi…" : "Gửi hồ sơ"}</button></div>
                 </>}
-                {toi.trang_thai === "cho_duyet" && <div className="cong-ok">Hồ sơ đã gửi lúc {String(toi.gui_ho_so_luc || "").slice(0, 16).replace("T", " ")} — đang chờ Vietourist duyệt.</div>}
+                {/* DK-4: dòng «Hồ sơ đã gửi lúc …» chuyển vào TrangThaiHoSo, kèm tên người đang duyệt. */}
 
                 {toi.trang_thai === "hoat_dong" && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 10, margin: "10px 0" }}>
                   {(PHAN_HE[toi.loai] || []).map(([t, m, s]) => <div key={t} style={{ border: "1px solid #dfe6ef", borderRadius: 12, padding: 12, color: "#142a43" }}>

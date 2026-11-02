@@ -65,35 +65,11 @@ def kenh(db: Session = Depends(get_db)):
     return C.kenh_san_sang(db)
 
 
-class GuiMaIn(BaseModel):
-    loai: str
-    lien_he: str
-    kenh: str
-
-
-@router.post("/ma")
-def gui_ma(data: GuiMaIn, request: Request, db: Session = Depends(get_db)):
-    ip = _phanh(request)
-    try:
-        return C.gui_ma(db, data.loai, data.lien_he, data.kenh, ip)
-    except C.LoiCong as ex:
-        _loi(ex)
-
-
-class XacThucIn(BaseModel):
-    khoa: str
-    ma: str
-    dong_y_dieu_khoan: bool = False
-
-
-@router.post("/xac-thuc")
-def xac_thuc(data: XacThucIn, request: Request, db: Session = Depends(get_db)):
-    _phanh(request)
-    try:
-        tk, phien = C.xac_thuc(db, data.khoa, data.ma, data.dong_y_dieu_khoan)
-    except C.LoiCong as ex:
-        _loi(ex)
-    return {"phien": phien, "toi": C.toi_out(tk)}
+# DK-4 (02/11/2026): hai cửa cũ `POST /cong/ma` + `POST /cong/xac-thuc` đã XOÁ. Chúng cho tạo tài khoản
+# KHÔNG MẬT KHẨU chỉ bằng mã một lần — trái điều 5 Chủ tịch chốt 01/11/2026 («mã không bao giờ thay
+# được mật khẩu»). DK-3 bỏ chúng khỏi màn hình, nhưng ai gọi thẳng vào máy chủ vẫn mở được tài khoản.
+# Nay mã chỉ còn là LỚP THỨ HAI ở ba chỗ: tạo tài khoản (/dang-ky/*), máy lạ (/dang-nhap/xac-minh),
+# đặt lại mật khẩu (/quen-mat-khau/*). Phép thử: test_cg1 · test_dk4_cua_vao_bang_ma_da_mat_khoi_may_chu.
 
 
 @router.get("/toi")
