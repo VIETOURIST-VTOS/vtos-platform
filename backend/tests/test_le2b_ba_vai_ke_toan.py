@@ -57,6 +57,15 @@ CHO_DA_KHAI_BA_VAI = [
     "services/ops.py: ketoan_truong",
     "services/ops.py: ketoan_tt",
     "services/ops.py: thu_quy",
+    # ── Đợt P2-2, 02/11/2026 ──────────────────────────────────────────────────────────────
+    # `api/v1/payments.py` — cửa PHIẾU THU TIỀN MẶT (`cash_receipt`) nay là
+    #   `require_roles("ketoan", "thu_quy")`. Dòng này đến cùng PR #613 (TR-1d) và lên main
+    #   mà chưa khai, nên f1 đỏ trên main — lại đúng việc phép thử này sinh ra để làm.
+    #
+    #   KHAI LÀ GHI NHẬN, KHÔNG PHẢI MỞ. Vòng P2-2 không chạm `payments.py`: quyền ấy đã nằm
+    #   trên main rồi. Khai ở đây để lần sau còn ĐẾM ĐƯỢC. Ai thấy việc mở quyền ấy là sai
+    #   thì sửa ở `payments.py`, chứ đừng xoá dòng này — xoá dòng này chỉ làm hàng rào mù.
+    "api/v1/payments.py: thu_quy",
     "api/v1/tai_xe.py: ketoan_truong",
     # `api/v1/routes.py` — Đợt E4a 12/10/2026: Kế toán trưởng nằm trong hai bộ vai XEM và TRÌNH
     #   của cửa điều khoản thanh toán, cùng bộ vai với Kế toán. Đợt E4a thêm mà quên khai, nên
