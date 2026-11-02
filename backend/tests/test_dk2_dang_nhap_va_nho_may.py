@@ -22,7 +22,10 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-MK = "hoa sen no thang bay"
+# SUA-5 (02/11/2026): mật khẩu mẫu phải NGẮN HƠN MK_DU_DAI_KHOI_HOI (15). Bản cũ 20 ký tự nên khách
+# hàng máy lạ được vào thẳng đúng theo luật «mật khẩu đủ dài khỏi hỏi mã» — phép thử 2 đỏ vì mẫu, không vì
+# mã. Phép thử 10 giữ mật khẩu dài riêng để soát chiều ngược lại.
+MK = "sen no thang7"
 DT = "0912345678"
 
 
@@ -173,6 +176,14 @@ def test_dk2_6_nho_toi_da_nam_may(moi):
     assert C.NHO_MAY_TOI_DA == 5 and C.NHO_MAY_NGAY == 90
     _tao(moi)
     for i in range(7):
+        # SUA-5: bảy lần gửi mã cho cùng một liên hệ vượt phanh GUI_TOI_DA_MOI_GIO (5/giờ) — phanh ấy là
+        # đúng. Phép thử này đo việc NHỚ MÁY, nên lùi giờ các mã đã gửi để mỗi vòng là một giờ khác.
+        from app.models.cong_ngoai import MaXacThucNgoai
+        s0 = moi["S"]()
+        for m in s0.execute(select(MaXacThucNgoai)).scalars().all():
+            m.tao_luc = m.tao_luc - timedelta(hours=2)
+        s0.commit()
+        s0.close()
         k = _vao(moi).json()["khoa"]
         r = c.post("/api/v1/cong/dang-nhap/xac-minh",
                    json={"khoa": k, "ma": moi["gui"][-1][2], "nho_may": True,
@@ -207,17 +218,17 @@ def test_dk2_7_dat_lai_mat_khau_quen_sach_may_va_tang_phien(moi):
     assert r.status_code == 200
     k2 = r.json()["khoa"]
     r2 = c.post("/api/v1/cong/quen-mat-khau/dat-lai",
-                json={"khoa": k2, "ma": moi["gui"][-1][2], "mat_khau": "con meo trang 2026"})
+                json={"khoa": k2, "ma": moi["gui"][-1][2], "mat_khau": "meo trang 2026"})
     assert r2.status_code == 200, r2.text
     s = moi["S"]()
     tk = s.get(TaiKhoanNgoai, tid)
     assert tk.phien == phien_truoc + 1, "đặt lại mật khẩu phải đăng xuất mọi nơi"
     assert not s.execute(select(MayDaNho)).scalars().all(), "phải quên sạch mọi máy"
-    assert C.dung_mat_khau("con meo trang 2026", tk.mat_khau_bam)
+    assert C.dung_mat_khau("meo trang 2026", tk.mat_khau_bam)
     assert not C.dung_mat_khau(MK, tk.mat_khau_bam), "mật khẩu cũ phải chết"
     s.close()
     # dấu nhớ cũ nay vô giá trị — vào lại phải gõ mã
-    assert _vao(moi, mk="con meo trang 2026", dau=dau).json()["xong"] is False
+    assert _vao(moi, mk="meo trang 2026", dau=dau).json()["xong"] is False
 
 
 # ── 8 · quên mật khẩu không thành máy dò ──────────────────────────────────────────────────────

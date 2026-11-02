@@ -49,6 +49,8 @@ from app.models.cskh import CareTicket
 from app.models.ban_hang import BaoGia
 from app.models.to_chuc_kd import PhanCongKD
 from app.models.visa import VisaCase, VisaTask
+from app.models.ops import DailyReportFollowUp
+from app.models.cham_soc_khach import HoTroKhach
 from app.services import rules as R
 
 # Tour đã qua những trạng thái này thì mọi thứ treo dưới nó là LỊCH SỬ, không bàn giao.
@@ -88,6 +90,12 @@ CHUYEN = [
      lambda q: q.where(Conversation.status != "dong")),
     ("service_requests", "sales_id", "Yêu cầu dịch vụ chưa thành booking",
      lambda q: q.where(ServiceRequest.booking_id.is_(None))),
+    # SUA-5 (02/11/2026): hai loại việc mới sinh sau HS-7, đều là việc GIAO CHO MỘT NGƯỜI và còn mở thì
+    # người kế nhiệm phải nhận — để lại thì việc treo dưới tên người đã nghỉ, không ai thấy.
+    ("daily_report_follow_ups", "nguoi_nhan_id", "Việc hỗ trợ từ báo cáo ngày chưa xong",
+     lambda q: q.where(DailyReportFollowUp.trang_thai.notin_(("da_xong", "rut")))),
+    ("ho_tro_khach", "giao_cho_id", "Yêu cầu hỗ trợ của khách chưa trả lời",
+     lambda q: q.where(HoTroKhach.trang_thai.notin_(("da_tra_loi", "dong")))),
     # Đóng chặng cũ, mở chặng mới — xử riêng trong `_chuyen_phan_cong`, không gán thẳng.
     ("phan_cong_kd", "user_id", "Phân công kinh doanh đang hiệu lực", None),
 ]
@@ -95,7 +103,8 @@ CHUYEN = [
 MO_HINH = {"tours": Tour, "bookings": Booking, "visa_cases": VisaCase, "visa_tasks": VisaTask,
            "leads": Lead, "bao_gia": BaoGia, "care_tickets": CareTicket,
            "conversations": Conversation, "service_requests": ServiceRequest,
-           "phan_cong_kd": PhanCongKD}
+           "phan_cong_kd": PhanCongKD, "daily_report_follow_ups": DailyReportFollowUp,
+           "ho_tro_khach": HoTroKhach}
 
 # ---------------------------------------------------------------------------------------------
 # NHÓM 2 — GIỮ NGUYÊN TÊN NGƯỜI CŨ. Lịch sử đã phát sinh là thứ không bàn giao được.

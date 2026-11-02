@@ -31,7 +31,9 @@ def db():
         s.add(User(username=ten, full_name=ten.upper(), role=vai, password_hash="x"))
     s.add(PhapNhanHopDong(id=1, ma="INFINIS_CA", ten="THE INFINIS PATHWAY INC.", quoc_gia="Canada"))
     for i, (m, t) in enumerate((("expedia", "Expedia"), ("booking_com", "Booking.com"))):
-        s.add(DoiTacOta(ma=m, ten=t, phap_nhan_id=1, thu_tu=i))
+        # SUA-5 (02/11/2026): KS-5 thêm hai điều kiện bật — quyền AFFILIATE và môi trường khác «Tắt». Dữ liệu mẫu
+        # ghi sẵn hai điều ấy để phép thử đo đúng bốn điều kiện gốc của nó.
+        s.add(DoiTacOta(ma=m, ten=t, phap_nhan_id=1, thu_tu=i, quyen="AFFILIATE", moi_truong="thu"))
     s.commit()
     yield s
     s.close()
@@ -50,7 +52,10 @@ def _ota(s, ma="expedia"):
 def _mo(s, ma="expedia", link=LINK, mien="expedia.com"):
     from app.services import khach_san_ota as S
     o = _ota(s, ma)
-    S.sua(s, _u(s, "ct"), o.id, {"trang_thai": "da_duyet", "link": link, "ten_mien": mien, "da_kiem_link": True, "duoc_dung_web": True})
+    # SUA-5: KS-3 — đổi link thì cờ «đã kiểm» rơi về chưa, kể cả khi gửi kèm trong cùng một lần sửa. Kiểm
+    # link là bước RIÊNG sau khi link đã nằm yên, nên mẫu tách làm hai lần sửa.
+    S.sua(s, _u(s, "ct"), o.id, {"trang_thai": "da_duyet", "link": link, "ten_mien": mien, "duoc_dung_web": True})
+    S.sua(s, _u(s, "ct"), o.id, {"da_kiem_link": True})
     return S.bat_tat(s, _u(s, "ct"), o.id, True)
 
 
@@ -73,7 +78,8 @@ def test_bat_chi_khi_du_bon_dieu_va_chi_chu_tich(db):
         with pytest.raises(S.LoiOta) as ex:
             S.sua(db, _u(db, ai), o.id, {"trang_thai": "da_duyet"})
         assert ex.value.status == 403
-    S.sua(db, _u(db, "ct"), o.id, {"trang_thai": "da_duyet", "link": LINK, "ten_mien": "expedia.com", "da_kiem_link": True})
+    S.sua(db, _u(db, "ct"), o.id, {"trang_thai": "da_duyet", "link": LINK, "ten_mien": "expedia.com"})
+    S.sua(db, _u(db, "ct"), o.id, {"da_kiem_link": True})              # SUA-5: kiểm link là bước riêng (KS-3)
     with pytest.raises(S.LoiOta):                                        # thiếu «được dùng trên web»
         S.bat_tat(db, _u(db, "ct"), o.id, True)
     S.sua(db, _u(db, "ct"), o.id, {"duoc_dung_web": True})
@@ -133,7 +139,8 @@ def test_chuyen_khach_mot_luot_mot_request(db):
     with pytest.raises(S.LoiOta) as ex:                                   # cùng request, khác OTA
         S.chuyen(db, tk, "booking_com", rid, {}, now=NOW)
     assert ex.value.status == 409
-    S.sua(db, _u(db, "ct"), _ota(db).id, {"link": "https://expedia.com/affiliate/MOI", "da_kiem_link": True})
+    S.sua(db, _u(db, "ct"), _ota(db).id, {"link": "https://expedia.com/affiliate/MOI"})
+    S.sua(db, _u(db, "ct"), _ota(db).id, {"da_kiem_link": True})         # SUA-5: kiểm link là bước riêng (KS-3)
     S.bat_tat(db, _u(db, "ct"), _ota(db).id, True)
     with pytest.raises(S.LoiOta) as ex:                                   # link đổi phiên bản → không phát link cũ
         S.chuyen(db, tk, "expedia", rid, {}, now=NOW)

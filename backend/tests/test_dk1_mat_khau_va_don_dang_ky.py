@@ -116,8 +116,9 @@ def test_dk1_5_bam_khong_cat_o_72_byte(moi):
     """bcrypt chỉ đọc 72 byte đầu. Tiếng Việt có dấu 3 byte một ký tự nên 64 ký tự có thể 192
     byte — không băm sha256 trước thì hai mật khẩu khác hẳn nhau sẽ cùng một băm."""
     C = moi["C"]
-    a = "à" * 30 + "mot"          # 30*3 + 3 = 93 byte
-    b = "à" * 30 + "hai"          # khác nhau ở byte 91-93, tức SAU byte thứ 72
+    # SUA-5: «à» (U+00E0) chỉ 2 byte nên bản cũ 63 byte, chưa vượt 72. «ạ» (U+1EA1) mới là 3 byte.
+    a = "ạ" * 30 + "mot"          # 30*3 + 3 = 93 byte
+    b = "ạ" * 30 + "hai"          # khác nhau ở byte 91-93, tức SAU byte thứ 72
     assert len(a.encode()) > 72 and len(b.encode()) > 72
     assert C.dung_mat_khau(a, C.bam_mat_khau(a)) is True
     assert C.dung_mat_khau(b, C.bam_mat_khau(b)) is True
