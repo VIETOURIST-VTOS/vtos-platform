@@ -168,7 +168,7 @@ class DonKhachSanOta(Base):
     tien_te: Mapped[str] = mapped_column(String(3), default="VND")
 
     # Giá ĐÃ GỒM THUẾ, lấy ở `rate.inclusive`. Không chép `totalPayment`: tài liệu cấm dùng.
-    gia_gom_thue: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
+    gia_gom_thue: Mapped[float | None] = mapped_column(Numeric(14, 2), default=0, nullable=True)
     phu_thu: Mapped[str] = mapped_column(Text, default="")              # surcharges, dạng JSON
 
     # ── bước 3 · Book ──────────────────────────────────────────────────────────────────────
@@ -186,7 +186,7 @@ class DonKhachSanOta(Base):
     # ── bước 5-6 · Cancel ──────────────────────────────────────────────────────────────────
     tham_chieu_huy: Mapped[int] = mapped_column(Integer, default=0)     # cancellationSummary.reference
     ly_do_huy: Mapped[int] = mapped_column(Integer, default=0)
-    hoan_gom_thue: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
+    hoan_gom_thue: Mapped[float | None] = mapped_column(Numeric(14, 2), default=0, nullable=True)
     huy_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # ── KS-11 · CHỦ ĐƠN ────────────────────────────────────────────────────────────────────

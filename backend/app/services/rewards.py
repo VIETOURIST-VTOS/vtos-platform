@@ -607,7 +607,7 @@ def _thuong_gioi_thieu(db: Session, chu: str, h: date, hn: date, now: datetime, 
 
 
 def co_du_toan(t: Tour | None) -> bool:
-    if t is None or not t.price_per_pax or float(t.price_per_pax) <= 0:
+    if t is None or not (t.price_per_pax or 0) or float(t.price_per_pax or 0) <= 0:
         return False
     return t.fixed_cost is not None or t.var_cost_per_pax is not None
 
@@ -632,7 +632,7 @@ def phong_uu_dai_tour(db: Session, b: Booking, them: int = 0, chu: str | None = 
     if not co_du_toan(t):
         return None
     pax = max(int(t.planned_pax or 0), R.booked_pax(t))
-    dt_ = Fraction(int(round(float(t.price_per_pax)))) * pax
+    dt_ = Fraction(int(round(float(t.price_per_pax or 0)))) * pax
     B = int(round(float(b.amount or 0)))
     if dt_ <= 0 or B <= 0:
         return None
@@ -732,11 +732,11 @@ def ap_voucher(db: Session, u: User, ma_voucher: str, ma_booking: str, hom_nay: 
         raise LoiDiem("Booking không cùng SĐT / email với chủ voucher")
     net = int(round(float(b.amount or 0) - float(b.discount or 0)))
     tran = math.floor(net * TRAN_VOUCHER)
-    if v.gia_tri > tran:
+    if (v.gia_tri or 0) > tran:
         raise LoiDiem(f"Voucher {v.gia_tri:,} đ vượt trần 5% booking ({tran:,} đ)".replace(",", "."))
     _kiem_voucher_qua_tour(db, v, b, net)
     truoc = float(b.discount or 0)
-    b.discount = truoc + v.gia_tri
+    b.discount = truoc + (v.gia_tri or 0)
     v.trang_thai, v.booking_id, v.ap_boi, v.ap_luc = "da_dung", b.id, u.username, now
     R.audit(db, u.username, u.role, "ap_voucher_rewards", f"booking:{b.code}",
             before={"discount": truoc}, after={"discount": b.discount, "voucher": v.ma, "gia_tri": v.gia_tri})
@@ -761,7 +761,7 @@ def _kiem_voucher_qua_tour(db: Session, v: VoucherRewards, b: Booking, net: int)
     p = phong_uu_dai_tour(db, b, chu=v.chu)
     if p is None:
         raise LoiDiem("Tour chưa có dự toán (giá bán / chi phí) — chưa áp được ưu đãi mới")
-    if v.gia_tri > p["con"]:
+    if (v.gia_tri or 0) > p["con"]:
         raise LoiDiem(f"Vượt trần ưu đãi của booking: còn {max(0, p['con']):,} đ (trần {p['tran']:,} đ, đã dùng {p['da_dung']:,} đ)".replace(",", "."))
 
 
@@ -841,7 +841,7 @@ def _kiem_voucher(db: Session, tk, ma: str, tran: int, ten_tran: str, hom_nay: d
         raise LoiDiem("Voucher đã quá hạn dùng")
     if v.pham_vi == "tour":
         raise LoiDiem(f"Voucher {LOAI_VOUCHER.get(v.loai, v.loai).lower()} chỉ dùng cho tour")
-    if v.gia_tri > tran:
+    if (v.gia_tri or 0) > tran:
         raise LoiDiem(f"Voucher {v.gia_tri:,} đ vượt mức {ten_tran} ({tran:,} đ)".replace(",", "."))
     return v
 
@@ -930,7 +930,7 @@ def quyen_loi_don(db: Session, tk, b: Booking, hom_nay: date | None = None) -> d
     dung = []
     for v in ([] if ctv else db.execute(select(VoucherRewards).where(VoucherRewards.chu.in_(chu_cua_tai_khoan(tk)), VoucherRewards.trang_thai == "cho_dung",
                                                      VoucherRewards.han_dung >= hn).order_by(VoucherRewards.han_dung)).scalars()):
-        if v.gia_tri > tran or net < int(v.don_toi_thieu or 0):
+        if (v.gia_tri or 0) > tran or net < int(v.don_toi_thieu or 0):
             continue
         if v.loai == "chao_mung":
             dau = next((x for x in _bookings(db, v.chu) if not x.cancelled), None)

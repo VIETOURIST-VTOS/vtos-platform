@@ -127,9 +127,9 @@ def test_vietqr_chuan():
     assert Q.crc16("123456789") == "29B1"                               # CRC-16/CCITT-FALSE, giá trị kiểm chuẩn
     assert Q.bin_cua("Vietcombank") == "970436" and Q.bin_cua("Ngân hàng TMCP Tiên Phong (TPBank)") == "970423"
     assert Q.bin_cua("VietABank") == "970427" and Q.bin_cua("MB Bank") == "970422" and Q.bin_cua("Ngân hàng lạ") is None
-    p = Q.payload("970436", "0071 000 123456", 2094000, "BK26100012")
+    p = Q.payload("970436", "0071 000 123456", 2094000, "BKQR000012")
     assert p.startswith("000201010212") and "0010A000000727" in p and "5303704" in p and "54072094000" in p
-    assert "0810BK26100012" in p and p[-8:-4] == "6304" and Q.crc16(p[:-4]) == p[-4:]
+    assert "0810BKQR000012" in p and p[-8:-4] == "6304" and Q.crc16(p[:-4]) == p[-4:]
     with pytest.raises(ValueError):
         Q.payload("970436", "123", 0, "x")
 
@@ -145,7 +145,7 @@ def test_qr_don_so_tien_va_tham_so(db, monkeypatch):
     db.add(t); db.flush()
     r = ServiceRequest(tour_id=t.id, sales_id=_u(db, "nvkd").id, customer_name="An", customer_phone="0901234567", source="web", pax=2)
     db.add(r); db.flush()
-    b = Booking(code="BK26100012", tour_id=t.id, request_id=r.id, sales_id=_u(db, "nvkd").id, created_by=_u(db, "nvkd").id,
+    b = Booking(code="BKQR000012", tour_id=t.id, request_id=r.id, sales_id=_u(db, "nvkd").id, created_by=_u(db, "nvkd").id,
                 customer_name="An", customer_phone="0901234567", source="web", pax=2, amount=6_980_000, discount=0, deposit_pct=30)
     db.add(b)
     db.add(BankAccount(code="VCB1", bank_name="Vietcombank", account_number="0071000123456", account_name="CTCP VIETOURIST HOLDINGS"))
@@ -155,7 +155,7 @@ def test_qr_don_so_tien_va_tham_so(db, monkeypatch):
         K.qr_don(db, tk, b.code)                                          # chưa ký tài khoản → đóng
     monkeypatch.setattr(R, "get_param_text", lambda db, k, on=None: "0071000123456")
     q = K.qr_don(db, tk, b.code)
-    assert q["muc"] == "coc" and q["so_tien"] == 2_094_000 and q["con_lai"] == 6_980_000 and q["noi_dung"] == "BK26100012"
+    assert q["muc"] == "coc" and q["so_tien"] == 2_094_000 and q["con_lai"] == 6_980_000 and q["noi_dung"] == "BKQR000012"
     assert K.qr_don(db, tk, b.code, "du")["so_tien"] == 6_980_000 and K.qr_don(db, tk, b.code, "du")["tu_khop"] is True
     db.add(Receipt(code="PT1", booking_id=b.id, amount=2_094_000, status="tu_dong")); db.commit()
     q = K.qr_don(db, tk, b.code)

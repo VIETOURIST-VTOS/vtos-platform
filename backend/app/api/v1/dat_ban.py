@@ -152,7 +152,7 @@ def thay_doi(ma: str, data: ThayDoiIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngo
     d = _goi(S.thay_doi, db, tk, ma, data.ngay, data.gio, data.nguoi_lon, data.tre_em)
     msg = "Đã gửi thay đổi — chờ nhà hàng nhận" if d.thay_doi else "Đã cập nhật đơn"
     if d.hoan_tt == "cho_sales" and int(d.so_hoan or 0) > int(d.da_hoan_tien or 0):
-        msg += f" · phần trả dư {int(d.so_hoan) - int(d.da_hoan_tien or 0):,} đ sẽ được hoàn".replace(",", ".")
+        msg += f" · phần trả dư {int(d.so_hoan or 0) - int(d.da_hoan_tien or 0):,} đ sẽ được hoàn".replace(",", ".")
     return {"message": msg, "dat_ban": S.ds_cua(db, tk)}
 
 
@@ -163,7 +163,7 @@ class HuyIn(BaseModel):
 @router.post("/{ma}/huy")
 def huy(ma: str, data: HuyIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
     d = _goi(S.huy_boi_nguoi_dat, db, tk, ma, data.ly_do)
-    msg = (f"Đã hủy {d.ma}. Hoàn {int(d.so_hoan):,} đ".replace(",", ".") + " — Sales xác nhận, Kế toán hoàn trong 7 ngày làm việc."
+    msg = (f"Đã hủy {d.ma}. Hoàn {int(d.so_hoan or 0):,} đ".replace(",", ".") + " — Sales xác nhận, Kế toán hoàn trong 7 ngày làm việc."
            if d.so_hoan else f"Đã hủy {d.ma}.")
     return {"message": msg, "dat_ban": S.ds_cua(db, tk)}
 

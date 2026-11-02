@@ -200,7 +200,7 @@ def xem_cong(db: Session, ma: str, hom_nay: date | None = None) -> dict:
         ba = K.tai_khoan_qr(db)
         bin_ = Q.bin_cua(ba.bank_name) if ba is not None and ba.account_number else None
         if bin_:
-            so = int(round(float(l.so_tien)))
+            so = int(round(float(l.so_tien or 0)))
             ra["chuyen_khoan"] = {"ngan_hang": ba.bank_name, "so_tk": ba.account_number, "chu_tk": ba.account_name,
                                   "so_tien": so, "noi_dung": Q.noi_dung_sach(l.ma), "payload": Q.payload(bin_, ba.account_number, so, l.ma)}
     return ra
@@ -236,7 +236,7 @@ def tu_khop(db: Session, txn, now: datetime | None = None) -> bool:
     b = db.get(Booking, l.booking_id)
     so = float(txn.amount or 0)
     tt = trang_thai(l, now.date())
-    if b is None or b.cancelled or tt != "mo" or abs(so - float(l.so_tien)) >= 1:
+    if b is None or b.cancelled or tt != "mo" or abs(so - float(l.so_tien or 0)) >= 1:
         ly_do = (f"link {l.ma} đang «{tt}»" if tt != "mo" else
                  f"số {_vnd(so)} ≠ {_vnd(l.so_tien)} của link {l.ma}") if b is not None else f"link {l.ma} mất booking"
         txn.match_status, txn.booking_id = "cho_ke_toan", (b.id if b is not None else None)
@@ -276,7 +276,7 @@ def gui_email_link(db: Session, l: LinkThanhToanDoan, now: datetime | None = Non
         noi = (f"Kính gửi {x['hd'].khach_ten},\n\nVietourist gửi link thanh toán đợt {x['lich'].dot}/{x['so_dot']}"
                f" ({x['lich'].ten}) của hợp đồng {x['hd'].so_hop_dong}"
                + (f" — {x['t'].name}, khởi hành {x['t'].start_date:%d/%m/%Y}" if x["t"] and x["t"].start_date else "") + ".\n"
-               f"Số tiền: {_vnd(l.so_tien)} đ · hạn {l.han:%d/%m/%Y}.\n\n{GOC_LINK}{l.ma}\n\n"
+               f"Số tiền: {_vnd(l.so_tien or 0)} đ · hạn {l.han:%d/%m/%Y}.\n\n{GOC_LINK}{l.ma}\n\n"
                f"Thanh toán bằng chuyển khoản (QR hoặc chuyển tay), nội dung ghi đúng mã {l.ma}.\n\nVietourist")
         TRO.GUI_EMAIL(l.email, f"Link thanh toán đợt {x['lich'].dot} · {x['hd'].so_hop_dong}", noi, [])
         l.email_link_luc, l.email_loi = now, ""
@@ -349,7 +349,7 @@ def hoa_don_pdf(db: Session, l: LinkThanhToanDoan, now: datetime | None = None) 
     for r in db.execute(select(Receipt).where(Receipt.booking_id == b.id, Receipt.status != "huy").order_by(Receipt.id)).scalars():
         cach = "Tiền mặt" if r.method == "tien_mat" else "Chuyển khoản"
         g.text((L, y), f"{r.code} · {r.created_at:%d/%m/%Y %H:%M} · {cach}", font=f_nho, fill="#333")
-        g.text((W - L - 300, y), f"{_vnd(r.amount)} đ", font=f_nho, fill="#333"); y += 34
+        g.text((W - L - 300, y), f"{_vnd(r.amount or 0)} đ", font=f_nho, fill="#333"); y += 34
     g.text((L, H - 120), "Chứng từ xác nhận thanh toán do hệ thống Vietourist lập tự động — không thay hóa đơn GTGT.", font=f_nho, fill="#777")
     buf = io.BytesIO()
     im.save(buf, "PDF", resolution=150.0)

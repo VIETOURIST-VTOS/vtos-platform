@@ -82,7 +82,7 @@ class KhachSanVtd(Base):
     cs_giuong_phu_kieu: Mapped[str] = mapped_column(String(10), default="co_dinh")     # co_dinh (đ) | phan_tram (% giá phòng)
     # Giá Điều hành nhập là giá CHƯA gồm thuế phí; khách thấy «chưa gồm thuế và phí» và số thuế phí ở bước
     # thanh toán. Mức % theo từng khách sạn (VAT + phí phục vụ) — Điều hành nhập theo hợp đồng.
-    thue_phi_pt: Mapped[float] = mapped_column(Float, default=0)
+    thue_phi_pt: Mapped[float | None] = mapped_column(Float, default=0, nullable=True)
     lien_he_noi_bo: Mapped[str] = mapped_column(String(300), default="")  # KHÔNG ra cổng
     ghi_chu_noi_bo: Mapped[str] = mapped_column(Text, default="")         # KHÔNG ra cổng
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), nullable=True, index=True)

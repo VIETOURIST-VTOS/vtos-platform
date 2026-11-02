@@ -258,9 +258,9 @@ def _chi(db: Session, ky: KyHoaHong) -> dict:
     for c, pr in db.execute(select(ChiHoaHong, PaymentRequest).join(PaymentRequest, PaymentRequest.id == ChiHoaHong.payment_request_id)
                             .where(ChiHoaHong.ky_id == ky.id)).all():
         if pr.status == "da_chi":
-            da_tra += c.so_tien
+            da_tra += (c.so_tien or 0)
         elif pr.status != "tu_choi":
-            dang += c.so_tien
+            dang += (c.so_tien or 0)
     return {"da_tra": da_tra, "dang_de_nghi": dang}
 
 

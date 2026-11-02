@@ -120,7 +120,10 @@ def test_nl9_chi_con_dung_mot_cua_ngoai_so_va_no_duoc_goi_ten():
     nếu có ai lặng lẽ thêm một cửa mới KHÔNG ghi sổ thì nó cũng đỏ, và đó mới là lý do chính.
     """
     con = [c["cua"] for c in KNL.cua_khong_ghi_so()]
-    assert con == ["fleet.nhap_chuyen_hang_loat"], (
+    # `nha_hang.hien_hang_loat` (SUA-3, 02/11/2026): NL7 bắt nó theo tên `*_hang_loat`, nhưng nó KHÔNG nạp số
+    # liệu — chỉ bật/tắt cờ hiện trên cổng của nhiều nhà hàng; mỗi nhà hàng đi qua bat_hien, có nhật ký
+    # từng dòng. Không có lô nào để ghi sổ, nên đứng ngoài sổ là đúng chứ không phải chưa bịt.
+    assert con == ["fleet.nhap_chuyen_hang_loat", "nha_hang.hien_hang_loat"], (
         f"Danh sách cửa ngoài sổ đã đổi: {con}. Thêm cửa mới thì bịt nó, hoặc ghi rõ vì sao chưa.")
 
 

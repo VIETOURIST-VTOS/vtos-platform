@@ -910,10 +910,12 @@ def dat(db: Session, tk: TaiKhoanNgoai, d: dict, now: datetime | None = None) ->
                         han_tra_con_lai=datetime.fromisoformat(tinh_["han_tra_con_lai"]) if tinh_["cach_tra"] == "coc" else None,
                         hoa_don_cong_ty=hd, yeu_cau=yc, tao_luc=now)
     db.add(don)
-    db.add(Alert(kind="tour_online_dat", level="info", ref=b.code[:60],
-                 message=f"Khách đặt online {nl + te} chỗ {t.code} ({b.code}) — {CACH_TRA_TOUR[tinh_['cach_tra']]} {_vnd(tinh_['phai_tra'])} đ, "
-                         f"giữ chỗ tới {b.giu_cho_den:%H:%M %d/%m} · tiếp nhận: {sa.full_name}",
-                 to_roles="sales_admin,tp_kd,gd_kd,nv_dh"))
+    if not db.execute(select(Alert).where(Alert.kind == "tour_online_dat", Alert.ref == b.code[:60],
+                                          Alert.resolved == False)).scalars().first():   # noqa: E712 — khuôn dò dòng đang mở
+        db.add(Alert(kind="tour_online_dat", level="info", ref=b.code[:60],
+                     message=f"Khách đặt online {nl + te} chỗ {t.code} ({b.code}) — {CACH_TRA_TOUR[tinh_['cach_tra']]} {_vnd(tinh_['phai_tra'])} đ, "
+                             f"giữ chỗ tới {b.giu_cho_den:%H:%M %d/%m} · tiếp nhận: {sa.full_name}",
+                     to_roles="sales_admin,tp_kd,gd_kd,nv_dh"))
     R.audit(db, f"cong:{tk.id}", tk.loai, "tour_online_dat", f"booking:{b.code}",
             after={"tour": t.code, "nl": nl, "te": te, "eb": eb, "tong": tinh_["tong"], "cach_tra": tinh_["cach_tra"],
                    "phai_tra": tinh_["phai_tra"], "hoa_don_cong_ty": bool(hd)})
@@ -941,17 +943,17 @@ def ra_khach(db: Session, d: DonTourOnline, now: datetime | None = None) -> dict
     tra = da_tra(db, b)
     con_ngay = max(int(d.phai_tra) - tra, 0)
     het_giu = bool(b.giu_cho_het or (b.giu_cho_den and b.giu_cho_den < now and tra <= 0))
-    tt = ("Đã hủy" if b.cancelled else "Hết giờ giữ chỗ" if het_giu else "Đã thanh toán đủ" if tra >= int(d.tong)
+    tt = ("Đã hủy" if b.cancelled else "Hết giờ giữ chỗ" if het_giu else "Đã thanh toán đủ" if tra >= int(d.tong or 0)
           else "Đã đặt cọc — giữ chỗ" if tra >= int(d.phai_tra) else "Chờ thanh toán")
     return {"ma": d.ma, "ten": p.name if p else t.name, "ma_chuyen": t.code, "khoi_hanh": t.start_date.isoformat(),
             "ket_thuc": t.end_date.isoformat(), "noi_khoi_hanh": t.departure_point or (p.departure_point if p else ""),
             "nguoi_lon": d.nguoi_lon, "tre_em": d.tre_em, "em_be": d.em_be, "khach": d.khach or [], "email": d.email,
             "cach_tra": d.cach_tra, "cach_tra_ten": CACH_TRA_TOUR.get(d.cach_tra, d.cach_tra), "tong": int(d.tong),
-            "phai_tra": int(d.phai_tra), "da_tra": tra, "con_phai_tra_ngay": con_ngay, "con_lai": max(int(d.tong) - tra, 0),
+            "phai_tra": int(d.phai_tra), "da_tra": tra, "con_phai_tra_ngay": con_ngay, "con_lai": max(int(d.tong or 0) - tra, 0),
             "han_tra_con_lai": d.han_tra_con_lai.isoformat(timespec="minutes") if d.han_tra_con_lai else None,
             "giu_den": b.giu_cho_den.isoformat(timespec="seconds") if b.giu_cho_den else None,
             "giay_con": max(0, int((b.giu_cho_den - now).total_seconds())) if b.giu_cho_den and tra <= 0 and not het_giu else 0,
-            "trang_thai": tt, "co_the_tra": not b.cancelled and not het_giu and tra < int(d.tong),
+            "trang_thai": tt, "co_the_tra": not b.cancelled and not het_giu and tra < int(d.tong or 0),
             "mo_thanh_toan": mo_thanh_toan(db, p), "the_bat": _the_bat(), "co_hoa_don": tra > 0,
             "hoa_don_cong_ty": d.hoa_don_cong_ty, "email_gui_luc": d.email_gui_luc.isoformat(timespec="minutes") if d.email_gui_luc else None,
             "tao_luc": d.tao_luc.isoformat(timespec="minutes")}
@@ -1060,7 +1062,7 @@ def tu_khop(db: Session, txn) -> bool:
     tra = da_tra(db, b)
     so = int(round(float(txn.amount or 0)))
     coc_thieu = int(d.phai_tra) - tra
-    con = int(d.tong) - tra
+    con = int(d.tong or 0) - tra
     if so <= 0 or so not in {x for x in (coc_thieu, con) if x > 0}:
         return False
     r = P._make_receipt(db, b, txn, float(so), "robot", "tu_dong", note="Đơn tour online — khớp mã + đúng số")
@@ -1157,7 +1159,7 @@ def hoa_don_pdf(db: Session, d: DonTourOnline, now: datetime | None = None) -> b
         g_te = int(t.price_chd) if t.price_chd else gia
         dong.append((f"Trẻ em × {d.tre_em}", g_te * d.tre_em))
     if d.em_be:
-        dong.append((f"Em bé × {d.em_be}", (int(t.price_inf) if t.price_inf else 0) * d.em_be))
+        dong.append((f"Em bé × {d.em_be}", (int(t.price_inf or 0) if (t.price_inf or 0) else 0) * d.em_be))
     for k, v in dong:
         g.text((L, y), k, font=f_th, fill="#111"); g.text((W - L - 260, y), f"{_vnd(v)} đ", font=f_th, fill="#111"); y += 40
     g.line((L, y, W - L, y), fill="#ddd", width=1); y += 16
@@ -1170,7 +1172,7 @@ def hoa_don_pdf(db: Session, d: DonTourOnline, now: datetime | None = None) -> b
     for r in db.execute(select(Receipt).where(Receipt.booking_id == b.id, Receipt.status != "huy").order_by(Receipt.id)).scalars():
         cach = "Thẻ" if r.method == "the" else ("Tiền mặt" if r.method == "tien_mat" else "Chuyển khoản / QR")
         g.text((L, y), f"{r.code} · {r.created_at:%d/%m/%Y %H:%M} · {cach}", font=f_nho, fill="#333")
-        g.text((W - L - 260, y), f"{_vnd(r.amount)} đ", font=f_nho, fill="#333"); y += 34
+        g.text((W - L - 260, y), f"{_vnd(r.amount or 0)} đ", font=f_nho, fill="#333"); y += 34
     y += 30
     if d.hoa_don_cong_ty:
         h = d.hoa_don_cong_ty

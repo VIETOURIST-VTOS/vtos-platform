@@ -107,12 +107,12 @@ def test_da_chi_phai_co_unc(db, k3, bat):
     r = _cho_duyet(db, "DC-U1")
     r.status = "cho_chi"; db.commit()
     with pytest.raises(ValueError, match="UNC"):
-        O.step(db, _u(db, "kt"), r, "pay", "CK 1")
+        O.step(db, _u(db, "kt"), r, "pay", "CK 1", "chuyen_khoan")
     db.add(Attachment(doi_tuong="de_nghi_chi", doi_tuong_id="DC-U1", loai="chung_tu", ten_tep="hd.pdf", checksum="a", khoa_luu="a"))
     db.commit()
     with pytest.raises(ValueError, match="UNC"):
-        O.step(db, _u(db, "kt"), r, "pay", "CK 1")                    # chứng từ khác không thay được UNC
+        O.step(db, _u(db, "kt"), r, "pay", "CK 1", "chuyen_khoan")                    # chứng từ khác không thay được UNC
     db.add(Attachment(doi_tuong="de_nghi_chi", doi_tuong_id="DC-U1", loai="unc", ten_tep="unc.pdf", checksum="b", khoa_luu="b"))
     db.commit()
-    O.step(db, _u(db, "kt"), r, "pay", "CK 1"); db.commit()
+    O.step(db, _u(db, "kt"), r, "pay", "CK 1", "chuyen_khoan"); db.commit()
     assert r.status == "da_chi"

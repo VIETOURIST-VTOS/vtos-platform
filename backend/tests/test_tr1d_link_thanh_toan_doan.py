@@ -54,7 +54,7 @@ def _hop_dong(s, chot=True, noi_booking=True, gia_tri=256_000_000):
     t = Tour(code="DN001.121226", name="Đoàn Đà Nẵng – Hội An 4N3Đ", tour_type="doan_noi_dia", start_date=dt.date(2026, 12, 12),
              end_date=dt.date(2026, 12, 15), operator_id=_u(s, "dh").id, status="da_duyet", product_id=p.id, product_code=p.code)
     s.add(t); s.flush()
-    b = Booking(code="BK26110201", tour_id=t.id, request_id=0, sales_id=_u(s, "kd").id, created_by=_u(s, "kd").id,
+    b = Booking(code="BK-TR1D-01", tour_id=t.id, request_id=0, sales_id=_u(s, "kd").id, created_by=_u(s, "kd").id,
                 customer_name="Công ty ABC", customer_phone="0905111222", source="doan", pax=32, amount=gia_tri,
                 customer_email="ketoan@abc.vn")
     s.add(b); s.flush()

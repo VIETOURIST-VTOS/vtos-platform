@@ -239,7 +239,7 @@ def _gui_nhac_email(d: DonKsVtd, ks_ten: str, con_ngay: int) -> bool:
     m["Subject"] = f"Nhắc hạn thanh toán đơn {d.ma} — còn {con_ngay} ngày"
     m["From"], m["To"] = settings.SMTP_FROM, d.email
     m.set_content(f"Chào {d.ho_ten},\n\nĐơn {d.ma} ({ks_ten}, {d.vao:%d/%m/%Y} – {d.ra:%d/%m/%Y}) đang được giữ phòng tới hết ngày "
-                  f"{d.han_tra:%d/%m/%Y}. Số tiền {_vnd(d.tong)} đ.\nVào «Phòng đã đặt của tôi» trên cổng Vietourist để trả bằng QR hoặc thẻ. "
+                  f"{d.han_tra:%d/%m/%Y}. Số tiền {_vnd(d.tong or 0)} đ.\nVào «Phòng đã đặt của tôi» trên cổng Vietourist để trả bằng QR hoặc thẻ. "
                   "Quá hạn chưa trả, đơn tự hủy và không mất phí.\n\n" + settings.COMPANY_NAME)
     cls = smtplib.SMTP_SSL if settings.SMTP_SSL else smtplib.SMTP
     with cls(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as sv:
@@ -417,7 +417,7 @@ def dat(db: Session, tk, kid: int, d: dict, now: datetime | None = None) -> DonK
 
 def _sau_khi_tra(db: Session, d: DonKsVtd, now: datetime) -> None:
     """Đủ tiền → «Đã thanh toán», hạn chốt 2 giờ làm việc. Trả sau khi hết giờ giữ mà phòng đã hết → hủy, hoàn 100%."""
-    if d.trang_thai not in ("cho_tra", "het_han") or da_tra(db, d) < int(d.tong):
+    if d.trang_thai not in ("cho_tra", "het_han") or da_tra(db, d) < int(d.tong or 0):
         return
     if d.trang_thai == "het_han":
         lps = db.execute(select(LoaiPhongVtd).where(LoaiPhongVtd.id.in_({x["loai_phong_id"] for x in d.dong}))).scalars().all()
@@ -457,7 +457,7 @@ def _huy(db: Session, d: DonKsVtd, boi: str, ly_do: str, now: datetime, toan_bo:
     tra = da_tra(db, d)
     d.so_hoan = tra if toan_bo else so_hoan_neu_huy(d, tra, now.date())
     d.trang_thai, d.huy_boi, d.huy_luc, d.ly_do_huy = "da_huy", boi[:60], now, (ly_do or "").strip()[:300]
-    d.hoan_tt = "cho_sales" if int(d.so_hoan) > 0 else ""
+    d.hoan_tt = "cho_sales" if int(d.so_hoan or 0) > 0 else ""
     _voucher_doi_chieu(db, d, now)
     db.flush()
     return d
@@ -487,7 +487,7 @@ def ra_khach(db: Session, d: DonKsVtd, now: datetime | None = None) -> dict:
                                        "gio_nhan": k.gio_nhan, "gio_tra": k.gio_tra, "dia_chi": k.dia_chi} if k else None,
             "vao": d.vao.isoformat(), "ra": d.ra.isoformat(), "dem": (d.ra - d.vao).days, "nguoi_lon": d.nguoi_lon,
             "tre_em": d.tre_em, "dong": d.dong, "so_phong": d.so_phong, "tien_phong": int(d.tien_phong),
-            "thue_phi": int(d.thue_phi), "tong": int(d.tong), "da_tra": tra, "con_phai_tra": max(0, int(d.tong) - tra),
+            "thue_phi": int(d.thue_phi or 0), "tong": int(d.tong or 0), "da_tra": tra, "con_phai_tra": max(0, int(d.tong or 0) - tra),
             "giam_voucher": int(d.giam_voucher or 0), "voucher": _ma_voucher_don(db, d),
             "trang_thai": d.trang_thai, "trang_thai_ten": TRANG_THAI_DON.get(d.trang_thai, d.trang_thai),
             "giu_den": d.giu_den.isoformat(timespec="seconds") if d.giu_den else None,
@@ -499,7 +499,7 @@ def ra_khach(db: Session, d: DonKsVtd, now: datetime | None = None) -> dict:
             "ma_xac_nhan_ks": d.ma_xac_nhan_ks, "xac_nhan_luc": d.xac_nhan_luc.isoformat(timespec="minutes") if d.xac_nhan_luc else None,
             "ho_ten": d.ho_ten, "lien_he": d.lien_he, "email": d.email,
             "ly_do_huy": d.ly_do_huy, "so_hoan": int(d.so_hoan), "hoan_tt": d.hoan_tt, "hoan_tt_ten": HOAN_TT_KS.get(d.hoan_tt, ""),
-            "da_hoan_tien": int(d.da_hoan_tien), "co_the_tra": d.trang_thai == "cho_tra" and tra < int(d.tong),
+            "da_hoan_tien": int(d.da_hoan_tien or 0), "co_the_tra": d.trang_thai == "cho_tra" and tra < int(d.tong or 0),
             "co_the_huy": huy_duoc, "hoan_neu_huy": so_hoan_neu_huy(d, tra, now.date()) if huy_duoc else 0,
             "danh_gia": _dg(db, d, now),
             "the_bat": SP.cong_the_bat(), "tao_luc": d.tao_luc.isoformat(timespec="minutes") if d.tao_luc else None}
@@ -546,7 +546,7 @@ def qr(db: Session, tk, ma: str, now: datetime | None = None) -> dict:
     now = now or datetime.now()
     d = cap_nhat(db, _cua(db, tk, ma), now)
     db.commit()
-    con = int(d.tong) - da_tra(db, d)
+    con = int(d.tong or 0) - da_tra(db, d)
     if d.trang_thai != "cho_tra" or con <= 0:
         raise LoiDon(f"Đơn đang «{TRANG_THAI_DON.get(d.trang_thai, d.trang_thai)}» — không thanh toán", 409)
     _kiem_mo_tt(db, db.get(KhachSanVtd, d.khach_san_id))              # KS-16s
@@ -567,7 +567,7 @@ def onepay_bat_dau(db: Session, tk, ma: str, goc: str, ip: str, now: datetime | 
         raise LoiDon("Thanh toán thẻ chưa mở — dùng QR chuyển khoản", 409)
     d = cap_nhat(db, _cua(db, tk, ma), now)
     _kiem_mo_tt(db, db.get(KhachSanVtd, d.khach_san_id))              # KS-16s
-    con = int(d.tong) - da_tra(db, d)
+    con = int(d.tong or 0) - da_tra(db, d)
     if d.trang_thai != "cho_tra" or con <= 0:
         db.commit()
         raise LoiDon(f"Đơn đang «{TRANG_THAI_DON.get(d.trang_thai, d.trang_thai)}» — không thanh toán", 409)
@@ -587,7 +587,7 @@ def the_bat_dau(db: Session, tk, ma: str, goc: str, ip: str, now: datetime | Non
         return {"url": onepay_bat_dau(db, tk, ma, goc, ip, now)}
     d = cap_nhat(db, _cua(db, tk, ma), now)
     _kiem_mo_tt(db, db.get(KhachSanVtd, d.khach_san_id))              # KS-16s
-    con = int(d.tong) - da_tra(db, d)
+    con = int(d.tong or 0) - da_tra(db, d)
     if d.trang_thai != "cho_tra" or con <= 0:
         db.commit()
         raise LoiDon(f"Đơn đang «{TRANG_THAI_DON.get(d.trang_thai, d.trang_thai)}» — không thanh toán", 409)
@@ -671,7 +671,7 @@ def tu_khop(db: Session, txn: BankTransaction, now: datetime | None = None) -> b
     if db.execute(select(ThanhToanKsVtd.id).where(ThanhToanKsVtd.bank_txn_id == txn.id)).first():
         return True
     cap_nhat(db, d, now)
-    con = int(d.tong) - da_tra(db, d)
+    con = int(d.tong or 0) - da_tra(db, d)
     so = int(round(float(txn.amount or 0)))
     if d.trang_thai in ("cho_tra", "het_han") and con > 0 and so == con:
         t = ThanhToanKsVtd(don_id=d.id, kenh="qr", so_tien=so, trang_thai="tu_khop", bank_txn_id=txn.id,
@@ -726,7 +726,7 @@ def ra_vtos(db: Session, d: DonKsVtd, now: datetime | None = None) -> dict:
               "hoa_hong": int(d.hoa_hong) if d.hoa_hong is not None else None,
               "phai_tra_ks": int(d.phai_tra_ks) if d.phai_tra_ks is not None else None, "chot_boi": d.chot_boi,
               "qua_han_chot": bool(d.trang_thai == "da_tra" and d.han_chot and d.han_chot < now),
-              "giu_lai": max(0, o["da_tra"] - int(d.so_hoan)) if d.trang_thai == "da_huy" else None,
+              "giu_lai": max(0, o["da_tra"] - int(d.so_hoan or 0)) if d.trang_thai == "da_huy" else None,
               "khuyen_mai": khuyen_mai(db, d), "km_but_toan": d.km_but_toan, "de_nghi_chi": _dnc(db, d.payment_request_id),
               "dt_but_toan": d.dt_but_toan})
     return o
@@ -830,7 +830,7 @@ def sales_xac_nhan_hoan(db: Session, u: User, did: int, ghi_chu: str = "", now: 
     if d.hoan_tt != "cho_sales":
         raise LoiDon("Đơn không chờ Sales xác nhận hoàn", 409)
     d.hoan_tt = "cho_chi"
-    d.hoan_ghi_chu = (((d.hoan_ghi_chu + "\n") if d.hoan_ghi_chu else "") + f"Sales {u.username}: xác nhận hoàn {_vnd(d.so_hoan)} đ {(ghi_chu or '').strip()}")[-1000:]
+    d.hoan_ghi_chu = (((d.hoan_ghi_chu + "\n") if d.hoan_ghi_chu else "") + f"Sales {u.username}: xác nhận hoàn {_vnd(d.so_hoan or 0)} đ {(ghi_chu or '').strip()}")[-1000:]
     R.audit(db, u.username, u.role, "ks_vtd_xac_nhan_hoan", f"don_ks_vtd:{d.ma}", after={"so_hoan": int(d.so_hoan)})
     db.flush()
     return d
@@ -847,7 +847,7 @@ def sales_mien_phat(db: Session, u: User, did: int, ly_do: str, now: datetime | 
     if len((ly_do or "").strip()) < 5:
         raise LoiDon("Ghi lý do miễn phạt")
     tra = da_tra(db, d)
-    if int(d.so_hoan) >= tra:
+    if int(d.so_hoan or 0) >= tra:
         raise LoiDon("Đơn đã được hoàn đủ — không có gì để miễn", 409)
     d.so_hoan, d.mien_phat_boi = tra, u.username
     d.hoan_tt = "cho_chi"
@@ -932,7 +932,7 @@ def giao_dich_cho(db: Session, u: User, now: datetime | None = None) -> list[dic
         ra_.append({"txn_id": t.id, "luc": t.transaction_date.isoformat(timespec="minutes") if t.transaction_date else None,
                     "so_tien": int(round(float(t.amount or 0))), "noi_dung": (t.content or "")[:160], "ghi_chu": t.match_note or "",
                     "don_id": d.id if d else None, "ma": m.group(0), "tong": int(d.tong) if d else None,
-                    "con_phai_tra": (int(d.tong) - da_tra(db, d)) if d else None,
+                    "con_phai_tra": (int(d.tong or 0) - da_tra(db, d)) if d else None,
                     "trang_thai_ten": TRANG_THAI_DON.get(d.trang_thai, d.trang_thai) if d else "Không có đơn mã này"})
     return ra_
 
@@ -964,7 +964,7 @@ def kt_gan_qr(db: Session, u: User, did: int, txn_id: int, now: datetime | None 
     db.flush()
     if d.trang_thai == "da_huy":
         # Tiền vào đơn đã hủy: toàn bộ khoản này phải trả lại khách.
-        d.so_hoan = int(d.so_hoan) + int(tt.so_tien)
+        d.so_hoan = int(d.so_hoan or 0) + int(tt.so_tien or 0)
         d.hoan_tt = "cho_sales" if d.hoan_tt in ("", "da_hoan") else d.hoan_tt
     else:
         _sau_khi_tra(db, d, now)
@@ -981,11 +981,11 @@ def kt_doi_soat(db: Session, u: User, tt_id: int, phi: int | None, now: datetime
         raise LoiDon("Không có giao dịch thẻ này", 404)
     if t.trang_thai != "thanh_cong":
         raise LoiDon("Chỉ đối soát giao dịch cổng thẻ báo thành công", 409)
-    if phi is None or int(phi) < 0 or int(phi) >= int(t.so_tien):
+    if phi is None or int(phi) < 0 or int(phi) >= int(t.so_tien or 0):
         raise LoiDon("Ghi phí thẻ theo sao kê cổng thẻ (0 nếu không trừ phí)")
     d = db.get(DonKsVtd, t.don_id)
     ten, ma_dt = _doi_tuong_ks(db, d)
-    dong = [{"account": TK_TIEN, "debit": int(t.so_tien) - int(phi), "note": t.so_gd_cong or d.ma}]
+    dong = [{"account": TK_TIEN, "debit": int(t.so_tien or 0) - int(phi), "note": t.so_gd_cong or d.ma}]
     if int(phi):
         dong.append({"account": TK_PHI, "debit": int(phi), "note": f"Phí thẻ {d.ma}"})
     dong.append({"account": TK_THU_HO, "credit": int(t.so_tien), "partner": ten, "partner_code": ma_dt, "note": d.ma})
@@ -1026,7 +1026,7 @@ def kt_da_hoan(db: Session, u: User, did: int, ghi_chu: str, now: datetime | Non
     cho = db.execute(select(ThanhToanKsVtd.id).where(ThanhToanKsVtd.don_id == d.id, ThanhToanKsVtd.trang_thai.in_(("tu_khop", "thanh_cong")))).first()
     if cho:
         raise LoiDon("Còn khoản tiền vào chưa ghi sổ — ghi sổ / đối soát trước rồi mới hoàn", 409)
-    lan = int(d.so_hoan) - int(d.da_hoan_tien or 0)
+    lan = int(d.so_hoan or 0) - int(d.da_hoan_tien or 0)
     if lan <= 0:
         raise LoiDon("Không còn số phải hoàn", 409)
     ten, ma_dt = _doi_tuong_ks(db, d)
@@ -1062,7 +1062,7 @@ def kt_chot(db: Session, u: User, did: int, hoa_hong: int | None, now: datetime 
     if db.execute(select(ThanhToanKsVtd.id).where(ThanhToanKsVtd.don_id == d.id, ThanhToanKsVtd.trang_thai.in_(("tu_khop", "thanh_cong")))).first():
         raise LoiDon("Còn khoản tiền vào chưa ghi sổ / đối soát", 409)
     km = khuyen_mai(db, d)                     # KS-16: voucher VTD chịu → khách sạn vẫn nhận như không có voucher
-    giu = da_tra(db, d) - int(d.so_hoan) + km
+    giu = da_tra(db, d) - int(d.so_hoan or 0) + km
     if giu <= 0:
         raise LoiDon("Đơn không giữ lại đồng nào — không có gì để chốt", 409)
     if hoa_hong is None or not (0 <= int(hoa_hong) <= giu):
@@ -1078,9 +1078,9 @@ def kt_chot(db: Session, u: User, did: int, hoa_hong: int | None, now: datetime 
     R.audit(db, u.username, u.role, "ks_vtd_chot", f"don_ks_vtd:{d.ma}",
             after={"hoa_hong": int(hoa_hong), "phai_tra_ks": d.phai_tra_ks, "khuyen_mai": km, "but_toan_km": d.km_but_toan})
     db.flush()
-    if d.phai_tra_ks == 0 and d.hoa_hong > 0:   # KS-16e: không còn gì trả khách sạn → ghi doanh thu hoa hồng ngay
+    if (d.phai_tra_ks or 0) == 0 and (d.hoa_hong or 0) > 0:   # KS-16e: không còn gì trả khách sạn → ghi doanh thu hoa hồng ngay
         ghi_dt_hoa_hong(db, u, d, now.date())
-    if d.phai_tra_ks > 0:                       # KS-16d: một đơn → một đề nghị chi trả khách sạn, TP Điều hành xác nhận
+    if (d.phai_tra_ks or 0) > 0:                       # KS-16d: một đơn → một đề nghị chi trả khách sạn, TP Điều hành xác nhận
         k = db.get(KhachSanVtd, d.khach_san_id)
         d.payment_request_id = lap_de_nghi_chi_ncc(
             db, u, k.supplier_id if k else None, k.ten if k else "Khách sạn", int(d.phai_tra_ks),
@@ -1096,7 +1096,7 @@ TK_DT_HH = "511"
 def ghi_dt_hoa_hong(db: Session, u: User, d: DonKsVtd, ngay: date) -> str:
     """KS-16e (Chủ tịch 31/10/2026): doanh thu hoa hồng khách sạn — Nợ 3388 / Có 511, chưa gồm VAT (Kế toán xử lý
     VAT riêng). Ghi khi đề nghị chi trả khách sạn đã chi; không còn gì phải trả thì ghi ngay lúc chốt."""
-    if d.dt_but_toan or not d.hoa_hong or int(d.hoa_hong) <= 0:
+    if d.dt_but_toan or not (d.hoa_hong or 0) or int(d.hoa_hong or 0) <= 0:
         return d.dt_but_toan
     ten, ma_dt = _doi_tuong_ks(db, d)
     hh = int(d.hoa_hong)
@@ -1124,7 +1124,7 @@ def _cho_ghi_dt(db: Session) -> list[dict]:
 
 def cho_ghi_dt(d: DonKsVtd, pr_status: str | None) -> bool:
     """Đã chốt, có hoa hồng, chưa ghi doanh thu, và khoản trả khách sạn đã chi (hoặc đơn chốt trước KS-16d, chi tay)."""
-    return bool(d.hoa_hong and int(d.hoa_hong) > 0 and not d.dt_but_toan
+    return bool((d.hoa_hong or 0) and int(d.hoa_hong or 0) > 0 and not d.dt_but_toan
                 and (d.payment_request_id is None or pr_status == "da_chi"))
 
 
@@ -1245,7 +1245,7 @@ def hang_ke_toan(db: Session, u: User, now: datetime | None = None) -> dict:
     cho_chot = [d for d in db.execute(select(DonKsVtd).where(DonKsVtd.hoa_hong.is_(None),
                                                              DonKsVtd.trang_thai.in_(("da_xac_nhan", "da_huy")))).scalars()
                 if (d.trang_thai == "da_xac_nhan" and d.ra <= now.date())
-                or (d.trang_thai == "da_huy" and d.hoan_tt not in ("cho_sales", "cho_chi") and da_tra(db, d) > int(d.so_hoan))]
+                or (d.trang_thai == "da_huy" and d.hoan_tt not in ("cho_sales", "cho_chi") and da_tra(db, d) > int(d.so_hoan or 0))]
     don_tt = {d.id: d for d in db.execute(select(DonKsVtd).where(DonKsVtd.id.in_(don_ids or {0}))).scalars()}
     phai_tra: dict[int, dict] = {}
     for d in db.execute(select(DonKsVtd).where(DonKsVtd.phai_tra_ks.is_not(None))).scalars():
@@ -1253,9 +1253,9 @@ def hang_ke_toan(db: Session, u: User, now: datetime | None = None) -> dict:
         o = phai_tra.setdefault(d.khach_san_id, {"khach_san": k.ten if k else "", "ma": k.ma if k else "", "so_don": 0,
                                                  "giu_lai": 0, "hoa_hong": 0, "phai_tra": 0, "khuyen_mai": 0, "de_nghi_chi": []})
         o["so_don"] += 1
-        o["giu_lai"] += int(d.hoa_hong) + int(d.phai_tra_ks)
-        o["hoa_hong"] += int(d.hoa_hong)
-        o["phai_tra"] += int(d.phai_tra_ks)
+        o["giu_lai"] += int(d.hoa_hong or 0) + int(d.phai_tra_ks or 0)
+        o["hoa_hong"] += int(d.hoa_hong or 0)
+        o["phai_tra"] += int(d.phai_tra_ks or 0)
         o["khuyen_mai"] += khuyen_mai(db, d) if d.km_but_toan else 0
         if d.payment_request_id:
             o["de_nghi_chi"].append({"don": d.ma, **_dnc(db, d.payment_request_id)})

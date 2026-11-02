@@ -21,6 +21,9 @@ NGOAI_LE = {
     # MÁY CHỦ KHÔNG VỚI TỚI – mà Shell thì gọi /auth/me ngay khi dựng, nên bọc nó vào Shell là cầm
     # chắc một màn hình trắng đúng lúc người dùng cần đọc dòng "máy đang không có mạng".
     "offline": "trang dự phòng khi mất mạng – Shell gọi máy chủ nên vô dụng ở đúng lúc này",
+    # CG-1: cổng NGOÀI cho khách hàng / đối tác / cổ đông. Phiên riêng (phienCong), khung riêng
+    # (THANH_TREN); Shell gọi /auth/me của NHÂN VIÊN nên bọc vào là đá khách ra trang đăng nhập.
+    "cong": "cổng ngoài cho khách/đối tác/cổ đông – phiên và khung riêng, không phải phiên nhân viên",
 }
 
 

@@ -228,7 +228,7 @@ def doi_diem(data: DoiIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Sess
     except RW.LoiDiem as ex:
         raise HTTPException(400, str(ex))
     n = lambda x: f"{x:,}".replace(",", ".")  # noqa: E731
-    return {"message": f"Đã đổi {n(v.so_diem)} điểm lấy voucher {v.ma} trị giá {n(v.gia_tri)} đ, dùng đến {v.han_dung:%d/%m/%Y}. Đọc mã cho Sales khi đặt dịch vụ.",
+    return {"message": f"Đã đổi {n(v.so_diem)} điểm lấy voucher {v.ma} trị giá {n(v.gia_tri or 0)} đ, dùng đến {v.han_dung:%d/%m/%Y}. Đọc mã cho Sales khi đặt dịch vụ.",
             "ma": v.ma}
 
 

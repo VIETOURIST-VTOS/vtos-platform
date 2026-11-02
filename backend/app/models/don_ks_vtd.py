@@ -66,9 +66,9 @@ class DonKsVtd(Base):
     # [{goi_id, loai_phong_id, loai_phong, goi, so, tien, thue, bua_sang, huy_han}] — chụp lúc đặt, không đổi theo giá sau
     dong: Mapped[list] = mapped_column(JSON, default=list)
     so_phong: Mapped[int] = mapped_column(Integer, default=1)
-    tien_phong: Mapped[float] = mapped_column(TIEN, default=0)
-    thue_phi: Mapped[float] = mapped_column(TIEN, default=0)
-    tong: Mapped[float] = mapped_column(TIEN, default=0)
+    tien_phong: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
+    thue_phi: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
+    tong: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     trang_thai: Mapped[str] = mapped_column(String(12), default="cho_tra", index=True)
     giu_den: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     tra_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -82,7 +82,7 @@ class DonKsVtd(Base):
     so_hoan: Mapped[float] = mapped_column(TIEN, default=0)
     hoan_tt: Mapped[str] = mapped_column(String(10), default="", index=True)
     mien_phat_boi: Mapped[str] = mapped_column(String(50), default="")
-    da_hoan_tien: Mapped[float] = mapped_column(TIEN, default=0)
+    da_hoan_tien: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     hoan_boi: Mapped[str] = mapped_column(String(50), default="")
     hoan_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     hoan_ghi_chu: Mapped[str] = mapped_column(Text, default="")
@@ -94,7 +94,7 @@ class DonKsVtd(Base):
     # KS-16 (Chủ tịch duyệt 30/10/2026): khách tự nhập voucher VTD Rewards lúc đặt — tối đa 5% đơn, VTD chịu.
     # `tong` = số khách phải trả (đã trừ voucher); khách sạn vẫn nhận như không có voucher.
     voucher_id: Mapped[int | None] = mapped_column(Integer, nullable=True)   # voucher_rewards.id (khoá ngoại ở phía voucher)
-    giam_voucher: Mapped[float] = mapped_column(TIEN, default=0)
+    giam_voucher: Mapped[float | None] = mapped_column(TIEN, default=0, nullable=True)
     # KS-16p (Chủ tịch duyệt bản xem thử 01/11/2026): «Đặt giữ, trả sau» — chỉ gói miễn phí hủy. Đơn «cho_tra» giữ phòng tới
     # cuối ngày han_tra (giu_den); quá hạn chưa trả → het_han như đơn trả ngay, nhả phòng, không thu phí. VTD không lưu thẻ.
     cach_tra: Mapped[str] = mapped_column(String(6), default="ngay")       # ngay | sau

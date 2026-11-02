@@ -459,9 +459,11 @@ def giu_cho(db: Session, tk: TaiKhoanNgoai, tour_id: int, ten_khach: str, sdt_kh
                 company_id=t.company_id, created_at=now)
     db.add(b); db.flush(); r.booking_id = b.id
     BK.init_terms(db, b, t)
-    db.add(Alert(kind="dai_ly_giu_cho", level="info", ref=b.code[:60],
-                 message=f"{dt.ten} giữ {nl + te} chỗ {t.code} qua cổng đối tác ({b.code}) — giữ đến {b.giu_cho_den:%d/%m %H:%M} · tiếp nhận: {sa.full_name}",
-                 to_roles="nv_dh,tp_dh,sales_admin"))
+    if not db.execute(select(Alert).where(Alert.kind == "dai_ly_giu_cho", Alert.ref == b.code[:60],
+                                          Alert.resolved == False)).scalars().first():   # noqa: E712 — khuôn dò dòng đang mở
+        db.add(Alert(kind="dai_ly_giu_cho", level="info", ref=b.code[:60],
+                     message=f"{dt.ten} giữ {nl + te} chỗ {t.code} qua cổng đối tác ({b.code}) — giữ đến {b.giu_cho_den:%d/%m %H:%M} · tiếp nhận: {sa.full_name}",
+                     to_roles="nv_dh,tp_dh,sales_admin"))
     R.audit(db, f"cong:{tk.id}", "doi_tac", "dai_ly_giu_cho", f"booking:{b.code}",
             after={"doi_tac": dt.ma, "tour": t.code, "nguoi_lon": nl, "tre_em": te, "amount": b.amount, "giu_den": str(b.giu_cho_den)})
     db.commit(); db.refresh(b)
