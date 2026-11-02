@@ -82,11 +82,12 @@ DA_BIET = (
     ("/cong-no", "robot_ks"),
     ("/cong-no", "sales_admin"),
     ("/doi-xe", "robot_ks"),
-    ("/hach-toan", "robot_ks"),
+    # ("/hach-toan", "robot_ks") và ("/ket-so", "robot_ks") — GẠCH 02/11/2026, SUA-2: cửa đọc mới
+    #   `GET /api/v1/hach-toan/bang` (danh mục hình thức thanh toán) mở cho nhóm vai đề nghị chi, trong đó có
+    #   robot_ks; phép đo xét theo TIỀN TỐ `/api/v1/hach-toan` nên hai cặp này hết lệch.
     ("/hieu-qua-doi-xe", "robot_ks"),
     ("/hop-dong-khach", "robot_ks"),
     ("/ir-phap-che", "robot_ks"),
-    ("/ket-so", "robot_ks"),
     ("/lai-lo-doi-xe", "robot_ks"),
     ("/lai-lo-tour", "robot_ks"),
     ("/lai-lo-tour", "sales_admin"),
