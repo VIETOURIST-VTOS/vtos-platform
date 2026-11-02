@@ -9,7 +9,10 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "dk2b5e8c1f3a7d49"
-down_revision = "dk1a7c3e5b9d2f41"
+# SUA-2 02/11/2026: TR-1d (#613, `tr1d4b6c8e0a2f13`) và bản này cùng nối sau dk1a7… → mạch có HAI ĐẦU, `alembic upgrade
+# head` của Dockerfile dừng. TR-1d gộp TRƯỚC (#613 rồi mới #609) nên máy chủ thật đã ở tr1d4…; nối bản này SAU tr1d4…
+# là cách duy nhất để lần nâng kế tiếp chạy đúng bản này. Đổi chiều ngược lại thì máy thật bỏ sót bảng `may_da_nho`.
+down_revision = "tr1d4b6c8e0a2f13"
 branch_labels = None
 depends_on = None
 
