@@ -74,7 +74,10 @@ DA_BIET = (
     ("/ai-roles", "robot_ks"),
     ("/bang-gia", "robot_ks"),
     ("/bao-gia", "robot_ks"),
-    ("/bao-gia", "sales_admin"),
+    # ("/bao-gia", "sales_admin") và ("/hop-dong-khach", "sales_admin") — GẠCH 02/11/2026, TR-1d: Sale Admin
+    #   được mở BA cửa đọc của `/api/v1/ban-hang` (danh sách hợp đồng, lịch thanh toán, link thanh toán) để tạo
+    #   link theo đợt. `/bao-gia` gạch theo vì phép đo này xét theo TIỀN TỐ dùng chung — thực tế cửa đọc
+    #   BÁO GIÁ (`XEM`) vẫn chưa có Sale Admin; màn hình /hop-dong-khach thì nay chạy thật.
     ("/cham-soc", "robot_ks"),
     ("/cong-no", "robot_ks"),
     ("/cong-no", "sales_admin"),
@@ -82,7 +85,6 @@ DA_BIET = (
     ("/hach-toan", "robot_ks"),
     ("/hieu-qua-doi-xe", "robot_ks"),
     ("/hop-dong-khach", "robot_ks"),
-    ("/hop-dong-khach", "sales_admin"),
     ("/ir-phap-che", "robot_ks"),
     ("/ket-so", "robot_ks"),
     ("/lai-lo-doi-xe", "robot_ks"),

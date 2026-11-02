@@ -219,6 +219,9 @@ CUA_TAY = (
     # TR-1 (02/11/2026): khách đặt tour + trả trên cổng kh.vietourist.vn/tours (phiên cổng, QR khớp mã / SePay báo có
     # chữ ký); Kế toán đánh dấu đã xuất GTGT ở màn /tour-online.
     "don_tour_online", "thanh_toan_tour_online",
+    # TR-1d (02/11/2026): Sale Admin phòng Đoàn tạo / hủy link theo đợt ở màn /hop-dong-khach (số tiền máy lấy từ hợp
+    # đồng); khách trả qua chuyển khoản, robot khớp mã TD… hoặc Kế toán gán tay.
+    "link_thanh_toan_doan",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi
