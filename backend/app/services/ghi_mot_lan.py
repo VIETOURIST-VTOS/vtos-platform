@@ -143,6 +143,23 @@ CHUA_CO_CUA_SUA = {
 }
 
 
+# SUA-4 · 02/11/2026. Bốn bảng dưới đây có cột TÊN `phien_ban` nhưng NGHĨA khác hẳn khoá ghi một lần:
+# nó là SỐ BẢN của nội dung (link, hợp đồng, dòng đặt phòng sau mỗi lô đối soát), được tăng có chủ ý và
+# được người dùng đọc ("hợp đồng bản 2"). Gắn kiem_phien_ban vào thì 409 sẽ nổ khi người dùng chỉ đang
+# làm đúng việc – tạo bản mới. Ghi ra đây để không ai tưởng cột ấy là khoá và đi "chữa" nó thành khoá.
+# Nếu sau này các bảng này cần khoá ghi một lần thật thì thêm một cột khoá RIÊNG, không dùng chung tên.
+PHIEN_BAN_NGHIA_KHAC = {
+    "doi_tac_ota": "số bản của LINK đối tác OTA – đổi link thì tăng bản, tắt link và bắt kiểm lại; "
+                   "lượt chuyển khách ghi kèm số bản link (app/services/khach_san_ota.py)",
+    "dat_phong_ota": "số bản của dòng đặt phòng OTA – mỗi lô đối soát làm đổi số tiền thì tăng một bản "
+                     "(app/services/doi_soat_ota.py)",
+    "so_hoa_hong_ota": "chép số bản của dòng đặt phòng tại lúc ghi sổ hoa hồng – để biết sổ ứng với bản "
+                       "nào, không phải khoá sửa",
+    "hop_dong_nha_hang": "số bản HỢP ĐỒNG nhà hàng – ký lại thì dựng dòng mới bản + 1, dòng cũ thôi dùng; "
+                         "không sửa đè dòng cũ (app/services/nha_hang.py)",
+}
+
+
 class LechPhienBan(HTTPException):
     """409 – bản ghi đã đổi kể từ lúc người này mở nó ra."""
 
