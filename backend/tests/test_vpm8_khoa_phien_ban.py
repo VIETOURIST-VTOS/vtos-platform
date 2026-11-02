@@ -69,12 +69,14 @@ def test_a1_moi_bang_co_cot_phien_ban_deu_duoc_XEP_MOT_CHO():
     """Thêm cột `phien_ban` vào một bảng mà không khai gì thêm = thêm một cột không ai đọc."""
     from app.services import ghi_mot_lan as GML
     co_cot = _bang_co_cot_phien_ban()
-    da_xep = set(GML.CUA_SUA_CO_KHOA) | set(GML.CHUA_CO_CUA_SUA) | set(GML.KHOA_TEN_KHAC)
+    da_xep = (set(GML.CUA_SUA_CO_KHOA) | set(GML.CHUA_CO_CUA_SUA) | set(GML.KHOA_TEN_KHAC)
+              | set(GML.PHIEN_BAN_NGHIA_KHAC))   # SUA-4: cột cùng tên, nghĩa là SỐ BẢN, không phải khoá
     thieu = sorted(co_cot - da_xep)
     assert not thieu, (
         "Bảng mang cột `phien_ban` mà chưa xếp vào đâu trong app/services/ghi_mot_lan.py: "
-        f"{thieu}. Chọn một trong ba: khai cửa sửa vào CUA_SUA_CO_KHOA, hoặc khai lý do vào "
-        "CHUA_CO_CUA_SUA nếu bảng chưa có cửa sửa, hoặc KHOA_TEN_KHAC nếu nó đã có khoá tên khác. "
+        f"{thieu}. Chọn một trong bốn: khai cửa sửa vào CUA_SUA_CO_KHOA, hoặc khai lý do vào "
+        "CHUA_CO_CUA_SUA nếu bảng chưa có cửa sửa, KHOA_TEN_KHAC nếu nó đã có khoá tên khác, hoặc "
+        "PHIEN_BAN_NGHIA_KHAC nếu cột ấy là số bản nội dung chứ không phải khoá. "
         "Cột có mà không ai đọc thì tệ hơn không có cột – nó làm người đọc mã tin rằng chỗ ấy đã được canh.")
 
 
@@ -109,7 +111,8 @@ def test_a3_moi_cua_sua_da_khai_deu_GOI_THAT_hai_ham_khoa():
 def test_a4_ly_do_chua_co_cua_sua_phai_viet_ra_bang_loi():
     """"Chưa có cửa sửa" là cách dễ nhất để một bảng được cho qua, nên phải viết ra vì sao."""
     from app.services import ghi_mot_lan as GML
-    cut = sorted(b for b, ly in GML.CHUA_CO_CUA_SUA.items() if len((ly or "").strip()) < 15)
+    cut = sorted(b for b, ly in {**GML.CHUA_CO_CUA_SUA, **GML.PHIEN_BAN_NGHIA_KHAC}.items()
+                 if len((ly or "").strip()) < 15)
     assert not cut, f"Khai 'chưa có cửa sửa' mà lý do quá ngắn để đọc được: {cut}"
 
 
