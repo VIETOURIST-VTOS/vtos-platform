@@ -138,6 +138,11 @@ CUA_TAY = (
     # CG-1 (26/10/2026): tài khoản bên ngoài — người ngoài tự tạo ở cổng kết nối (/login, bước xác thực
     # mã) và tự khai hồ sơ; VTOS duyệt ở màn /tai-khoan-ngoai.
     "tai_khoan_ngoai",
+    # DK-1 (01/11/2026): ĐƠN ĐĂNG KÝ TẠM — chính người đăng ký gõ vào, từng chữ một, qua bốn bước
+    # ở cổng (/cong/dang-ky/lien-he → mat-khau → dieu-khoan → ma → xong). Đây là cửa tay thật,
+    # KHÔNG phải máy sinh: máy chỉ băm mật khẩu và đóng dấu giờ. Đơn tự hết hạn sau 24 giờ; nó
+    # biến mất khi mã đúng và tài khoản ra đời, nên không có màn quản trị nào sửa nó.
+    "don_dang_ky",
     # DH-1 (26/10/2026): hình thức hưởng hoa hồng của đối tác — GĐ KD / Kế toán chọn ở màn /hoa-hong-d06.
     "hinh_thuc_hoa_hong",
     # KH-1 (26/10/2026): yêu cầu khách tự gửi ở cổng khách hàng (/cong) — tour có lịch hoặc tour đoàn; đi kèm một lead cho Sales.
@@ -214,6 +219,9 @@ CUA_TAY = (
     # TR-1 (02/11/2026): khách đặt tour + trả trên cổng kh.vietourist.vn/tours (phiên cổng, QR khớp mã / SePay báo có
     # chữ ký); Kế toán đánh dấu đã xuất GTGT ở màn /tour-online.
     "don_tour_online", "thanh_toan_tour_online",
+    # TR-1d (02/11/2026): Sale Admin phòng Đoàn tạo / hủy link theo đợt ở màn /hop-dong-khach (số tiền máy lấy từ hợp
+    # đồng); khách trả qua chuyển khoản, robot khớp mã TD… hoặc Kế toán gán tay.
+    "link_thanh_toan_doan",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi

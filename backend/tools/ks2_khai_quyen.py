@@ -53,6 +53,19 @@ CUA_KHONG_THEO_VAI_TRO: dict[str, str] = {
         "dùng không có tài khoản VTOS. Phiên ký bằng khoá RIÊNG (services/cong_ngoai._khoa_ky), kiểm "
         "số phiên và trạng thái tài khoản mỗi lần gọi; phạm vi ghi khoá vào chính tài khoản của phiên. "
         "Máy đọc được: cổng nằm ở chữ ký và mang dấu la_cong_chan_quyen."),
+    # DK-1b · 02/11/2026 — năm cửa CÔNG KHAI của luồng tạo tài khoản cổng ngoài
+    # (POST /cong/dang-ky/lien-he, /mat-khau, /dieu-khoan, /ma, /xong).
+    "cong_cua_mo": (
+        "Cửa CÔNG KHAI của cổng ngoài · 02/11/2026. Người gõ CHƯA CÓ tài khoản — đang đi bốn "
+        "bước để tạo ra một tài khoản — nên không có vai trò nào để khai. Chỗ chặn là phanh "
+        "theo địa chỉ mạng (30 lượt / 10 phút), cộng với luật của chính luồng: mỗi liên hệ tối "
+        "đa 5 mã mỗi giờ, mã sống 5 phút sai 5 lần là chết, đơn đăng ký hết hạn sau 24 giờ. "
+        "Không cửa nào trong năm cửa ĐỌC RA dữ liệu của người khác: bước 1 trả CÙNG một câu dù "
+        "liên hệ đã có tài khoản hay chưa, nên nó không thành máy dò; và mã đúng KHÔNG mở được "
+        "tài khoản đã có (409) — mã không bao giờ thay được mật khẩu, Chủ tịch chốt 01/11/2026. "
+        "Khai MỘT dòng ở đây thay vì năm dòng trong CONG_KHAI, vì bảng ấy đã chạm trần và trần "
+        "ấy có lý: một luồng công khai cả bốn bước không còn là ngoại lệ lẻ, nó là một quy tắc "
+        "và quy tắc thì phải có tên."),
     "cong_xem_tong_quan_hcns": (
         "Cổng xem Tổng quan HCNS (GET /hr/tong-quan) · 08/10/2026. Cùng một ca với cổng chi "
         "lương ở trên: luật là 'mở được thẻ tong_quan', mà tập thẻ ấy do access tính theo TỪNG "

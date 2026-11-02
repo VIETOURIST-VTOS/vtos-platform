@@ -8,6 +8,10 @@ from app.models.ops import PaymentRequest
 from app.models.hr import PayrollRun
 from app.services import rules as R
 from app.services import accounting as ACC
+
+# DOT R4c-4 02/11/2026 — MOT hang so cho ve tien cua khe uoc, khong go cung nam lan.
+# Go cung nam lan thi mot lan sua sot mot dong, va dong sot lai se ghi sai IM LANG.
+TK_TIEN_GUI_CT = "1121"
 from app.services import reports as RP
 
 
@@ -84,11 +88,15 @@ def settle(db: Session, u: User, s: FinSchedule, done_on: date, bank_ref: str, a
         db.commit()
         return s
     acc = KIND_ACCOUNT[c.kind]
-    lines = {"tra_goc": [{"account": "341", "debit": amt}, {"account": "112", "credit": amt}],
-             "tra_lai": [{"account": "635", "debit": amt}, {"account": "112", "credit": amt}],
-             "nhan_vay": [{"account": "112", "debit": amt}, {"account": "341", "credit": amt}],
-             "giai_ngan": [{"account": acc, "debit": amt}, {"account": "112", "credit": amt}],
-             "thu_hoi": [{"account": "112", "debit": amt}, {"account": acc, "credit": amt}]}[s.kind]
+    # ĐỢT R4c-4 02/11/2026 — NĂM DÒNG NÀY GÕ CỨNG `"112"`, là tài khoản CHA. Xem lý do đầy đủ ở
+    # `accounting.on_receipt_confirmed`. Khế ước luôn chạy qua ngân hàng (trả gốc, trả lãi, nhận
+    # vay, giải ngân, thu hồi), nên cả năm dòng là `1121` — KHÔNG có nhánh tiền mặt ở đây, và
+    # không đợt nào được thêm một nhánh như thế mà không hỏi Kế toán trưởng.
+    lines = {"tra_goc": [{"account": "341", "debit": amt}, {"account": TK_TIEN_GUI_CT, "credit": amt}],
+             "tra_lai": [{"account": "635", "debit": amt}, {"account": TK_TIEN_GUI_CT, "credit": amt}],
+             "nhan_vay": [{"account": TK_TIEN_GUI_CT, "debit": amt}, {"account": "341", "credit": amt}],
+             "giai_ngan": [{"account": acc, "debit": amt}, {"account": TK_TIEN_GUI_CT, "credit": amt}],
+             "thu_hoi": [{"account": TK_TIEN_GUI_CT, "debit": amt}, {"account": acc, "credit": amt}]}[s.kind]
     for l in lines: l["partner"] = c.partner
     # GHI SỔ HỎNG THÌ DỪNG – không đánh dấu đã thực hiện.
     #

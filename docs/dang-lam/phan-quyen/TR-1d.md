@@ -1,0 +1,8 @@
+# Sổ giữ chỗ — làn Phân quyền · Đợt TR-1d
+
+Một đợt một tệp (Đợt SO-DOT 02/11/2026). Luật: [../README.md](../README.md).
+Mọi dòng trong tệp này PHẢI có cột `Làn` là `Phân quyền`.
+
+| Làn | Mã việc | Tệp sẽ đụng | Bắt đầu | Trạng thái |
+|---|---|---|---|---|
+| Phân quyền | **TR-1d — LINK THANH TOÁN TOUR ĐOÀN RIÊNG** (Chủ tịch duyệt bản xem thử 02/11/2026: số tiền theo báo giá khách đã chốt → hợp đồng → lịch thanh toán từng đợt; hạn link = hạn đợt; CHỈ Sale Admin phòng Đoàn tạo / hủy; tour đoàn KHÔNG nhận thẻ Visa / Master — chỉ chuyển khoản QR hoặc chuyển tay; trả xong gửi email kèm hóa đơn). Bảng mới `link_thanh_toan_doan`; robot khớp mã TD…+ đúng số trước đường booking chung (lệch số → chờ Kế toán, Kế toán gán tay xong mà đợt đủ → «đã trả» + email); trang khách kh.vietourist.vn/thanh-toan/TD… chỉ GET, không đăng nhập. QUYỀN: thêm `sales_admin` vào BA cửa ĐỌC của `/api/v1/ban-hang` (danh sách hợp đồng, lịch thanh toán, link) — trả món nợ `/hop-dong-khach × sales_admin` của test_lg1; ba cửa GHI link chỉ `sales_admin`. Bảy luật ở `test_tr1d_link_thanh_toan_doan.py`. | backend/app/models/thanh_toan_doan.py, backend/app/models/__init__.py, backend/alembic/versions/tr1d4b6c8e0a2f13_link_thanh_toan_doan.py, backend/app/services/thanh_toan_doan.py, backend/app/services/payments.py, backend/app/services/ks_cua_nhap.py, backend/app/api/v1/ban_hang.py, backend/app/api/v1/cong_mo.py, backend/tests/test_tr1d_link_thanh_toan_doan.py, backend/tests/test_lg1_hai_bang_quyen_khop_nhau.py, web/app/hop-dong-khach/page.tsx, web/app/kham-pha/thanh-toan/[ma]/page.tsx, web/next.config.mjs, docs/dang-lam/phan-quyen/TR-1d.md | 02-11-2026 07:30 | đang làm |
