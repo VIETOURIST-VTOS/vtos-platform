@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { login, getUser, clearSession } from "@/lib/api";
 import { THANH_TREN, TRANG_MO_DAU, KHUNG_HO_TRO, CAU_CHUYEN } from "@/components/cong/manh";
 import { ThuVien } from "@/components/cong/co-dong/CoDong";
-import { goiCong as goi, luuPhienCong, laTenMienCong, VTOS_GOC } from "@/lib/cong";
+import { goiCong as goi, luuPhienCong, laTenMienCong, VTOS_GOC, dauMay, luuDauMay, xoaDauMay } from "@/lib/cong";
 
 /* CG-1 · CỔNG KẾT NỐI VTD thay màn đăng nhập VTOS — Chủ tịch duyệt bản xem thử 26/10/2026, dựng từ đúng
    bộ giao diện v3.2 (logo, biểu tượng, địa cầu có máy bay bay quanh). Bốn ô:
@@ -51,63 +51,215 @@ function NoiBo() {
   </form>);
 }
 
+/* DK-3 · MÀN ĐĂNG NHẬP MỚI — Chủ tịch chốt 01/11/2026, sáu điều.
+
+   Điều 5: KHÔNG có cửa đăng nhập bằng mã một lần. Màn này không còn nút «Nhận mã xác thực» để
+   vào thẳng. Mã một lần chỉ xuất hiện ở ba chỗ, và ở cả ba nó là LỚP THỨ HAI chứ không bao giờ
+   là lớp duy nhất: bước cuối khi TẠO tài khoản, bước xác minh MÁY LẠ (sau khi mật khẩu đã đúng),
+   và bước ĐẶT LẠI mật khẩu.
+
+   Điều 6: mật khẩu từ 5 ký tự, không bắt viết hoa. Bù lại, vào từ máy lạ thì phải gõ thêm mã;
+   máy đã quen thì vào thẳng, nhớ 90 ngày. Dấu nhớ máy cất ở `vtd_cong_may:<cổng>` — mỗi cổng một
+   dấu riêng, vì mỗi cổng là một tài khoản riêng.
+
+   TÀI KHOẢN CŨ chưa có mật khẩu (tạo trước DK-1, hồi cổng còn đăng nhập bằng mã) vẫn đăng nhập
+   được — qua «Quên mật khẩu» để đặt mật khẩu lần đầu. Màn này NÓI RA điều đó, vì không nói thì
+   khách cũ gõ mãi không vào và không hiểu vì sao. */
+type Buoc = "vao" | "may" | "quen1" | "quen2" | "tao1" | "tao2" | "tao3" | "tao4";
+
+function DongHoMa({ con }: { con: number }) {
+  if (con <= 0) return <b>Mã đã hết hạn.</b>;
+  return <>Còn <b>{Math.floor(con / 60)}:{String(con % 60).padStart(2, "0")}</b>.</>;
+}
+
+function ChonKenh({ k, chon, dat }: { k: any; chon: "zalo" | "email"; dat: (c: "zalo" | "email") => void }) {
+  return (<fieldset className="kenh-otp"><legend>Nhận mã qua</legend>
+    {(["zalo", "email"] as const).map((c) => <label key={c} className={k[c] && !k[c].ok ? "tat" : ""} title={k[c]?.ly_do || ""}>
+      <input type="radio" name="kenh" checked={chon === c} disabled={!!k[c] && !k[c].ok} onChange={() => dat(c)} />
+      {c === "zalo" ? "Zalo" : "Email"} <small>{k[c] && !k[c].ok ? "chưa mở" : c === "zalo" ? "tới số điện thoại" : "tới hộp thư"}</small></label>)}
+  </fieldset>);
+}
+
 function Ngoai({ man }: { man: Exclude<Man, "cong" | "noi"> }) {
   const v = VAI[man];
+  const [buoc, setBuoc] = useState<Buoc>("vao");
   const [kenh, setKenh] = useState<any>(null);
   const [chon, setChon] = useState<"zalo" | "email">("zalo");
-  const [lh, setLh] = useState(""); const [ma, setMa] = useState("");
-  const [gui, setGui] = useState<any>(null);
-  const [dongY, setDongY] = useState(false); const [canDongY, setCanDongY] = useState(false);
-  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false); const [con, setCon] = useState(0);
+  const [lh, setLh] = useState(""); const [mk, setMk] = useState(""); const [hien, setHien] = useState(false);
+  const [ma, setMa] = useState(""); const [gui, setGui] = useState<any>(null); const [con, setCon] = useState(0);
+  const [don, setDon] = useState<any>(null);            // đơn đăng ký tạm (bốn bước)
+  const [hoTen, setHoTen] = useState(""); const [dt, setDt] = useState(""); const [em, setEm] = useState("");
+  const [dongY, setDongY] = useState(false); const [quangCao, setQuangCao] = useState(false);
+  const [nhoMay, setNhoMay] = useState(true); const [tenMay, setTenMay] = useState("");
+  const [err, setErr] = useState(""); const [tin, setTin] = useState(""); const [busy, setBusy] = useState(false);
   useEffect(() => { goi("/kenh").then((k) => { setKenh(k); if (!k.zalo.ok && k.email.ok) setChon("email"); }).catch(() => setKenh({})); }, []);
   useEffect(() => { if (!gui) return; const t = setInterval(() => setCon((c) => Math.max(0, c - 1)), 1000); return () => clearInterval(t); }, [gui]);
-  const guiMa = async () => {
-    setBusy(true); setErr("");
-    try { const r = await goi("/ma", { loai: v.loai, lien_he: lh, kenh: chon }); setGui(r); setCon(r.het_han_giay); setMa(""); setCanDongY(false); }
-    catch (x: any) { setErr(x.message); } finally { setBusy(false); }
-  };
-  const xacThuc = async () => {
-    setBusy(true); setErr("");
-    try {
-      const r = await goi("/xac-thuc", { khoa: gui.khoa, ma, dong_y_dieu_khoan: dongY });
-      luuPhienCong(r.phien);
-      location.replace(veSauDangNhap());   // KS-16q: quay lại trang riêng /hotel, /restaurant, /tours nếu đến từ đó
-    } catch (x: any) {
-      if (x.ma === "can_dong_y") setCanDongY(true);
-      if (x.ma === "ma_het") setGui(null);
-      setErr(x.message); setBusy(false);
-    }
-  };
   const k = kenh || {};
-  if (!gui) return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); guiMa(); }}>
+  const sang = (b: Buoc) => { setBuoc(b); setErr(""); setTin(""); setMa(""); window.scrollTo(0, 0); };
+  const xong = (r: any) => { luuPhienCong(r.phien); location.replace(veSauDangNhap()); };
+  const chay = async (f: () => Promise<void>) => {
+    setBusy(true); setErr("");
+    try { await f(); } catch (x: any) { setErr(x.message); } finally { setBusy(false); }
+  };
+
+  // ── vào: liên hệ + MẬT KHẨU. Không có nút nào gửi mã để vào thẳng. ──────────────────────────
+  const vao = () => chay(async () => {
+    const r = await goi("/dang-nhap", { loai: v.loai, lien_he: lh, mat_khau: mk, dau_nho: dauMay(v.loai), kenh: chon });
+    if (r.xong) { xong(r); return; }
+    setGui(r); setCon(r.het_han_giay || 600); sang("may");       // máy lạ: còn một lớp nữa
+  });
+  const xacMinhMay = () => chay(async () => {
+    const r = await goi("/dang-nhap/xac-minh", { khoa: gui.khoa, ma, nho_may: nhoMay, ten_may: tenMay });
+    if (nhoMay && r.dau_nho) luuDauMay(v.loai, r.dau_nho);
+    xong(r);
+  });
+
+  // ── quên mật khẩu: câu trả lời KHÔNG đổi dù liên hệ có tài khoản hay không ──────────────────
+  const quenGui = () => chay(async () => {
+    const r = await goi("/quen-mat-khau/ma", { loai: v.loai, lien_he: lh, kenh: chon });
+    setGui(r); setCon(r.het_han_giay || 600); sang("quen2"); setTin(r.message);
+  });
+  const quenDat = () => chay(async () => {
+    await goi("/quen-mat-khau/dat-lai", { khoa: gui.khoa, ma, mat_khau: mk });
+    xoaDauMay(v.loai);                                            // đổi mật khẩu là quên sạch máy
+    setGui(null); setMk(""); sang("vao");
+    setTin("Đã đặt mật khẩu mới. Mọi phiên và mọi máy đã nhớ đều bị đăng xuất — đăng nhập lại bằng mật khẩu vừa đặt.");
+  });
+
+  // ── tạo tài khoản: BỐN BƯỚC, mã ở bước CUỐI ────────────────────────────────────────────────
+  const tao1 = () => chay(async () => { setDon(await goi("/dang-ky/lien-he", { loai: v.loai, ho_ten: hoTen, dien_thoai: dt, email: em })); sang("tao2"); });
+  const tao2 = () => chay(async () => { await goi("/dang-ky/mat-khau", { khoa: don.khoa, mat_khau: mk }); sang("tao3"); });
+  const tao3 = () => chay(async () => { await goi("/dang-ky/dieu-khoan", { khoa: don.khoa, dong_y_dieu_khoan: dongY, nhan_tin_quang_cao: quangCao }); sang("tao4"); });
+  const taoGuiMa = () => chay(async () => { const r = await goi("/dang-ky/ma", { khoa: don.khoa, kenh: chon }); setGui(r); setCon(r.het_han_giay || 600); setMa(""); });
+  const taoXong = () => chay(async () => { xong(await goi("/dang-ky/xong", { khoa: don.khoa, ma })); });
+
+  const oMa = (<label className="v3-field">Mã xác thực
+    <input value={ma} onChange={(e) => setMa(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric"
+      autoComplete="one-time-code" placeholder="••••••" required autoFocus /></label>);
+  const oMatKhau = (nhan: string) => (<label className="v3-field">{nhan}
+    <span style={{ position: "relative", display: "block" }}>
+      <input type={hien ? "text" : "password"} value={mk} onChange={(e) => setMk(e.target.value)}
+        autoComplete={buoc === "vao" ? "current-password" : "new-password"} required />
+      <button type="button" className="v3-button v3-secondary cursor-interaction" style={{ position: "absolute", right: 4, top: 4, padding: "2px 10px" }}
+        onClick={() => setHien(!hien)}>{hien ? "Ẩn" : "Hiện"}</button></span></label>);
+
+  // ══ 1 · ĐĂNG NHẬP ═══════════════════════════════════════════════════════════════════════════
+  if (buoc === "vao") return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); vao(); }}>
     <h2>{v.h2}</h2><p>{v.p}</p>
-    <fieldset className="kenh-otp"><legend>Nhận mã qua</legend>
-      {(["zalo", "email"] as const).map((c) => <label key={c} className={k[c] && !k[c].ok ? "tat" : ""} title={k[c]?.ly_do || ""}>
-        <input type="radio" name="kenh" checked={chon === c} disabled={!!k[c] && !k[c].ok} onChange={() => setChon(c)} />
-        {c === "zalo" ? "Zalo" : "Email"} <small>{k[c] && !k[c].ok ? "chưa mở" : c === "zalo" ? "tới số điện thoại" : "tới hộp thư"}</small></label>)}
-    </fieldset>
-    {k[chon] && !k[chon].ok && <div className="cong-loi">Kênh {k[chon].ten} chưa mở: {k[chon].ly_do}.</div>}
-    <label className="v3-field">{chon === "zalo" ? "Số điện thoại" : "Email"}
-      <input value={lh} onChange={(e) => setLh(e.target.value)} inputMode={chon === "zalo" ? "tel" : "email"} autoComplete={chon === "zalo" ? "tel" : "email"}
-        placeholder={chon === "zalo" ? "0912 345 678" : "ten@email.com"} required /></label>
+    <label className="v3-field">Số điện thoại hoặc email
+      <input value={lh} onChange={(e) => setLh(e.target.value)} inputMode="email" autoComplete="username"
+        placeholder="0912 345 678 hoặc ten@email.com" required /></label>
+    {oMatKhau("Mật khẩu")}
+    <div style={{ textAlign: "right", marginTop: -6 }}>
+      <button type="button" className="vtd-text-button cursor-interaction" onClick={() => sang("quen1")}>Quên mật khẩu?</button></div>
+    {tin && <p className="vtd-form-notice">{tin}</p>}
     {err && <div className="cong-loi">{err}</div>}
-    <div className="v4-actions"><button className="v3-button v3-primary cursor-interaction" disabled={busy || !lh.trim() || (!!k[chon] && !k[chon].ok)}>{busy ? "Đang gửi…" : "Nhận mã xác thực"}</button></div>
-    <p className="vtd-form-notice">Mã 6 số, dùng một lần, hết hạn sau 5 phút. Lần đầu dùng liên hệ này thì hệ thống tạo tài khoản sau khi bạn đồng ý điều khoản dịch vụ{man !== "kh" ? "; đối tác và cổ đông gửi hồ sơ để Vietourist duyệt" : ""}.</p>
-    {man === "cd" && <p className="vtd-form-notice"><a href="/login?cong=cd&xem=ir">Xem tài liệu công bố thông tin — không cần đăng nhập</a></p>}
+    <div className="v4-actions"><button className="v3-button v3-primary cursor-interaction" disabled={busy || !lh.trim() || !mk}>{busy ? "Đang vào…" : "Đăng nhập"}</button></div>
+    <p className="vtd-form-notice"><b>Chỉ một cửa vào: mật khẩu.</b> Mã một lần không bao giờ thay được mật khẩu — nó chỉ là lớp thứ hai khi bạn vào từ máy lạ.</p>
+    <p className="vtd-form-notice">Tài khoản cũ chưa có mật khẩu? Trước đây cổng đăng nhập bằng mã một lần. Bấm <b>Quên mật khẩu</b> để đặt mật khẩu lần đầu cho tài khoản ấy.</p>
+    <div className="v4-actions"><button type="button" className="v3-button v3-secondary cursor-interaction" onClick={() => sang("tao1")}>Chưa có tài khoản · Tạo tài khoản</button></div>
   </form>);
-  return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); xacThuc(); }}>
-    <h2>Xác thực liên hệ</h2>
-    <ol className="v3-steps"><li className="done"><span>✓</span><div>Thông tin</div></li><li className="active"><span>2</span><div>Xác thực</div></li><li className=""><span>3</span><div>Truy cập</div></li></ol>
-    <p>{gui.message} {con > 0 ? <>Còn <b>{Math.floor(con / 60)}:{String(con % 60).padStart(2, "0")}</b>.</> : <b>Mã đã hết hạn.</b>}</p>
-    <label className="v3-field">Mã xác thực<input value={ma} onChange={(e) => setMa(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="••••••" required autoFocus /></label>
-    {canDongY && <label className="cong-dong-y"><input type="checkbox" checked={dongY} onChange={(e) => setDongY(e.target.checked)} />
-      <span>Tôi đồng ý điều khoản dịch vụ và chính sách bảo vệ dữ liệu cá nhân của Vietourist. (Không bao gồm nhận tin quảng cáo.)</span></label>}
+
+  // ══ 2 · MÁY LẠ — mật khẩu đã đúng, còn một lớp nữa ══════════════════════════════════════════
+  if (buoc === "may") return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); xacMinhMay(); }}>
+    <h2>Mật khẩu đúng rồi. Chưa nhận ra máy này.</h2>
+    <p>{gui?.message} <DongHoMa con={con} /></p>
+    {oMa}
+    <label className="cong-dong-y"><input type="checkbox" checked={nhoMay} onChange={(e) => setNhoMay(e.target.checked)} />
+      <span>Nhớ máy này <b>90 ngày</b> — lần sau chỉ cần mật khẩu. Đừng chọn nếu đây là máy tiệm net hay máy mượn.</span></label>
+    {nhoMay && <label className="v3-field">Đặt tên cho máy này <span style={{ fontWeight: 400 }}>· không bắt buộc</span>
+      <input value={tenMay} onChange={(e) => setTenMay(e.target.value.slice(0, 80))} placeholder="Điện thoại của tôi" /></label>}
     {err && <div className="cong-loi">{err}</div>}
     <div className="v4-actions">
-      <button className="v3-button v3-primary cursor-interaction" disabled={busy || ma.length !== 6 || con <= 0 || (canDongY && !dongY)}>{busy ? "Đang xác thực…" : "Xác thực"}</button>
-      <button type="button" className="v3-button v3-secondary cursor-interaction" disabled={busy} onClick={guiMa}>Gửi lại mã</button></div>
-    <button type="button" className="v3-button v3-secondary cursor-interaction" onClick={() => { setGui(null); setErr(""); }}>Đổi liên hệ / đổi kênh</button>
+      <button className="v3-button v3-primary cursor-interaction" disabled={busy || ma.length !== 6 || con <= 0}>{busy ? "Đang xác minh…" : "Xác minh và vào"}</button>
+      <button type="button" className="v3-button v3-secondary cursor-interaction" disabled={busy} onClick={vao}>Gửi lại mã</button></div>
+    <p className="vtd-form-notice">Không phải bạn đang đăng nhập? Có người đã biết mật khẩu của bạn — <button type="button" className="vtd-text-button cursor-interaction" onClick={() => sang("quen1")}>đổi mật khẩu ngay</button>. Đổi xong mọi máy đã nhớ đều bị quên.</p>
+    <button type="button" className="v3-button v3-secondary cursor-interaction" onClick={() => { setGui(null); sang("vao"); }}>Quay lại</button>
+  </form>);
+
+  // ══ 3 · QUÊN MẬT KHẨU ═══════════════════════════════════════════════════════════════════════
+  if (buoc === "quen1") return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); quenGui(); }}>
+    <h2>Đặt lại mật khẩu</h2><p>Vietourist không có tên đăng nhập riêng, nên không có gì để quên ngoài mật khẩu.</p>
+    <ChonKenh k={k} chon={chon} dat={setChon} />
+    <label className="v3-field">{chon === "zalo" ? "Số điện thoại" : "Email"}
+      <input value={lh} onChange={(e) => setLh(e.target.value)} inputMode={chon === "zalo" ? "tel" : "email"} autoComplete="username" required /></label>
+    {err && <div className="cong-loi">{err}</div>}
+    <div className="v4-actions"><button className="v3-button v3-primary cursor-interaction" disabled={busy || !lh.trim()}>{busy ? "Đang gửi…" : "Gửi mã đặt lại"}</button></div>
+    <p className="vtd-form-notice">Máy luôn trả lời một câu duy nhất, dù liên hệ này có tài khoản hay không — nói ra là biến màn này thành máy dò xem ai là khách của Vietourist.</p>
+    <button type="button" className="v3-button v3-secondary cursor-interaction" onClick={() => sang("vao")}>Tôi nhớ ra rồi · quay lại</button>
+  </form>);
+
+  if (buoc === "quen2") return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); quenDat(); }}>
+    <h2>Mã và mật khẩu mới</h2>
+    <p>{tin} <DongHoMa con={con} /></p>
+    {oMa}
+    {oMatKhau("Mật khẩu mới")}
+    <p className="vtd-form-notice">Từ <b>5 ký tự</b>. Không bắt viết hoa, không bắt trộn số hay ký hiệu. Chỉ không được trùng danh sách mật khẩu đã bị lộ.</p>
+    {err && <div className="cong-loi">{err}</div>}
+    <div className="v4-actions">
+      <button className="v3-button v3-primary cursor-interaction" disabled={busy || ma.length !== 6 || !mk || con <= 0}>{busy ? "Đang đặt…" : "Đặt mật khẩu mới"}</button>
+      <button type="button" className="v3-button v3-secondary cursor-interaction" disabled={busy} onClick={quenGui}>Gửi lại mã</button></div>
+    <p className="vtd-form-notice">Đặt xong, <b>mọi phiên đang mở ở máy khác đều bị đăng xuất</b> và <b>mọi máy đã nhớ đều bị quên</b>.</p>
+  </form>);
+
+  // ══ 4 · TẠO TÀI KHOẢN — bốn bước, mã ở bước CUỐI ════════════════════════════════════════════
+  const buocSo = buoc === "tao1" ? 1 : buoc === "tao2" ? 2 : buoc === "tao3" ? 3 : 4;
+  const thanhBuoc = (<ol className="v3-steps">{["Liên hệ", "Mật khẩu", "Điều khoản", "Mã xác thực"].map((t, i) =>
+    <li key={t} className={i + 1 < buocSo ? "done" : i + 1 === buocSo ? "active" : ""}><span>{i + 1 < buocSo ? "✓" : i + 1}</span><div>{t}</div></li>)}</ol>);
+
+  if (buoc === "tao1") return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); tao1(); }}>
+    <h2>Tạo tài khoản {v.ten}</h2>{thanhBuoc}
+    <p>Số điện thoại hoặc email này sẽ là tên đăng nhập của bạn. Chưa gửi mã ở bước này.</p>
+    <label className="v3-field">Họ và tên<input value={hoTen} onChange={(e) => setHoTen(e.target.value)} autoComplete="name" required /></label>
+    <label className="v3-field">Số điện thoại<input value={dt} onChange={(e) => setDt(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="0912 345 678" /></label>
+    <label className="v3-field">Email <span style={{ fontWeight: 400 }}>· không bắt buộc</span>
+      <input value={em} onChange={(e) => setEm(e.target.value)} inputMode="email" autoComplete="email" placeholder="ten@email.com" /></label>
+    {err && <div className="cong-loi">{err}</div>}
+    <div className="v4-actions"><button className="v3-button v3-primary cursor-interaction" disabled={busy || !hoTen.trim() || (!dt.trim() && !em.trim())}>{busy ? "Đang lưu…" : "Tiếp tục"}</button></div>
+    <p className="vtd-form-notice">Máy chưa trả lời số này đã có tài khoản hay chưa. Nói ra là để người lạ dò được ai là khách của Vietourist; nếu số đã có, bước 4 sẽ nhắn cho chủ số, không nhắn cho người đang gõ.</p>
+    <button type="button" className="v3-button v3-secondary cursor-interaction" onClick={() => sang("vao")}>Đã có tài khoản · Đăng nhập</button>
+  </form>);
+
+  if (buoc === "tao2") return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); tao2(); }}>
+    <h2>Đặt mật khẩu</h2>{thanhBuoc}
+    <p>Một câu bạn nhớ được dễ hơn một mớ ký hiệu — và khó đoán hơn nhiều.</p>
+    {oMatKhau("Mật khẩu")}
+    <p className="vtd-form-notice">Từ <b>5 ký tự</b>, tối đa 64. Dấu cách và chữ có dấu đều dùng được. <b>Không bắt viết hoa</b>, không bắt trộn số hay ký hiệu — bắt trộn chỉ làm người ta viết ra giấy.</p>
+    <p className="vtd-form-notice">Đặt dưới 15 ký tự vẫn được. Nhưng khi đăng nhập từ <b>máy lạ</b>, Vietourist sẽ hỏi thêm một mã. Máy bạn hay dùng thì vào thẳng.</p>
+    {err && <div className="cong-loi">{err}</div>}
+    <div className="v4-actions"><button className="v3-button v3-primary cursor-interaction" disabled={busy || !mk}>{busy ? "Đang lưu…" : "Tiếp tục"}</button></div>
+    <p className="vtd-form-notice">Vietourist <b>không bao giờ</b> bắt bạn đổi mật khẩu định kỳ, và không hỏi câu hỏi bí mật.</p>
+  </form>);
+
+  if (buoc === "tao3") return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); tao3(); }}>
+    <h2>Điều khoản dịch vụ</h2>{thanhBuoc}
+    <label className="cong-dong-y"><input type="checkbox" checked={dongY} onChange={(e) => setDongY(e.target.checked)} />
+      <span>Tôi đồng ý điều khoản dịch vụ và chính sách bảo vệ dữ liệu cá nhân của Vietourist.</span></label>
+    <label className="cong-dong-y"><input type="checkbox" checked={quangCao} onChange={(e) => setQuangCao(e.target.checked)} />
+      <span>Nhận tin ưu đãi từ Vietourist. <b>Không bắt buộc</b> — bỏ trống vẫn tạo được tài khoản.</span></label>
+    {err && <div className="cong-loi">{err}</div>}
+    <div className="v4-actions"><button className="v3-button v3-primary cursor-interaction" disabled={busy || !dongY}>{busy ? "Đang lưu…" : "Tiếp tục"}</button></div>
+    <p className="vtd-form-notice">Ô nhận tin ưu đãi mặc định TẮT và không bao giờ tự bật.</p>
+  </form>);
+
+  return (<form className="vtd-form" onSubmit={(e) => { e.preventDefault(); if (gui) { taoXong(); } else { taoGuiMa(); } }}>
+    <h2>Mã xác thực</h2>{thanhBuoc}
+    <p><b>Đây là bước cuối — và là bước tạo ra tài khoản thật.</b> Ba bước trước chưa dựng tài khoản nào; tất cả đang nằm trong một đơn đăng ký tạm, hết hạn sau 24 giờ.</p>
+    {!gui ? (<>
+      <ChonKenh k={k} chon={chon} dat={setChon} />
+      {k[chon] && !k[chon].ok && <div className="cong-loi">Kênh {k[chon].ten} chưa mở: {k[chon].ly_do}.</div>}
+      {err && <div className="cong-loi">{err}</div>}
+      <div className="v4-actions"><button className="v3-button v3-primary cursor-interaction" disabled={busy || (!!k[chon] && !k[chon].ok)}>{busy ? "Đang gửi…" : "Gửi mã xác thực"}</button></div>
+    </>) : (<>
+      <p>{gui.message} <DongHoMa con={con} /></p>
+      {oMa}
+      {err && <div className="cong-loi">{err}</div>}
+      <div className="v4-actions">
+        <button className="v3-button v3-primary cursor-interaction" disabled={busy || ma.length !== 6 || con <= 0}>{busy ? "Đang tạo…" : "Xác thực và tạo tài khoản"}</button>
+        <button type="button" className="v3-button v3-secondary cursor-interaction" disabled={busy} onClick={taoGuiMa}>Gửi lại mã</button></div>
+    </>)}
     <p className="vtd-form-notice">Vietourist không bao giờ hỏi mã này qua điện thoại. Sai 5 lần thì phải gửi lại mã mới.</p>
+    {man !== "kh" && <p className="vtd-form-notice">Tạo xong, {man === "dt" ? "đối tác" : "cổ đông"} còn một bước nữa: khai hồ sơ để Vietourist duyệt. Vào xem được ngay, chưa giao dịch được.</p>}
   </form>);
 }
 

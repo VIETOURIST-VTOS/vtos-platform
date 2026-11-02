@@ -64,6 +64,10 @@ class TaiKhoanNgoai(Base):
     # sha256 — xem services/cong_ngoai.bam_mat_khau. RỖNG = tài khoản tạo TRƯỚC DK-1, còn vào
     # bằng mã một lần cho tới khi DK-3 đóng cửa ấy và buộc đặt mật khẩu.
     mat_khau_bam: Mapped[str] = mapped_column(String(255), default="")
+    # DK-2: phanh đăng nhập THEO TÀI KHOẢN. Phanh theo địa chỉ mạng không đủ — kẻ dò đổi
+    # địa chỉ là lách; phanh ở đây thì đổi địa chỉ cũng vô ích. Đúng mật khẩu là đặt lại 0.
+    dn_sai: Mapped[int] = mapped_column(Integer, default=0)
+    dn_khoa_den: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class MaXacThucNgoai(Base):
@@ -104,5 +108,26 @@ class DonDangKy(Base):
     dong_y_dieu_khoan_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     nhan_tin_quang_cao: Mapped[bool] = mapped_column(default=False)          # không bao giờ tự bật
     ip: Mapped[str] = mapped_column(String(64), default="")
+    het_han: Mapped[datetime] = mapped_column(DateTime, index=True)
+    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class MayDaNho(Base):
+    """DK-2 · MÁY ĐÃ XÁC MINH — lớp thứ hai giữ cho mật khẩu 5 ký tự đứng được.
+
+    Mật khẩu ngắn một mình thì không đủ. Đúng mật khẩu mà máy LẠ thì vẫn phải gõ mã gửi về điện
+    thoại; máy đã quen thì vào thẳng. Bảng này giữ danh sách máy đã quen.
+
+    Dấu nhớ lưu dạng BĂM, như mật khẩu: bảng này rò ra ngoài thì kẻ cầm nó vẫn KHÔNG dựng lại
+    được dấu nhớ nào. Và dấu nhớ chỉ trả lời đúng MỘT câu — "máy này đã xác minh chưa". Nó không
+    chứa quyền, không chứa mật khẩu, tự nó không mở được tài khoản nào.
+    """
+    __tablename__ = "may_da_nho"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tai_khoan_id: Mapped[int] = mapped_column(ForeignKey("tai_khoan_ngoai.id"), index=True)
+    dau_bam: Mapped[str] = mapped_column(String(64), index=True)   # BĂM, không bao giờ là dấu thô
+    ten_may: Mapped[str] = mapped_column(String(80), default="")   # người dùng tự đặt
+    ip_cuoi: Mapped[str] = mapped_column(String(64), default="")
+    dung_cuoi: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     het_han: Mapped[datetime] = mapped_column(DateTime, index=True)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
