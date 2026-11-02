@@ -14,6 +14,7 @@ from app.db.session import get_db
 from app.api.deps import require_roles
 from app.models.core import User
 from app.services import hach_toan as HT
+from app.services import access as AC
 from app.services import cong_chan as CC
 from app.services import accounting as ACC
 from app.services import chung_tu_loai as CTL   # Đợt E3 – ba bảng phân loại chứng từ
@@ -34,6 +35,18 @@ GHI_SO = ("ketoan",)
 @router.get("")
 def bang(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
     return HT.bang(db)
+
+
+@router.get("/bang")
+def danh_muc_httt(u: User = Depends(require_roles(*AC.PAYMENT_REQUEST_ROLES, "thu_quy",
+                                                   mo_ta="danh mục hình thức thanh toán cho nút ĐÃ CHI")),
+                  db: Session = Depends(get_db)):
+    """SUA-2 02/11/2026 — đường `/hach-toan/bang` mà màn /expenses gọi (Đợt P2-1 đã khai vào bản đồ màn hình)
+    nhưng KHÔNG CÓ trên máy chủ: ô «Hình thức thanh toán» khi bấm ĐÃ CHI luôn rỗng. Cửa này trả ĐÚNG MỘT danh
+    mục tĩnh `HINH_THUC_TT` — không quy tắc, không số liệu — cho mười vai lập đề nghị chi và thủ quỹ (người bấm
+    ĐÃ CHI, `ops.VAI_GHI_DA_CHI`). Bảng quy ước đầy đủ vẫn chỉ ở `GET /hach-toan` với `XEM`."""
+    from app.models.hach_toan import HINH_THUC_TT
+    return {"hinh_thuc_tt": HINH_THUC_TT}
 
 
 @router.post("/nap-mac-dinh")

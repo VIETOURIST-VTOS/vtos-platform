@@ -82,11 +82,12 @@ DA_BIET = (
     ("/cong-no", "robot_ks"),
     ("/cong-no", "sales_admin"),
     ("/doi-xe", "robot_ks"),
-    ("/hach-toan", "robot_ks"),
+    # ("/hach-toan", "robot_ks") và ("/ket-so", "robot_ks") — GẠCH 02/11/2026, SUA-2: cửa đọc mới
+    #   `GET /api/v1/hach-toan/bang` (danh mục hình thức thanh toán) mở cho nhóm vai đề nghị chi, trong đó có
+    #   robot_ks; phép đo xét theo TIỀN TỐ `/api/v1/hach-toan` nên hai cặp này hết lệch.
     ("/hieu-qua-doi-xe", "robot_ks"),
     ("/hop-dong-khach", "robot_ks"),
     ("/ir-phap-che", "robot_ks"),
-    ("/ket-so", "robot_ks"),
     ("/lai-lo-doi-xe", "robot_ks"),
     ("/lai-lo-tour", "robot_ks"),
     ("/lai-lo-tour", "sales_admin"),
@@ -278,8 +279,10 @@ def test_lg9_ba_vai_tien_vao_moi_nhan_vien_chi_mo_them_don_tu():
         pv = set(AC.pham_vi_day_du(vai))
         thieu = [m for m in DON_TU_CUA_NGUOI if m not in pv]
         assert not thieu, f"{vai} la nguoi di lam ma khong gui duoc don tu: {thieu}"
-    assert len(AC.pham_vi_day_du("ketoan_tt")) == 31
-    assert len(AC.pham_vi_day_du("thu_quy")) == 27
+    # SUA-2 02/11/2026: +1 cho cả hai — Đợt P2-1 (#614) khai `/api/v1/hach-toan/bang` vào màn /expenses mà hai vai
+    # này đều có; `test_p2.PHAM_VI_DA_CHOT` đã đổi 31→32 / 27→28 cùng đợt ấy, chỗ này quên theo nên đỏ trên main.
+    assert len(AC.pham_vi_day_du("ketoan_tt")) == 32
+    assert len(AC.pham_vi_day_du("thu_quy")) == 28
     # Kế toán trưởng KHÔNG hẹp hơn Kế toán. Từ 20/10/2026 rộng hơn đúng MỘT cửa (Chủ tịch chốt): tự
     # gửi yêu cầu Pháp chế — việc của trưởng phòng trở lên; kế toán viên nhờ Kế toán trưởng gửi.
     ktt, kt = set(AC.pham_vi_day_du("ketoan_truong")), set(AC.pham_vi_day_du("ketoan"))

@@ -57,6 +57,13 @@ CHO_DA_KHAI_BA_VAI = [
     "services/ops.py: ketoan_truong",
     "services/ops.py: ketoan_tt",
     "services/ops.py: thu_quy",
+    # ── SUA-2, 02/11/2026 ─────────────────────────────────────────────────────────────────
+    # `api/v1/payments.py` — Đợt R4c-4: `POST /receipts/cash` nhận thêm `thu_quy` (Chủ tịch chốt 02/11 "cả hai
+    #   vai đều lập được"; menu /collections đã cấp từ E2b-0). Đợt ấy quên khai ở đây nên f1 đỏ trên main.
+    "api/v1/payments.py: thu_quy",
+    # `api/v1/hach_toan.py` — cửa ĐỌC `GET /hach-toan/bang`: chỉ danh mục hình thức thanh toán cho nút ĐÃ CHI ở
+    #   /expenses; thủ quỹ là người bấm ĐÃ CHI. Không mở bảng quy ước (`XEM` không đổi).
+    "api/v1/hach_toan.py: thu_quy",
     "api/v1/tai_xe.py: ketoan_truong",
     # `api/v1/routes.py` — Đợt E4a 12/10/2026: Kế toán trưởng nằm trong hai bộ vai XEM và TRÌNH
     #   của cửa điều khoản thanh toán, cùng bộ vai với Kế toán. Đợt E4a thêm mà quên khai, nên
