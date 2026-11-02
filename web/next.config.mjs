@@ -19,7 +19,8 @@ const nextConfig = {
     const rieng = ["hotel", "restaurant", "tours"].flatMap((k) => [
       { source: `/${k}`, has: cong, destination: `/kham-pha/${k}` },
       { source: `/${k}/:id(\\d+)`, has: cong, destination: `/kham-pha/${k}/:id` },
-    ]).concat([{ source: "/tours/don/:ma", has: cong, destination: "/kham-pha/tours/don/:ma" }]);   // TR-1: cổng thẻ trả về đơn
+    ]).concat([{ source: "/tours/don/:ma", has: cong, destination: "/kham-pha/tours/don/:ma" },   // TR-1: cổng thẻ trả về đơn
+             { source: "/thanh-toan/:ma", has: cong, destination: "/kham-pha/thanh-toan/:ma" }]); // TR-1d: link thanh toán tour đoàn
     return { beforeFiles: rieng, afterFiles: [{ source: "/api/:path*", destination: `${api}/api/:path*` }], fallback: [] };
   },
 };

@@ -20,7 +20,9 @@ const vnd = (n: number) => (n || 0).toLocaleString("vi-VN") + " đ";
 const pct = (n: number | null) => (n === null || n === undefined ? "–" : (n * 100).toFixed(1) + "%");
 
 function HopDong() {
-  const { toast } = useShell();
+  const { toast, user } = useShell();
+  // TR-1d (Chủ tịch 02/11/2026): CHỈ Sale Admin phòng Đoàn tạo / hủy link thanh toán; máy chủ chặn lại lần nữa.
+  const laSA = user?.role === "sales_admin";
   const [ds, setDs] = useState<HD[]>([]);
   const [chuoi, setChuoi] = useState<Record<number, any>>({});
 
@@ -64,7 +66,49 @@ function HopDong() {
 
   const xemLich = async (h: HD) => {
     if (lich[h.id]) { setLich({ ...lich, [h.id]: null }); return; }
-    try { setLich({ ...lich, [h.id]: await api<any>(`/ban-hang/hop-dong/${h.id}/lich-thanh-toan`) }); }
+    try { setLich({ ...lich, [h.id]: await api<any>(`/ban-hang/hop-dong/${h.id}/lich-thanh-toan`) }); taiLink(h.id); }
+    catch (e) { toast(errMsg(e), true); }
+  };
+
+  // TR-1d · LINK THANH TOÁN TOUR ĐOÀN (Chủ tịch duyệt bản xem thử 02/11/2026). Mỗi đợt một link; số tiền MÁY lấy
+  // (báo giá khách đã chốt → hợp đồng → phần còn thiếu của đợt), hạn = hạn đợt, khách chỉ chuyển khoản (không thẻ).
+  const [lk, setLk] = useState<Record<number, any>>({});
+  const [taoL, setTaoL] = useState<{ hid: number; d: any; email: string; dien_thoai: string } | null>(null);
+  const taiLink = async (hid: number) => {
+    try { const r = await api<any>(`/ban-hang/hop-dong/${hid}/link-thanh-toan`); setLk((x) => ({ ...x, [hid]: r })); }
+    catch { /* không có quyền xem link thì bảng lịch vẫn hiện */ }
+  };
+  const linkCuaDot = (hid: number, did: number) =>
+    (lk[hid]?.link || []).find((l: any) => l.lich_id === did && (l.trang_thai === "mo" || l.trang_thai === "da_tra"));
+  const lamMoi = async (hid: number) => {
+    setLich((x) => ({ ...x, [hid]: null }));
+    try { const b = await api<any>(`/ban-hang/hop-dong/${hid}/lich-thanh-toan`); setLich((x) => ({ ...x, [hid]: b })); } catch { /* bỏ qua */ }
+    await taiLink(hid);
+  };
+  const taoLink = async (guiEmail: boolean) => {
+    if (!taoL) return;
+    const lich_id = taoL.d.id;
+    setDang(true);
+    try {
+      const r = await api<any>("/ban-hang/link-thanh-toan",
+        { method: "POST", json: { lich_id, email: taoL.email, dien_thoai: taoL.dien_thoai, gui_email: guiEmail } });
+      toast(`Đã tạo link ${r.ma}` + (guiEmail && r.email_link_luc ? ` và gửi tới ${r.email}` : ""));
+      const hid = taoL.hid; setTaoL(null); await lamMoi(hid);
+    } catch (e) { toast(errMsg(e), true); }
+    setDang(false);
+  };
+  const chepLink = async (l: any) => {
+    try { await navigator.clipboard.writeText(l.link); toast("Đã chép link — dán gửi khách qua Zalo / email"); }
+    catch { window.prompt("Chép link này gửi khách:", l.link); }
+  };
+  const guiLaiLink = async (hid: number, l: any) => {
+    try { await api<any>(`/ban-hang/link-thanh-toan/${l.ma}/gui-lai`, { method: "POST" }); toast(`Đã gửi lại email tới ${l.email}`); await taiLink(hid); }
+    catch (e) { toast(errMsg(e), true); }
+  };
+  const huyLink = async (hid: number, l: any) => {
+    const ly_do = (window.prompt(`Hủy link ${l.ma}? Ghi lý do (bắt buộc):`) || "").trim();
+    if (!ly_do) return;
+    try { await api<any>(`/ban-hang/link-thanh-toan/${l.ma}/huy`, { method: "POST", json: { ly_do } }); toast(`Đã hủy link ${l.ma}`); await taiLink(hid); }
     catch (e) { toast(errMsg(e), true); }
   };
 
@@ -174,7 +218,7 @@ function HopDong() {
                             <th style={{ textAlign: "right" }}>Số tiền</th>
                             <th style={{ textAlign: "right" }}>Đã rải</th>
                             <th style={{ textAlign: "right" }}>Còn thiếu</th>
-                            <th>Trạng thái</th><th></th></tr></thead>
+                            <th>Trạng thái</th><th>Link thanh toán</th><th></th></tr></thead>
                           <tbody>{lich[h.id].dot.map((d: any) => (
                             <tr key={d.id}>
                               <td>{d.dot}. {d.ten}<div className="muted small">{d.moc_mo_ta}
@@ -185,6 +229,23 @@ function HopDong() {
                               <td style={{ textAlign: "right" }}>{d.con_thieu > 0 ? <b>{vnd(d.con_thieu)}</b> : "–"}</td>
                               <td><Tag cls={d.trang_thai === "da_du" ? "ok" : d.qua_han ? "red" : "warn"}>
                                 {d.trang_thai === "da_du" ? "đã đủ" : d.qua_han ? "quá hạn" : "chờ đến hạn"}</Tag></td>
+                              <td className="nut">{(() => {
+                                const l = linkCuaDot(h.id, d.id);
+                                if (l) return (<>
+                                  <Tag cls={l.trang_thai === "da_tra" ? "ok" : "warn"}>{l.trang_thai_ten}</Tag>{" "}
+                                  <span className="mono small">{l.ma} · {vnd(l.so_tien)}</span>
+                                  {l.trang_thai === "mo" ? <div className="muted small">hết hạn {l.han}{l.email_link_luc ? ` · đã gửi ${l.email}` : ""}</div> : null}
+                                  {l.email_loi ? <div className="warn small">Email lỗi: {l.email_loi}</div> : null}
+                                  <div>
+                                    {l.trang_thai === "mo" ? <button className="ghost" onClick={() => chepLink(l)}>Chép link</button> : null}
+                                    {laSA && l.email ? <button className="ghost" onClick={() => guiLaiLink(h.id, l)}>
+                                      {l.trang_thai === "da_tra" ? "Gửi lại hóa đơn" : "Gửi lại email"}</button> : null}
+                                    {laSA && l.trang_thai === "mo" ? <button className="ghost" onClick={() => huyLink(h.id, l)}>Hủy link</button> : null}
+                                  </div></>);
+                                if (!laSA || d.con_thieu <= 0) return <span className="muted small">–</span>;
+                                if (lk[h.id] && !lk[h.id].tt_chung) return <span className="muted small">công tắc thanh toán chung đang tắt</span>;
+                                return <button onClick={() => setTaoL({ hid: h.id, d, email: "", dien_thoai: "" })}>Tạo link thanh toán</button>;
+                              })()}</td>
                               <td className="nut"><button className="ghost" onClick={() => doiHan(h.id, d)}>Dời hạn</button></td>
                             </tr>))}</tbody>
                         </table>)}
@@ -227,6 +288,21 @@ function HopDong() {
         )}
       </div>
 
+      {taoL ? (
+        <form className="card" onSubmit={(e) => { e.preventDefault(); taoLink(true); }}>
+          <h3>Tạo link thanh toán · đợt {taoL.d.dot}. {taoL.d.ten}</h3>
+          <p>Số tiền <b>{vnd(taoL.d.con_thieu)}</b> — phần còn thiếu của đợt, máy lấy từ hợp đồng (báo giá khách đã chốt), không sửa ở đây.
+            Hạn link <b>{taoL.d.han || "–"}</b> (hạn của đợt). Khách chỉ chuyển khoản — QR hoặc chuyển tay, không thẻ.</p>
+          <label>Email nhận link <input id="ttd-email" type="email" value={taoL.email} placeholder="để trống: lấy email trên báo giá / booking"
+            onChange={(e) => setTaoL({ ...taoL, email: e.target.value })} /></label>
+          <label>Điện thoại (để Zalo) <input id="ttd-dt" value={taoL.dien_thoai} placeholder="để trống: lấy trên báo giá / booking"
+            onChange={(e) => setTaoL({ ...taoL, dien_thoai: e.target.value })} /></label>
+          <div className="nut">
+            <button type="submit" disabled={dang}>Tạo và gửi email</button>
+            <button type="button" className="ghost" disabled={dang} onClick={() => taoLink(false)}>Chỉ tạo, tự gửi Zalo</button>
+            <button type="button" className="ghost" onClick={() => setTaoL(null)}>Thôi</button>
+          </div>
+        </form>) : null}
       {soan ? (
         <form className="card" onSubmit={datLich}>
           <h3>Lịch thanh toán – {soan.hd.so_hop_dong} · giá trị {vnd(soan.hd.gia_tri)}</h3>
