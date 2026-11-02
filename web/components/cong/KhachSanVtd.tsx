@@ -69,6 +69,17 @@ const P = {
   qua: "M4 11h16v10H4zM3 7h18v4H3zM12 7v14M12 7S10 3 7.5 4 9 7 12 7zm0 0s2-4 4.5-3S15 7 12 7z",
 };
 
+/* KS-18 · Ảnh tạm cho thẻ phòng (Chủ tịch chọn «3» 03/11/2026): 1.358 ảnh nhưng chỉ 56 ảnh gắn loại phòng → thẻ
+   phòng trống «Ảnh đang cập nhật». Phòng chưa có ảnh riêng thì mượn ảnh khách sạn — ưu tiên nhóm «Phòng» chưa gắn
+   phòng nào, rồi ảnh album không phải bìa — mỗi phòng một ảnh (theo thứ tự thẻ), góc ảnh ghi «Ảnh khách sạn».
+   Điều hành gắn ảnh cho phòng (nút «Sửa» trong Album, KS-17) thì thẻ tự về ảnh riêng, nhãn tự mất. */
+export function anhTamPhong(anh: any[], i: number): any | null {
+  const tu = anh.filter((a) => !a.loai_phong_id);
+  const phong = tu.filter((a) => a.nhom === "phong");
+  const kho = phong.length ? phong : tu.filter((a) => !a.la_bia).length ? tu.filter((a) => !a.la_bia) : tu.length ? tu : anh;
+  return kho.length ? kho[i % kho.length] : null;
+}
+
 function AnhTrong({ k, cao }: { k: any; cao?: number }) {
   const chu = (k.ten || "?").normalize("NFC").trim().charAt(0).toUpperCase();
   return <span className="ksv-trong" style={{ minHeight: cao }}><b style={{ background: MAU[k.mien] || "#3d4b59" }}>{chu}</b><small>Ảnh đang cập nhật</small></span>;
@@ -515,11 +526,13 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
         {loiBox}
         {!ks.phong.length && <div className="ksv-panel">Khách sạn chưa nhập loại phòng. <button type="button" className="ksv-btn line" onClick={() => moYeuCauTrong()}>Gửi yêu cầu giữ phòng</button></div>}
         {locP.length > 0 && !phongHien.length && <div className="ksv-panel">Không có gói nào khớp bộ lọc. <button type="button" className="ksv-btn line" onClick={() => setLocP([])}>Xóa bộ lọc</button></div>}
-        {phongHien.map((p: any) => { const aP = anh.filter((a) => a.loai_phong_id === p.id); const anhP = p.anh?.[0] || aP[0];
+        {phongHien.map((p: any, iP: number) => { const aP = anh.filter((a) => a.loai_phong_id === p.id); const rieng = p.anh?.[0] || aP[0];
+          const anhP = rieng || anhTamPhong(anh, iP), tam = !rieng && !!anhP;
           return <div key={p.id} className="ksv-room">
           <div className="ksv-rl">
-            <button type="button" className="ksv-rph" onClick={() => setAlbum(aP.length ? { lp: p.id } : { nhom: "phong" })} aria-label={`Xem ảnh ${p.ten}`}>
-              {anhP ? <img src={anhP.nho} alt={p.ten} loading="lazy" /> : <AnhTrong k={ks} cao={150} />}
+            <button type="button" className="ksv-rph" onClick={() => setAlbum(aP.length ? { lp: p.id } : { nhom: anh.some((a) => a.nhom === "phong") ? "phong" : "" })} aria-label={`Xem ảnh ${p.ten}`}>
+              {anhP ? <img src={anhP.nho} alt={tam ? `${ks.ten} — ảnh khách sạn` : (anhP.mo_ta_thay_the || p.ten)} loading="lazy" /> : <AnhTrong k={ks} cao={150} />}
+              {tam && <span className="ksv-ct ksv-tam">Ảnh khách sạn</span>}
               {(p.con ?? 9) > 0 && (p.con ?? 9) <= 3 && p.goi.length > 0 && <span className="ksv-b aw" style={{ background: "#fff", color: "var(--ksv-price)" }}>Còn {p.con} phòng!</span>}
               {aP.length > 0 && <span className="ksv-ct">1/{aP.length}</span>}</button>
             {p.video?.[0] && <div style={{ aspectRatio: "16 / 9", maxWidth: "100%" }}><VideoO v={p.video[0]} ten={p.ten} nhan="VIDEO PHÒNG" /></div>}
@@ -1016,6 +1029,7 @@ const CSS = `
 .ksv-phbtn{all:unset;cursor:pointer;display:block;width:100%;height:100%}
 .ksv-ph img{width:100%;height:100%;min-height:200px;object-fit:cover;display:block}
 .ksv-ct{position:absolute;left:10px;bottom:10px;background:rgba(20,20,30,.66);color:#fff;font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px}
+.ksv-ct.ksv-tam{font-weight:500}
 .ksv-ico{position:absolute;border:0;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .ksv-heart{right:10px;top:10px;width:38px;height:38px}.ksv-heart.on svg{fill:#e0335a;stroke:#e0335a}
 .ksv-nxt{right:10px;top:calc(50% - 16px);width:32px;height:32px}.ksv-prv{left:10px;top:calc(50% - 16px);width:32px;height:32px}
