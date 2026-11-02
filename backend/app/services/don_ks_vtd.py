@@ -297,6 +297,8 @@ def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict]
         hh = S.han_huy(g, vao)
         dong.append({"goi_id": g.id, "loai_phong_id": lp.id, "loai_phong": lp.ten, "goi": g.ten, "so": n, "tien": tien,
                      "bua_sang": bool(g.bua_sang), "huy_han": hh.isoformat() if hh else None, "gia_mot": int(p["tong"]),
+                     "huy_gio_chot": g.huy_gio_chot or "", "huy_mui_gio": g.huy_mui_gio or "Asia/Ho_Chi_Minh",   # KS-17
+                     "cho_tra_sau": bool(g.cho_tra_sau),
                      "_lp": lp, "_g": g})
     # KS-16j/16k: phụ thu trẻ em / ăn sáng trẻ / giường phụ máy tự cộng vào dòng (chưa thuế phí, cùng tỷ lệ thuế phí)
     try:
@@ -329,6 +331,8 @@ def _kiem_mo_tt(db: Session, k: KhachSanVtd | None) -> None:
 def han_tra_sau(dong: list[dict], hom_nay: date) -> date | None:
     """KS-16p: hạn trả cho «Đặt giữ, trả sau». None = không cho trả sau (có gói không hoàn tiền, hoặc hạn đã qua)."""
     if not dong or any(not x.get("huy_han") for x in dong):
+        return None
+    if any(x.get("cho_tra_sau") is False for x in dong):             # KS-17: gói khai «không cho trả sau»
         return None
     han = min(date.fromisoformat(str(x["huy_han"])[:10]) for x in dong) - timedelta(days=TRA_SAU_TRUOC_HUY)
     return han if han > hom_nay else None

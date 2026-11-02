@@ -79,6 +79,11 @@ def gia_luu(goi: GoiGiaVtd, mua: list[MuaGiaVtd], vao: date, ra: date) -> dict |
     return {"tong": round(tien), "gia_dem": round(tien / so), "niem_yet_dem": round(niem / so) if co_niem and niem > tien else None}
 
 
+# KS-17: múi giờ của giờ chốt hủy — khách sạn trong nước theo giờ Việt Nam; giờ OTA ghi kèm khi khác.
+MUI_GIO_HUY = {"Asia/Ho_Chi_Minh": "Giờ Việt Nam (GMT+7)", "UTC": "UTC (GMT+0)", "Asia/Singapore": "Singapore (GMT+8)",
+               "Asia/Bangkok": "Bangkok (GMT+7)"}
+
+
 def han_huy(goi: GoiGiaVtd, vao: date) -> date | None:
     return vao - timedelta(days=goi.huy_truoc_ngay) if goi.huy_truoc_ngay is not None else None
 
@@ -102,6 +107,7 @@ def _kiem_ky(vao, ra, hom_nay: date | None = None) -> tuple[date, date]:
 # ══ VTOS · HỒ SƠ KHÁCH SẠN ════════════════════════════════════════════════════════════════════════
 TRUONG_KS = ("ten", "tinh_thanh", "khu_vuc", "dia_chi", "sao", "loai", "km_trung_tam", "gan", "noi_bat", "mo_ta",
              "tien_ich", "gio_nhan", "gio_tra", "cs_tre_em", "cs_giuong_phu", "cs_vat_nuoi", "cs_khac", "thue_phi_pt",
+             "thue_phi_xac_nhan",                                                                   # KS-17
              "lien_he_noi_bo", "ghi_chu_noi_bo",
              # KS-16j
              "cs_nhan_tre_em", "cs_tre_tu_tuoi", "cs_moc_tuoi", "cs_phi_giuong_phu", "cs_giuong_phu_an_sang", "cs_noi",
@@ -251,6 +257,10 @@ def _kiem_ks(d: dict) -> dict:
     o["thue_phi_pt"] = 0.0 if t in (None, "") else float(t)
     if not 0 <= o["thue_phi_pt"] <= 30:
         raise LoiKhachSan("Thuế phí 0–30%")
+    # KS-17: xác nhận là một ô RIÊNG — ô trống không bao giờ được hiểu là «đã xác nhận 0%».
+    o["thue_phi_xac_nhan"] = bool(d.get("thue_phi_xac_nhan"))
+    if o["thue_phi_xac_nhan"] and t in (None, ""):
+        raise LoiKhachSan("Xác nhận thuế phí thì ghi mức % theo hợp đồng (ghi 0 nếu khách sạn xác nhận không thu)")
     for k, n in (("khu_vuc", 120), ("dia_chi", 300), ("gan", 300), ("noi_bat", 300), ("cs_tre_em", 300),
                  ("cs_giuong_phu", 300), ("cs_vat_nuoi", 300), ("lien_he_noi_bo", 300)):
         o[k] = str(d.get(k) or "").strip()[:n]
@@ -412,6 +422,8 @@ def bat_tt_chung(db: Session, u: User, bat: bool, now: datetime | None = None) -
 def bat_tt_ks(db: Session, u: User, kid: int, bat: bool) -> KhachSanVtd:
     _quyen(u, VAI_DUYET, "Chỉ TP Điều hành / Chủ tịch / TGĐ mở / đóng thanh toán của khách sạn")
     k = _ks(db, kid)
+    if bat and not k.thue_phi_xac_nhan:
+        raise LoiKhachSan("Chưa xác nhận thuế phí với khách sạn — chưa mở thanh toán được")   # KS-17
     k.mo_thanh_toan = bool(bat)
     _audit(db, u, "ks_vtd_tt_mo" if bat else "ks_vtd_tt_dong", k.ma)
     db.commit()
@@ -496,11 +508,14 @@ def luu_loai_phong(db: Session, u: User, kid: int, d: dict, lid: int | None = No
     try:
         sp = d.get("so_phong", 1)          # KS-16j: 0 là 0 (không còn đổi thành 1); trống = 0
         o = {"ten": ten, "dien_tich": int(d.get("dien_tich") or 0), "giuong": str(d.get("giuong") or "").strip()[:120],
-             "mo_ta": mo_ta, "mo_ta_dai": mo_ta_dai, "toi_da_nguoi_lon": int(d.get("toi_da_nguoi_lon") or 2),
+             "mo_ta": mo_ta, "mo_ta_dai": mo_ta_dai,
              "so_phong": 0 if sp in (None, "") else int(sp),
              "thu_tu": int(d.get("thu_tu") or 0), "dang_ban": bool(d.get("dang_ban", True))}
     except (TypeError, ValueError):
         raise LoiKhachSan("Số liệu loại phòng không hợp lệ")
+    # KS-17: trống = CHƯA XÁC NHẬN (bản cũ tự gán 2, giao diện tự gán 1). Phòng chưa xác nhận người lớn không bán được.
+    o["toi_da_nguoi_lon"] = _so_hoac_none(d.get("toi_da_nguoi_lon"), "Tối đa người lớn", 1, 20)
+    o["tong_khach_toi_da"] = _so_hoac_none(d.get("tong_khach_toi_da"), "Tổng khách tối đa", 1, 30)
     o["toi_da_tre_em"] = _so_hoac_none(d.get("toi_da_tre_em"), "Tối đa trẻ em", 0, 10)
     o["giuong_phu_toi_da"] = _so_hoac_none(d.get("giuong_phu_toi_da"), "Giường phụ tối đa", 0, 5)
     # KS-16k: sức chứa kiểu Agoda + ghi đè của riêng phòng (trống = theo khách sạn)
@@ -542,8 +557,9 @@ def luu_loai_phong(db: Session, u: User, kid: int, d: dict, lid: int | None = No
         if len(v) > n:
             raise LoiKhachSan(f"Ô {x.replace('_', ' ')} quá {n} ký tự")
         o[x] = v
-    if not 1 <= o["toi_da_nguoi_lon"] <= 20:
-        raise LoiKhachSan("Sức chứa: người lớn 1–20, trẻ em 0–10")
+    if (o["tong_khach_toi_da"] is not None and o["toi_da_nguoi_lon"] is not None
+            and o["tong_khach_toi_da"] < o["toi_da_nguoi_lon"]):
+        raise LoiKhachSan("Tổng khách tối đa không nhỏ hơn số người lớn tối đa")
     if not 0 <= o["so_phong"] <= 500 or not 0 <= o["dien_tich"] <= 2000:
         raise LoiKhachSan("Số phòng 0–500, diện tích 0–2000 m²")
     if o["dang_ban"] and o["so_phong"] < 1:
@@ -611,6 +627,12 @@ def luu_goi(db: Session, u: User, lid: int, d: dict, gid: int | None = None, now
     h = None if h in (None, "", "khong") else int(h)
     if h is not None and not 0 <= h <= 60:
         raise LoiKhachSan("Miễn phí hủy trước 0–60 ngày, hoặc «không hoàn tiền»")
+    gc = str(d.get("huy_gio_chot") or "").strip()                    # KS-17
+    if gc and (len(gc) != 5 or gc[2] != ":" or not (gc[:2] + gc[3:]).isdigit() or int(gc[:2]) > 23 or int(gc[3:]) > 59):
+        raise LoiKhachSan("Giờ chốt hủy dạng HH:MM, hoặc để trống = hết ngày")
+    mg = str(d.get("huy_mui_gio") or "Asia/Ho_Chi_Minh").strip()
+    if mg not in MUI_GIO_HUY:
+        raise LoiKhachSan("Múi giờ hủy không hợp lệ")
     mua = _kiem_mua(d.get("mua") or [])
     if not mua:
         raise LoiKhachSan("Nhập ít nhất một mùa giá")
@@ -633,6 +655,7 @@ def luu_goi(db: Session, u: User, lid: int, d: dict, gid: int | None = None, now
     truoc = g.trang_thai if gid else None
     g.ten, g.bua_sang, g.huy_truoc_ngay, g.dang_ban = ten, bool(d.get("bua_sang")), h, bool(d.get("dang_ban", True))
     g.tre_em_che_do, g.gia_tre = che_do, gia_tre
+    g.huy_gio_chot, g.huy_mui_gio, g.cho_tra_sau = gc, mg, bool(d.get("cho_tra_sau", True))   # KS-17
     g.trang_thai, g.ly_do_tra_lai, g.duyet_boi, g.duyet_luc = "nhap", "", "", None
     g.sua_boi, g.sua_luc = u.username, now
     db.flush()
@@ -668,6 +691,13 @@ def duyet_goi(db: Session, u: User, gid: int, dong_y: bool, ly_do: str = "", now
         raise LoiKhachSan("Người nhập giá không tự duyệt — cần TP Điều hành khác hoặc Chủ tịch / TGĐ")
     if not dong_y and len((ly_do or "").strip()) < 5:
         raise LoiKhachSan("Trả lại phải ghi lý do")
+    if dong_y:                                                        # KS-17: giá chưa thuế + thuế chưa xác nhận = giá sai
+        lp0 = db.get(LoaiPhongVtd, g.loai_phong_id)
+        k0 = db.get(KhachSanVtd, lp0.khach_san_id)
+        if not k0.thue_phi_xac_nhan:
+            raise LoiKhachSan("Chưa xác nhận thuế phí của khách sạn — xác nhận ở hồ sơ khách sạn rồi mới duyệt giá")
+        if lp0.toi_da_nguoi_lon is None:
+            raise LoiKhachSan("Loại phòng chưa xác nhận số người lớn tối đa — xác nhận rồi mới duyệt giá")
     g.trang_thai = "da_duyet" if dong_y else "tra_lai"
     g.ly_do_tra_lai = "" if dong_y else ly_do.strip()[:300]
     g.duyet_boi, g.duyet_luc = u.username, now or datetime.now()
@@ -736,6 +766,7 @@ def tai_anh(db: Session, u: User, kid: int, ten_tep: str, data: bytes, d: dict, 
         raise LoiKhachSan(str(ex))
     x = AnhKhachSanVtd(khach_san_id=k.id, loai_phong_id=lid, attachment_id=a.id, hien_id=ah.id, nho_id=an.id,
                        rong=rong, cao=cao, nhom=nhom, chu_thich=str(d.get("chu_thich") or "").strip()[:200],
+                       mo_ta_thay_the=str(d.get("mo_ta_thay_the") or "").strip()[:200],          # KS-17
                        nguon=str(d.get("nguon") or "").strip()[:200], thu_tu=max([y.thu_tu for y in ds], default=0) + 1,
                        la_bia=False, trang_thai="da_duyet", tai_boi=u.username, tai_luc=now or datetime.now(),
                        duyet_boi="tu_dong", duyet_luc=now or datetime.now())   # KS-16c: bỏ duyệt ảnh — tải là hiện
@@ -769,6 +800,8 @@ def sua_anh(db: Session, u: User, pid: int, d: dict) -> AnhKhachSanVtd:
         x.loai_phong_id = lid
     if "chu_thich" in d:
         x.chu_thich = str(d["chu_thich"] or "").strip()[:200]           # KS-16c: không còn duyệt lại
+    if "mo_ta_thay_the" in d:                                           # KS-17: chữ thay ảnh cho trình đọc màn hình
+        x.mo_ta_thay_the = str(d["mo_ta_thay_the"] or "").strip()[:200]
     if "thu_tu" in d:
         x.thu_tu = int(d["thu_tu"] or 0)
     if d.get("la_bia"):
@@ -854,6 +887,7 @@ def tep_anh(db: Session, u: User | None, pid: int, co: str):
 def _anh_out(x: AnhKhachSanVtd, cong: bool = False) -> dict:
     goc = "/api/v1/ks-vtd-anh" if cong else "/api/v1/khach-san-vtd/anh"
     o = {"id": x.id, "nhom": x.nhom, "nhom_ten": NHOM_ANH_KS.get(x.nhom, x.nhom), "chu_thich": x.chu_thich,
+         "mo_ta_thay_the": x.mo_ta_thay_the or "",                                                        # KS-17
          "loai_phong_id": x.loai_phong_id, "la_bia": x.la_bia,
          "hien": f"{goc}/{x.id}/hien", "nho": f"{goc}/{x.id}/nho"}
     if not cong:
@@ -877,6 +911,8 @@ def _goi_out(g: GoiGiaVtd, mua: list[MuaGiaVtd]) -> dict:
             "dang_ban": g.dang_ban, "trang_thai": g.trang_thai, "trang_thai_ten": TRANG_THAI_GOI.get(g.trang_thai, g.trang_thai),
             "ly_do_tra_lai": g.ly_do_tra_lai, "sua_boi": g.sua_boi, "duyet_boi": g.duyet_boi,
             "tre_em_che_do": g.tre_em_che_do or "", "gia_tre": [chuan_moc(m) for m in (g.gia_tre or [])],   # KS-16k
+            "huy_gio_chot": g.huy_gio_chot or "", "huy_mui_gio": g.huy_mui_gio or "Asia/Ho_Chi_Minh",
+            "cho_tra_sau": bool(g.cho_tra_sau),                                                           # KS-17
             "mua": [{"id": m.id, "tu_ngay": m.tu_ngay.isoformat(), "den_ngay": m.den_ngay.isoformat(), "gia_thuong": float(m.gia_thuong),
                      "gia_cuoi_tuan": float(m.gia_cuoi_tuan) if m.gia_cuoi_tuan else None,
                      "gia_niem_yet": float(m.gia_niem_yet) if m.gia_niem_yet else None, "ghi_chu": m.ghi_chu} for m in mua]}
@@ -916,6 +952,7 @@ def ds_vtos(db: Session, u: User) -> dict:
             "nhan_tre_em": NHAN_TRE_EM, "cach_tinh_tre": CACH_TINH_TRE, "tien_nghi_phong": TIEN_NGHI_PHONG,   # KS-16j
             "nguon_lp": NGUON_LP, "can_xac_nhan": CAN_XAC_NHAN, "trang_thai_dc": TRANG_THAI_DC,
             "nhom_tuoi": NHOM_TUOI, "kieu_gia": KIEU_GIA, "che_do_tre_goi": CHE_DO_TRE_GOI,   # KS-16k
+            "mui_gio_huy": MUI_GIO_HUY,                                                          # KS-17
             "duoc_nhap": _co(u, VAI_NHAP), "duoc_duyet": _co(u, VAI_DUYET), "toi": u.username,
             "toan_quyen": _co(u, TOAN_QUYEN), "tt_chung": tt_chung(db),   # KS-16s
             "cho_duyet": {"anh": sum(d["anh_cho"] for d in dong), "goi": sum(d["goi_cho"] for d in dong)}}
@@ -940,6 +977,7 @@ def mot_vtos(db: Session, u: User, kid: int) -> dict:
             "video_toi_da": VD.toi_da("khach_san_vtd"), "album": album_nhac(len(_anh_cua(db, kid))),   # KS-16p
             "loai_phong": [{"id": x.id, "ten": x.ten, "dien_tich": x.dien_tich, "giuong": x.giuong, "mo_ta": x.mo_ta,
                             "toi_da_nguoi_lon": x.toi_da_nguoi_lon, "toi_da_tre_em": x.toi_da_tre_em, "so_phong": x.so_phong,
+                            "tong_khach_toi_da": x.tong_khach_toi_da,                                     # KS-17
                             "thu_tu": x.thu_tu, "dang_ban": x.dang_ban, **_lp_them(x),
                             "goi": [_goi_out(g, mua.get(g.id, [])) for g in goi.get(x.id, [])]} for x in lps]}
 
@@ -1033,6 +1071,10 @@ def _mot_phong(k: KhachSanVtd, lp: LoaiPhongVtd, a: int, tre: list[dict], gia_de
     ở chung không mất tiền; vượt sức chứa cơ bản thì nằm giường phụ (trẻ lớn nhất trước, rồi người lớn) và trả giá
     giường phụ thay cho giá trẻ em; còn lại trả giá trẻ em của nhóm. Gói có bữa sáng: trẻ trả giá ăn sáng của nhóm."""
     ten = lp.ten
+    if lp.toi_da_nguoi_lon is None:                                   # KS-17
+        return {"ok": False, "ly_do": f"«{ten}»: số người lớn tối đa cần khách sạn xác nhận — gửi yêu cầu"}
+    if lp.tong_khach_toi_da is not None and a + len(tre) > lp.tong_khach_toi_da:
+        return {"ok": False, "ly_do": f"«{ten}» tối đa {lp.tong_khach_toi_da} khách một phòng", "vuot": True}
     if tre and lp.toi_da_tre_em is None:
         return {"ok": False, "ly_do": f"«{ten}»: số trẻ em của phòng cần khách sạn xác nhận — gửi yêu cầu"}
     if len(tre) > (lp.toi_da_tre_em or 0) + max(0, lp.toi_da_nguoi_lon - a):
@@ -1096,7 +1138,7 @@ def phan_khach(k: KhachSanVtd, don_vi: list[tuple], nl: int, te: int, tuoi: list
     tuoi_tre = sorted([x["tuoi"] for x in loai[0]["tre"]], reverse=True)
     chia: list[list[int]] = [[] for _ in range(n)]
     for t in tuoi_tre:
-        i = max(range(n), key=lambda j: ((don_vi[j][0].suc_chua or don_vi[j][0].toi_da_nguoi_lon) + (don_vi[j][0].toi_da_tre_em or 0)
+        i = max(range(n), key=lambda j: ((don_vi[j][0].suc_chua or don_vi[j][0].toi_da_nguoi_lon or 0) + (don_vi[j][0].toi_da_tre_em or 0)
                                          - a[j] - len(chia[j]), -j))
         chia[i].append(t)
     ra = []
@@ -1205,6 +1247,8 @@ def _phong_ban_duoc(db: Session, kids: list[int], vao: date, ra: date, nl: int, 
             pk = phan_khach(k, [(x, g, p["tong"] / max(1, dem))] * sp, nl, te, tu)   # KS-16k: theo bảng của từng gói
             gs.append({"id": g.id, "ten": g.ten, "bua_sang": g.bua_sang, "huy_truoc_ngay": g.huy_truoc_ngay,
                        "huy_han": hh.isoformat() if hh else None, "mien_phi_huy": g.huy_truoc_ngay is not None,
+                       "huy_gio_chot": g.huy_gio_chot or "", "huy_mui_gio": MUI_GIO_HUY.get(g.huy_mui_gio or "", ""),
+                       "cho_tra_sau": bool(g.cho_tra_sau),                                                # KS-17
                        **p, "con": con.get(x.id, 0),
                        "vua": pk["ok"], "ly_do": pk["ly_do"], "phu_thu_ky": int(round(pk.get("dem", 0) * dem)),
                        "phu_thu_ct": _gop_ct(pk, dem), "cho_xac_nhan": bool(pk.get("cho_xac_nhan"))})
@@ -1215,6 +1259,7 @@ def _phong_ban_duoc(db: Session, kids: list[int], vao: date, ra: date, nl: int, 
         ra_.setdefault(x.khach_san_id, []).append({
             "id": x.id, "ten": x.ten, "dien_tich": x.dien_tich, "giuong": x.giuong, "mo_ta": x.mo_ta,
             "toi_da_nguoi_lon": x.toi_da_nguoi_lon, "toi_da_tre_em": x.toi_da_tre_em, "so_phong": x.so_phong,
+            "tong_khach_toi_da": x.tong_khach_toi_da,                                                     # KS-17
             "vua": vua, "goi": gs, "con": con.get(x.id, 0),
             # KS-16j/16k: mô tả chi tiết, tiện nghi, sức chứa, giường phụ; phụ thu trẻ em / giường phụ ở từng gói
             "mo_ta_dai": x.mo_ta_dai or "", "tien_nghi": x.tien_nghi or [], "giuong_phu_toi_da": x.giuong_phu_toi_da,
@@ -1270,7 +1315,8 @@ def _loc_them(phong: list[dict], hom_nay: date | None = None) -> dict:
             "gia_dinh": any((p.get("suc_chua") or p.get("toi_da_nguoi_lon") or 0) + (p.get("khach_them_toi_da") or 0) >= 4 for p in phong),
             "co_chi_phong": any(not g["bua_sang"] for g in goi),
             "co_uu_dai": any((g.get("niem_yet_dem") or 0) > (g.get("gia_dem") or 0) for g in goi),
-            "co_tra_sau": any(g.get("huy_han") and date.fromisoformat(g["huy_han"]) - timedelta(days=KV.TRA_SAU_TRUOC_HUY) > hn
+            "co_tra_sau": any(g.get("cho_tra_sau", True) and g.get("huy_han")                                  # KS-17
+                              and date.fromisoformat(g["huy_han"]) - timedelta(days=KV.TRA_SAU_TRUOC_HUY) > hn
                               for g in goi),
             "co_tra_ngay": bool(goi)}
 
