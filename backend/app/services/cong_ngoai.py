@@ -29,8 +29,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.core import User, ROLES
-from app.models.cong_ngoai import (TaiKhoanNgoai, MaXacThucNgoai, DonDangKy, LOAI_NGOAI,
-                                   LOAI_DOI_TAC, TRANG_THAI_NGOAI, KENH_MA)
+from app.models.cong_ngoai import (TaiKhoanNgoai, MaXacThucNgoai, DonDangKy, MayDaNho,
+                                   LOAI_NGOAI, LOAI_DOI_TAC, TRANG_THAI_NGOAI, KENH_MA)
 from app.services import rules as R
 
 SONG_MA_PHUT = 5
@@ -42,6 +42,15 @@ SAI_TOI_DA = 5
 MK_TOI_THIEU = 5
 MK_TOI_DA = 64
 DON_SONG_GIO = 24
+# DK-2 · vế sau của điều 6: mật khẩu ngắn thì máy phải quen. Mật khẩu từ 15 ký tự trở lên
+# (mức chuẩn NIST đòi cho mật khẩu đứng một mình) thì cổng Khách hàng bỏ qua bước máy lạ;
+# cổng Đối tác và Cổ đông thì LUÔN hỏi, kể cả mật khẩu dài — họ thấy công nợ và tài liệu
+# chưa công bố.
+NHO_MAY_NGAY = 90
+NHO_MAY_TOI_DA = 5
+MK_DU_DAI_KHOI_HOI = 15
+DN_SAI_TOI_DA = 10
+DN_KHOA_PHUT = 15
 GUI_TOI_DA_MOI_GIO = 5
 PHIEN_GIO = 12
 AUD = "vtd-cong"
@@ -598,5 +607,215 @@ def don_qua_han(db: Session, now: datetime | None = None) -> int:
     ds = db.execute(select(DonDangKy).where(DonDangKy.het_han <= now)).scalars().all()
     for d in ds:
         db.delete(d)
+    db.commit()
+    return len(ds)
+
+
+# ──────────────────────────────────────────── DK-2 · ĐĂNG NHẬP BẰNG MẬT KHẨU + NHỚ MÁY
+
+# MỘT câu duy nhất cho mọi kiểu sai. Không có tài khoản, sai mật khẩu, tài khoản chưa đặt mật
+# khẩu — cả ba trả đúng câu này. Tách ra là biến màn đăng nhập thành máy dò xem ai là khách.
+SAI_DN = "Số điện thoại/email hoặc mật khẩu không đúng"
+
+
+def _bam_dau(dau: str) -> str:
+    return hmac.new(settings.SECRET_KEY.encode(), f"may:{dau}".encode(), hashlib.sha256).hexdigest()
+
+
+def _tim_tk(db: Session, loai: str, lien_he: str) -> TaiKhoanNgoai | None:
+    try:
+        kieu, lh = chuan_lien_he(lien_he)
+    except LoiCong:
+        return None
+    cot = TaiKhoanNgoai.email if kieu == "email" else TaiKhoanNgoai.dien_thoai
+    return db.execute(select(TaiKhoanNgoai).where(
+        TaiKhoanNgoai.loai == loai, cot == lh)).scalars().first()
+
+
+def may_quen_duoc(db: Session, tk: TaiKhoanNgoai, dau_nho: str,
+                  now: datetime | None = None) -> MayDaNho | None:
+    """Máy này đã xác minh và còn hạn chưa. Trả về bản ghi, hoặc None."""
+    now = now or datetime.now()
+    if not dau_nho:
+        return None
+    m = db.execute(select(MayDaNho).where(
+        MayDaNho.tai_khoan_id == tk.id, MayDaNho.dau_bam == _bam_dau(dau_nho))).scalars().first()
+    if m is None or m.het_han <= now:
+        return None
+    return m
+
+
+def can_hoi_ma(tk: TaiKhoanNgoai, mat_khau: str) -> bool:
+    """Máy lạ thì cổng nào cũng hỏi mã — trừ khách hàng đặt mật khẩu đủ dài."""
+    if tk.loai != "khach_hang":
+        return True
+    return len(_chuan_mk(mat_khau)) < MK_DU_DAI_KHOI_HOI
+
+
+def dang_nhap(db: Session, loai: str, lien_he: str, mat_khau: str, dau_nho: str = "",
+              kenh: str = "", ip: str = "", now: datetime | None = None) -> dict:
+    """Bước 1 của đăng nhập: kiểm mật khẩu.
+
+    Trả một trong hai:
+      {"xong": True,  "phien": ..., "toi": {...}}            — máy đã quen, vào thẳng
+      {"xong": False, "can_ma": True, "khoa": ..., ...}      — máy lạ, phải gõ mã
+    """
+    now = now or datetime.now()
+    if loai not in LOAI_NGOAI:
+        raise LoiCong("Cổng không hợp lệ")
+    tk = _tim_tk(db, loai, lien_he)
+    if tk is not None and tk.dn_khoa_den and tk.dn_khoa_den > now:
+        con = int((tk.dn_khoa_den - now).total_seconds() // 60) + 1
+        raise LoiCong(f"Đã sai quá nhiều lần — thử lại sau {con} phút", ma="dn_khoa", status=429)
+    if tk is None or not dung_mat_khau(mat_khau, tk.mat_khau_bam):
+        if tk is not None:
+            tk.dn_sai = (tk.dn_sai or 0) + 1
+            if tk.dn_sai >= DN_SAI_TOI_DA:
+                tk.dn_khoa_den = now + timedelta(minutes=DN_KHOA_PHUT)
+                tk.dn_sai = 0
+            db.commit()
+        raise LoiCong(SAI_DN, ma="sai_dn", status=401)
+    if tk.trang_thai in ("khoa", "tu_choi"):
+        # Mật khẩu đúng nên người này đã chứng minh là chủ tài khoản — nói thật được.
+        raise LoiCong("Tài khoản này đang bị khoá hoặc hồ sơ đã bị từ chối — liên hệ Vietourist",
+                      ma="bi_khoa", status=403)
+    tk.dn_sai, tk.dn_khoa_den = 0, None
+    m = may_quen_duoc(db, tk, dau_nho, now)
+    if m is not None or not can_hoi_ma(tk, mat_khau):
+        if m is not None:
+            m.dung_cuoi, m.ip_cuoi = now, (ip or "")[:64]
+            m.het_han = now + timedelta(days=NHO_MAY_NGAY)
+        tk.dang_nhap_cuoi = now
+        db.commit()
+        db.refresh(tk)
+        return {"xong": True, "phien": cap_phien(tk), "toi": toi_out(tk)}
+    db.commit()
+    k = kenh or tk.kenh_ua_thich or ("zalo" if tk.dien_thoai else "email")
+    lh = tk.dien_thoai if k == "zalo" else tk.email
+    if not lh:
+        k = "email" if tk.email else "zalo"
+        lh = tk.email or tk.dien_thoai
+    r = gui_ma(db, tk.loai, lh, k, ip, now)
+    r.update({"xong": False, "can_ma": True,
+              "message": "Mật khẩu đúng rồi. Chưa nhận ra máy này — " + r["message"].lower()})
+    return r
+
+
+def dang_nhap_xac_minh(db: Session, khoa: str, ma: str, nho_may: bool = False, ten_may: str = "",
+                       ip: str = "", now: datetime | None = None) -> dict:
+    """Bước 2 của đăng nhập từ máy lạ: gõ mã. Mã một mình KHÔNG mở được gì — phải qua bước 1."""
+    now = now or datetime.now()
+    c = db.execute(select(MaXacThucNgoai).where(
+        MaXacThucNgoai.khoa == (khoa or ""))).scalars().first()
+    if c is None or c.da_dung or c.het_han <= now or c.so_lan_sai >= SAI_TOI_DA:
+        raise LoiCong("Mã đã hết hạn hoặc không còn dùng được — bấm Gửi lại mã", ma="ma_het")
+    if not hmac.compare_digest(c.ma_bam, _bam(c.khoa, (ma or "").strip())):
+        c.so_lan_sai += 1
+        db.commit()
+        con = SAI_TOI_DA - c.so_lan_sai
+        raise LoiCong(f"Mã chưa đúng — còn {con} lần thử" if con > 0
+                      else f"Sai quá {SAI_TOI_DA} lần — bấm Gửi lại mã",
+                      ma="ma_sai" if con > 0 else "ma_het")
+    tk = _tim_tk(db, c.loai, c.lien_he)
+    if tk is None:
+        raise LoiCong("Mã này không gắn với tài khoản nào", ma="ma_het")
+    c.da_dung = True
+    dau = ""
+    if nho_may:
+        dau = secrets.token_urlsafe(32)
+        db.add(MayDaNho(tai_khoan_id=tk.id, dau_bam=_bam_dau(dau),
+                        ten_may=(ten_may or "").strip()[:80], ip_cuoi=(ip or "")[:64],
+                        dung_cuoi=now, het_han=now + timedelta(days=NHO_MAY_NGAY), tao_luc=now))
+        db.flush()
+        cu = db.execute(select(MayDaNho).where(MayDaNho.tai_khoan_id == tk.id)
+                        .order_by(MayDaNho.dung_cuoi.desc().nullslast(),
+                                  MayDaNho.id.desc())).scalars().all()
+        for m in cu[NHO_MAY_TOI_DA:]:      # máy thứ 6 đẩy máy cũ nhất ra
+            db.delete(m)
+    tk.dang_nhap_cuoi, tk.dn_sai, tk.dn_khoa_den = now, 0, None
+    db.commit()
+    db.refresh(tk)
+    return {"xong": True, "phien": cap_phien(tk), "toi": toi_out(tk), "dau_nho": dau}
+
+
+# ──────────────────────────────────────────── DK-2 · QUÊN MẬT KHẨU
+
+CAU_QUEN = "Nếu liên hệ này có tài khoản, Vietourist vừa gửi mã tới đó."
+
+
+def quen_mat_khau_gui_ma(db: Session, loai: str, lien_he: str, kenh: str, ip: str = "",
+                         now: datetime | None = None) -> dict:
+    """Trả CÙNG MỘT CÂU dù liên hệ có tài khoản hay không — không thành máy dò."""
+    now = now or datetime.now()
+    if loai not in LOAI_NGOAI:
+        raise LoiCong("Cổng không hợp lệ")
+    tk = _tim_tk(db, loai, lien_he)
+    if tk is None:
+        # Không gửi gì, nhưng câu trả lời không đổi một chữ.
+        return {"message": CAU_QUEN, "khoa": "", "gui_toi": che(chuan_lien_he(lien_he)[1])}
+    r = gui_ma(db, loai, lien_he, kenh, ip, now)
+    r["message"] = CAU_QUEN
+    return r
+
+
+def quen_mat_khau_dat_lai(db: Session, khoa: str, ma: str, mat_khau_moi: str,
+                          now: datetime | None = None) -> dict:
+    """Đặt lại mật khẩu: ĐĂNG XUẤT MỌI NƠI và QUÊN MỌI MÁY.
+
+    Người đổi mật khẩu thường là người vừa nghi bị chiếm tài khoản. Giữ lại dấu nhớ cũ là giữ
+    luôn đường vào cho kẻ chiếm.
+    """
+    now = now or datetime.now()
+    c = db.execute(select(MaXacThucNgoai).where(
+        MaXacThucNgoai.khoa == (khoa or ""))).scalars().first()
+    if c is None or c.da_dung or c.het_han <= now or c.so_lan_sai >= SAI_TOI_DA:
+        raise LoiCong("Mã đã hết hạn hoặc không còn dùng được — bấm Gửi lại mã", ma="ma_het")
+    if not hmac.compare_digest(c.ma_bam, _bam(c.khoa, (ma or "").strip())):
+        c.so_lan_sai += 1
+        db.commit()
+        con = SAI_TOI_DA - c.so_lan_sai
+        raise LoiCong(f"Mã chưa đúng — còn {con} lần thử" if con > 0
+                      else f"Sai quá {SAI_TOI_DA} lần — bấm Gửi lại mã",
+                      ma="ma_sai" if con > 0 else "ma_het")
+    tk = _tim_tk(db, c.loai, c.lien_he)
+    if tk is None:
+        raise LoiCong("Mã này không gắn với tài khoản nào", ma="ma_het")
+    loi = kiem_mat_khau(mat_khau_moi, c.lien_he, tk.ho_ten)
+    if loi:
+        raise LoiCong(loi, ma="mk_yeu")       # KHÔNG tiêu mã: để người ta đặt lại cho đạt
+    c.da_dung = True
+    tk.mat_khau_bam = bam_mat_khau(mat_khau_moi)
+    tk.phien = (tk.phien or 1) + 1            # mọi phiên đang mở mất hiệu lực
+    tk.dn_sai, tk.dn_khoa_den = 0, None
+    for m in db.execute(select(MayDaNho).where(MayDaNho.tai_khoan_id == tk.id)).scalars().all():
+        db.delete(m)                          # quên sạch mọi máy
+    db.commit()
+    return {"message": "Đã đặt mật khẩu mới. Mọi phiên và mọi máy đã nhớ đều bị đăng xuất."}
+
+
+# ──────────────────────────────────────────── DK-2 · MÀN TỰ XEM MÁY ĐÃ NHỚ
+
+def may_cua_toi(db: Session, tk: TaiKhoanNgoai, now: datetime | None = None) -> list[dict]:
+    now = now or datetime.now()
+    ds = db.execute(select(MayDaNho).where(MayDaNho.tai_khoan_id == tk.id)
+                    .order_by(MayDaNho.dung_cuoi.desc().nullslast())).scalars().all()
+    return [{"id": m.id, "ten_may": m.ten_may or "Máy không đặt tên",
+             "dung_cuoi": m.dung_cuoi, "het_han": m.het_han,
+             "con_han": m.het_han > now} for m in ds]
+
+
+def go_may(db: Session, tk: TaiKhoanNgoai, may_id: int) -> None:
+    m = db.get(MayDaNho, may_id)
+    if m is None or m.tai_khoan_id != tk.id:
+        raise LoiCong("Không có máy này trong danh sách của bạn", status=404)
+    db.delete(m)
+    db.commit()
+
+
+def don_may_qua_han(db: Session, now: datetime | None = None) -> int:
+    now = now or datetime.now()
+    ds = db.execute(select(MayDaNho).where(MayDaNho.het_han <= now)).scalars().all()
+    for m in ds:
+        db.delete(m)
     db.commit()
     return len(ds)
