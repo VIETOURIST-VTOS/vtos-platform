@@ -44,7 +44,8 @@ def db():
         s.add(User(username=ten, full_name=ten.upper(), role=vai, password_hash="x"))
     s.add(PhapNhanHopDong(id=1, ma="INFINIS_CA", ten="THE INFINIS PATHWAY INC.", quoc_gia="Canada"))
     s.add(DoiTacOta(id=1, ma="expedia", ten="Expedia", phap_nhan_id=1, trang_thai="da_duyet", link="https://expedia.com/affiliate/xKzmv5G",
-                    ten_mien="expedia.com", duong_dan="/affiliate/", da_kiem_link=True, duoc_dung_web=True, bat=True))
+                    ten_mien="expedia.com", duong_dan="/affiliate/", da_kiem_link=True, duoc_dung_web=True, bat=True,
+                    quyen="AFFILIATE", moi_truong="thu"))   # SUA-5: hai điều kiện bật của KS-5
     s.commit()
     yield s
     s.close()

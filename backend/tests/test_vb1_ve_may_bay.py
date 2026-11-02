@@ -130,7 +130,8 @@ def test_chuyen_ve_loi_nhac_khong_subid_va_lich_su(db):
     assert len(S.lich_su(db, kh, "ve_may_bay")) == 1 and S.lich_su(db, kh) == []
     # Chủ tịch chuyển sang link hoa hồng đã duyệt → câu hoa hồng hiện
     S.sua(db, _u(db, "ct"), 3, {"link": "https://www.trip.com/flights/?Allianceid=1", "ten_mien": "trip.com, www.trip.com",
-                               "loai_link": "hoa_hong", "trang_thai": "da_duyet", "phap_nhan_id": 1})
+                               "loai_link": "hoa_hong", "trang_thai": "da_duyet", "phap_nhan_id": 1,
+                               "quyen": "AFFILIATE", "moi_truong": "thu"})   # SUA-5: hai điều kiện bật của KS-5
     S.sua(db, _u(db, "ct"), 3, {"da_kiem_link": True, "duoc_dung_web": True})
     S.bat_tat(db, _u(db, "ct"), 3, True)
     r2 = S.chuyen(db, kh, "trip_com_ve", str(uuid.uuid4()), {"ngay_di": DI}, now=NOW)

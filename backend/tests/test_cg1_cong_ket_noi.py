@@ -254,6 +254,8 @@ def test_giao_dien_dung_ban_v32_da_sua():
         assert co in manh, co
     assert (GOC / "web/public/cong/vtd.css").exists() and (GOC / "web/public/cong/logo.png").exists()
     login = (GOC / "web/app/login/page.tsx").read_text(encoding="utf-8")
-    for co in ('"/ma"', '"/xac-thuc"', "Zalo", "Email", "login(u.trim(), p)", "luuPhienCong"):
+    # SUA-5 (02/11/2026): DK-3 (#609) đổi cổng ngoài sang đăng nhập bằng MẬT KHẨU + mã xác minh máy lạ —
+    # đường cũ "/ma" và "/xac-thuc" không còn trên màn hình; soát đúng hai đường mới.
+    for co in ('"/dang-nhap"', '"/dang-nhap/xac-minh"', "Zalo", "Email", "login(u.trim(), p)", "luuPhienCong"):
         assert co in login, co
     assert 'KHOA_PHIEN_CONG = "vtd_cong_phien"' in (GOC / "web/lib/cong.ts").read_text(encoding="utf-8")

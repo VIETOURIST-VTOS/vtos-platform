@@ -307,6 +307,10 @@ PHAI_LOC = {
                        "thấy được cả quan hệ nhân thân của khách pháp nhân khác",
     "KeHoachThang":   "chỉ tiêu doanh thu và lợi nhuận tháng của MỘT pháp nhân; thấy được chỉ tiêu "
                       "của pháp nhân khác là biết trước họ cam kết gì với Hội đồng quản trị",
+    # SUA-5 · 02/11/2026. Kỳ hoa hồng D06 tính và chốt THEO PHÁP NHÂN (khoá duy nhất có company_key):
+    # đó là chi phí hoa hồng của đúng một công ty. Khai để phép đo thấy; nối loc() là việc VPM-C2.
+    "KyHoaHong":      "kỳ hoa hồng đại lý / CTV tính và chốt riêng cho từng pháp nhân – là chi phí "
+                      "hoa hồng của đúng một công ty, lộ chéo là lộ mức thưởng đối tác của đơn vị khác",
 }
 
 # Mô hình CÓ cột pháp nhân nhưng CỐ Ý không lọc theo phiên. Phải viết ra lý do: "cố ý không lọc" là
