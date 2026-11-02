@@ -11,6 +11,12 @@ const ST: Record<string, [string, string]> = {
 };
 const S = (s: string) => <Tag cls={ST[s]?.[1] || ""}>{ST[s]?.[0] || s}</Tag>;
 
+// DOT R4c-4 02/11/2026 — DUNG BO VAI MA CUA MAY CHU NHAN (`require_roles("ketoan",
+// "thu_quy")` o `api/v1/payments.py::cash_receipt`). Mot hang so chu khong go roi: go roi
+// thi sua mot ben quen ben kia, va luc ay nut hien ra de bam vao nhan 403 — hoac bien mat
+// voi nguoi van con quyen.
+const VAI_LAP_PHIEU_THU = ["ketoan", "thu_quy"];
+
 function Collections() {
   const { user, toast } = useShell();
   const isKT = ["ketoan", "cntt"].includes(user?.role || "");
@@ -175,7 +181,9 @@ function Collections() {
                    chiXem={r.status === "da_xac_nhan"} />
         </td></tr>]) : <tr><td colSpan={10} className="muted">Chưa có phiếu thu.</td></tr>}</tbody></table></div>
 
-    {user?.role === "ketoan" && <><h2>Lập phiếu thu tiền mặt</h2>
+    {/* ĐỢT R4c-4 — hai vai, đọc từ MỘT hằng số: màn hình và cửa máy chủ phải nói cùng một câu.
+        Gõ rời hai chỗ thì sửa một bên quên bên kia, và lúc ấy nút hiện ra để bấm vào nhận 403. */}
+    {VAI_LAP_PHIEU_THU.includes(user?.role || "") && <><h2>Lập phiếu thu tiền mặt</h2>
       <div className="panel"><div className="grid">
         <label>Booking<select value={cash.booking_id} onChange={(e) => setCash({ ...cash, booking_id: e.target.value })}><option value="">– chọn –</option>{dueRows.map((b: any) => <option key={b.booking_id} value={b.booking_id}>{b.code} · {b.customer_name} · còn {vnd(b.due)}</option>)}</select></label>
         <label>Số tiền (đ)<input type="number" value={cash.amount} onChange={(e) => setCash({ ...cash, amount: e.target.value })} /></label>

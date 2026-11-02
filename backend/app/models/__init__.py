@@ -180,3 +180,4 @@ from app.models.dat_ban import *  # noqa
 from app.models.video_dich_vu import *  # noqa   KS-16f video khách sạn / nhà hàng
 from app.models.nguon_doi_soat import *  # noqa   KS-16h nguồn đơn CTV, đối soát đối tác
 from app.models.tour_online import *  # noqa   TR-1 đặt tour online trên cổng khách
+from app.models.thanh_toan_doan import *  # noqa   TR-1d link thanh toán tour đoàn riêng
