@@ -4,6 +4,8 @@
 Điều phải giữ, mỗi điều một nhóm phép thử:
   1. Phiên cổng ngoài KHÔNG mở được cửa nội bộ nào, và phiên nhân viên không mở được cửa cổng ngoài.
   2. Mã một lần: lưu băm, dùng một lần, 5 phút, sai 5 lần là chết, 5 lần gửi mỗi giờ mỗi liên hệ.
+     DK-4 (02/11/2026): mã chỉ còn là LỚP THỨ HAI — cửa /ma + /xac-thuc đã xoá, mọi phép thử đi qua
+     bốn bước /dang-ky/*.
   3. Kênh chưa cấu hình thì nói ra (503), không giả vờ đã gửi; Zalo cần số điện thoại, Email cần email.
   4. Lần đầu phải đồng ý điều khoản; chưa đồng ý thì mã KHÔNG bị tiêu. Không tự bật nhận quảng cáo.
   5. Đối tác / cổ đông chỉ gửi hồ sơ; duyệt đúng người (NCC — TP ĐH / GĐ KD; đại lý, CTV — GĐ KD;
@@ -61,12 +63,29 @@ def _nhan_vien(S, username, vai):
     return {"Authorization": f"Bearer {create_token(username, vai)}"}
 
 
-def _dang_nhap(m, loai="khach_hang", lh="0912345678", kenh="zalo", dong_y=True):
+MK = "sen no thang7"        # 13 ký tự: dưới ngưỡng «đủ dài khỏi hỏi mã» của DK-2
+
+
+def _den_buoc_ma(m, loai="khach_hang", lh="0912345678"):
+    """DK-4 (02/11/2026): cửa /ma + /xac-thuc đã xoá khỏi máy chủ. Tài khoản chỉ ra đời qua bốn bước
+    /dang-ky/*. Hàm này đi ba bước đầu và trả khoá ĐƠN, chưa gửi mã."""
     c = m["c"]
-    r = c.post("/api/v1/cong/ma", json={"loai": loai, "lien_he": lh, "kenh": kenh})
+    lien = {"email": lh} if "@" in lh else {"dien_thoai": lh}
+    r1 = c.post("/api/v1/cong/dang-ky/lien-he", json={"loai": loai, "ho_ten": "Khach Thu", **lien})
+    assert r1.status_code == 200, r1.text
+    k = r1.json()["khoa"]
+    assert c.post("/api/v1/cong/dang-ky/mat-khau", json={"khoa": k, "mat_khau": MK}).status_code == 200
+    assert c.post("/api/v1/cong/dang-ky/dieu-khoan", json={"khoa": k, "dong_y_dieu_khoan": True}).status_code == 200
+    return k
+
+
+def _dang_nhap(m, loai="khach_hang", lh="0912345678", kenh="zalo"):
+    """Tạo tài khoản đủ bốn bước. Trả (câu gửi mã, câu tạo xong) — câu sau mang `phien` và `toi`."""
+    c = m["c"]
+    k = _den_buoc_ma(m, loai, lh)
+    r = c.post("/api/v1/cong/dang-ky/ma", json={"khoa": k, "kenh": kenh})
     assert r.status_code == 200, r.text
-    ma = m["gui"][-1][2]
-    r2 = c.post("/api/v1/cong/xac-thuc", json={"khoa": r.json()["khoa"], "ma": ma, "dong_y_dieu_khoan": dong_y})
+    r2 = c.post("/api/v1/cong/dang-ky/xong", json={"khoa": k, "ma": m["gui"][-1][2]})
     return r, r2
 
 
@@ -86,6 +105,18 @@ def test_phien_ngoai_khong_mo_cua_noi_bo_va_nguoc_lai(moi):
 
 # ── 2 · mã một lần ─────────────────────────────────────────────────────────────────────────────
 
+def test_dk4_cua_vao_bang_ma_da_mat_khoi_may_chu(moi):
+    """Điều 5 Chủ tịch chốt 01/11/2026: mã một lần KHÔNG BAO GIỜ thay được mật khẩu. DK-3 bỏ nó khỏi
+    màn hình; DK-4 xoá nó khỏi máy chủ. Dòng này đỏ nghĩa là có người mở lại cửa tạo tài khoản
+    không mật khẩu."""
+    c = moi["c"]
+    assert c.post("/api/v1/cong/ma", json={"loai": "khach_hang", "lien_he": "0912345678", "kenh": "zalo"}).status_code in (404, 405)
+    assert c.post("/api/v1/cong/xac-thuc", json={"khoa": "x", "ma": "000000"}).status_code in (404, 405)
+    assert moi["gui"] == [], "không được gửi mã nào qua cửa đã xoá"
+    from app.services import cong_ngoai as C
+    assert not hasattr(C, "xac_thuc"), "hàm tạo tài khoản bằng mã còn trong máy chủ"
+
+
 def test_ma_luu_bam_dung_mot_lan(moi):
     r, r2 = _dang_nhap(moi)
     ma = moi["gui"][-1][2]
@@ -95,55 +126,59 @@ def test_ma_luu_bam_dung_mot_lan(moi):
     row = s.execute(select(MaXacThucNgoai)).scalars().one()
     assert ma not in row.ma_bam and row.da_dung
     s.close()
-    lai = moi["c"].post("/api/v1/cong/xac-thuc", json={"khoa": r.json()["khoa"], "ma": ma})
-    assert lai.status_code == 422 and lai.json()["detail"]["ma"] == "ma_het"
+    lai = moi["c"].post("/api/v1/cong/dang-ky/xong", json={"khoa": r.json()["khoa"], "ma": ma})
+    assert lai.status_code in (410, 422) and lai.json()["detail"]["ma"] in ("don_het", "ma_het")
     assert "khoa" in r.json() and ma not in r.text, "mã thật không bao giờ trả về trình duyệt"
 
 
 def test_sai_nam_lan_la_chet_va_het_han(moi):
     c = moi["c"]
-    r = c.post("/api/v1/cong/ma", json={"loai": "khach_hang", "lien_he": "0912345678", "kenh": "zalo"})
+    k = _den_buoc_ma(moi)
+    assert c.post("/api/v1/cong/dang-ky/ma", json={"khoa": k, "kenh": "zalo"}).status_code == 200
     dung = moi["gui"][-1][2]
     sai = "000000" if dung != "000000" else "111111"
     for i in range(5):
-        x = c.post("/api/v1/cong/xac-thuc", json={"khoa": r.json()["khoa"], "ma": sai, "dong_y_dieu_khoan": True})
+        x = c.post("/api/v1/cong/dang-ky/xong", json={"khoa": k, "ma": sai})
         assert x.status_code == 422
-    assert c.post("/api/v1/cong/xac-thuc", json={"khoa": r.json()["khoa"], "ma": dung, "dong_y_dieu_khoan": True}).status_code == 422
+    assert c.post("/api/v1/cong/dang-ky/xong", json={"khoa": k, "ma": dung}).status_code == 422
     from app.services import cong_ngoai as C
+    k2 = _den_buoc_ma(moi, lh="0987654321")
+    assert c.post("/api/v1/cong/dang-ky/ma", json={"khoa": k2, "kenh": "zalo"}).status_code == 200
     s = moi["S"]()
-    C.gui_ma(s, "khach_hang", "0987654321", "zalo")
-    k = s.execute(select(__import__("app.models.cong_ngoai", fromlist=["x"]).MaXacThucNgoai).order_by(
-        __import__("app.models.cong_ngoai", fromlist=["x"]).MaXacThucNgoai.id.desc())).scalars().first()
     with pytest.raises(C.LoiCong):
-        C.xac_thuc(s, k.khoa, moi["gui"][-1][2], True, now=datetime.now() + timedelta(minutes=6))
+        C.dang_ky_xong(s, k2, moi["gui"][-1][2], now=datetime.now() + timedelta(minutes=6))
     s.close()
 
 
 def test_toi_da_nam_lan_gui_moi_gio(moi):
-    c = moi["c"]
+    from app.services import cong_ngoai as C
+    s = moi["S"]()
     for _ in range(5):
-        assert c.post("/api/v1/cong/ma", json={"loai": "khach_hang", "lien_he": "0912 345 678", "kenh": "zalo"}).status_code == 200
-    r = c.post("/api/v1/cong/ma", json={"loai": "khach_hang", "lien_he": "+84912345678", "kenh": "zalo"})
-    assert r.status_code == 429, "cùng một số viết ba kiểu vẫn là một liên hệ"
+        C.gui_ma(s, "khach_hang", "0912 345 678", "zalo")
+    with pytest.raises(C.LoiCong) as ex:
+        C.gui_ma(s, "khach_hang", "+84912345678", "zalo")
+    assert ex.value.status == 429, "cùng một số viết ba kiểu vẫn là một liên hệ"
+    s.close()
 
 
 def test_khong_thanh_may_do(moi):
     _dang_nhap(moi)                              # 0912345678 đã có tài khoản
     c = moi["c"]
-    co = c.post("/api/v1/cong/ma", json={"loai": "khach_hang", "lien_he": "0912345678", "kenh": "zalo"}).json()
-    chua = c.post("/api/v1/cong/ma", json={"loai": "khach_hang", "lien_he": "0909000111", "kenh": "zalo"}).json()
-    assert set(co) == set(chua) and co["message"].split(" tới ")[0] == chua["message"].split(" tới ")[0]
+    co = c.post("/api/v1/cong/dang-ky/lien-he", json={"loai": "khach_hang", "ho_ten": "Ai Do", "dien_thoai": "0912345678"}).json()
+    chua = c.post("/api/v1/cong/dang-ky/lien-he", json={"loai": "khach_hang", "ho_ten": "Ai Do", "dien_thoai": "0909000111"}).json()
+    assert set(co) == set(chua) and co["buoc"] == chua["buoc"] == 2
 
 
 # ── 3 · kênh ──────────────────────────────────────────────────────────────────────────────────
 
 def test_kenh_chua_cau_hinh_thi_noi_ra_va_khong_luu_ma(moi):
     moi["mo"]["zalo"] = False
-    r = moi["c"].post("/api/v1/cong/ma", json={"loai": "khach_hang", "lien_he": "0912345678", "kenh": "zalo"})
+    k = _den_buoc_ma(moi)
+    r = moi["c"].post("/api/v1/cong/dang-ky/ma", json={"khoa": k, "kenh": "zalo"})
     assert r.status_code == 503 and r.json()["detail"]["ma"] == "kenh_chua_mo"
     assert moi["gui"] == []
-    sai = moi["c"].post("/api/v1/cong/ma", json={"loai": "khach_hang", "lien_he": "0912345678", "kenh": "email"})
-    assert sai.status_code == 422, "kênh Email phải nhập email"
+    sai = moi["c"].post("/api/v1/cong/dang-ky/ma", json={"khoa": k, "kenh": "email"})
+    assert sai.status_code == 422, "đơn chỉ có số điện thoại thì không nhận mã qua Email"
 
 
 def test_gui_loi_thi_khong_co_ma_song(moi):
@@ -153,7 +188,8 @@ def test_gui_loi_thi_khong_co_ma_song(moi):
     def hong(db, lh, ma):
         raise RuntimeError("máy chủ thư từ chối")
     C.GUI["email"] = hong
-    r = moi["c"].post("/api/v1/cong/ma", json={"loai": "co_dong", "lien_he": "a@b.vn", "kenh": "email"})
+    k = _den_buoc_ma(moi, loai="co_dong", lh="a@b.vn")
+    r = moi["c"].post("/api/v1/cong/dang-ky/ma", json={"khoa": k, "kenh": "email"})
     assert r.status_code == 502
     s = moi["S"](); assert s.execute(select(MaXacThucNgoai)).first() is None; s.close()
 
@@ -169,13 +205,21 @@ def test_kenh_that_doc_cau_hinh_khong_viet_cung():
 # ── 4 · đồng ý điều khoản ─────────────────────────────────────────────────────────────────────
 
 def test_chua_dong_y_thi_ma_khong_bi_tieu(moi):
-    r, r2 = _dang_nhap(moi, dong_y=False)
-    assert r2.status_code == 409 and r2.json()["detail"]["ma"] == "can_dong_y"
-    r3 = moi["c"].post("/api/v1/cong/xac-thuc", json={"khoa": r.json()["khoa"], "ma": moi["gui"][-1][2], "dong_y_dieu_khoan": True})
-    assert r3.status_code == 200
-    toi = r3.json()["toi"]
+    c = moi["c"]
+    r1 = c.post("/api/v1/cong/dang-ky/lien-he", json={"loai": "khach_hang", "ho_ten": "Khach Thu", "dien_thoai": "0912345678"})
+    k = r1.json()["khoa"]
+    assert c.post("/api/v1/cong/dang-ky/mat-khau", json={"khoa": k, "mat_khau": MK}).status_code == 200
+    r3 = c.post("/api/v1/cong/dang-ky/dieu-khoan", json={"khoa": k, "dong_y_dieu_khoan": False})
+    assert r3.status_code == 422 and r3.json()["detail"]["ma"] == "can_dong_y"
+    chan = c.post("/api/v1/cong/dang-ky/ma", json={"khoa": k, "kenh": "zalo"})
+    assert chan.status_code == 422 and moi["gui"] == [], "chưa đồng ý thì chưa gửi mã nào"
+    assert c.post("/api/v1/cong/dang-ky/dieu-khoan", json={"khoa": k, "dong_y_dieu_khoan": True}).status_code == 200
+    assert c.post("/api/v1/cong/dang-ky/ma", json={"khoa": k, "kenh": "zalo"}).status_code == 200
+    r4 = c.post("/api/v1/cong/dang-ky/xong", json={"khoa": k, "ma": moi["gui"][-1][2]})
+    assert r4.status_code == 200
+    toi = r4.json()["toi"]
     assert toi["trang_thai"] == "hoat_dong" and toi["nhan_tin_quang_cao"] is False
-    assert "0912345678" not in r3.text, "liên hệ trả về đã che"
+    assert "0912345678" not in r4.text, "liên hệ trả về đã che"
 
 
 # ── 5 · đối tác / cổ đông ─────────────────────────────────────────────────────────────────────
@@ -200,8 +244,7 @@ def test_doi_tac_gui_ho_so_va_duyet_dung_nguoi(moi):
     # khoá → phiên đang mở chết ngay
     assert c.post(f"/api/v1/tai-khoan-ngoai/{tid}", json={"hanh_dong": "khoa", "ly_do": "Vi phạm hợp đồng"}, headers=gd_kd).status_code == 200
     assert c.get("/api/v1/cong/toi", headers=ngoai).status_code == 401
-    r = c.post("/api/v1/cong/ma", json={"loai": "doi_tac", "lien_he": "dl@daily.vn", "kenh": "email"})
-    x = c.post("/api/v1/cong/xac-thuc", json={"khoa": r.json()["khoa"], "ma": moi["gui"][-1][2], "dong_y_dieu_khoan": True})
+    x = c.post("/api/v1/cong/dang-nhap", json={"loai": "doi_tac", "lien_he": "dl@daily.vn", "mat_khau": MK})
     assert x.status_code == 403 and x.json()["detail"]["ma"] == "bi_khoa"
 
 
