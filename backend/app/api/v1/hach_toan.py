@@ -39,6 +39,14 @@ def bang(u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
 
 @router.get("/bang")
 def danh_muc_httt(u: User = Depends(require_roles(*AC.PAYMENT_REQUEST_ROLES, "thu_quy",
+                                                   # DOT DON-R4c3 04/11/2026 — them
+                                                   # `ketoan_tt`: vai ay CO `/expenses`
+                                                   # trong MAN_HINH_KETOAN_TT nhung CO Y
+                                                   # khong ke thua `ketoan`, nen khong
+                                                   # duong nao noi toi no va o hinh thuc
+                                                   # thanh toan RONG voi dung vai xu
+                                                   # chuyen khoan.
+                                                   "ketoan_tt",
                                                    mo_ta="danh mục hình thức thanh toán cho nút ĐÃ CHI")),
                   db: Session = Depends(get_db)):
     """SUA-2 02/11/2026 — đường `/hach-toan/bang` mà màn /expenses gọi (Đợt P2-1 đã khai vào bản đồ màn hình)

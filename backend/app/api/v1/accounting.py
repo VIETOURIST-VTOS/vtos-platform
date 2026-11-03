@@ -753,7 +753,13 @@ def bbc_tu_choi(bid: int, data: BanBaoCaoTuChoiIn,
 TIEN_CAP_CHA = ("111", "112", "113")
 
 
-@router.get("/tien-ghi-cap-cha")
+# DOT DON-R4c3 04/11/2026 — DOI DUONG, KHONG DOI VIEC.
+# Ban cu gan duong nay thang vao router `prefix="/api/v1"`, nen duong that la
+# `/api/v1/tien-ghi-cap-cha` — MOT NHOM API rieng, khong man hinh nao khai trong
+# MAN_HINH_API, nen hang rao `test_p2.test_khong_nhom_api_nao_mo_coi` do va khong vai nao
+# cham duoc cua. Nay no nam duoi nhom `/api/v1/accounting`, nhom ma `/ket-so` DA khai san
+# va cho den hom nay chua co mot duong nao.
+@router.get("/accounting/tien-ghi-cap-cha")
 def tien_ghi_cap_cha(tu: date | None = None, den: date | None = None, gioi_han: int = 500,
                      u: User = Depends(require_roles(*READ, mo_ta="bút toán ghi tiền ở cấp cha")),
                      db: Session = Depends(get_db)):
