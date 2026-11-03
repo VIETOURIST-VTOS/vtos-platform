@@ -50,7 +50,9 @@ def _xe_out(db: Session, v: Vehicle, cos: dict, emps: dict, kem_kiem_tra: bool =
          "partner_name": v.partner_name, "contract_ref": v.contract_ref,
          "contract_from": v.contract_from, "contract_to": v.contract_to,
          "driver": emps.get(v.driver_id, ""), "odo_km": v.odo_km, "odo_at": v.odo_at,
-         "active": v.active, "source_note": v.source_note}
+         "active": v.active, "source_note": v.source_note,
+         # TK-1d: đơn giá ngày xe nhà — tạm tính tour đoàn dùng khi hành trình không trùng tuyến trong bảng giá xe
+         "internal_rate_per_day": v.internal_rate_per_day, "phien_ban": v.phien_ban}
     if kem_kiem_tra:
         d["san_sang"] = FL.san_sang(db, v, _chan_khi_thieu_giay(db))
     return d
@@ -111,6 +113,7 @@ class HoSoXeIn(BaseModel):
     odo_km: int | None = None
     odo_at: date | None = None
     source_note: str | None = None
+    internal_rate_per_day: float | None = None   # TK-1d: đơn giá ngày xe nhà (đ/ngày), Đội xe nhập
 
 
 @router.put("/xe/{vid}")
@@ -123,6 +126,8 @@ def cap_nhat_ho_so(vid: int, data: HoSoXeIn, u: User = Depends(require_roles(*WR
         raise HTTPException(422, f"Vòng đời không hợp lệ. Chỉ nhận {', '.join(LIFECYCLE)}")
     if "op_right" in d and d["op_right"] not in OP_RIGHT:
         raise HTTPException(422, f"Quyền khai thác không hợp lệ. Chỉ nhận {', '.join(OP_RIGHT)}")
+    if "internal_rate_per_day" in d and d["internal_rate_per_day"] is not None and not 0 <= d["internal_rate_per_day"] <= 1e9:
+        raise HTTPException(422, "Đơn giá ngày không hợp lệ")
     if d.get("code"):
         trung = db.execute(select(Vehicle).where(Vehicle.code == d["code"], Vehicle.id != vid)).scalars().first()
         if trung: raise HTTPException(422, f"Mã xe {d['code']} đã dùng cho xe {trung.plate}")

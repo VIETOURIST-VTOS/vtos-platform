@@ -307,14 +307,21 @@ def _tu_hcm(tk: dict) -> bool:
 
 
 def gia_xe_bang(db: Session, tk: dict, so_ngay: int, ngoi: int, ngay: date) -> dict | None:
+    """Xe trong nước (TK-1b, TK-1d — Chủ tịch 04/11/2026), theo thứ tự:
+      1. Đi xe từ TP HCM, trùng tuyến + số ngày trong bảng giá xe → giá trọn chuyến cột xe nhà × số xe 45 chỗ.
+      2. Đơn giá ngày xe nhà (Đội xe nhập ở hồ sơ xe) — xe nhỏ nhất đủ chỗ × số ngày.
+      3. Đi xe từ TP HCM, trùng tuyến nhưng lệch số ngày → giá tuyến (số ngày gần nhất) ÷ số ngày tuyến × số ngày đi.
+    """
     from app.models.hr import Vehicle, VehicleRate
     so = max(1, math.ceil(ngoi / XE_BANG_CHO))
     diem = [h["ten"] for h in tk["diem"]]
     di_xe = all(c["pt"] == "xe" for c in tk["chang"])
+    tuyen = []
     if di_xe and _tu_hcm(tk):
-        rs = [r for r in db.execute(select(VehicleRate).where(VehicleRate.status == "active")).scalars()
-              if (r.effective_from is None or r.effective_from <= ngay) and int(r.days or 0) == so_ngay
-              and (r.internal_price or 0) > 0 and khop_tuyen(r.route, diem)]
+        tuyen = [r for r in db.execute(select(VehicleRate).where(VehicleRate.status == "active")).scalars()
+                 if (r.effective_from is None or r.effective_from <= ngay) and (r.internal_price or 0) > 0
+                 and khop_tuyen(r.route, diem)]
+        rs = [r for r in tuyen if int(r.days or 0) == so_ngay]
         if rs:
             r = sorted(rs, key=lambda x: (x.effective_from or date.min, x.id))[-1]
             return {"ten": f"Xe {XE_BANG_CHO} chỗ · tuyến {r.route} (bảng giá xe)", "loai": f"xe {XE_BANG_CHO} chỗ",
@@ -322,16 +329,23 @@ def gia_xe_bang(db: Session, tk: dict, so_ngay: int, ngoi: int, ngay: date) -> d
                     "nguon": f"vehicle_rates:{r.id}"}
     xs = [v for v in db.execute(select(Vehicle).where(Vehicle.active.is_(True), Vehicle.kind == "noi_bo")).scalars()
           if (v.internal_rate_per_day or 0) > 0 and (v.seats or 0) > 0]
-    if not xs:
-        return None
-    theo_cho: dict[int, float] = {}
-    for v in xs:
-        theo_cho[v.seats] = min(theo_cho.get(v.seats, float(v.internal_rate_per_day)), float(v.internal_rate_per_day))
-    vua = sorted(c for c in theo_cho if c >= ngoi)
-    cho = vua[0] if vua else max(theo_cho)
-    n = 1 if vua else math.ceil(ngoi / cho)
-    return {"ten": f"Xe {cho} chỗ (đơn giá ngày xe nhà)", "loai": f"xe {cho} chỗ",
-            "chi_tiet": f"{n} xe × {so_ngay} ngày", "von": theo_cho[cho] * n * so_ngay, "nguon": f"vehicles:seats={cho}"}
+    if xs:
+        theo_cho: dict[int, float] = {}
+        for v in xs:
+            theo_cho[v.seats] = min(theo_cho.get(v.seats, float(v.internal_rate_per_day)), float(v.internal_rate_per_day))
+        vua = sorted(c for c in theo_cho if c >= ngoi)
+        cho = vua[0] if vua else max(theo_cho)
+        n = 1 if vua else math.ceil(ngoi / cho)
+        return {"ten": f"Xe {cho} chỗ (đơn giá ngày xe nhà)", "loai": f"xe {cho} chỗ",
+                "chi_tiet": f"{n} xe × {so_ngay} ngày", "von": theo_cho[cho] * n * so_ngay, "nguon": f"vehicles:seats={cho}"}
+    tl = [r for r in tuyen if int(r.days or 0) > 0]
+    if tl:
+        r = sorted(tl, key=lambda x: (abs(int(x.days) - so_ngay), -(x.effective_from or date.min).toordinal(), -x.id))[0]
+        ngay_gia = float(r.internal_price) / int(r.days)
+        return {"ten": f"Xe {XE_BANG_CHO} chỗ · theo tuyến {r.route} {int(r.days)} ngày, quy theo ngày (bảng giá xe)",
+                "loai": f"xe {XE_BANG_CHO} chỗ", "chi_tiet": f"{so} xe × {so_ngay} ngày",
+                "von": ngay_gia * so_ngay * so, "nguon": f"vehicle_rates:{r.id}:quy_ngay"}
+    return None
 
 
 def bang_hdv(db: Session, ngay: date) -> list[dict]:
