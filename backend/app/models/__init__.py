@@ -182,3 +182,4 @@ from app.models.nguon_doi_soat import *  # noqa   KS-16h nguồn đơn CTV, đ�
 from app.models.tour_online import *  # noqa   TR-1 đặt tour online trên cổng khách
 from app.models.thanh_toan_doan import *  # noqa   TR-1d link thanh toán tour đoàn riêng
 from app.models.don_khach_san_ota import *  # noqa   KS-2 đơn khách sạn OTA (ks7: bảng phải vào Base.metadata)
+from app.models.thiet_ke_doan import *  # noqa   TK-1 khách tự thiết kế tour đoàn (đơn giá đoàn + phiên bản thiết kế)
