@@ -310,3 +310,23 @@ def test_tk1_11_cua_nhap_don_gia_ngay_xe():
     assert "internal_rate_per_day: float | None = None   # TK-1d" in f and '"internal_rate_per_day": v.internal_rate_per_day' in f
     w = (goc / "web" / "app" / "doi-xe" / "page.tsx").read_text(encoding="utf-8")
     assert "function DonGiaNgay" in w and "Đơn giá ngày (xe nhà)" in w
+
+
+def test_tk1_12_hdv_muc_cao_va_ngay_le_tet_nhan_doi(db, nen):
+    """Chủ tịch 04/11/2026: (4) tuyến nhiều mức lấy 600k; (5) ngày lễ Tết thù lao HDV ×2 — lịch lễ Điều hành nhập."""
+    from app.models.hr import GuideRate
+    from app.services import thiet_ke_doan as S
+    for r, d, g in (("Đà Lạt 3N2Đ", 3, 600_000), ("Đà Lạt 3N3Đ", 3.5, 500_000)):
+        db.add(GuideRate(route=r, days=d, rate_per_day=g, effective_from=dt.date(2026, 9, 1), status="active"))
+    db.commit()
+    tk = S.chuan_hoa(_thiet_ke(nen, diem=[{"ten": "Đà Lạt", "dem": 3}], ngay=[], dich_vu=["hdv"],
+                               chang=[{"pt": "xe"}, {"pt": "xe"}]), HOM_NAY)          # 4 ngày: 18–21/12
+    x = next(x for x in S.du_toan(db, tk)["dong"] if "Hướng dẫn viên" in x["ten"])
+    assert x["von"] == 600_000 * 4                                                    # mức cao, dù 3N3Đ gần số ngày hơn
+    with pytest.raises(S.LoiThietKe, match="Chỉ Điều hành"):
+        S.luu_ngay_le(db, _u(db, "kd"), {"ngay": "2026-12-19", "ten": "Thử"})
+    S.luu_ngay_le(db, _u(db, "dh"), {"ngay": "2026-12-19", "ten": "Ngày lễ thử"})
+    S.luu_ngay_le(db, _u(db, "dh"), {"ngay": "2026-12-25", "ten": "Ngoài chuyến"})
+    x = next(x for x in S.du_toan(db, tk)["dong"] if "Hướng dẫn viên" in x["ten"])
+    assert x["von"] == 600_000 * 5 and "1 ngày lễ Tết ×2" in x["chi_tiet"]
+    assert [n["ngay"] for n in S.ds_ngay_le(db, _u(db, "kd"))["ngay_le"]] == ["2026-12-19", "2026-12-25"]

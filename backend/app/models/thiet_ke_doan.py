@@ -83,3 +83,58 @@ class ThietKeDoan(Base):
     tom_tat: Mapped[str] = mapped_column(Text, default="")
     trang_thai: Mapped[str] = mapped_column(String(12), default="da_gui")      # da_gui | thay_the (có phiên bản mới hơn)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class NgayLeTet(Base):
+    """TK-1e (Chủ tịch 04/11/2026: thù lao HDV ngày lễ Tết nhân đôi trong tạm tính). Lịch ngày lễ Tết do Điều hành nhập
+    ở màn /tour-doan — máy không tự suy lịch âm. Ngày đi tour trùng ngày ở đây thì thù lao HDV ngày ấy ×2."""
+    __tablename__ = "ngay_le_tet"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ngay: Mapped[date] = mapped_column(Date, unique=True, index=True)
+    ten: Mapped[str] = mapped_column(String(120), default="")
+    tao_boi: Mapped[str] = mapped_column(String(50), default="")
+    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+# ══ TK-2 · GIAI ĐOẠN 2 — BÁO GIÁ CHÍNH THỨC (Chủ tịch 04/11/2026, duyệt bản xem thử) ════════════════════════════
+# Điều hành lập từ một phiên bản thiết kế khách gửi: máy chép dòng tạm tính kèm giá vốn, Điều hành sửa theo xác nhận
+# thật của NCC, điền dòng thiếu giá. Biên ≥ 10% → TP Điều hành duyệt (khác người lập); < 10% → Chủ tịch / TGĐ, có lý
+# do. Duyệt xong khóa (hash), hiện cho khách 24 giờ. Giá trẻ em = 75% người lớn (tour đi xe) / 80% (có chặng bay).
+# Khách đồng ý → máy tạo hợp đồng khách NHÁP (hop_dong_khach) cho Sale Admin hoàn thiện. Đặt cọc là giai đoạn 3.
+TRANG_THAI_BG = {"nhap": "Nháp", "cho_duyet": "Chờ duyệt", "tra_lai": "Trả lại", "da_duyet": "Đã gửi khách",
+                 "khach_dong_y": "Khách đồng ý", "het_han": "Hết hạn", "thay_the": "Bị thay (khách sửa thiết kế)"}
+
+
+class BaoGiaDoan(Base):
+    __tablename__ = "bao_gia_doan"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ma: Mapped[str] = mapped_column(String(24), unique=True, index=True)               # BGD-000001
+    thiet_ke_id: Mapped[int] = mapped_column(ForeignKey("thiet_ke_doan.id"), index=True)
+    thiet_ke_ma: Mapped[str] = mapped_column(String(20), index=True)
+    tai_khoan_id: Mapped[int] = mapped_column(ForeignKey("tai_khoan_ngoai.id"), index=True)
+    dong: Mapped[list] = mapped_column(JSON, default=list)       # [{nhom, ten, chi_tiet, von|None, ban, nguon}]
+    bien_pt: Mapped[float] = mapped_column(TIEN, default=10)     # %
+    he_so_te: Mapped[float] = mapped_column(TIEN, default=0.75)
+    so_nl: Mapped[int] = mapped_column(Integer, default=0)
+    so_te: Mapped[int] = mapped_column(Integer, default=0)
+    so_eb: Mapped[int] = mapped_column(Integer, default=0)
+    tong_von: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    tong_ban: Mapped[float | None] = mapped_column(TIEN, nullable=True)                # khách trả = NL × giá + TE × giá
+    gia_nl: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    gia_te: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    bao_gom: Mapped[list] = mapped_column(JSON, default=list)
+    khong_bao_gom: Mapped[list] = mapped_column(JSON, default=list)
+    ghi_chu: Mapped[str] = mapped_column(Text, default="")
+    trang_thai: Mapped[str] = mapped_column(String(14), default="nhap", index=True)
+    cap_duyet: Mapped[str] = mapped_column(String(10), default="")        # tp_dh | ct_tgd
+    ly_do_bien: Mapped[str] = mapped_column(String(300), default="")
+    tao_boi: Mapped[str] = mapped_column(String(50), default="")
+    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    gui_duyet_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    duyet_boi: Mapped[str] = mapped_column(String(50), default="")
+    duyet_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ly_do_tra: Mapped[str] = mapped_column(String(300), default="")
+    han_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ma_bam: Mapped[str] = mapped_column(String(64), default="")
+    khach_dong_y_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    hop_dong_id: Mapped[int | None] = mapped_column(ForeignKey("hop_dong_khach.id"), nullable=True)
