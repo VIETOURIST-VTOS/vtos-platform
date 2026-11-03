@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 from app.models.cong_ngoai import TaiKhoanNgoai
 from app.models.core import User
 from app.models.thiet_ke_doan import (DON_VI, HANG_VE, LOAI_DON_GIA, PHAM_VI, TRANG_THAI_DG, DonGiaDoan,
-                                      ThietKeDoan)
+                                      NgayLeTet, ThietKeDoan)
 from app.services import rules as R
 
 BIEN_TAM_TINH = 0.10          # Chủ tịch 04/11/2026: «biên lợi nhuận tạm tính là 10%»
@@ -374,7 +374,7 @@ def gia_vung_hdv(bang: list[dict]) -> dict[str, float]:
 
 
 def gia_hdv_bang(db: Session, tk: dict, so_ngay: int, ngay: date) -> dict | None:
-    """Thù lao HDV × số ngày, chưa tính lễ Tết ×2.
+    """Thù lao HDV × số ngày, ngày lễ Tết ×2 (lịch lễ Tết ở màn /tour-doan).
       1. Trùng tuyến (đúng tập địa danh) → đơn giá tuyến ấy; nhiều bản thì số ngày gần nhất, bằng nhau lấy giá cao.
       2. Có tuyến chung địa danh → trung vị các tuyến ấy.
       3. Không có → suy theo VÙNG: giá vùng = trung vị các tuyến nằm trong vùng; chuyến đi nhiều vùng lấy vùng cao nhất.
@@ -385,24 +385,37 @@ def gia_hdv_bang(db: Session, tk: dict, so_ngay: int, ngay: date) -> dict | None
     diem = [h["ten"] for h in tk["diem"]]
     khop = [x for x in bang if khop_tuyen(x["route"], diem)]
     if khop:
-        x = sorted(khop, key=lambda x: (abs(x["days"] - so_ngay), -x["gia"]))[0]
-        return {"ten": f"Hướng dẫn viên suốt tuyến · {x['route']} (bảng thù lao HDV)", "chi_tiet": f"{so_ngay} ngày",
-                "von": x["gia"] * so_ngay, "nguon": f"guide_rates:{x['id']}"}
+        # Chủ tịch 04/11/2026: tuyến có nhiều mức (Đà Lạt 3N2Đ 600k / 3N3Đ 500k) → lấy mức cao
+        x = sorted(khop, key=lambda x: (-x["gia"], abs(x["days"] - so_ngay)))[0]
+        return _hdv_dong(db, tk, so_ngay, x["gia"], f"{x['route']} (bảng thù lao HDV)", f"guide_rates:{x['id']}")
     # 2. Tuyến có chung địa danh với hành trình (khách đi Quy Nhơn → tuyến «Quy Nhơn Phú Yên») → trung vị các tuyến ấy
     import statistics
     co = set().union(*[dia_danh(d) for d in diem]) if diem else set()
     gan = [x for x in bang if co & {y for m in _manh_tuyen(x["route"]) for y in dia_danh(m)}]
     if gan:
         gia = float(statistics.median_high([x["gia"] for x in gan]))
-        return {"ten": f"Hướng dẫn viên suốt tuyến · tương tự tuyến {', '.join(x['route'] for x in gan[:3])} (bảng thù lao HDV)",
-                "chi_tiet": f"{so_ngay} ngày", "von": gia * so_ngay, "nguon": "guide_rates:gan"}
+        return _hdv_dong(db, tk, so_ngay, gia, f"tương tự tuyến {', '.join(x['route'] for x in gan[:3])} (bảng thù lao HDV)",
+                         "guide_rates:gan")
     gv = gia_vung_hdv(bang)
     vs = [(gv[v], v) for d in diem for v in vung_cua(d) if v in gv]
     if not vs:
         return None
     gia, v = max(vs)
-    return {"ten": f"Hướng dẫn viên suốt tuyến · vùng {v} (suy từ bảng thù lao HDV)", "chi_tiet": f"{so_ngay} ngày",
-            "von": gia * so_ngay, "nguon": f"guide_rates:vung:{v}"}
+    return _hdv_dong(db, tk, so_ngay, gia, f"vùng {v} (suy từ bảng thù lao HDV)", f"guide_rates:vung:{v}")
+
+
+def so_ngay_le(db: Session, tu: date, so_ngay: int) -> int:
+    """Số ngày của chuyến rơi vào lịch lễ Tết Điều hành đã nhập (TK-1e)."""
+    den = tu + timedelta(days=max(0, so_ngay - 1))
+    return int(db.execute(select(func.count(NgayLeTet.id)).where(NgayLeTet.ngay >= tu, NgayLeTet.ngay <= den)).scalar() or 0)
+
+
+def _hdv_dong(db: Session, tk: dict, so_ngay: int, gia: float, nguon_ten: str, nguon: str) -> dict:
+    """Một dòng HDV: đơn giá × số ngày, ngày lễ Tết ×2 (Chủ tịch 04/11/2026)."""
+    le = so_ngay_le(db, date.fromisoformat(tk["ngay_di"]), so_ngay)
+    return {"ten": f"Hướng dẫn viên suốt tuyến · {nguon_ten}",
+            "chi_tiet": f"{so_ngay} ngày" + (f", {le} ngày lễ Tết ×2" if le else ""),
+            "von": gia * (so_ngay + le), "nguon": nguon}
 
 
 # Thứ tự hỏi giá vé: nguồn đầu tiên trả lời được thì dùng. Nối API vé (hãng bay / nhà cung cấp vé) = thêm hàm cùng
@@ -871,3 +884,41 @@ def ngung_don_gia(db: Session, u: User, dg_id: int, now: datetime | None = None)
     R.audit(db, u.username, u.role, "don_gia_doan_ngung", f"don_gia_doan:{x.id}")
     db.commit()
     return _dg_out(x)
+
+
+# ══ TK-1e · LỊCH NGÀY LỄ TẾT (Điều hành nhập) ════════════════════════════════════════════════════════
+def ds_ngay_le(db: Session, u: User) -> dict:
+    _quyen(u, VAI_XEM)
+    ds = db.execute(select(NgayLeTet).order_by(NgayLeTet.ngay)).scalars().all()
+    return {"ngay_le": [{"id": x.id, "ngay": x.ngay.isoformat(), "ten": x.ten, "tao_boi": x.tao_boi} for x in ds],
+            "duoc": {"nhap": _co(u, VAI_NHAP_GIA)}}
+
+
+def luu_ngay_le(db: Session, u: User, d: dict, now: datetime | None = None) -> dict:
+    _quyen(u, VAI_NHAP_GIA, "Chỉ Điều hành nhập lịch ngày lễ Tết")
+    ngay = _ngay(d.get("ngay"))
+    if ngay is None:
+        raise LoiThietKe("Chọn ngày")
+    ten = _sach(d.get("ten"), 120)
+    if not ten:
+        raise LoiThietKe("Ghi tên ngày lễ (ví dụ Tết Nguyên đán, 30/4)")
+    x = db.execute(select(NgayLeTet).where(NgayLeTet.ngay == ngay)).scalars().first()
+    if x is None:
+        x = NgayLeTet(ngay=ngay, tao_boi=u.username, tao_luc=now or datetime.now())
+        db.add(x)
+    x.ten = ten
+    db.flush()
+    R.audit(db, u.username, u.role, "ngay_le_tet_luu", f"ngay_le_tet:{ngay.isoformat()}", after={"ten": ten})
+    db.commit()
+    return {"id": x.id, "ngay": x.ngay.isoformat(), "ten": x.ten}
+
+
+def xoa_ngay_le(db: Session, u: User, nid: int) -> dict:
+    _quyen(u, VAI_NHAP_GIA, "Chỉ Điều hành sửa lịch ngày lễ Tết")
+    x = db.get(NgayLeTet, nid)
+    if x is None:
+        raise LoiThietKe("Không có ngày này", 404)
+    R.audit(db, u.username, u.role, "ngay_le_tet_xoa", f"ngay_le_tet:{x.ngay.isoformat()}", before={"ten": x.ten})
+    db.delete(x)
+    db.commit()
+    return {"message": "Đã bỏ ngày khỏi lịch lễ Tết"}

@@ -19,7 +19,8 @@ const TRONG = { loai: "xe", ten: "", pham_vi: "ca_hai", gia: "", tu_cho: "", tu_
 
 function Trang() {
   const { toast } = useShell();
-  const [tab, setTab] = useState<"tk" | "dg">("tk");
+  const [tab, setTab] = useState<"tk" | "dg" | "le">("tk");
+  const [le, setLe] = useState<any>(null); const [fLe, setFLe] = useState({ ngay: "", ten: "" });
   const [x, setX] = useState<any>(null);
   const [dg, setDg] = useState<any>(null);
   const [mo, setMo] = useState<any>(null);
@@ -29,6 +30,8 @@ function Trang() {
   const taiDg = () => api("/tour-doan/don-gia").then(setDg).catch((e) => toast(errMsg(e), true));
   useEffect(() => { tai(); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tab === "dg" && !dg) taiDg(); }, [tab]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const taiLe = () => api("/tour-doan/ngay-le").then(setLe).catch((e) => toast(errMsg(e), true));
+  useEffect(() => { if (tab === "le" && !le) taiLe(); }, [tab]);  // eslint-disable-line react-hooks/exhaustive-deps
   const lam = async (g: () => Promise<any>) => { setBusy(true); try { await g(); await taiDg(); } catch (e) { toast(errMsg(e), true); } finally { setBusy(false); } };
   if (!x) return <p>Đang tải…</p>;
   const duoc = x.duoc || {};
@@ -50,7 +53,21 @@ function Trang() {
       {Object.entries(x.hdv_vung).map(([v, g]: any) => `${v} ${d(g)}/ngày`).join(" · ")}. Phòng Hướng dẫn thêm tuyến vào bảng thì giá tuyến được dùng trước.</p>}
     <div style={{ display: "flex", gap: 6, margin: "8px 0", flexWrap: "wrap" }}>
       <button className={`act ${tab === "tk" ? "teal" : "grey"}`} aria-pressed={tab === "tk"} onClick={() => setTab("tk")}>Thiết kế khách gửi ({x.thiet_ke.length})</button>
-      {duoc.gia_von && <button className={`act ${tab === "dg" ? "teal" : "grey"}`} aria-pressed={tab === "dg"} onClick={() => setTab("dg")}>Đơn giá dịch vụ đoàn (giá vốn)</button>}</div>
+      {duoc.gia_von && <button className={`act ${tab === "dg" ? "teal" : "grey"}`} aria-pressed={tab === "dg"} onClick={() => setTab("dg")}>Đơn giá dịch vụ đoàn (giá vốn)</button>}
+      <button className={`act ${tab === "le" ? "teal" : "grey"}`} aria-pressed={tab === "le"} onClick={() => setTab("le")}>Ngày lễ Tết</button></div>
+
+    {/* TK-1e · lịch ngày lễ Tết: chuyến đi trùng ngày ở đây thì thù lao HDV ngày ấy ×2 trong tạm tính (Chủ tịch 04/11/2026). */}
+    {tab === "le" && le && <div className="panel">
+      <p className="muted">Ngày đi tour trùng ngày trong lịch này thì thù lao HDV ngày ấy nhân đôi trong tạm tính. Lịch âm (Tết Nguyên đán, Giỗ Tổ) đổi theo năm — Điều hành nhập từng ngày.</p>
+      {le.duoc.nhap && <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <label>Ngày<input type="date" value={fLe.ngay} onChange={(e) => setFLe({ ...fLe, ngay: e.target.value })} /></label>
+        <label>Tên ngày lễ<input value={fLe.ten} placeholder="Tết Nguyên đán, 30/4, 2/9…" onChange={(e) => setFLe({ ...fLe, ten: e.target.value })} /></label>
+        <button className="act teal" disabled={busy || !fLe.ngay || !fLe.ten} onClick={async () => { setBusy(true); try { await api("/tour-doan/ngay-le", { method: "POST", json: fLe }); setFLe({ ngay: "", ten: "" }); await taiLe(); } catch (e) { toast(errMsg(e), true); } finally { setBusy(false); } }}>Thêm ngày</button></div>}
+      <div className="wrap"><table><thead><tr><th>Ngày</th><th>Tên</th><th>Người nhập</th><th /></tr></thead>
+        <tbody>{le.ngay_le.map((n: any) => <tr key={n.id}><td>{ngay(n.ngay)}</td><td>{n.ten}</td><td><small>{n.tao_boi}</small></td>
+          <td>{le.duoc.nhap && <button className="act grey" disabled={busy} onClick={async () => { setBusy(true); try { await api(`/tour-doan/ngay-le/${n.id}/xoa`, { method: "POST" }); await taiLe(); } catch (e) { toast(errMsg(e), true); } finally { setBusy(false); } }}>Bỏ</button>}</td></tr>)}
+          {!le.ngay_le.length && <tr><td colSpan={4} className="muted">Chưa có ngày nào — thù lao HDV chưa nhân đôi ngày lễ.</td></tr>}</tbody></table></div>
+    </div>}
 
     {tab === "tk" && <div className="panel"><div className="wrap"><table><thead><tr><th>Mã</th><th>Thiết kế</th><th>Ngày đi</th><th>Khách</th><th>Tạm tính</th>
       {duoc.gia_von && <th>Giá vốn · biên</th>}<th>Sales báo giá</th><th>Gửi lúc</th><th /></tr></thead>

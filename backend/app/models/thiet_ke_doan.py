@@ -83,3 +83,14 @@ class ThietKeDoan(Base):
     tom_tat: Mapped[str] = mapped_column(Text, default="")
     trang_thai: Mapped[str] = mapped_column(String(12), default="da_gui")      # da_gui | thay_the (có phiên bản mới hơn)
     tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class NgayLeTet(Base):
+    """TK-1e (Chủ tịch 04/11/2026: thù lao HDV ngày lễ Tết nhân đôi trong tạm tính). Lịch ngày lễ Tết do Điều hành nhập
+    ở màn /tour-doan — máy không tự suy lịch âm. Ngày đi tour trùng ngày ở đây thì thù lao HDV ngày ấy ×2."""
+    __tablename__ = "ngay_le_tet"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ngay: Mapped[date] = mapped_column(Date, unique=True, index=True)
+    ten: Mapped[str] = mapped_column(String(120), default="")
+    tao_boi: Mapped[str] = mapped_column(String(50), default="")
+    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

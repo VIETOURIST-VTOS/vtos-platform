@@ -124,3 +124,24 @@ def duyet(dg_id: int, data: DuyetIn, u: User = Depends(require_roles(*S.VAI_DUYE
 @router_vtos.post("/don-gia/{dg_id:int}/ngung")
 def ngung(dg_id: int, u: User = Depends(require_roles(*S.VAI_DUYET_GIA)), db: Session = Depends(get_db)):
     return _goi(S.ngung_don_gia, db, u, dg_id)
+
+
+# ── TK-1e · lịch ngày lễ Tết (thù lao HDV ×2 trong tạm tính) ────────────────────────────────────────
+class NgayLeIn(BaseModel):
+    ngay: str
+    ten: str = ""
+
+
+@router_vtos.get("/ngay-le")
+def ngay_le(u: User = Depends(require_roles(*S.VAI_XEM)), db: Session = Depends(get_db)):
+    return _goi(S.ds_ngay_le, db, u)
+
+
+@router_vtos.post("/ngay-le")
+def them_ngay_le(data: NgayLeIn, u: User = Depends(require_roles(*S.VAI_NHAP_GIA)), db: Session = Depends(get_db)):
+    return _goi(S.luu_ngay_le, db, u, data.model_dump())
+
+
+@router_vtos.post("/ngay-le/{nid:int}/xoa")
+def xoa_ngay_le(nid: int, u: User = Depends(require_roles(*S.VAI_NHAP_GIA)), db: Session = Depends(get_db)):
+    return _goi(S.xoa_ngay_le, db, u, nid)

@@ -232,6 +232,8 @@ CUA_TAY = (
     # TK-1 (04/11/2026): Điều hành nhập đơn giá dịch vụ đoàn, TP Điều hành duyệt ở màn /tour-doan; khách tự thiết kế
     # tour đoàn và gửi trên cổng kh.vietourist.vn/tours (mỗi lần gửi một phiên bản, máy chỉ tính tạm tính).
     "don_gia_doan", "thiet_ke_doan",
+    # TK-1e (04/11/2026): Điều hành nhập lịch ngày lễ Tết ở màn /tour-doan › Ngày lễ Tết (thù lao HDV ×2).
+    "ngay_le_tet",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi
