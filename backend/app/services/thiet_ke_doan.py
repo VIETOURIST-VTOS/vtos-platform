@@ -235,6 +235,78 @@ def _ve_dieu_hanh_nhap(db: Session, tu: str, den: str, ngay: date, hang_ve: str,
     return None
 
 
+# ── TK-1b · bảng giá XE và thù lao HDV theo tuyến đã có trên VTOS (Chủ tịch + TGĐ ký) ───────────────────────────
+import re as _re
+
+XE_BANG_CHO = 45            # Chủ tịch 04/11/2026: bảng giá xe theo tuyến là giá xe 45 chỗ
+_DUOI_TUYEN = _re.compile(r"\s*(\(.*?\)|\bnew\b|\d+(?:[.,]\d+)?\s*(?:n\d*đ?|ngày|n)\b.*)$", _re.I)
+
+
+def _manh_tuyen(route: str) -> list[str]:
+    """«Tà Đùng – Đà Lạt – Phan Thiết» → 3 mảnh; bỏ đuôi «2 ngày», «3N2Đ», «5N», «(mới)», «New»."""
+    ra = []
+    for m in _re.split(r"\s+[–—-]\s+", route or ""):
+        m = _DUOI_TUYEN.sub("", m.strip()).strip()
+        if m:
+            ra.append(m)
+    return ra
+
+
+def khop_tuyen(route: str, diem: list[str]) -> bool:
+    """Tuyến khớp hành trình khi mọi mảnh tuyến khớp một điểm đến và mọi điểm đến khớp một mảnh tuyến."""
+    manh = _manh_tuyen(route)
+    if not manh or not diem:
+        return False
+    return all(any(khop_diem(d, m) for d in diem) for m in manh) and all(any(khop_diem(d, m) for m in manh) for d in diem)
+
+
+def _tu_hcm(tk: dict) -> bool:
+    return khong_dau(tk["khoi_hanh"]).replace(".", "").replace(" ", "") in ("tphcm", "hcm", "tphochiminh", "hochiminh", "saigon")
+
+
+def gia_xe_bang(db: Session, tk: dict, so_ngay: int, ngoi: int, ngay: date) -> dict | None:
+    from app.models.hr import Vehicle, VehicleRate
+    so = max(1, math.ceil(ngoi / XE_BANG_CHO))
+    diem = [h["ten"] for h in tk["diem"]]
+    di_xe = all(c["pt"] == "xe" for c in tk["chang"])
+    if di_xe and _tu_hcm(tk):
+        rs = [r for r in db.execute(select(VehicleRate).where(VehicleRate.status == "active")).scalars()
+              if (r.effective_from is None or r.effective_from <= ngay) and int(r.days or 0) == so_ngay
+              and (r.internal_price or 0) > 0 and khop_tuyen(r.route, diem)]
+        if rs:
+            r = sorted(rs, key=lambda x: (x.effective_from or date.min, x.id))[-1]
+            return {"ten": f"Xe {XE_BANG_CHO} chỗ · tuyến {r.route} (bảng giá xe)", "loai": f"xe {XE_BANG_CHO} chỗ",
+                    "chi_tiet": f"{so} xe × trọn chuyến {so_ngay} ngày", "von": float(r.internal_price) * so,
+                    "nguon": f"vehicle_rates:{r.id}"}
+    xs = [v for v in db.execute(select(Vehicle).where(Vehicle.active.is_(True), Vehicle.kind == "noi_bo")).scalars()
+          if (v.internal_rate_per_day or 0) > 0 and (v.seats or 0) > 0]
+    if not xs:
+        return None
+    theo_cho: dict[int, float] = {}
+    for v in xs:
+        theo_cho[v.seats] = min(theo_cho.get(v.seats, float(v.internal_rate_per_day)), float(v.internal_rate_per_day))
+    vua = sorted(c for c in theo_cho if c >= ngoi)
+    cho = vua[0] if vua else max(theo_cho)
+    n = 1 if vua else math.ceil(ngoi / cho)
+    return {"ten": f"Xe {cho} chỗ (đơn giá ngày xe nhà)", "loai": f"xe {cho} chỗ",
+            "chi_tiet": f"{n} xe × {so_ngay} ngày", "von": theo_cho[cho] * n * so_ngay, "nguon": f"vehicles:seats={cho}"}
+
+
+def gia_hdv_bang(db: Session, tk: dict, so_ngay: int, ngay: date) -> dict | None:
+    """Thù lao HDV theo tuyến (bản «doan» trước, bản chung sau — hdv.tra_don_gia), chưa tính lễ Tết ×2."""
+    from app.models.hr import GuideRate
+    from app.services import hdv as HDV
+    diem = [h["ten"] for h in tk["diem"]]
+    tuyen = sorted({r.route for r in db.execute(select(GuideRate).where(GuideRate.status == "active")).scalars()
+                    if abs(float(r.days or 0) - so_ngay) < 1 and khop_tuyen(r.route, diem)})
+    for t in tuyen:
+        r = HDV.tra_don_gia(db, t, "doan", ngay)
+        if r and r.rate_per_day:
+            return {"ten": f"Hướng dẫn viên suốt tuyến · {t} (bảng thù lao HDV)", "chi_tiet": f"{so_ngay} ngày",
+                    "von": float(r.rate_per_day) * so_ngay, "nguon": f"guide_rates:{r.id}"}
+    return None
+
+
 # Thứ tự hỏi giá vé: nguồn đầu tiên trả lời được thì dùng. Nối API vé (hãng bay / nhà cung cấp vé) = thêm hàm cùng
 # chữ ký vào ĐẦU danh sách, trả kèm «nguon» và «luc» (thời điểm lấy giá — giá vé đổi liên tục).
 NGUON_VE = [_ve_dieu_hanh_nhap]
@@ -367,14 +439,24 @@ def du_toan(db: Session, tk: dict) -> dict:
         elif c["pt"] == "khac":
             thieu_gia("Phương tiện", f"{ten_c}: {c['khac'] or 'khách tự ghi'}", "Sales báo giá")
 
-    # ── xe theo đoàn suốt hành trình (trong nước: xe đưa đón; nước ngoài: xe tại điểm đến)
-    x = chon_xe(xe_ds, ngoi)
-    if x:
-        xe, so = x
-        them("Xe", f"{xe.ten}", f"{so} xe × {so_ngay} ngày", float(xe.gia) * so * so_ngay)
-        bg.append(f"Xe du lịch đời mới đưa đón theo chương trình ({xe.ten})")
-    else:
-        thieu_gia("Xe", f"Xe cho {ngoi} khách", "Điều hành chưa nhập đơn giá xe")
+    # ── xe theo đoàn suốt hành trình. TK-1b (Chủ tịch 04/11/2026): trong nước lấy BẢNG GIÁ XE có sẵn trên VTOS —
+    # trùng tuyến + số ngày thì giá trọn chuyến cột xe nhà (xe 45 chỗ); lệch tuyến thì đơn giá ngày của xe × số ngày;
+    # không có nữa mới rơi về đơn giá đoàn Điều hành nhập. Nước ngoài: đơn giá đoàn (xe tại điểm đến).
+    xe_xong = False
+    if pv == "dn":
+        r = gia_xe_bang(db, tk, so_ngay, ngoi, di)
+        if r:
+            them("Xe", r["ten"], r["chi_tiet"], r["von"])
+            bg.append(f"Xe du lịch đời mới đưa đón theo chương trình ({r['loai']})")
+            xe_xong = True
+    if not xe_xong:
+        x = chon_xe(xe_ds, ngoi)
+        if x:
+            xe, so = x
+            them("Xe", f"{xe.ten}", f"{so} xe × {so_ngay} ngày", float(xe.gia) * so * so_ngay)
+            bg.append(f"Xe du lịch đời mới đưa đón theo chương trình ({xe.ten})")
+        else:
+            thieu_gia("Xe", f"Xe cho {ngoi} khách", "chưa có tuyến hoặc đơn giá ngày phù hợp")
 
     # ── dịch vụ cả chuyến
     xa = pv == "nn" and any(h["ten"] in TOUR_XA for h in tk["diem"])
@@ -382,6 +464,12 @@ def du_toan(db: Session, tk: dict) -> dict:
     if xa and "hdv" in dvs:
         dvs[dvs.index("hdv")] = "truong_doan"
     for k_ in dvs:
+        if k_ == "hdv" and pv == "dn":          # TK-1b: bảng thù lao HDV theo tuyến có sẵn trên VTOS
+            r = gia_hdv_bang(db, tk, so_ngay, di)
+            if r:
+                them("Dịch vụ", r["ten"], r["chi_tiet"], r["von"])
+                bg.append("Hướng dẫn viên suốt tuyến")
+                continue
         dg = _mot_gia(db, k_, pv, di)
         ten = LOAI_DON_GIA[k_][0] if k_ in LOAI_DON_GIA else DICH_VU_KHACH.get(k_, k_)
         if dg is None:

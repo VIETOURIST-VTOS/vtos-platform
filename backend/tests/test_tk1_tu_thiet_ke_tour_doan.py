@@ -10,6 +10,8 @@ có sẵn; xe và chi phí khác Điều hành nhập; biên tạm tính 10%; «
   5. Gửi: tạo yêu cầu tour đoàn cho Sales (tạm tính ghi vào yêu cầu), phiên bản 1; gửi lại cùng mã → phiên bản 2,
      bản cũ «thay_the»; khách khác không sửa được. Sales thấy giá bán, không thấy giá vốn; Điều hành thấy cả hai.
   6. Nguồn theo điểm: khách sạn, nhà hàng khớp tỉnh; giá hiện ra là giá bán.
+  8. TK-1b (Chủ tịch 04/11/2026): xe trong nước lấy bảng giá xe theo tuyến có sẵn (xe 45 chỗ, cột xe nhà, trùng tuyến
+     + số ngày, đi xe từ TP HCM); lệch tuyến → đơn giá ngày xe nhà × số ngày; HDV lấy bảng thù lao HDV theo tuyến.
   7. Giao diện: màn khách và màn VTOS có đủ cửa.
 """
 import datetime as dt
@@ -225,3 +227,32 @@ def test_tk1_7_giao_dien():
     v = (goc / "app" / "tour-doan" / "page.tsx").read_text(encoding="utf-8")
     for chu in ("/tour-doan/don-gia", "Duyệt", "Giá vốn", "Vé máy bay theo chặng"):
         assert chu in v, chu
+
+
+def test_tk1_8_bang_gia_xe_va_hdv_co_san(db, nen):
+    from app.models.hr import GuideRate, Vehicle, VehicleRate
+    from app.services import thiet_ke_doan as S
+    db.add_all([VehicleRate(route="Đà Lạt", days=4, internal_price=13_000_000, partner_price=16_000_000,
+                            effective_from=dt.date(2026, 5, 6), status="active"),
+                VehicleRate(route="Đà Lạt 4 ngày", days=4, internal_price=16_000_000, partner_price=18_000_000,
+                            effective_from=dt.date(2026, 4, 1), status="active"),
+                GuideRate(route="Đà Lạt 4N3Đ", days=4, rate_per_day=600_000, effective_from=dt.date(2026, 9, 1), status="active"),
+                Vehicle(plate="51B-00001", seats=29, internal_rate_per_day=2_500_000),
+                Vehicle(plate="51B-00002", seats=45, internal_rate_per_day=3_500_000)])
+    db.commit()
+    _dg(db, loai="xe", ten="Xe 29 chỗ (Điều hành nhập)", tu_cho=28, gia=9_000_000, pham_vi="dn")
+    base = dict(diem=[{"ten": "Đà Lạt", "dem": 3}], ngay=[], dich_vu=["hdv"], chang=[{"pt": "xe"}, {"pt": "xe"}])
+    # trùng tuyến «Đà Lạt» 4 ngày, đi xe từ TP HCM → giá trọn chuyến cột xe nhà, bản hiệu lực mới nhất; 50 ghế → 2 xe 45 chỗ
+    dt_ = S.du_toan(db, S.chuan_hoa(_thiet_ke(nen, khach={"nl": 50}, phong={"p2": 25}, **base), HOM_NAY))
+    xe = next(x for x in dt_["dong"] if x["nhom"] == "Xe")
+    assert "bảng giá xe" in xe["ten"] and xe["von"] == 13_000_000 * 2          # bản hiệu lực mới nhất
+    hdv = next(x for x in dt_["dong"] if "bảng thù lao HDV" in x["ten"])
+    assert hdv["von"] == 600_000 * 4
+    # có chặng bay → không dùng giá tuyến từ TP HCM; đơn giá ngày xe nhà: 22 ghế → xe 29 chỗ × 4 ngày
+    d2 = dict(base, chang=[{"pt": "bay"}, {"pt": "bay"}])
+    dt2 = S.du_toan(db, S.chuan_hoa(_thiet_ke(nen, **d2), HOM_NAY))
+    xe2 = next(x for x in dt2["dong"] if x["nhom"] == "Xe")
+    assert xe2["ten"].startswith("Xe 29 chỗ (đơn giá ngày") and xe2["von"] == 2_500_000 * 4
+    # nước ngoài: không dùng bảng xe trong nước
+    assert S.gia_xe_bang is not None and not S.khop_tuyen("Đà Lạt", ["Đà Lạt", "Nha Trang"])
+    assert S._manh_tuyen("Tà Đùng – Đà Lạt – Phan Thiết") == ["Tà Đùng", "Đà Lạt", "Phan Thiết"]
