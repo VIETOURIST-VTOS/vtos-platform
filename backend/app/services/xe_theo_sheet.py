@@ -150,7 +150,7 @@ def _tim_cot(rows: list[list[str]]) -> tuple[int, dict[str, int]]:
     return -1, {}
 
 
-def doc_bang(noi_dung: str, nguong_km_noi: float = 50) -> dict:
+def doc_bang(noi_dung: str, nguong_km_noi: float = 50, kiem_chuoi: bool = True) -> dict:
     """Văn bản CSV → các chuyến + các dòng cần sửa. Hàm thuần: không gọi mạng, không đọc CSDL.
 
     `nguong_km_noi`: tham số `xe_lech_km_noi_chuyen` (Đội xe v1.3 – A2) — cùng một ngưỡng với luật
@@ -203,8 +203,28 @@ def doc_bang(noi_dung: str, nguong_km_noi: float = 50) -> dict:
                 can_sua.append({"loai": "dong_khong_tour", "khoi": hien["khoi"], "dong": dong,
                                 "noi_dung": "Có số tiền mà không có tên tour — VTOS bỏ qua dòng này."})
             continue
+        # XS-4 (03/11/2026) — BẢNG CHI PHÍ THÁNG DÁN DƯỚI BẢNG CHUYẾN KHÔNG PHẢI LÀ CHUYẾN.
+        #
+        # Đo trên hệ thật 03/11/2026: màn Chủ tịch báo «11 dòng sửa», mà MƯỜI trong mười một là khối
+        # chi phí tháng ở cuối sheet — B.DƯỠNG T10, BÃI XE THÁNG 10, SIM DATA, CAMERA, BẢO HIỂM,
+        # THAY VỎ XE, CHI PHÍ LÃI VAY. Khối ấy là một BẢNG KHÁC dán nối xuống, có hàng tiêu đề
+        # riêng «XE | SỐ TIỀN | HD SỐ» rơi đúng vào ba cột Ngày đi / Ngày về / Số ngày của bảng
+        # chuyến. Nên mỗi dòng của nó vào đây thành một «chuyến thiếu ngày».
+        #
+        # Mười cảnh báo giả trên mười một là cách chắc chắn nhất để dạy người đọc phớt lờ ô vàng —
+        # và dòng thứ mười một (km đứt mạch 360 km của xe 50H-938.27) là cảnh báo THẬT.
+        #
+        # LUẬT: không có NGÀY NÀO đọc được, VÀ không có đồng tiền nào của chuyến, VÀ không có km,
+        # thì dòng ấy không mang thông tin của một chuyến — bỏ qua, KHÔNG báo. Chuyến gõ sai ngày
+        # thật thì vẫn còn tiền hoặc km, nên vẫn vào `can_sua` như cũ. Chỉ im lặng ở chỗ không có
+        # gì để mất.
+        di_, ve_ = ngay(o(r, "di")), ngay(o(r, "ve"))
+        co_so = any(so(o(r, c)) for c in
+                    COT_CHI + ("doanh_thu", "km_dau", "km_cuoi", "tong_km", "lit"))
+        if di_ is None and ve_ is None and not co_so:
+            continue
         t = {"khoi": hien["khoi"], "dong": dong, "tour": tour,
-             "di": ngay(o(r, "di")), "ve": ngay(o(r, "ve")),
+             "di": di_, "ve": ve_,
              "doanh_thu": so(o(r, "doanh_thu")), "ghi_chu": o(r, "ghi_chu")}
         for c in COT_CHI + ("tong_chi", "loi_nhuan", "km_dau", "km_cuoi", "tong_km", "lit"):
             t[c] = so(o(r, c))
@@ -215,6 +235,50 @@ def doc_bang(noi_dung: str, nguong_km_noi: float = 50) -> dict:
         chuyen.append(t)
         _kiem_dong(t, can_sua)
 
+    # `kiem_chuoi=False` khi sheet có NHIỀU TAB: hai phép kiểm này soi quan hệ GIỮA các chuyến
+    # (km nối nhau, ngày chồng nhau) nên phải chạy một lần trên bảng ĐÃ GỘP, không chạy từng tab —
+    # chạy từng tab thì chuyến cuối tab tháng 10 và chuyến đầu tab tháng 11 không bao giờ được nối.
+    if kiem_chuoi:
+        _kiem_noi_km(chuyen, can_sua, nguong_km_noi)
+        _kiem_chong_ngay(chuyen, can_sua)
+    for k in khoi:
+        k["khoa"] = nam_so_cuoi(k["bien"])
+    return {"loi": None, "chuyen": chuyen, "can_sua": can_sua, "khoi": khoi, "ctp_ngoai": ctp_ngoai}
+
+
+def gop_bang(bangs: list[dict], nguong_km_noi: float = 50) -> dict:
+    """Gộp nhiều tab của cùng một sheet thành MỘT bảng, rồi mới kiểm chuỗi.
+
+    XS-5 (03/11/2026) — VÌ SAO CẦN: chủ sheet mở tab mới theo tháng («QT tháng 11 2026»), và các
+    chuyến ĐANG CHẠY nằm ở tab mới nhất. Link CSV của Google Sheet chỉ xuất ĐÚNG MỘT tab (một
+    `gid`), nên bộ đọc một link chỉ thấy tab cũ — đo 03/11/2026: hai xe đang trên đường (Hòn Cò
+    02→04/11, Đà Lạt 01→03/11) mà màn Chủ tịch in «0 / 11 xe đang đi». Con số 0 ấy không sai vì
+    phép tính sai; nó sai vì cái bảng được hỏi không chứa câu trả lời.
+
+    Thứ tự `bangs` là thứ tự dán link — cũ trước, mới sau — và phép nối km đi theo thứ tự ấy.
+    """
+    khoi: list[dict] = []
+    theo_ten: dict[str, dict] = {}
+    chuyen, can_sua, ctp_ngoai = [], [], []
+    for b in bangs:
+        chuyen += b["chuyen"]
+        can_sua += b["can_sua"]
+        ctp_ngoai += b["ctp_ngoai"]
+        for k in b["khoi"]:
+            cu = theo_ten.get(k["khoi"])
+            if cu is None:
+                cu = dict(k)
+                theo_ten[k["khoi"]] = cu
+                khoi.append(cu)
+                continue
+            # Cùng một xe xuất hiện ở mọi tab: cộng số chuyến, giữ bản biển số đầy đủ hơn và tên
+            # lái xe đầu tiên đọc được. KHÔNG tạo khối thứ hai — mẫu số «trên N xe» phải là số xe,
+            # không phải số lần xe ấy được kẻ bảng.
+            cu["so_chuyen"] += k["so_chuyen"]
+            if len(re.sub(r"\D", "", k["bien"])) > len(re.sub(r"\D", "", cu["bien"])):
+                cu["bien"] = k["bien"]
+            if k.get("lai_xe") and not cu.get("lai_xe"):
+                cu["lai_xe"] = k["lai_xe"]
     _kiem_noi_km(chuyen, can_sua, nguong_km_noi)
     _kiem_chong_ngay(chuyen, can_sua)
     for k in khoi:
@@ -325,6 +389,19 @@ def link(db: Session) -> str:
         return ""
 
 
+def cac_link(s: str) -> list[str]:
+    """Tham số link có thể chứa NHIỀU link — mỗi dòng một tab của sheet.
+
+    XS-5 (03/11/2026). Một link CSV của Google Sheet xuất đúng một tab; sheet quyết toán xe đã có
+    hai tab («Quyết Toán dữ liệu xe» và «QT tháng 11 2026») và sẽ còn thêm mỗi tháng. Cho tham số
+    nhận nhiều dòng là đường ngắn nhất: không đổi khuôn tham số, không đổi cửa ký duyệt, và người
+    dán chỉ việc thêm một dòng khi mở tab mới.
+
+    Thứ tự dòng là thứ tự đọc — dán tab CŨ TRƯỚC, tab MỚI SAU, để phép nối km chạy đúng chiều.
+    """
+    return [d.strip() for d in (s or "").splitlines() if d.strip()]
+
+
 def link_hop_le(url: str) -> bool:
     return url.startswith(TIEN_TO_HOP_LE) and "output=csv" in url
 
@@ -371,23 +448,40 @@ def _xe_dieu_duoc(db: Session) -> dict[str, str]:
 
 def bao_cao(db: Session, hom_nay_: date, doc_lai: bool = False, tai=_tai) -> dict:
     """Toàn bộ cho màn chi tiết: link có chưa, đọc lúc nào, xe hôm nay, dòng cần sửa."""
-    url = link(db)
-    if not url:
+    urls = cac_link(link(db))
+    if not urls:
         return {"co_link": False, "ghi_chu": "Chưa dán link CSV của sheet Đội xe "
                 f"(tham số «{KHOA_LINK}» ở màn Chính sách & định mức)."}
-    if not link_hop_le(url):
+    xau = [u for u in urls if not link_hop_le(u)]
+    if xau:
         return {"co_link": True, "loi": "Link không phải link CSV «Công bố lên web» của Google Sheet "
-                "(phải bắt đầu bằng https://docs.google.com/spreadsheets/ và có output=csv)."}
-    d = doc(url, doc_lai=doc_lai, tai=tai)
-    if d["noi_dung"] is None:
-        return {"co_link": True, "loi": d["loi_tai"]}
+                "(phải bắt đầu bằng https://docs.google.com/spreadsheets/ và có output=csv)"
+                + (f" — dòng {urls.index(xau[0]) + 1}." if len(urls) > 1 else ".")}
     try:
         nguong = R.get_param(db, "xe_lech_km_noi_chuyen")
     except KeyError:
         nguong = 50
-    bang = doc_bang(d["noi_dung"], nguong)
-    if bang["loi"]:
-        return {"co_link": True, "loi": bang["loi"], "doc_luc": d["doc_luc"]}
+    # Mỗi link là một tab. Một tab hỏng thì NÓI RA và dừng — đọc được một nửa sheet rồi in «0 xe
+    # đang đi» là đúng cái kiểu sai vừa phải sửa: con số trông như đã đếm xong.
+    ds, doc_luc, loi_tai, ban_cu = [], None, None, False
+    for i, u in enumerate(urls):
+        d = doc(u, doc_lai=doc_lai, tai=tai)
+        if d["noi_dung"] is None:
+            return {"co_link": True,
+                    "loi": d["loi_tai"] + (f" (link dòng {i + 1})" if len(urls) > 1 else "")}
+        b = doc_bang(d["noi_dung"], nguong, kiem_chuoi=False)
+        if b["loi"]:
+            return {"co_link": True, "doc_luc": d["doc_luc"],
+                    "loi": b["loi"] + (f" (link dòng {i + 1})" if len(urls) > 1 else "")}
+        ds.append(b)
+        # Mốc đọc hiện ra là mốc CŨ NHẤT trong các tab: nói "đọc lúc 02:08" trong khi một tab còn
+        # là bản đệm từ nửa tiếng trước là nói quá độ tươi của con số.
+        if doc_luc is None or (d["doc_luc"] or "") < doc_luc:
+            doc_luc = d["doc_luc"]
+        loi_tai = loi_tai or d["loi_tai"]
+        ban_cu = ban_cu or d["ban_cu"]
+    d = {"doc_luc": doc_luc, "loi_tai": loi_tai, "ban_cu": ban_cu}
+    bang = gop_bang(ds, nguong)
     xe = _xe_dieu_duoc(db)
     hn = hom_nay(bang, hom_nay_, xe)
     bang["can_sua"] += doi_chieu_ctp_ngoai(db, bang)

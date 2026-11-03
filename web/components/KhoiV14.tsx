@@ -484,12 +484,23 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet }: {
       diem: diem((c) => c.loi_nhuan) },
   ];
   return (
-    <section className="panel" id="hieu-qua-doi-xe">
+    <section className="panel" id="hieu-qua-doi-xe" aria-busy={dangNap}>
       <div className="mh01-dau">
         <h2>Hiệu quả đội xe</h2>
         {/* Nút chọn kỳ nằm ngay đầu khối, cạnh tên — không giấu dưới đáy: nó đổi ý nghĩa của MỌI
             con số trong khối, nên người đọc phải thấy mình đang xem kỳ nào trước khi đọc số. */}
         {o.nhan && <span className="muted" style={{ fontSize: ".85em", marginRight: 8 }}>{o.nhan}</span>}
+        {/* HQ-6 (03/11/2026) — NÓI RA LÀ ĐANG TÍNH.
+            Đo trên hệ thật 03/11: `/fleet/hieu-qua-doi-xe?moc=…` trả đúng số nhưng mất 10–30 giây
+            (tính lại ba kỳ, kỳ liền trước để so, và 12 cột của hình diễn biến). Suốt ngần ấy giây
+            màn hình vẫn in nguyên bộ số của kỳ CŨ dưới cái nhãn kỳ cũ, và dấu hiệu duy nhất là ô
+            chọn bị mờ đi. Chủ tịch bấm «Tính đến tháng 10/2026», thấy mọi con số y nguyên, kết
+            luận «chọn tháng không hiện ra» — một phép tính chạy đúng mà đọc ra là hỏng.
+            Hai việc nhỏ, đủ để sửa chỗ ấy: nói «đang tính…», và làm nhạt bộ số cũ để không ai đọc
+            nhầm nó là số của kỳ vừa chọn. KHÔNG xoá trắng bộ số cũ: màn trống 20 giây còn khó đọc
+            hơn, và số cũ mờ vẫn là số đúng của kỳ ghi trên nhãn. */}
+        {dangNap && <span className="muted" style={{ fontSize: ".85em", marginRight: 8 }}
+          role="status">đang tính…</span>}
         <div className="v14-ky" role="group" aria-label="Kỳ xem của khối đội xe">
           {KY_XE.map((k) => (
             <button key={k.ma} type="button"
@@ -512,7 +523,8 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet }: {
 
       {/* ── TẦNG CHỦ ── */}
       <div style={{ display: "grid", gap: 10, marginBottom: 12,
-                    gridTemplateColumns: "repeat(auto-fit, minmax(168px, 1fr))" }}>
+                    gridTemplateColumns: "repeat(auto-fit, minmax(168px, 1fr))",
+                    opacity: dangNap ? 0.45 : 1, transition: "opacity .15s" }}>
         {chu.map(([nhan, gt, khoa]) => (
           <div key={nhan} style={O_CHU}>
             <div className="v14-o-nhan">{nhan}</div>
@@ -527,7 +539,8 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet }: {
           tên · con số · MỘT dòng 4–5 chữ kèm số cụ thể · nút «Xem chi tiết» nằm ở đáy, thẳng hàng
           giữa năm ô. Lời giải thích dài chuyển vào màn chi tiết, không nằm trên màn Chủ tịch.
           Kiểu đặt thẳng tại chỗ (O_VH, PHU, XEM) — không thêm lớp vào globals.css (tệp làn khác giữ). */}
-      <div className="v14-o-ds" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+      <div className="v14-o-ds" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                                         opacity: dangNap ? 0.45 : 1, transition: "opacity .15s" }}>
         {vanHanh.map(([nhan, gt, khoa]) => (
           <div key={nhan} className={"v14-o" + (gt === null ? " rong" : "")} style={O_VH}>
             <div className="v14-o-nhan">{nhan}</div>
