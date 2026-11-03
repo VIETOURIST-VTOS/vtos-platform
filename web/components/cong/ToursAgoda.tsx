@@ -13,6 +13,7 @@ import QRCode from "qrcode";
 import { diCongThe, duongRieng, goiCong, phienCong } from "@/lib/cong";
 import { CSS_KSV } from "./KhachSanVtd";
 import QrThanhToan from "./khach/QrThanhToan";
+import TuThietKeTour from "./TuThietKeTour";   // TK-1: khách tự thiết kế tour đoàn
 
 const vnd = (n?: number | null) => (n || n === 0 ? Math.round(n).toLocaleString("vi-VN") : "—");
 const iso = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -364,7 +365,8 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
     <label className="ksv-chk"><input type="checkbox" checked={yc.dong_y} onChange={(e) => setYc({ ...yc, dong_y: e.target.checked })} /><span style={{ fontSize: 13 }}>Đồng ý để Sales Vietourist liên hệ báo giá. Gửi yêu cầu chưa giữ chỗ và chưa thu tiền.</span></label>
     {loi && <div className="ksv-loi">{loi}</div>}
     <button type="button" className="ksv-btn" style={{ alignSelf: "flex-start", minHeight: 50 }} disabled={busy} onClick={guiDoan}>{busy ? "Đang gửi…" : chuaLich ? "Gửi yêu cầu giữ chỗ" : "Gửi yêu cầu thiết kế tour"}</button></section>;
-  if (buoc === "doan") return <div className="ksv tra">{css}{thanhTim(true)}<button type="button" className="ksv-link" onClick={veDs}>← Tất cả tour</button>{formDoan}</div>;
+  // TK-1: «Tour đoàn theo yêu cầu» (không gắn tour mẫu) → màn tự thiết kế có tạm tính; tour mẫu / tour chưa có lịch giữ form cũ
+  if (buoc === "doan") return <div className="ksv tra">{css}{thanhTim(true)}<button type="button" className="ksv-link" onClick={veDs}>← Tất cả tour</button>{sp ? formDoan : <TuThietKeTour toi={toi} />}</div>;
 
   // ═══════════════════════════════════ 3 · TRANG TOUR ═══════════════════════════════════
   if (buoc === "sp" && sp) {
@@ -474,8 +476,8 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
               <button type="button" className="ksv-btn wide" onClick={() => moSp(s.id)}>{s.loai === "doan" || s.chua_co_lich ? "Xem & gửi yêu cầu" : "Xem ngày đi"}</button></div>
           </div></article>)}
         {ds && !kq.length && <section className="ksv-panel"><span>Không có tour khớp. Thử bỏ bớt bộ lọc, đổi khoảng ngày, hoặc gửi yêu cầu thiết kế tour riêng.</span></section>}
-        <section className="ksv-panel"><b>Tour đoàn theo yêu cầu</b><span className="ksv-muted">Gia đình, doanh nghiệp, hội nhóm — Sales thiết kế hành trình và báo giá riêng.</span>
-          <button type="button" className="ksv-btn line" style={{ alignSelf: "flex-start" }} onClick={() => { setSp(null); setBuoc("doan"); len(); }}>Gửi yêu cầu thiết kế tour</button></section>
+        <section className="ksv-panel"><b>Tour đoàn theo yêu cầu</b><span className="ksv-muted">Gia đình, doanh nghiệp, hội nhóm — tự chọn điểm đến, khách sạn, bữa ăn, phương tiện và xem giá tạm tính ngay.</span>
+          <button type="button" className="ksv-btn line" style={{ alignSelf: "flex-start" }} onClick={() => { setSp(null); setBuoc("doan"); len(); }}>Tự thiết kế tour đoàn</button></section>
       </div>
     </div>
   </div>;

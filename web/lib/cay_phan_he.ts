@@ -288,7 +288,9 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "4.8.4", ten: "Cổng nhà cung cấp", href: "/cong-ncc", them: true },
           { ma: "4.8.5", ten: "Nhà hàng (cổng khách)", href: "/nha-hang", them: true },
           { ma: "4.8.6", ten: "Khách sạn (cổng khách)", href: "/khach-san-vtd", them: true },
-          { ma: "4.8.7", ten: "Tour (cổng khách)", href: "/tour-online", them: true }
+          { ma: "4.8.7", ten: "Tour (cổng khách)", href: "/tour-online", them: true },
+          // TK-1 · 04/11/2026 — khách tự thiết kế tour đoàn: thiết kế khách gửi + đơn giá dịch vụ đoàn
+          { ma: "4.8.8", ten: "Tour đoàn khách tự thiết kế", href: "/tour-doan", them: true }
         ] },
       { ma: "4.9", ten: "Quản lý đội xe",
         con: [
