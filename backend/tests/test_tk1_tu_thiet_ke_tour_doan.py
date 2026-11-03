@@ -330,3 +330,27 @@ def test_tk1_12_hdv_muc_cao_va_ngay_le_tet_nhan_doi(db, nen):
     x = next(x for x in S.du_toan(db, tk)["dong"] if "Hướng dẫn viên" in x["ten"])
     assert x["von"] == 600_000 * 5 and "1 ngày lễ Tết ×2" in x["chi_tiet"]
     assert [n["ngay"] for n in S.ds_ngay_le(db, _u(db, "kd"))["ngay_le"]] == ["2026-12-19", "2026-12-25"]
+
+
+def test_tk1_13_lich_le_theo_luat_may_tinh():
+    """Chủ tịch 04/11/2026: áp dụng đúng ngày nghỉ theo luật; Tết Âm lịch tính mùng 1–4; Quốc khánh lấy 1/9 và 2/9."""
+    from app.services import thiet_ke_doan as S
+    from app.services.am_lich import am_sang_duong
+    assert [am_sang_duong(1, 1, y) for y in (2024, 2025, 2026, 2027)] == [
+        dt.date(2024, 2, 10), dt.date(2025, 1, 29), dt.date(2026, 2, 17), dt.date(2027, 2, 6)]
+    assert am_sang_duong(10, 3, 2025) == dt.date(2025, 4, 7) and am_sang_duong(10, 3, 2027) == dt.date(2027, 4, 16)
+    le = S.ngay_le_luat(2027)
+    assert len(le) == 11 and dt.date(2027, 2, 9) in le and dt.date(2027, 2, 10) not in le
+    assert dt.date(2027, 9, 1) in le and dt.date(2027, 9, 3) not in le and dt.date(2027, 11, 24) in le
+    assert dt.date(2025, 11, 24) not in S.ngay_le_luat(2025)          # 24/11 áp dụng từ 1/7/2026
+
+
+def test_tk1_14_hdv_x2_ngay_tet_tu_dong(db, nen):
+    from app.models.hr import GuideRate
+    from app.services import thiet_ke_doan as S
+    db.add(GuideRate(route="Đà Lạt 3N2Đ", days=3, rate_per_day=600_000, effective_from=dt.date(2026, 9, 1), status="active"))
+    db.commit()
+    tk = S.chuan_hoa(_thiet_ke(nen, ngay_di="2027-02-05", diem=[{"ten": "Đà Lạt", "dem": 3}], ngay=[], dich_vu=["hdv"],
+                               chang=[{"pt": "xe"}, {"pt": "xe"}]), HOM_NAY)        # 5–8/2/2027: mùng 1, 2, 3 trong chuyến
+    x = next(x for x in S.du_toan(db, tk)["dong"] if "Hướng dẫn viên" in x["ten"])
+    assert x["von"] == 600_000 * (4 + 3) and "3 ngày lễ Tết ×2" in x["chi_tiet"]

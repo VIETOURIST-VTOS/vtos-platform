@@ -59,7 +59,12 @@ function Trang() {
 
     {/* TK-1e · lịch ngày lễ Tết: chuyến đi trùng ngày ở đây thì thù lao HDV ngày ấy ×2 trong tạm tính (Chủ tịch 04/11/2026). */}
     {tab === "le" && le && <div className="panel">
-      <p className="muted">Ngày đi tour trùng ngày trong lịch này thì thù lao HDV ngày ấy nhân đôi trong tạm tính. Lịch âm (Tết Nguyên đán, Giỗ Tổ) đổi theo năm — Điều hành nhập từng ngày.</p>
+      <p className="muted">Ngày đi tour trùng ngày lễ Tết thì thù lao HDV ngày ấy nhân đôi trong tạm tính. Máy tự tính lịch theo luật mỗi năm
+        (Tết Dương lịch, Tết Nguyên đán mùng 1–4, Giỗ Tổ 10/3 âm lịch, 30/4, 1/5, Quốc khánh 1/9 và 2/9, Ngày Văn hóa Việt Nam 24/11).
+        Điều hành chỉ thêm ngày Nhà nước hoán đổi trong năm.</p>
+      <div className="wrap"><table><thead><tr><th>Ngày (máy tính theo luật)</th><th>Dịp</th></tr></thead>
+        <tbody>{(le.theo_luat || []).map((n: any) => <tr key={n.ngay}><td>{ngay(n.ngay)}</td><td>{n.ten}</td></tr>)}</tbody></table></div>
+      <h3 style={{ margin: "8px 0 0" }}>Ngày Điều hành thêm</h3>
       {le.duoc.nhap && <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
         <label>Ngày<input type="date" value={fLe.ngay} onChange={(e) => setFLe({ ...fLe, ngay: e.target.value })} /></label>
         <label>Tên ngày lễ<input value={fLe.ten} placeholder="Tết Nguyên đán, 30/4, 2/9…" onChange={(e) => setFLe({ ...fLe, ten: e.target.value })} /></label>
