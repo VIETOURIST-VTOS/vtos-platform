@@ -51,6 +51,17 @@ export default function TuThietKeTour({ toi }: { toi?: any }) {
   const [gui, setGui] = useState({ dien_thoai: toi?.dien_thoai || "", ghi_chu: "", dong_y: false });
   const [daGui, setDaGui] = useState<any>(null); const [loi, setLoi] = useState(""); const [busy, setBusy] = useState(false);
   const [them, setThem] = useState<Record<number, string>>({});
+  // TK-2: thiết kế đã gửi + báo giá chính thức (đã duyệt, hiệu lực 24 giờ) — khách đồng ý ngay tại đây
+  const [cuaToi, setCuaToi] = useState<any[]>([]);
+  const [dongY, setDongY] = useState<Record<number, boolean>>({});
+  const [msgBg, setMsgBg] = useState(""); const [loiBg, setLoiBg] = useState("");
+  const taiCuaToi = () => goiCong("/khach/tour-doan/cua-toi").then((r) => setCuaToi(r.thiet_ke || [])).catch(() => null);
+  useEffect(() => { taiCuaToi(); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  const dongYBg = async (b: any) => {
+    setLoiBg(""); setMsgBg("");
+    try { const r = await goiCong(`/khach/tour-doan/bao-gia/${b.id}/dong-y`, { ma_bam: b.ma_bam, dong_y: !!dongY[b.id] }); setMsgBg(r.message); taiCuaToi(); }
+    catch (x: any) { setLoiBg(x.message); taiCuaToi(); }
+  };
   const nn = pv === "nn";
   const khoiHanh = kh === "khac" ? (khKhac.trim() || "Khác") : kh;
 
@@ -127,7 +138,7 @@ export default function TuThietKeTour({ toi }: { toi?: any }) {
     setBusy(true); setLoi("");
     try {
       const r = await goiCong("/khach/tour-doan/gui", { thiet_ke: thietKe(), dien_thoai: gui.dien_thoai, dong_y: gui.dong_y, ma: daGui?.ma || "" });
-      setDaGui(r); setKq(r.du_toan);
+      setDaGui(r); setKq(r.du_toan); taiCuaToi();
       try { window.scrollTo(0, 0); } catch { /* bỏ qua */ }
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
   };
@@ -155,6 +166,32 @@ export default function TuThietKeTour({ toi }: { toi?: any }) {
     <style>{CSS}</style>
     {daGui && <section className="ksv-panel tk-ok"><b>Đã gửi thiết kế {daGui.ma} · phiên bản {daGui.phien_ban}</b>
       <span>Sales Vietourist liên hệ để chốt dịch vụ và gửi báo giá chính thức. Bạn vẫn sửa được bên dưới và bấm «Gửi lại phiên bản mới».</span></section>}
+    {cuaToi.length > 0 && <section className="ksv-panel"><h3 className="tk-h">Thiết kế của tôi</h3>
+      {msgBg && <div className="tk-ok" style={{ padding: 10, borderRadius: 8 }}>{msgBg}</div>}
+      {loiBg && <div className="ksv-loi">{loiBg}</div>}
+      {cuaToi.map((t) => { const b = t.bao_gia; return <div key={t.ma} className="tk-diem">
+        <div className="tk-hang"><b>{t.ma} · phiên bản {t.phien_ban}</b><span className="ksv-muted">{t.ngay_di ? `khởi hành ${ngayVn(t.ngay_di)}/${t.ngay_di.slice(0, 4)}` : ""}</span></div>
+        <span className="ksv-muted">{t.tom_tat}</span>
+        {!b && <span className="ksv-muted">Đang chờ Vietourist lập báo giá chính thức.</span>}
+        {b && <>
+          <div className="tk-hang"><b>Báo giá chính thức {b.ma}</b>
+            <span className={b.trang_thai === "da_duyet" ? "ksv-diem" : "ksv-muted"}>{b.trang_thai_ten}</span></div>
+          <div className="wrap" style={{ overflowX: "auto" }}><table className="tk-bang"><tbody>{b.dong.map((r: any, i: number) =>
+            <tr key={i}><td>{r.ten}</td><td>{r.chi_tiet}</td></tr>)}</tbody></table></div>
+          <div className="ksv-sum"><b>Tổng giá trị</b><b className="ksv-big">₫ {vnd(b.tong_ban)}</b></div>
+          <span className="ksv-muted">Người lớn ₫ {vnd(b.gia_nl)} · trẻ em ₫ {vnd(b.gia_te)} ({Math.round(b.he_so_te * 100)}% người lớn){b.so_eb ? ` · ${b.so_eb} em bé không tính` : ""}</span>
+          <div className="ksv-f2"><div><b>Bao gồm</b><ul className="tk-ul">{b.bao_gom.map((x: string) => <li key={x}>{x}</li>)}</ul></div>
+            <div><b>Không bao gồm</b><ul className="tk-ul">{b.khong_bao_gom.map((x: string) => <li key={x}>{x}</li>)}</ul></div></div>
+          {b.trang_thai === "da_duyet" && <>
+            <span className="ksv-hv">Hiệu lực đến {b.han_luc ? `${b.han_luc.slice(11, 16)} · ${ngayVn(b.han_luc.slice(0, 10))}/${b.han_luc.slice(0, 4)}` : ""} — sau giờ này cần xin báo giá mới.</span>
+            <label className="ksv-chk"><input type="checkbox" checked={!!dongY[b.id]} onChange={(e) => setDongY({ ...dongY, [b.id]: e.target.checked })} />
+              <span style={{ fontSize: 13 }}>Tôi đồng ý báo giá này. Sales Vietourist liên hệ ký hợp đồng; chưa thu tiền ở bước này.</span></label>
+            <button type="button" className="ksv-btn" disabled={!dongY[b.id]} onClick={() => dongYBg(b)}>Đồng ý báo giá</button></>}
+          {b.trang_thai === "khach_dong_y" && <span className="ksv-diem">Bạn đã đồng ý báo giá — Sales Vietourist sẽ liên hệ ký hợp đồng.</span>}
+          {b.trang_thai === "het_han" && <span className="ksv-muted">Báo giá đã hết hạn — sửa và gửi lại thiết kế, hoặc liên hệ Sales để nhận báo giá mới.</span>}
+        </>}
+      </div>; })}
+    </section>}
     <section className="ksv-panel"><h2 style={{ margin: 0, fontSize: 20 }}>Tự thiết kế tour đoàn</h2>
       <span className="ksv-muted">Chọn điểm đến, khách sạn, bữa ăn, phương tiện theo lịch trình của đoàn. Giá tạm tính lấy từ bảng giá Vietourist; mục chưa có giá Sales báo sau.</span></section>
 
