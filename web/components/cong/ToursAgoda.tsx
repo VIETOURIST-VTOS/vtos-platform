@@ -158,6 +158,7 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
     try {
       const o = await goiCong(`/mo/tour-online/san-pham/${id}?nguoi_lon=${q.nl}&tre_em=${q.te}`);
       setSp(o); setLt(o.lich_trinh); setBuoc("sp"); len(); datDuong(duongRieng("tours", id));
+      if (o.chua_co_lich) setYc((y: any) => ({ ...y, so_khach: Math.max(1, q.nl + q.te), tu: q.tu || y.tu, den: q.den || y.den }));   // TR-3
       const dau = (o.chuyen || []).find((c: any) => c.du_cho && (!q.tu || c.khoi_hanh >= q.tu) && (!q.den || c.khoi_hanh <= q.den));
       setChon(dau ? dau.tour_id : null);
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
@@ -340,12 +341,14 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
   }
 
   // ═══════════════════════════════════ ĐOÀN RIÊNG · GỬI YÊU CẦU THIẾT KẾ TOUR ═══════════════════════════════════
-  const formDoan = <section className="ksv-panel" id="tra-doan" style={{ padding: 20 }}><h2 style={{ margin: 0, fontSize: 20 }}>Gửi yêu cầu thiết kế tour</h2>
-    <span className="ksv-muted">Tour đoàn không có lịch cố định. Sales thiết kế hành trình và báo giá; đồng ý thì link thanh toán cọc hiện ở «Đơn của tôi».</span>
+  const chuaLich = !!sp?.chua_co_lich;      // TR-3: tour ghép chưa có chuyến mở bán → gửi yêu cầu giữ chỗ
+  const formDoan = <section className="ksv-panel" id="tra-doan" style={{ padding: 20 }}><h2 style={{ margin: 0, fontSize: 20 }}>{chuaLich ? "Gửi yêu cầu giữ chỗ" : "Gửi yêu cầu thiết kế tour"}</h2>
+    <span className="ksv-muted">{chuaLich ? "Tour này đang cập nhật lịch khởi hành. Chọn ngày muốn đi và số khách — Sales Vietourist gọi lại báo ngày và giá chính xác. Chưa thu tiền."
+      : "Tour đoàn không có lịch cố định. Sales thiết kế hành trình và báo giá; đồng ý thì link thanh toán cọc hiện ở «Đơn của tôi»."}</span>
     <div className="ksv-f2">
       <label className="ksv-fld">Đi từ ngày<input type="date" value={yc.tu} min={homNay} onChange={(e) => setYc({ ...yc, tu: e.target.value })} /></label>
       <label className="ksv-fld">Đến ngày<input type="date" value={yc.den} min={yc.tu || homNay} onChange={(e) => setYc({ ...yc, den: e.target.value })} /></label>
-      <label className="ksv-fld">Số khách<input type="number" min={2} max={2000} value={yc.so_khach} onChange={(e) => setYc({ ...yc, so_khach: e.target.value })} /></label>
+      <label className="ksv-fld">Số khách<input type="number" min={chuaLich ? 1 : 2} max={2000} value={yc.so_khach} onChange={(e) => setYc({ ...yc, so_khach: e.target.value })} /></label>
       <label className="ksv-fld">Nơi khởi hành<input value={yc.noi} placeholder={sp?.noi_khoi_hanh || "TP HCM"} onChange={(e) => setYc({ ...yc, noi: e.target.value })} /></label>
       <label className="ksv-fld">Ngân sách / khách (₫)<input inputMode="numeric" value={yc.ngan_sach} onChange={(e) => setYc({ ...yc, ngan_sach: e.target.value.replace(/\D/g, "") })} /></label>
       <label className="ksv-fld">Hạng khách sạn<select className="ksv-sel" value={yc.hang_ks} onChange={(e) => setYc({ ...yc, hang_ks: e.target.value })}>
@@ -356,33 +359,35 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
     <label className="ksv-chk"><input type="checkbox" checked={yc.hoa_don} onChange={(e) => setYc({ ...yc, hoa_don: e.target.checked })} /><span>Cần xuất hóa đơn công ty</span></label>
     <label className="ksv-chk"><input type="checkbox" checked={yc.dong_y} onChange={(e) => setYc({ ...yc, dong_y: e.target.checked })} /><span style={{ fontSize: 13 }}>Đồng ý để Sales Vietourist liên hệ báo giá. Gửi yêu cầu chưa giữ chỗ và chưa thu tiền.</span></label>
     {loi && <div className="ksv-loi">{loi}</div>}
-    <button type="button" className="ksv-btn" style={{ alignSelf: "flex-start", minHeight: 50 }} disabled={busy} onClick={guiDoan}>{busy ? "Đang gửi…" : "Gửi yêu cầu thiết kế tour"}</button></section>;
+    <button type="button" className="ksv-btn" style={{ alignSelf: "flex-start", minHeight: 50 }} disabled={busy} onClick={guiDoan}>{busy ? "Đang gửi…" : chuaLich ? "Gửi yêu cầu giữ chỗ" : "Gửi yêu cầu thiết kế tour"}</button></section>;
   if (buoc === "doan") return <div className="ksv tra">{css}{thanhTim(true)}<button type="button" className="ksv-link" onClick={veDs}>← Tất cả tour</button>{formDoan}</div>;
 
   // ═══════════════════════════════════ 3 · TRANG TOUR ═══════════════════════════════════
   if (buoc === "sp" && sp) {
     const anh: string[] = sp.anh || [];
-    const doan = sp.loai === "doan";
+    const doan = sp.loai === "doan" || !!sp.chua_co_lich;
     const keo = (id: string) => (e: React.MouseEvent) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }); };
     const ngayLt: any[] = lt?.ngay || [];
     return <div className="ksv tra">{css}{thanhTim(true)}
       <button type="button" className="ksv-link" onClick={veDs}>← {q.tab === "nuoc_ngoai" ? "Tour nước ngoài" : "Tour trong nước"}</button>
       <div className="ksv-gal tra-gal">{anh.length ? anh.slice(0, 5).map((a, i) => <span key={a}><img src={a} alt={`${sp.ten} — ảnh ${i + 1}`} loading={i ? "lazy" : "eager"} referrerPolicy="no-referrer" /></span>)
         : <span style={{ gridColumn: "1 / -1", gridRow: "1 / 3" }}><AnhTrong ten={sp.ten} cao={300} /></span>}</div>
-      <nav className="ksv-tabs" aria-label="Mục của trang tour">{[["tra-tq", "Tổng quan"], [doan ? "tra-doan" : "tra-ngay", doan ? "Yêu cầu thiết kế" : "Ngày khởi hành"], ["tra-lt", "Lịch trình"],
+      <nav className="ksv-tabs" aria-label="Mục của trang tour">{[["tra-tq", "Tổng quan"], [doan ? "tra-doan" : "tra-ngay", sp.chua_co_lich ? "Gửi yêu cầu" : doan ? "Yêu cầu thiết kế" : "Ngày khởi hành"], ["tra-lt", "Lịch trình"],
         ["tra-bg", "Bao gồm"], ["tra-cs", "Chính sách"]].map(([id, t]) => <a key={id} href={`#${id}`} onClick={keo(id)}>{t}</a>)}
         <span className="ksv-tp">{sp.gia_tu ? <><small className="ksv-muted">từ</small><b className="ksv-big" style={{ fontSize: 19 }}>₫ {vnd(sp.gia_tu)}</b><small className="ksv-muted">/ khách</small></> : null}
           <button type="button" className="ksv-btn" onClick={keo(doan ? "tra-doan" : "tra-ngay")}>{doan ? "Gửi yêu cầu" : "Chọn ngày"}</button></span></nav>
       <div className="ksv-two" id="tra-tq">
         <div className="ksv-panel" style={{ padding: 20 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}><h2 style={{ margin: 0, fontSize: 26 }}>{sp.ten}</h2>
-            <span className="tra-tag">{sp.loai_ten}</span>{sp.wellness && <span className="tra-tag ok">Wellness &amp; retreat</span>}{sp.gio_chot && <span className="tra-tag hot">Giờ chót</span>}</div>
+            <span className="tra-tag">{sp.loai_ten}</span>{sp.wellness && <span className="tra-tag ok">Wellness &amp; retreat</span>}{sp.chua_co_lich && <span className="tra-tag">Lịch khởi hành đang cập nhật</span>}{sp.gio_chot && <span className="tra-tag hot">Giờ chót</span>}</div>
           <span className="ksv-muted">{sp.ma} · {sp.thoi_luong}{sp.noi_khoi_hanh ? ` · khởi hành ${sp.noi_khoi_hanh}` : ""}{sp.phuong_tien?.length ? ` · ${sp.phuong_tien.map((p: string) => PT[p] || p).join(", ")}` : ""}</span>
           {sp.khoi_hanh_text && <span>Lịch khởi hành: {sp.khoi_hanh_text}</span>}
           {sp.noi_bat?.length > 0 && <ul className="tra-nb">{sp.noi_bat.map((x: string) => <li key={x}>{x}</li>)}</ul>}
         </div>
         <div className="ksv-panel">{sp.gia_tu ? <><span className="ksv-muted">Giá từ</span>{sp.gia_goc && <span className="ksv-old">₫ {vnd(sp.gia_goc)}</span>}
           <b className="ksv-big">₫ {vnd(sp.gia_tu)}</b><span className="ksv-muted">/ người lớn · trẻ em ₫ {vnd(sp.gia_tre_em)}</span></>
+          : sp.chua_co_lich ? (sp.gia_tham_khao ? <><span className="ksv-muted">Giá tham khảo từ</span><b className="ksv-big">₫ {vnd(sp.gia_tham_khao)}</b>
+            <span className="ksv-muted">/ người lớn — theo bảng giá trên web; Sales báo giá chính xác theo ngày bạn chọn</span></> : <span className="ksv-muted">Giá liên hệ — Sales báo giá theo ngày bạn chọn.</span>)
           : <span className="ksv-muted">Báo giá theo hành trình và số khách.</span>}
           {sp.link_web && <a className="ksv-link" href={sp.link_web} target="_blank" rel="noopener noreferrer">Xem trang tour trên vietourist.com.vn ↗</a>}</div>
       </div>
@@ -454,13 +459,15 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
               {s.anh?.length > 1 && <span className="ksv-ct">{s.anh.length} ảnh</span>}</div>
             <div className="ksv-info"><h3><button type="button" className="ksv-ten" onClick={() => moSp(s.id)}>{s.ten}</button></h3>
               <span className="ksv-muted" style={{ fontSize: 13 }}>{s.ma} · {s.thoi_luong}{s.noi_khoi_hanh ? ` · khởi hành ${s.noi_khoi_hanh}` : ""}{s.phuong_tien?.length ? ` · ${s.phuong_tien.map((p: string) => PT[p] || p).join(", ")}` : ""}</span>
-              <div className="ksv-feat sm"><span>{s.loai_ten}</span>{s.wellness && <span>Wellness</span>}{s.diem_den && <span>{s.diem_den}</span>}</div>
+              <div className="ksv-feat sm"><span>{s.loai_ten}</span>{s.wellness && <span>Wellness</span>}{s.diem_den && <span>{s.diem_den}</span>}{s.chua_co_lich && <span>Lịch khởi hành đang cập nhật</span>}</div>
               {s.noi_bat?.length > 0 && <span className="ksv-hl">{s.noi_bat.slice(0, 3).join(" · ")}</span>}
               {s.khoi_hanh_gan?.length > 0 && <span className="ksv-where" style={{ fontSize: 13 }}>{s.so_chuyen} ngày khởi hành · gần nhất {s.khoi_hanh_gan.slice(0, 3).map((k: string) => ngayDep(k)).join(", ")}</span>}</div>
             <div className="ksv-side">{s.gia_tu ? <><small className="ksv-muted">Từ</small>{s.gia_goc && <span className="ksv-old">₫ {vnd(s.gia_goc)}</span>}
               <b className="ksv-big">₫ {vnd(s.gia_tu)}</b><small className="ksv-muted">/ khách{s.gia_tre_em && s.gia_tre_em !== s.gia_tu ? ` · trẻ em ₫ ${vnd(s.gia_tre_em)}` : ""}</small></>
+              : s.chua_co_lich ? (s.gia_tham_khao ? <><small className="ksv-muted">Giá tham khảo từ</small><b className="ksv-big">₫ {vnd(s.gia_tham_khao)}</b><small className="ksv-muted">theo bảng giá trên web</small></>
+                : <span className="ksv-muted">Giá liên hệ</span>)
               : <span className="ksv-muted">{s.loai === "doan" ? "Báo giá theo yêu cầu" : "Hết chỗ cho số khách đã chọn"}</span>}
-              <button type="button" className="ksv-btn wide" onClick={() => moSp(s.id)}>{s.loai === "doan" ? "Xem & gửi yêu cầu" : "Xem ngày đi"}</button></div>
+              <button type="button" className="ksv-btn wide" onClick={() => moSp(s.id)}>{s.loai === "doan" || s.chua_co_lich ? "Xem & gửi yêu cầu" : "Xem ngày đi"}</button></div>
           </div></article>)}
         {ds && !kq.length && <section className="ksv-panel"><span>Không có tour khớp. Thử bỏ bớt bộ lọc, đổi khoảng ngày, hoặc gửi yêu cầu thiết kế tour riêng.</span></section>}
         <section className="ksv-panel"><b>Tour đoàn theo yêu cầu</b><span className="ksv-muted">Gia đình, doanh nghiệp, hội nhóm — Sales thiết kế hành trình và báo giá riêng.</span>

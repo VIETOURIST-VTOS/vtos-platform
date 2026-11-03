@@ -639,7 +639,10 @@ def the_san_pham(p: Product, chuyen: list[tuple[Tour, int]], so_khach: int, hom_
             "so_chuyen": len(ds), "khoi_hanh_gan": [c["khoi_hanh"] for c in du[:4]],
             "khuyen_mai": any(c["gia_goc"] for c in du), "gio_chot": any(c["gio_chot"] for c in du),
             "it_cho": any(c["it_cho"] for c in du), "anh": list(nd.get("anh") or [])[:8], "noi_bat": list(p.noi_bat or [])[:5],
-            "mo_thanh_toan": mo_thanh_toan(None, p, chung), "co_noi_dung": bool(nd.get("lich_trinh") or p.program)}
+            "mo_thanh_toan": mo_thanh_toan(None, p, chung), "co_noi_dung": bool(nd.get("lich_trinh") or p.program),
+            # TR-3: tour ghép đã ghép web nhưng chưa có chuyến mở bán → vẫn hiện, khách gửi yêu cầu giữ chỗ
+            "chua_co_lich": loai(p) == "ghep" and not ds,
+            "gia_tham_khao": (nd.get("gia_web") or None) if loai(p) == "ghep" and not ds else None}
 
 
 def _sp_hien(db: Session) -> list[Product]:
@@ -663,8 +666,8 @@ def tim(db: Session, tab: str = "", q: str = "", noi: str = "", tu: date | None 
     the, noi_ds = [], set()
     for p in sps:
         ds = ch.get(p.id, [])
-        if loai(p) == "ghep" and not ds:
-            continue                                     # tour ghép phải có chuyến đang bán
+        if loai(p) == "ghep" and not ds and not p.link_web:
+            continue                                     # tour ghép chưa có chuyến: chỉ hiện khi đã ghép web (TR-3)
         if loai(p) == "doan" and not ds and not (p.link_web or (p.program or "").strip()):
             continue                                     # tour đoàn: có chương trình mới hiện để khách xem
         if p.departure_point:
@@ -732,7 +735,7 @@ def chi_tiet(db: Session, pid: int, nguoi_lon: int = 2, tre_em: int = 0, hom_nay
         raise LoiTour("Tour này không còn trên cổng", 404)
     nl, te = max(1, int(nguoi_lon or 1)), max(0, int(tre_em or 0))
     ds = _chuyen(db, [p], hom_nay).get(p.id, [])
-    if loai(p) == "ghep" and not ds:
+    if loai(p) == "ghep" and not ds and not p.link_web:
         raise LoiTour("Tour này hiện chưa có ngày khởi hành mở bán — xem tour khác hoặc gửi yêu cầu", 404)
     chung = tt_chung(db)
     the = the_san_pham(p, ds, nl + te, hom_nay, chung)
@@ -1225,6 +1228,7 @@ def gui_yeu_cau_doan(db: Session, tk: TaiKhoanNgoai, d: dict, now: datetime | No
     from app.services import cong_khach as K
     p = db.get(Product, int(d.get("product_id") or 0)) if d.get("product_id") else None
     them = [x for x in (
+        "Tour ghép chưa có lịch — khách xin giữ chỗ" if p and loai(p) == "ghep" else "",           # TR-3
         f"Tour mẫu: {p.code} · {p.name}" if p else "",
         f"Ngày đi {d.get('tu_ngay')}" + (f"–{d.get('den_ngay')}" if d.get("den_ngay") else "") if d.get("tu_ngay") else "",
         f"Khởi hành từ {d.get('noi_khoi_hanh')}" if d.get("noi_khoi_hanh") else "",
