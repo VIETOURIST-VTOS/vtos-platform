@@ -45,6 +45,9 @@ function Trang() {
     <p className="muted">Khách thiết kế tại kh.vietourist.vn/tours → «Tự thiết kế tour đoàn». Tạm tính = giá vốn ÷ (1 − {Math.round((x.bien_tam_tinh || 0.1) * 100)}%).
       Khách sạn, nhà hàng lấy từ gói giá / thực đơn đã duyệt; xe trong nước lấy bảng giá xe theo tuyến (xe 45 chỗ, cột xe nhà), lệch tuyến thì đơn giá ngày xe nhà × số ngày; HDV trong nước lấy bảng thù lao HDV theo tuyến (chưa tính lễ Tết ×2). Dịch vụ khác, xe / HDV nước ngoài và vé máy bay lấy từ đơn giá đoàn dưới đây. Mục chưa có giá = Sales báo giá.
       Biên dưới {Math.round((x.nguong_duyet || 0.1) * 100)}% phải Chủ tịch / TGĐ duyệt (áp ở bước duyệt báo giá).</p>
+    {duoc.gia_von && Object.keys(x.hdv_vung || {}).length > 0 && <p className="muted" style={{ fontSize: 13 }}>
+      Tuyến chưa có trong bảng thù lao HDV thì máy lấy tuyến có chung địa danh, không có nữa thì theo vùng (trung vị bảng giá mới):{" "}
+      {Object.entries(x.hdv_vung).map(([v, g]: any) => `${v} ${d(g)}/ngày`).join(" · ")}. Phòng Hướng dẫn thêm tuyến vào bảng thì giá tuyến được dùng trước.</p>}
     <div style={{ display: "flex", gap: 6, margin: "8px 0", flexWrap: "wrap" }}>
       <button className={`act ${tab === "tk" ? "teal" : "grey"}`} aria-pressed={tab === "tk"} onClick={() => setTab("tk")}>Thiết kế khách gửi ({x.thiet_ke.length})</button>
       {duoc.gia_von && <button className={`act ${tab === "dg" ? "teal" : "grey"}`} aria-pressed={tab === "dg"} onClick={() => setTab("dg")}>Đơn giá dịch vụ đoàn (giá vốn)</button>}</div>

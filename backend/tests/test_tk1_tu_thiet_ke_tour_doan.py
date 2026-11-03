@@ -256,3 +256,33 @@ def test_tk1_8_bang_gia_xe_va_hdv_co_san(db, nen):
     # nước ngoài: không dùng bảng xe trong nước
     assert S.gia_xe_bang is not None and not S.khop_tuyen("Đà Lạt", ["Đà Lạt", "Nha Trang"])
     assert S._manh_tuyen("Tà Đùng – Đà Lạt – Phan Thiết") == ["Tà Đùng", "Đà Lạt", "Phan Thiết"]
+
+
+def test_tk1_9_hdv_tuyen_chua_co_suy_theo_vung(db, nen):
+    """Chủ tịch 04/11/2026: tuyến chưa có phí HDV thì lấy tương tự theo vùng của bảng giá mới."""
+    from app.models.hr import GuideRate
+    from app.services import thiet_ke_doan as S
+    for r, d, g in (("Quy Nhơn Phú Yên 4N3Đ", 4, 700_000), ("Phú Yên 3N2Đ", 3, 700_000), ("Nha Trang 3N2Đ", 3, 600_000),
+                    ("Đà Lạt 3N2Đ", 3, 600_000), ("Đà Lạt 3N3Đ", 3.5, 500_000), ("Đà Lạt Phan Thiết 4N3Đ", 4, 500_000),
+                    ("Di sản Miền Trung", 6, 700_000), ("Sapa – TQ", 5, 800_000), ("Miền Tây 3N2Đ", 3, 600_000)):
+        db.add(GuideRate(route=r, days=d, rate_per_day=g, effective_from=dt.date(2026, 9, 1), status="active"))
+    db.commit()
+
+    def hdv(diem, dem=2):
+        tk = S.chuan_hoa(_thiet_ke(nen, diem=[{"ten": x, "dem": dem} for x in diem], ngay=[], dich_vu=["hdv"],
+                                   chang=[{"pt": "xe"}] * (len(diem) + 1)), HOM_NAY)
+        return next(x for x in S.du_toan(db, tk)["dong"] if "Hướng dẫn viên" in x["ten"])
+    # đúng tuyến: Đà Lạt chỉ một điểm → không lấy tuyến «Đà Lạt Phan Thiết»; 2 đêm = 3 ngày → bản 3N2Đ
+    x = hdv(["Đà Lạt"])
+    assert "Đà Lạt 3N2Đ" in x["ten"] and x["von"] == 600_000 * 3
+    # chung địa danh: Quy Nhơn → tương tự «Quy Nhơn Phú Yên»
+    x = hdv(["Quy Nhơn"])
+    assert "tương tự" in x["ten"] and x["von"] == 700_000 * 3
+    # không tuyến nào chung địa danh → theo vùng: Huế (Bắc & Trung Trung Bộ) 700k; Hà Giang (Miền Bắc) 800k; Cần Thơ (Nam Bộ)
+    assert hdv(["Huế"])["von"] == 700_000 * 3 and "vùng Bắc & Trung Trung Bộ" in hdv(["Huế"])["ten"]
+    assert hdv(["Hà Giang"])["von"] == 800_000 * 3
+    assert hdv(["Cần Thơ"])["von"] == 600_000 * 3
+    # đi nhiều vùng → vùng cao nhất
+    assert hdv(["Cần Thơ", "Hà Giang"], 1)["von"] == 800_000 * 3
+    v = S.gia_vung_hdv(S.bang_hdv(db, dt.date(2026, 12, 1)))
+    assert v["Nam Trung Bộ"] == 700_000 and v["Tây Nguyên"] == 600_000
