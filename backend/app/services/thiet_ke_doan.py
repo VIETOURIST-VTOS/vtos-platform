@@ -404,10 +404,28 @@ def gia_hdv_bang(db: Session, tk: dict, so_ngay: int, ngay: date) -> dict | None
     return _hdv_dong(db, tk, so_ngay, gia, f"vùng {v} (suy từ bảng thù lao HDV)", f"guide_rates:vung:{v}")
 
 
+def ngay_le_luat(nam: int) -> dict[date, str]:
+    """TK-1f · Ngày lễ Tết MÁY TÍNH theo luật (Chủ tịch 04/11/2026: «áp dụng theo đúng ngày nghỉ»; Tết Âm lịch tính
+    mùng 1–4; Quốc khánh lấy 1/9 và 2/9). Điều 112 Bộ luật Lao động + Nghị quyết 24/4/2026 (24/11 từ 1/7/2026)."""
+    from app.services.am_lich import am_sang_duong
+    ra = {date(nam, 1, 1): "Tết Dương lịch", date(nam, 4, 30): "Giải phóng miền Nam", date(nam, 5, 1): "Quốc tế Lao động",
+          date(nam, 9, 1): "Quốc khánh (ngày liền kề)", date(nam, 9, 2): "Quốc khánh"}
+    if date(nam, 11, 24) >= date(2026, 7, 1):
+        ra[date(nam, 11, 24)] = "Ngày Văn hóa Việt Nam"
+    for i in range(1, 5):
+        ra[am_sang_duong(i, 1, nam)] = f"Tết Nguyên đán (mùng {i})"
+    ra[am_sang_duong(10, 3, nam)] = "Giỗ Tổ Hùng Vương (10/3 âm lịch)"
+    return ra
+
+
 def so_ngay_le(db: Session, tu: date, so_ngay: int) -> int:
-    """Số ngày của chuyến rơi vào lịch lễ Tết Điều hành đã nhập (TK-1e)."""
+    """Số ngày của chuyến rơi vào ngày lễ Tết: lịch máy tính theo luật ∪ ngày Điều hành thêm (TK-1e, TK-1f)."""
     den = tu + timedelta(days=max(0, so_ngay - 1))
-    return int(db.execute(select(func.count(NgayLeTet.id)).where(NgayLeTet.ngay >= tu, NgayLeTet.ngay <= den)).scalar() or 0)
+    le = set()
+    for y in range(tu.year, den.year + 1):
+        le |= {d for d in ngay_le_luat(y) if tu <= d <= den}
+    le |= set(db.execute(select(NgayLeTet.ngay).where(NgayLeTet.ngay >= tu, NgayLeTet.ngay <= den)).scalars())
+    return len(le)
 
 
 def _hdv_dong(db: Session, tk: dict, so_ngay: int, gia: float, nguon_ten: str, nguon: str) -> dict:
@@ -905,7 +923,10 @@ def ngung_don_gia(db: Session, u: User, dg_id: int, now: datetime | None = None)
 def ds_ngay_le(db: Session, u: User) -> dict:
     _quyen(u, VAI_XEM)
     ds = db.execute(select(NgayLeTet).order_by(NgayLeTet.ngay)).scalars().all()
+    nam = date.today().year
+    luat = sorted({**ngay_le_luat(nam), **ngay_le_luat(nam + 1)}.items())
     return {"ngay_le": [{"id": x.id, "ngay": x.ngay.isoformat(), "ten": x.ten, "tao_boi": x.tao_boi} for x in ds],
+            "theo_luat": [{"ngay": d.isoformat(), "ten": t} for d, t in luat],
             "duoc": {"nhap": _co(u, VAI_NHAP_GIA)}}
 
 
