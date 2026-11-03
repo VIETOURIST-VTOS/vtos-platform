@@ -60,6 +60,11 @@ WEB_DS = ("https://www.vietourist.com.vn/vn/tour/tour-trong-nuoc", "https://www.
 WEB_TOI_DA_BYTE = 2 * 1024 * 1024
 WEB_HAN_GIAY = 15
 WEB_CU_GIO = 24
+# TR-2 (03/11/2026): hai trang danh sách chỉ in vài tour mỗi miền rồi để nút «Xem thêm» → /vn/tour/area/?area=N, mỗi
+# khu lại chia trang (&page=K). Chỉ đọc hai trang đầu thì màn ghép thấy 57/105 tour đang bán — phần còn lại không ai ghép.
+WEB_KHU = "https://www.vietourist.com.vn/vn/tour/area/?area={khu}&page={trang}"
+WEB_KHU_TOI_DA_TRANG = 40          # chặn vòng lặp nếu web trả mãi một trang
+WEB_KHU_LUONG = 6                  # số khu đọc song song
 LOAI_TOUR = {"ghep": "Tour ghép", "doan": "Tour đoàn riêng"}
 
 
@@ -1301,20 +1306,70 @@ def doc_lai(db: Session, u: User, pid: int) -> dict:
     return nd
 
 
-def ds_web(db: Session, u: User) -> list[dict]:
-    """Tour đang có trên vietourist.com.vn (2 trang danh sách) + gợi ý sản phẩm crm để Điều hành xác nhận ghép."""
-    _quyen(u, VAI_SUA_CONG + VAI_GHEP)
+def phan_tich_khu(html: str) -> list[int]:
+    """TR-2: số khu ở các nút «Xem thêm» (/vn/tour/area/?area=N) trên trang danh sách — chỉ nhận số, tự dựng lại link
+    trên tên miền Vietourist (không đi theo href thô)."""
+    ra: list[int] = []
+    for m in re.finditer(r"/vn/tour/area/?\?area=(\d{1,4})(?![\d&])", html or ""):
+        k = int(m.group(1))
+        if k not in ra:
+            ra.append(k)
+    return ra
+
+
+def _doc_khu(khu: int, da: set[str]) -> tuple[list[dict], str]:
+    """Đọc lần lượt các trang của MỘT khu tới khi trang không còn tour mới (hoặc chạm trần)."""
+    ra: list[dict] = []
+    thay = set(da)
+    for trang in range(1, WEB_KHU_TOI_DA_TRANG + 1):
+        url = WEB_KHU.format(khu=khu, trang=trang)
+        try:
+            ds = phan_tich_ds(FETCH(url).decode("utf-8", "replace"), url)
+        except Exception as ex:   # noqa: BLE001
+            return ra, f"khu {khu} trang {trang}: {ex}"[:200]
+        moi = [o for o in ds if o["url"] not in thay]
+        if not moi:
+            break
+        for o in moi:
+            thay.add(o["url"])
+            ra.append(o)
+    return ra, ""
+
+
+def doc_ds_web() -> tuple[list[dict], list[str]]:
+    """Mọi tour đang có trên web: hai trang danh sách + mọi khu «Xem thêm» kèm phân trang (TR-2)."""
+    from concurrent.futures import ThreadPoolExecutor
     web: dict[str, dict] = {}
-    loi = []
+    loi: list[str] = []
+    khu: list[int] = []
     for url in WEB_DS:
         try:
-            for o in phan_tich_ds(FETCH(url).decode("utf-8", "replace"), url):
-                web.setdefault(o["url"], o)
+            html = FETCH(url).decode("utf-8", "replace")
         except Exception as ex:   # noqa: BLE001
             loi.append(f"{url}: {ex}"[:200])
+            continue
+        for o in phan_tich_ds(html, url):
+            web.setdefault(o["url"], o)
+        khu += [k for k in phan_tich_khu(html) if k not in khu]
+    if khu:
+        da = set(web)
+        with ThreadPoolExecutor(max_workers=WEB_KHU_LUONG) as ex:
+            for ds, l in ex.map(lambda k: _doc_khu(k, da), khu):
+                for o in ds:
+                    web.setdefault(o["url"], o)
+                if l:
+                    loi.append(l)
+    return list(web.values()), loi
+
+
+def ds_web(db: Session, u: User) -> list[dict]:
+    """Tour đang có trên vietourist.com.vn (hai trang danh sách + các khu «Xem thêm», TR-2) + gợi ý sản phẩm crm để
+    Điều hành xác nhận ghép."""
+    _quyen(u, VAI_SUA_CONG + VAI_GHEP)
+    web, loi = doc_ds_web()
     sps = _sp_hien(db)
     da = {p.link_web: p for p in sps if p.link_web}
-    ra = goi_y_ghep(list(web.values()), sps)
+    ra = goi_y_ghep(web, sps)
     for o in ra:
         g = da.get(o["url"])
         o["da_ghep"] = {"pid": g.id, "ma": g.code, "ten": g.name} if g else None
