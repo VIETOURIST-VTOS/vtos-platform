@@ -480,7 +480,9 @@ export const GROUPS: Group[] = [
       // KS-13 · 30/10/2026: Điều hành nhập khách sạn hợp tác, loại phòng, giá; TP Điều hành duyệt và bật hiện.
       ["Khách sạn (cổng khách)", "/khach-san-vtd"],
       // TR-1 · 02/11/2026: tour trên kh.vietourist.vn/tours — ghép trang tour vietourist.com.vn, công tắc thanh toán, đơn online.
-      ["Tour (cổng khách)", "/tour-online"]] },
+      ["Tour (cổng khách)", "/tour-online"],
+      // TK-1 · 04/11/2026: khách tự thiết kế tour đoàn — thiết kế khách gửi + đơn giá dịch vụ đoàn (giá vốn).
+      ["Tour đoàn khách tự thiết kế", "/tour-doan"]] },
     // Xe và hướng dẫn viên tách khỏi Điều hành thành đơn vị riêng (chỉ đạo 07/9/2026). Xe nội bộ
     // thuộc pháp nhân Công ty TNHH Vận tải Vietrip, còn hướng dẫn viên hưởng lương ở công ty mẹ.
     { label: "Xe & tài xế", items: [

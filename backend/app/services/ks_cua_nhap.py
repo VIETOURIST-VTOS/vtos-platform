@@ -229,6 +229,9 @@ CUA_TAY = (
     # TR-1d (02/11/2026): Sale Admin phòng Đoàn tạo / hủy link theo đợt ở màn /hop-dong-khach (số tiền máy lấy từ hợp
     # đồng); khách trả qua chuyển khoản, robot khớp mã TD… hoặc Kế toán gán tay.
     "link_thanh_toan_doan",
+    # TK-1 (04/11/2026): Điều hành nhập đơn giá dịch vụ đoàn, TP Điều hành duyệt ở màn /tour-doan; khách tự thiết kế
+    # tour đoàn và gửi trên cổng kh.vietourist.vn/tours (mỗi lần gửi một phiên bản, máy chỉ tính tạm tính).
+    "don_gia_doan", "thiet_ke_doan",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi
