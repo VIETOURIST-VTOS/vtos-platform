@@ -286,3 +286,27 @@ def test_tk1_9_hdv_tuyen_chua_co_suy_theo_vung(db, nen):
     assert hdv(["Cần Thơ", "Hà Giang"], 1)["von"] == 800_000 * 3
     v = S.gia_vung_hdv(S.bang_hdv(db, dt.date(2026, 12, 1)))
     assert v["Nam Trung Bộ"] == 700_000 and v["Tây Nguyên"] == 600_000
+
+
+def test_tk1_10_xe_lech_so_ngay_quy_theo_ngay_va_don_gia_ngay(db, nen):
+    """Chủ tịch 04/11/2026 «làm cả 2»: lệch số ngày → (a) đơn giá ngày xe nhà Đội xe nhập; chưa nhập thì (b) giá tuyến
+    quy theo ngày."""
+    from app.models.hr import Vehicle, VehicleRate
+    from app.services import thiet_ke_doan as S
+    db.add(VehicleRate(route="Đà Lạt 4 ngày", days=4, internal_price=16_000_000, partner_price=18_000_000,
+                       effective_from=dt.date(2026, 5, 6), status="active"))
+    db.commit()
+    d = dict(diem=[{"ten": "Đà Lạt", "dem": 2}], ngay=[], dich_vu=[], chang=[{"pt": "xe"}, {"pt": "xe"}])
+    xe = next(x for x in S.du_toan(db, S.chuan_hoa(_thiet_ke(nen, **d), HOM_NAY))["dong"] if x["nhom"] == "Xe")
+    assert "quy theo ngày" in xe["ten"] and xe["von"] == 16_000_000 / 4 * 3       # 3 ngày
+    db.add(Vehicle(plate="51B-99999", seats=45, internal_rate_per_day=3_800_000)); db.commit()
+    xe = next(x for x in S.du_toan(db, S.chuan_hoa(_thiet_ke(nen, **d), HOM_NAY))["dong"] if x["nhom"] == "Xe")
+    assert "đơn giá ngày xe nhà" in xe["ten"] and xe["von"] == 3_800_000 * 3
+
+
+def test_tk1_11_cua_nhap_don_gia_ngay_xe():
+    goc = Path(__file__).resolve().parents[2]
+    f = (goc / "backend" / "app" / "api" / "v1" / "fleet.py").read_text(encoding="utf-8")
+    assert "internal_rate_per_day: float | None = None   # TK-1d" in f and '"internal_rate_per_day": v.internal_rate_per_day' in f
+    w = (goc / "web" / "app" / "doi-xe" / "page.tsx").read_text(encoding="utf-8")
+    assert "function DonGiaNgay" in w and "Đơn giá ngày (xe nhà)" in w

@@ -669,6 +669,7 @@ function DoiXe() {
 
     {tab === "xe" && chon && <div className="panel"><h2>Hồ sơ xe {chon.code} · {chon.plate}</h2>
       <p className="muted">Số khung {chon.vin || "chưa nhập"} · {chon.seats} chỗ · đồng hồ {chon.odo_km ? `${chon.odo_km.toLocaleString("vi-VN")} km` : "chưa nhập"}{chon.odo_at ? ` (ghi ngày ${fmtD(chon.odo_at)})` : ""}</p>
+      <DonGiaNgay key={chon.id} xe={chon} ghi={["cntt", "hcns", "tp_dh", "nv_dh", "gd_doi_xe"].includes(user?.role || "")} xong={() => mo(chon.id)} />
       <div className="grid">
         <div><h3>Lịch sử biển số</h3>
           <table><tbody>{chon.lich_su_bien.map((p: any, i: number) => <tr key={i}>
@@ -969,6 +970,27 @@ function DoiXe() {
 }
 
 export default function Page() { return <Shell><DoiXe /></Shell>; }
+
+/* TK-1d (Chủ tịch 04/11/2026) · ĐƠN GIÁ NGÀY XE NHÀ. Tạm tính tour đoàn khách tự thiết kế lấy giá xe theo tuyến trước;
+   hành trình không trùng tuyến nào thì lấy đơn giá ngày của xe nhà nhỏ nhất đủ chỗ × số ngày. Đội xe nhập ở đây. */
+function DonGiaNgay({ xe, ghi, xong }: { xe: any; ghi: boolean; xong: () => void }) {
+  const { toast } = useShell();
+  const [v, setV] = useState<string>(xe.internal_rate_per_day != null ? String(Math.round(xe.internal_rate_per_day)) : "");
+  const [dang, setDang] = useState(false);
+  const luu = async () => {
+    setDang(true);
+    try {
+      const r: any = await api(`/fleet/xe/${xe.id}`, { method: "PUT", json: { phien_ban: xe.phien_ban, internal_rate_per_day: v === "" ? null : Number(v) } });
+      toast(r.message || "Đã lưu"); xong();
+    } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+  return <p style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+    <b>Đơn giá ngày (xe nhà):</b>
+    {ghi ? <><input inputMode="numeric" style={{ width: 160 }} value={v} placeholder="đ / ngày" onChange={(e) => setV(e.target.value.replace(/\D/g, ""))} />
+      <button className="act teal" disabled={dang} onClick={luu}>Lưu</button></>
+      : <span>{xe.internal_rate_per_day != null ? `${Math.round(xe.internal_rate_per_day).toLocaleString("vi-VN")} đ/ngày` : "chưa nhập"}</span>}
+    <span className="muted" style={{ fontSize: 13 }}>Dùng cho tạm tính tour đoàn khi hành trình không trùng tuyến trong bảng giá xe.</span></p>;
+}
 
 /* ════════════════════════════════════════════════════════════════════════════════════════════
    HQ-2c · ĐỊNH MỨC TIÊU HAO DẦU — cửa nhập của Đội xe.
