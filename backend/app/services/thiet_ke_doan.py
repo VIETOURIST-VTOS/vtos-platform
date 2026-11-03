@@ -252,8 +252,50 @@ def _manh_tuyen(route: str) -> list[str]:
     return ra
 
 
+# Địa danh để đọc tên tuyến trong bảng giá xe / HDV («Đà Lạt Phan Thiết 4N3Đ» là HAI điểm dù không có gạch nối) và để
+# xếp vùng cho thù lao HDV. Chia 5 vùng theo mức thù lao của bảng HDV (Chủ tịch 04/11/2026: tuyến chưa có phí thì lấy
+# tương tự theo vùng của bảng giá mới).
+VUNG_HDV: dict[str, list[str]] = {
+    "Miền Bắc": ["Hà Nội", "Hạ Long", "Cát Bà", "Lan Hạ", "Cô Tô", "Yên Tử", "Hải Phòng", "Ninh Bình", "Tràng An", "Tam Cốc",
+                 "Sapa", "Hà Giang", "Cao Bằng", "Bản Giốc", "Ba Bể", "Lạng Sơn", "Mộc Châu", "Mai Châu", "Mù Cang Chải",
+                 "Điện Biên", "Lai Châu", "Tam Đảo", "Đền Hùng", "Bắc Ninh", "Thái Nguyên", "Nam Định", "Sầm Sơn",
+                 "Thanh Hóa", "Pù Luông", "Miền Bắc"],
+    "Bắc & Trung Trung Bộ": ["Cửa Lò", "Nghệ An", "Hà Tĩnh", "Phong Nha", "Quảng Bình", "Quảng Trị", "Huế", "Đà Nẵng",
+                             "Hội An", "Bà Nà", "Lý Sơn", "Quảng Ngãi", "Di sản Miền Trung", "Miền Trung"],
+    "Nam Trung Bộ": ["Quy Nhơn", "Phú Yên", "Tuy Hòa", "Nha Trang", "Bình Ba", "Bình Hưng", "Vĩnh Hy", "Ninh Thuận",
+                     "Phan Thiết", "Mũi Né", "Tánh Linh", "Tà Pao", "La Ngâu", "Hòn Cò"],
+    "Tây Nguyên": ["Đà Lạt", "Bảo Lộc", "Buôn Ma Thuột", "Buôn Mê", "Pleiku", "Gia Lai", "Kon Tum", "Măng Đen", "Tà Đùng",
+                   "Tây Nguyên"],
+    "Nam Bộ": ["TP Hồ Chí Minh", "Cần Giờ", "Vũng Tàu", "Hồ Tràm", "Long Hải", "Côn Đảo", "Tây Ninh", "Núi Bà Đen",
+               "Nam Cát Tiên", "Bình Dương", "Mỹ Tho", "Tiền Giang", "Bến Tre", "Vĩnh Long", "Cần Thơ", "Đồng Tháp",
+               "Châu Đốc", "An Giang", "Long An", "Trà Vinh", "Sóc Trăng", "Bạc Liêu", "Cà Mau", "Rạch Giá", "Hà Tiên",
+               "Nam Du", "Phú Quốc", "Miền Tây"],
+}
+# Tên chung một vùng (không phải một điểm) — chỉ dùng để xếp vùng, không dùng để khớp đúng tuyến.
+_TEN_VUNG = {"Miền Bắc", "Di sản Miền Trung", "Miền Trung", "Tây Nguyên", "Miền Tây"}
+
+
+def _co_chu(chu: str, ten: str) -> bool:
+    return bool(_re.search(r"(?<![a-z0-9])" + _re.escape(khong_dau(chu)) + r"(?![a-z0-9])", khong_dau(ten)))
+
+
+def dia_danh(ten: str) -> set[str]:
+    """Các địa danh (không tính tên vùng) đọc được trong một tên điểm đến hoặc tên tuyến."""
+    return {d for ds in VUNG_HDV.values() for d in ds if d not in _TEN_VUNG and _co_chu(d, ten)}
+
+
+def vung_cua(ten: str) -> set[str]:
+    return {v for v, ds in VUNG_HDV.items() if any(_co_chu(d, ten) for d in ds)}
+
+
 def khop_tuyen(route: str, diem: list[str]) -> bool:
-    """Tuyến khớp hành trình khi mọi mảnh tuyến khớp một điểm đến và mọi điểm đến khớp một mảnh tuyến."""
+    """Tuyến khớp hành trình. Đọc được địa danh ở cả hai phía thì so ĐÚNG tập địa danh (tuyến «Đà Lạt Phan Thiết» không
+    khớp chuyến chỉ đi Đà Lạt); không đọc được thì so từng mảnh tên tuyến như cũ."""
+    a = {x for m in _manh_tuyen(route) for x in dia_danh(m)}
+    bs = [dia_danh(d) for d in diem]
+    if a and diem and all(bs):
+        # mỗi điểm khách chọn có mặt trong tuyến, và mỗi địa danh của tuyến thuộc một điểm khách chọn
+        return all(x & a for x in bs) and a <= set().union(*bs)
     manh = _manh_tuyen(route)
     if not manh or not diem:
         return False
@@ -292,19 +334,61 @@ def gia_xe_bang(db: Session, tk: dict, so_ngay: int, ngoi: int, ngay: date) -> d
             "chi_tiet": f"{n} xe × {so_ngay} ngày", "von": theo_cho[cho] * n * so_ngay, "nguon": f"vehicles:seats={cho}"}
 
 
-def gia_hdv_bang(db: Session, tk: dict, so_ngay: int, ngay: date) -> dict | None:
-    """Thù lao HDV theo tuyến (bản «doan» trước, bản chung sau — hdv.tra_don_gia), chưa tính lễ Tết ×2."""
+def bang_hdv(db: Session, ngay: date) -> list[dict]:
+    """Bảng thù lao HDV đang hiệu lực, mỗi tuyến một dòng (bản «doan» trước, bản chung sau — hdv.tra_don_gia)."""
     from app.models.hr import GuideRate
     from app.services import hdv as HDV
-    diem = [h["ten"] for h in tk["diem"]]
-    tuyen = sorted({r.route for r in db.execute(select(GuideRate).where(GuideRate.status == "active")).scalars()
-                    if abs(float(r.days or 0) - so_ngay) < 1 and khop_tuyen(r.route, diem)})
-    for t in tuyen:
+    ra = []
+    for t in sorted({r.route for r in db.execute(select(GuideRate).where(GuideRate.status == "active")).scalars()}):
         r = HDV.tra_don_gia(db, t, "doan", ngay)
         if r and r.rate_per_day:
-            return {"ten": f"Hướng dẫn viên suốt tuyến · {t} (bảng thù lao HDV)", "chi_tiet": f"{so_ngay} ngày",
-                    "von": float(r.rate_per_day) * so_ngay, "nguon": f"guide_rates:{r.id}"}
-    return None
+            ra.append({"route": t, "days": float(r.days or 0), "gia": float(r.rate_per_day), "id": r.id,
+                       "vung": sorted(vung_cua(t))})
+    return ra
+
+
+def gia_vung_hdv(bang: list[dict]) -> dict[str, float]:
+    """Thù lao HDV suy cho mỗi vùng = trung vị (lấy số cao hơn khi chẵn) các tuyến nằm trong vùng ấy."""
+    import statistics
+    ra = {}
+    for v in VUNG_HDV:
+        # tuyến chỉ nằm trong vùng ấy trước (tuyến ghép hai vùng kéo lệch mức của vùng); không có thì lấy mọi tuyến chạm vùng
+        gs = [x["gia"] for x in bang if x["vung"] == [v]] or [x["gia"] for x in bang if v in x["vung"]]
+        if gs:
+            ra[v] = float(statistics.median_high(gs))
+    return ra
+
+
+def gia_hdv_bang(db: Session, tk: dict, so_ngay: int, ngay: date) -> dict | None:
+    """Thù lao HDV × số ngày, chưa tính lễ Tết ×2.
+      1. Trùng tuyến (đúng tập địa danh) → đơn giá tuyến ấy; nhiều bản thì số ngày gần nhất, bằng nhau lấy giá cao.
+      2. Có tuyến chung địa danh → trung vị các tuyến ấy.
+      3. Không có → suy theo VÙNG: giá vùng = trung vị các tuyến nằm trong vùng; chuyến đi nhiều vùng lấy vùng cao nhất.
+    """
+    bang = bang_hdv(db, ngay)
+    if not bang:
+        return None
+    diem = [h["ten"] for h in tk["diem"]]
+    khop = [x for x in bang if khop_tuyen(x["route"], diem)]
+    if khop:
+        x = sorted(khop, key=lambda x: (abs(x["days"] - so_ngay), -x["gia"]))[0]
+        return {"ten": f"Hướng dẫn viên suốt tuyến · {x['route']} (bảng thù lao HDV)", "chi_tiet": f"{so_ngay} ngày",
+                "von": x["gia"] * so_ngay, "nguon": f"guide_rates:{x['id']}"}
+    # 2. Tuyến có chung địa danh với hành trình (khách đi Quy Nhơn → tuyến «Quy Nhơn Phú Yên») → trung vị các tuyến ấy
+    import statistics
+    co = set().union(*[dia_danh(d) for d in diem]) if diem else set()
+    gan = [x for x in bang if co & {y for m in _manh_tuyen(x["route"]) for y in dia_danh(m)}]
+    if gan:
+        gia = float(statistics.median_high([x["gia"] for x in gan]))
+        return {"ten": f"Hướng dẫn viên suốt tuyến · tương tự tuyến {', '.join(x['route'] for x in gan[:3])} (bảng thù lao HDV)",
+                "chi_tiet": f"{so_ngay} ngày", "von": gia * so_ngay, "nguon": "guide_rates:gan"}
+    gv = gia_vung_hdv(bang)
+    vs = [(gv[v], v) for d in diem for v in vung_cua(d) if v in gv]
+    if not vs:
+        return None
+    gia, v = max(vs)
+    return {"ten": f"Hướng dẫn viên suốt tuyến · vùng {v} (suy từ bảng thù lao HDV)", "chi_tiet": f"{so_ngay} ngày",
+            "von": gia * so_ngay, "nguon": f"guide_rates:vung:{v}"}
 
 
 # Thứ tự hỏi giá vé: nguồn đầu tiên trả lời được thì dùng. Nối API vé (hãng bay / nhà cung cấp vé) = thêm hàm cùng
@@ -660,6 +744,7 @@ def ds_vtos(db: Session, u: User) -> dict:
     ds = db.execute(select(ThietKeDoan).where(ThietKeDoan.trang_thai == "da_gui").order_by(ThietKeDoan.tao_luc.desc())
                     .limit(200)).scalars().all()
     return {"thiet_ke": [_ra(x, von) for x in ds], "bien_tam_tinh": BIEN_TAM_TINH, "nguong_duyet": NGUONG_DUYET,
+            "hdv_vung": gia_vung_hdv(bang_hdv(db, date.today())) if von else {},
             "duoc": {"gia_von": von, "nhap_gia": _co(u, VAI_NHAP_GIA), "duyet_gia": _co(u, VAI_DUYET_GIA)}}
 
 
