@@ -21,7 +21,7 @@ const THU = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const ngayDep = (s: string) => { const d = new Date(s + "T00:00:00"); return `${THU[d.getDay()]} · ${d.getDate()}/${d.getMonth() + 1}`; };
 const ngayVn = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "");
 const nghin = (x: number) => Math.ceil(Math.round(x) / 1000) * 1000;
-const PT: Record<string, string> = { xe: "Xe", may_bay: "Máy bay", tau_hoa: "Tàu hỏa", du_thuyen: "Du thuyền" };
+const PT: Record<string, string> = { xe: "Xe du lịch", may_bay: "Máy bay", tau_hoa: "Tàu hỏa", du_thuyen: "Du thuyền" };
 const BUA: Record<string, string> = { "sáng": "sáng", "trưa": "trưa", "tối": "tối" };
 
 type Q = { tab: string; q: string; noi: string; tu: string; den: string; nl: number; te: number; eb: number; loai: string };
@@ -31,6 +31,8 @@ const TL: [string, string, (n: number) => boolean][] = [["1", "1 ngày", (n) => 
   ["4_5", "4–5 ngày", (n) => n >= 4 && n <= 5], ["6", "6 ngày trở lên", (n) => n >= 6]];
 const GIA: [string, string, (g: number) => boolean][] = [["d2", "Dưới 2 triệu", (g) => g < 2e6], ["2_5", "2–5 triệu", (g) => g >= 2e6 && g <= 5e6],
   ["t5", "Trên 5 triệu", (g) => g > 5e6]];
+/* TR-4: lọc giá dùng giá thật của chuyến; tour chưa có lịch (TR-3) dùng giá tham khảo trên web. */
+const giaLoc = (s: any): number | null => s.gia_tu ?? s.gia_tham_khao ?? null;
 const UD: [string, string, (s: any) => boolean][] = [["km", "Khuyến mại", (s) => s.khuyen_mai], ["gc", "Giờ chót", (s) => s.gio_chot], ["it", "Còn ít chỗ", (s) => s.it_cho]];
 
 function nhanh(k: string, homNay: string): [string, string] {
@@ -180,7 +182,7 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
     if (bo !== "loai" && L.loai.length && !L.loai.includes(s.loai)) return false;
     if (bo !== "well" && L.well && !s.wellness) return false;
     if (bo !== "tl" && L.tl.length && !TL.some(([k, , f]) => L.tl.includes(k) && f(s.ngay))) return false;
-    if (bo !== "gia" && L.gia.length && !(s.gia_tu != null && GIA.some(([k, , f]) => L.gia.includes(k) && f(s.gia_tu)))) return false;
+    if (bo !== "gia" && L.gia.length && !((g) => g != null && GIA.some(([k, , f]) => L.gia.includes(k) && f(g)))(giaLoc(s))) return false;
     if (bo !== "ud" && L.ud.length && !L.ud.every((k) => UD.find((x) => x[0] === k)?.[2](s))) return false;
     if (bo !== "pt" && L.pt.length && !L.pt.some((k) => (s.phuong_tien || []).includes(k))) return false;
     return true;
@@ -196,10 +198,12 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
   }, [tat, loc, sx]);  // eslint-disable-line react-hooks/exhaustive-deps
   const dem = (f: (s: any) => boolean, bo: keyof Loc) => tat.filter((s) => khop(s, bo) && f(s)).length;
   const bat = (a: string[], k: string, v: boolean) => (v ? [...a, k] : a.filter((x) => x !== k));
-  const nhom = (tieuDe: string, muc: [string, string, (s: any) => boolean][], khoa: "loai" | "tl" | "gia" | "ud" | "pt") => {
-    const co = muc.filter(([, , f]) => dem(f, khoa) > 0);
+  // TR-4: «Giá mỗi khách» và «Phương tiện» luôn hiện đủ mức (mức chưa có tour thì mờ, số 0) — các nhóm khác ẩn mức trống.
+  const nhom = (tieuDe: string, muc: [string, string, (s: any) => boolean][], khoa: "loai" | "tl" | "gia" | "ud" | "pt", du = false) => {
+    const co = du ? muc : muc.filter(([, , f]) => dem(f, khoa) > 0);
     return co.length > 0 && <div className="ksv-panel"><b>{tieuDe}</b>{co.map(([m, t, f]) =>
-      <label key={khoa + m} className="ksv-chk"><input type="checkbox" checked={(loc[khoa] as string[]).includes(m)}
+      <label key={khoa + m} className="ksv-chk" style={dem(f, khoa) === 0 ? { opacity: 0.55 } : undefined}><input type="checkbox" checked={(loc[khoa] as string[]).includes(m)}
+        disabled={dem(f, khoa) === 0 && !(loc[khoa] as string[]).includes(m)}
         onChange={(e) => setLoc({ ...loc, [khoa]: bat(loc[khoa] as string[], m, e.target.checked) })} /><span>{t}</span><small>{dem(f, khoa)}</small></label>)}</div>;
   };
 
@@ -441,9 +445,9 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
         {dem((s) => s.wellness, "well") > 0 && <div className="ksv-panel"><b>Chủ đề</b><label className="ksv-chk"><input type="checkbox" checked={loc.well} onChange={(e) => setLoc({ ...loc, well: e.target.checked })} />
           <span>Wellness &amp; retreat</span><small>{dem((s) => s.wellness, "well")}</small></label></div>}
         {nhom("Thời lượng", TL.map(([k, t, f]) => [k, t, (s: any) => f(s.ngay)]), "tl")}
-        {nhom("Giá mỗi khách", GIA.map(([k, t, f]) => [k, t, (s: any) => s.gia_tu != null && f(s.gia_tu)]), "gia")}
+        {nhom("Giá mỗi khách", GIA.map(([k, t, f]) => [k, t, (s: any) => ((g) => g != null && f(g))(giaLoc(s))]), "gia", true)}
         {nhom("Ưu đãi", UD, "ud")}
-        {nhom("Phương tiện", Object.entries(ds?.phuong_tien || PT).map(([k, t]) => [k, t as string, (s: any) => (s.phuong_tien || []).includes(k)]), "pt")}
+        {nhom("Phương tiện", Object.entries(PT).map(([k, t]) => [k, (ds?.phuong_tien || PT)[k] || t, (s: any) => (s.phuong_tien || []).includes(k)]), "pt", true)}
       </aside>
       <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
         <div className="ksv-rhead"><b style={{ fontSize: 18 }}>{ds ? `${kq.length} tour${q.q ? ` ${q.q}` : ""}` : "Đang tải tour…"}</b>

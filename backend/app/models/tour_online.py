@@ -20,7 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 from app.models.kieu_tien import TIEN
 
-PHUONG_TIEN_TOUR = {"xe": "Xe", "may_bay": "Máy bay", "tau_hoa": "Tàu hỏa", "du_thuyen": "Du thuyền"}
+PHUONG_TIEN_TOUR = {"xe": "Xe du lịch", "may_bay": "Máy bay", "tau_hoa": "Tàu hỏa", "du_thuyen": "Du thuyền"}
 CACH_TRA_TOUR = {"coc": "Giữ chỗ — đặt cọc", "du": "Thanh toán toàn bộ"}
 KENH_TOUR = {"qr": "QR chuyển khoản", "sepay": "Thẻ (cổng SePay)", "onepay": "Thẻ (OnePay)"}
 
