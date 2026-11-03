@@ -76,6 +76,49 @@ COT_CHI = ("ctp", "gui_xe", "dau", "epass")
 LA_NGOAI_CHUYEN = re.compile(r"^(truc\b|cho$|cho (tour|khach|lich)\b)")
 NHOM_CTP_NGOAI = "ctp_ngoai_chuyen"
 
+# ══════════════════ XS-6 (03/11/2026) · KHỐI CHI PHÍ THÁNG DÁN DƯỚI BẢNG CHUYẾN
+#
+# XS-4 vừa dạy bộ đọc BỎ QUA khối ấy để thôi báo mười cảnh báo giả. Bỏ qua là đúng cho câu hỏi «xe
+# nào đang đi», nhưng khối ấy KHÔNG phải rác — nó là chi phí thật của đội xe, và đo 03/11/2026 thì
+# tháng 10 có **125.771.596 đ** nằm đó mà sổ VTOS KHÔNG CÓ MỘT DÒNG NÀO. Lợi nhuận đội xe tháng 10
+# màn Chủ tịch đang hiện 270.467.590 đ; trừ khối này còn 144.695.994 đ — gần một nửa.
+#
+# VTOS KHÔNG THIẾU CHỖ GHI: `NHOM_CHI_PHI_KY` đã có đủ bảo dưỡng, bãi xe, bảo hiểm, quản lý, trả
+# trước, lãi vay. Cái thiếu là một phép soi lại — cùng hình dạng với `doi_chieu_ctp_ngoai` của XS-2:
+# đọc số trên sheet, đặt cạnh số trong sổ, rồi DỪNG. Hệ thống viết phép tính, người của bộ phận nhập
+# số liệu (ranh giới Chủ tịch đặt 09/9/2026).
+#
+# VÌ SAO KHÔNG TỰ GHI VÀO SỔ: khoản theo xe phải quy được về đúng chiếc, và «BẢO HIEM CARIVAL» thì
+# ô xe ghi «CARIVAL» — không tra ra biển nào. Một bút toán đoán mò vào sổ tiền khó gỡ hơn nhiều so
+# với một dòng nhắc trên màn hình.
+#
+# Vế trái là nhãn đã bỏ dấu, chữ thường, khớp theo CHUỖI CON — không theo đầu chuỗi.
+#
+# Bản đầu dò theo đầu chuỗi và phép thử bắt ngay: «CHI PHÍ LÃI VAY» không khớp «lai vay» vì nó
+# không ĐỨNG ĐẦU. Nhãn ở đây là chữ người gõ tay, không có khuôn — «B.DƯỠNG T10», «CHI PHÍ LÃI
+# VAY», «CÔNG THAY VỎ XE» — nên neo vào vị trí là neo vào thói quen gõ của một người.
+#
+# Thứ tự trong bảng là thứ tự thử, nên xếp cái HẸP trước cái RỘNG: «cong thay vo» phải đứng trước
+# «thay vo», và «bh ds» trước «bao hiem». Đổi chỗ hai dòng là đổi kết quả.
+NHAN_CHI_PHI_THANG = (
+    ("b.duong", "bao_duong"), ("bao duong", "bao_duong"), ("sua chua", "bao_duong"),
+    ("dang kiem", "dang_kiem"),
+    ("cong thay vo", "tra_truoc"), ("thay vo", "tra_truoc"), ("vo xe", "tra_truoc"), ("ac quy", "tra_truoc"),
+    ("bh ds", "bao_hiem"), ("bao hiem", "bao_hiem"), ("bh ", "bao_hiem"),
+    ("bai xe", "bai_xe"),
+    ("sim", "quan_ly"), ("camera", "quan_ly"), ("gsht", "quan_ly"), ("dinh vi", "quan_ly"),
+    ("lai vay", "lai_vay"),
+    ("luong", "luong_tai_xe"),
+    ("wifi", "wifi_xe"),
+    # «điện» và «nước» đứng CUỐI vì chúng là hai chữ ngắn và rất dễ nằm lọt trong nhãn khác;
+    # mọi nhóm hẹp hơn phải được thử xong trước.
+    ("dien", "dien_nuoc"), ("nuoc", "dien_nuoc"),
+)
+# Hàng tiêu đề của khối ấy rơi đúng ba cột Ngày đi / Ngày về / Số ngày của bảng chuyến, và nguyên
+# văn là «XE | SỐ TIỀN | HD SỐ». Nhận ra hàng này là nhận ra một BẢNG KHÁC bắt đầu — chắc hơn nhiều
+# so với đoán theo vị trí dòng.
+TD_CHI_PHI = ("xe", "so tien")
+
 _DEM: dict[str, tuple[float, str | None, str | None]] = {}
 
 
@@ -168,7 +211,12 @@ def doc_bang(noi_dung: str, nguong_km_noi: float = 50, kiem_chuoi: bool = True) 
         return r[j].strip() if j is not None and j < len(r) else ""
 
     chuyen, can_sua, khoi, ctp_ngoai = [], [], [], []
+    chi_phi_thang: list[dict] = []
     hien = None
+    # XS-6: vào khối chi phí tháng rồi thì MỌI dòng sau đọc theo khuôn khối ấy, không đọc theo khuôn
+    # chuyến. `nhan_cp` giữ nhãn khoản đang áp dụng — sheet chỉ ghi nhãn ở dòng đầu rồi để trống các
+    # dòng xe bên dưới (B.DƯỠNG T10 có bảy dòng xe, chỉ dòng đầu mang tên).
+    trong_cp, nhan_cp = False, ""
     for i in range(i_td + 1, len(rows)):
         r, dong = rows[i], i + 1
         ten_khoi = o(r, "khoi")
@@ -176,8 +224,23 @@ def doc_bang(noi_dung: str, nguong_km_noi: float = 50, kiem_chuoi: bool = True) 
             hien = {"khoi": re.sub(r"\s+", " ", ten_khoi.upper()), "bien": o(r, "bien"),
                     "lai_xe": o(r, "lai_xe"), "so_chuyen": 0}
             khoi.append(hien)
+            trong_cp = False
             continue
         if hien is None:
+            continue
+        # Hàng tiêu đề của bảng chi phí tháng: «XE / SỐ TIỀN» rơi vào hai cột Ngày đi / Ngày về.
+        if (_khong_dau(o(r, "di")).startswith(TD_CHI_PHI[0])
+                and _khong_dau(o(r, "ve")).startswith(TD_CHI_PHI[1])):
+            trong_cp, nhan_cp = True, o(r, "tour")
+            continue
+        if trong_cp:
+            if o(r, "tour"):
+                nhan_cp = o(r, "tour")
+            tien = so(o(r, "ve"))
+            if tien:
+                chi_phi_thang.append({"dong": dong, "nhan": nhan_cp, "xe_ghi": o(r, "di"),
+                                      "so_tien": tien, "chung_tu": o(r, "so_ngay"),
+                                      "nhom": nhom_chi_phi(nhan_cp)})
             continue
         # Dòng khối thường ghi biển rút gọn («01783»), dòng chuyến đầu ghi đủ («50F01783»): giữ bản
         # có nhiều chữ số hơn — để hiện ra cho người đọc; phép khớp chỉ dùng năm số cuối.
@@ -243,7 +306,10 @@ def doc_bang(noi_dung: str, nguong_km_noi: float = 50, kiem_chuoi: bool = True) 
         _kiem_chong_ngay(chuyen, can_sua)
     for k in khoi:
         k["khoa"] = nam_so_cuoi(k["bien"])
-    return {"loi": None, "chuyen": chuyen, "can_sua": can_sua, "khoi": khoi, "ctp_ngoai": ctp_ngoai}
+    for c in chi_phi_thang:
+        c["ky"] = _ky_cua_khoan(c["nhan"], chuyen)
+    return {"loi": None, "chuyen": chuyen, "can_sua": can_sua, "khoi": khoi, "ctp_ngoai": ctp_ngoai,
+            "chi_phi_thang": chi_phi_thang}
 
 
 def gop_bang(bangs: list[dict], nguong_km_noi: float = 50) -> dict:
@@ -259,11 +325,12 @@ def gop_bang(bangs: list[dict], nguong_km_noi: float = 50) -> dict:
     """
     khoi: list[dict] = []
     theo_ten: dict[str, dict] = {}
-    chuyen, can_sua, ctp_ngoai = [], [], []
+    chuyen, can_sua, ctp_ngoai, chi_phi_thang = [], [], [], []
     for b in bangs:
         chuyen += b["chuyen"]
         can_sua += b["can_sua"]
         ctp_ngoai += b["ctp_ngoai"]
+        chi_phi_thang += b.get("chi_phi_thang", [])
         for k in b["khoi"]:
             cu = theo_ten.get(k["khoi"])
             if cu is None:
@@ -283,7 +350,48 @@ def gop_bang(bangs: list[dict], nguong_km_noi: float = 50) -> dict:
     _kiem_chong_ngay(chuyen, can_sua)
     for k in khoi:
         k["khoa"] = nam_so_cuoi(k["bien"])
-    return {"loi": None, "chuyen": chuyen, "can_sua": can_sua, "khoi": khoi, "ctp_ngoai": ctp_ngoai}
+    return {"loi": None, "chuyen": chuyen, "can_sua": can_sua, "khoi": khoi, "ctp_ngoai": ctp_ngoai,
+            "chi_phi_thang": chi_phi_thang}
+
+
+def nhom_chi_phi(nhan: str) -> str | None:
+    """Nhãn trên sheet → mã nhóm của `NHOM_CHI_PHI_KY`. Không khớp thì None, và khi ấy phải NÓI RA
+    chứ không xếp bừa vào «khác»: xếp bừa là giấu một khoản không ai biết thuộc về đâu."""
+    n = _khong_dau(nhan)
+    for dau, ma in NHAN_CHI_PHI_THANG:
+        if dau in n:
+            return ma
+    return None
+
+
+def _ky_cua_khoan(nhan: str, chuyen: list) -> str | None:
+    """Kỳ (YYYY-MM) của một khoản chi phí tháng — CHỈ khi chính nhãn nói ra tháng.
+
+    Nhãn thường tự mang tháng: «B.DƯỠNG T10», «BÃI XE THÁNG 10», «CAMERA NĐ 10». Khi có thì lấy
+    tháng ấy, và lấy NĂM từ các chuyến của cùng bảng (sheet không ghi năm ở nhãn bao giờ).
+
+    KHÔNG ĐOÁN KHI NHÃN KHÔNG NÓI. Bản đầu của hàm này lấy «tháng phổ biến của các chuyến trong
+    bảng» làm lối lui, và chạy thử trên số thật thì sáu khoản — SIM DATA, BẢO HIEM XE, THAY VỎ XE,
+    CÔNG THAY VỎ, hai khoản CARIVAL, cộng 50,3 triệu — rơi vào tháng 9 chỉ vì bảng có một chuyến đi
+    ngày 30/09. Đúng cái bẫy mà chính dòng chú thích này cảnh báo. Tab tháng 11 còn nguy hơn: chuyến
+    đi cuối tháng 10 về tháng 11, nên «tháng phổ biến» không nói lên tháng của khối chi phí.
+
+    Trả None thì màn hình hỏi người nhập một lần, và anh Huân gõ thêm «T10» vào tên khoản là xong
+    vĩnh viễn. Đoán sai thì một khoản tiền nằm sai kỳ và không ai thấy."""
+    m = re.search(r"(?:^|[^0-9])(?:t|thang|nd)\s*([0-9]{1,2})(?:[^0-9]|$)", _khong_dau(nhan))
+    if not m or not (1 <= int(m.group(1)) <= 12):
+        return None
+    thang = int(m.group(1))
+    ngay = [t["di"] for t in chuyen if t.get("di")]
+    if not ngay:
+        return None
+    pho_bien = max({(d.year, d.month) for d in ngay},
+                   key=lambda ym: sum(1 for d in ngay if (d.year, d.month) == ym))
+    nam = pho_bien[0]
+    # Nhãn ghi tháng 12 mà bảng toàn chuyến tháng 1 thì khoản ấy là của năm trước.
+    if thang - pho_bien[1] > 6:
+        nam -= 1
+    return f"{nam:04d}-{thang:02d}"
 
 
 def _vnd(x: float) -> str:
@@ -485,6 +593,7 @@ def bao_cao(db: Session, hom_nay_: date, doc_lai: bool = False, tai=_tai) -> dic
     xe = _xe_dieu_duoc(db)
     hn = hom_nay(bang, hom_nay_, xe)
     bang["can_sua"] += doi_chieu_ctp_ngoai(db, bang)
+    bang["can_sua"] += doi_chieu_chi_phi_thang(db, bang)
     return {"co_link": True, "loi": None, "doc_luc": d["doc_luc"], "loi_tai": d["loi_tai"],
             "ban_cu": d["ban_cu"], "ngay": hom_nay_.isoformat(), "dieu_duoc": len(xe),
             "so_xe_sheet": len(bang["khoi"]), "so_chuyen": len(bang["chuyen"]),
@@ -588,4 +697,67 @@ def doi_chieu_ctp_ngoai(db: Session, bang: dict) -> list[dict]:
                                    f"(dòng {', '.join(map(str, o['dong']))}), VTOS mới có {_vnd(da)}. "
                                    f"Nhập {_vnd(o['so_tien'] - da)} ở Lãi lỗ đội xe → Chi phí kỳ → "
                                    "«Công tác phí tài xế ngoài chuyến»."})
+    return ra
+
+
+def doi_chieu_chi_phi_thang(db: Session, bang: dict) -> list[dict]:
+    """Khối chi phí tháng trên sheet, đặt cạnh sổ «Chi phí kỳ» của VTOS. ĐỌC VÀ SO, KHÔNG GHI.
+
+    XS-6 (03/11/2026). Cùng hình dạng với `doi_chieu_ctp_ngoai`: đo trên hệ thật thì tháng 10/2026
+    có 125.771.596 đ chi phí đội xe nằm trên sheet mà sổ VTOS không có MỘT DÒNG NÀO — bảo dưỡng
+    48.237.336 · bãi xe 25.090.560 · thay vỏ 31.400.000 · bảo hiểm 17.463.700 · sim và camera
+    3.580.000. Lợi nhuận đội xe tháng 10 màn Chủ tịch hiện 270.467.590 đ; trừ khối này còn
+    144.695.994 đ.
+
+    So theo (kỳ, nhóm) chứ không theo từng chiếc xe: một khoản bảo dưỡng chia bảy xe mà so từng
+    chiếc thì bảy dòng nhắc cho một việc, và người đọc bỏ qua cả bảy. Dòng nhắc nói tổng còn thiếu
+    và chỗ nhập; chia về từng xe là việc của người nhập, vì chỉ họ mới biết hoá đơn nào của xe nào.
+    """
+    from app.models.fleet import NHOM_CHI_PHI_KY, FleetPeriodCost
+    ds = bang.get("chi_phi_thang") or []
+    if not ds:
+        return []
+    ra: list[dict] = []
+    # Hai loại KHÔNG so được, phải hỏi người: không biết thuộc nhóm nào, và không biết thuộc kỳ nào.
+    for c in ds:
+        if c.get("nhom") is None:
+            ra.append({"loai": "cp_chua_biet_nhom", "khoi": "CHI PHÍ THÁNG", "dong": c["dong"],
+                       "noi_dung": f"«{c['nhan']}» {_vnd(c['so_tien'])} — VTOS chưa biết xếp vào nhóm "
+                                   "chi phí kỳ nào. Báo CNTT thêm nhãn, hoặc nhập tay ở Lãi lỗ đội xe "
+                                   "→ Chi phí kỳ."})
+    # MỘT dòng cho tất cả khoản thiếu tháng, không phải mỗi khoản một dòng: sáu dòng nhắc cho cùng
+    # một việc («gõ tháng vào tên khoản») là sáu lần bị bỏ qua.
+    thieu_ky = [c for c in ds if c.get("nhom") and not c.get("ky")]
+    if thieu_ky:
+        ten = " · ".join(sorted({c["nhan"] for c in thieu_ky}))
+        ra.append({"loai": "cp_chua_biet_ky", "khoi": "CHI PHÍ THÁNG",
+                   "dong": min(c["dong"] for c in thieu_ky),
+                   "noi_dung": f"{len(thieu_ky)} khoản cộng {_vnd(sum(c['so_tien'] for c in thieu_ky))} "
+                               f"không ghi tháng trong tên nên VTOS không biết xếp vào kỳ nào: {ten}. "
+                               "Gõ thêm tháng vào tên khoản (ví dụ «SIM DATA T10») là xong vĩnh viễn — "
+                               "VTOS cố ý KHÔNG đoán, vì đoán sai thì tiền nằm sai kỳ mà không ai thấy."})
+    gom: dict[tuple[str, str], dict] = {}
+    for c in ds:
+        if not c.get("nhom") or not c.get("ky"):
+            continue
+        g = gom.setdefault((c["ky"], c["nhom"]), {"so_tien": 0.0, "dong": [], "nhan": set()})
+        g["so_tien"] += c["so_tien"]; g["dong"].append(c["dong"]); g["nhan"].add(c["nhan"])
+    if not gom:
+        return ra
+    kys = {k for k, _ in gom}
+    vtos: dict[tuple[str, str], float] = {}
+    for r in db.execute(select(FleetPeriodCost).where(FleetPeriodCost.ky.in_(kys))).scalars():
+        key = (r.ky, r.nhom)
+        vtos[key] = vtos.get(key, 0.0) + (r.so_tien or 0)
+    for (ky, nhom), g in sorted(gom.items()):
+        da = vtos.get((ky, nhom), 0.0)
+        thieu = g["so_tien"] - da
+        if thieu <= 1:
+            continue
+        ten = NHOM_CHI_PHI_KY.get(nhom, (nhom,))[0]
+        dong = ", ".join(map(str, sorted(g["dong"])[:6])) + ("…" if len(g["dong"]) > 6 else "")
+        ra.append({"loai": "cp_chua_vao_vtos", "khoi": "CHI PHÍ THÁNG", "dong": sorted(g["dong"])[0],
+                   "noi_dung": f"«{' · '.join(sorted(g['nhan']))}» tháng {ky[5:]}/{ky[:4]}: sheet "
+                               f"{_vnd(g['so_tien'])} (dòng {dong}), VTOS mới có {_vnd(da)}. "
+                               f"Thiếu {_vnd(thieu)} — nhập ở Lãi lỗ đội xe → Chi phí kỳ → «{ten}»."})
     return ra
