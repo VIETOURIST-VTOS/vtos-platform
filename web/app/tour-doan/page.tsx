@@ -43,7 +43,7 @@ function Trang() {
   return (<>
     <h1>Tour đoàn khách tự thiết kế</h1>
     <p className="muted">Khách thiết kế tại kh.vietourist.vn/tours → «Tự thiết kế tour đoàn». Tạm tính = giá vốn ÷ (1 − {Math.round((x.bien_tam_tinh || 0.1) * 100)}%).
-      Khách sạn, nhà hàng lấy từ gói giá / thực đơn đã duyệt; dịch vụ khác và vé máy bay lấy từ đơn giá đoàn dưới đây. Mục chưa có giá = Sales báo giá.
+      Khách sạn, nhà hàng lấy từ gói giá / thực đơn đã duyệt; xe trong nước lấy bảng giá xe theo tuyến (xe 45 chỗ, cột xe nhà), lệch tuyến thì đơn giá ngày xe nhà × số ngày; HDV trong nước lấy bảng thù lao HDV theo tuyến (chưa tính lễ Tết ×2). Dịch vụ khác, xe / HDV nước ngoài và vé máy bay lấy từ đơn giá đoàn dưới đây. Mục chưa có giá = Sales báo giá.
       Biên dưới {Math.round((x.nguong_duyet || 0.1) * 100)}% phải Chủ tịch / TGĐ duyệt (áp ở bước duyệt báo giá).</p>
     <div style={{ display: "flex", gap: 6, margin: "8px 0", flexWrap: "wrap" }}>
       <button className={`act ${tab === "tk" ? "teal" : "grey"}`} aria-pressed={tab === "tk"} onClick={() => setTab("tk")}>Thiết kế khách gửi ({x.thiet_ke.length})</button>
