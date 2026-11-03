@@ -130,6 +130,21 @@ CHO_DA_KHAI_BA_VAI = [
     # này soi theo TÊN VAI chứ không theo loại việc, đúng như nó được thiết kế, nên một dòng chỉ
     # ĐỌC cũng hiện ra và cũng phải khai.
     "services/bang_ky_cua.py: ketoan_truong",
+    # ── DOT DON-R4c3, 04/11/2026 ──────────────────────────────────────────────────────────
+    # CHU TICH CHOT QUA TIN NHAN 04/11/2026: Ke toan thanh toan doc duoc danh muc hinh thuc
+    # thanh toan. KHONG phai quyen moi tren du lieu — cua `GET /api/v1/hach-toan/bang` tra
+    # DUNG bay nhan tinh `HINH_THUC_TT`, khong quy uoc, khong so lieu, khong cham co so du
+    # lieu (than ham chi co mot dong `return`).
+    #
+    # Vi sao can mot dong o day: `ketoan_tt` DA co `/expenses` trong `MAN_HINH_KETOAN_TT`,
+    # nhung no CO Y khong ke thua `ketoan` (Dot E2b tach vai: ke toan thanh toan xu chuyen
+    # khoan, thu quy xu tien mat), nen `VKT.mo_rong` khong voi toi, va o «hinh thuc thanh
+    # toan» RONG voi dung vai xu chuyen khoan. Cung le voi viec Dot SUA-2 khai `thu_quy`
+    # vao chinh cua ay.
+    #
+    # Luat 3 cua `test_donr4c3_cua_hep_hinh_thuc_tt.py` canh chieu nguoc: vai nao vao duoc
+    # `/expenses` ma khong doc duoc cua nay thi DO — nen cho hong tren khong quay lai im lang.
+    "api/v1/hach_toan.py: ketoan_tt",
 ]
 GOC_APP = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app")
 
