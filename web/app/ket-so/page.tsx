@@ -175,7 +175,7 @@ function KetSo() {
             {sk.chua_nhan_dien.length === 0 ? <p className="muted">Không có dòng nào.</p> : (
               <table className="tbl">
                 <thead><tr><th>Ngày</th><th>Nội dung</th><th>Số tiền</th><th>Vì sao chưa ghi được</th>
-                  <th>Phân loại</th><th>Mã đối tượng</th></tr></thead>
+                  <th>Phân loại</th><th>Hình thức</th><th>Mã đối tượng</th></tr></thead>
                 <tbody>{sk.chua_nhan_dien.map((x: any) => (
                   <tr key={x.id}>
                     <td>{x.ngay}</td><td>{x.noi_dung}</td><td className="num">{vnd(x.so_tien)}</td>
@@ -191,6 +191,14 @@ function KetSo() {
                         {(x.phan_loai_giup_khop || []).map((g: any) => (
                           <option key={g.quy_tac + g.gia_tri} value={g.gia_tri}>{g.ten}</option>
                         ))}
+                      </select>
+                    </td>
+                    <td>
+                      <select value={pl[x.id]?.hinh_thuc_tt || "chuyen_khoan"}
+                              onChange={(e) => datPl(x.id, "hinh_thuc_tt", e.target.value)}>
+                        {Object.entries(sk?.hinh_thuc_tt || {})
+                          .filter(([k]: any) => k)
+                          .map(([k, t]: any) => <option key={k} value={k}>{t}</option>)}
                       </select>
                     </td>
                     <td><input value={pl[x.id]?.ma_doi_tuong || ""} placeholder="mã NCC / khách"
