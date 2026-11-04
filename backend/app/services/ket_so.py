@@ -496,8 +496,13 @@ def xem_truoc_sao_ke(db: Session, ky: str, phan_loai: dict | None = None) -> dic
         khop.append({**mo_ta, "quy_tac": bt["quy_tac"], "ten_quy_tac": bt["ten_quy_tac"],
                      "dien_giai": bt["dien_giai"], "lines": bt["lines"]})
 
+    from app.models.hach_toan import HINH_THUC_TT as _HTTT
     return {
         "ky": ky, "so_dong": len(ds),
+        # DOT R4c-2 02/11/2026 — bay hinh thuc, de man hinh KHONG go lai. Nhap tai cho chu
+        # khong o dau tep: `models.hach_toan` khong nhap `ket_so`, nhung dat o dau tep thi
+        # mot lan doi thu tu nhap sau nay du de sinh vong tron.
+        "hinh_thuc_tt": _HTTT,
         "khop": khop, "chua_nhan_dien": chua, "da_ghi_so": roi,
         "tong_khop": round(sum((x["so_tien"] or 0) for x in khop), 0),
         "tong_chua_nhan_dien": round(sum((x["so_tien"] or 0) for x in chua), 0),
