@@ -45,6 +45,7 @@ BA_VAI = ("ketoan_truong", "ketoan_tt", "thu_quy")
 #   `User.role` với đúng hai chuỗi ấy. Đây là chỗ THỨ HAI trong `services/` được phép nhắc
 #   `thu_quy`, và nó được KHAI RA chứ không lặng lẽ — chính phép thử f1 bắt nếu ai thêm chỗ thứ ba.
 CHO_DA_KHAI_BA_VAI = [
+    "services/intake_so_quy.py: thu_quy",
     "models/tach_nhiem.py: ketoan_truong",
     "models/tach_nhiem.py: ketoan_tt",
     "models/tach_nhiem.py: thu_quy",

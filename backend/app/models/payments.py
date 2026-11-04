@@ -98,6 +98,12 @@ class PhieuQuy(Base):
     khoan_muc: Mapped[str] = mapped_column(String(40), default="")
     booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"), nullable=True)
     quy_tac: Mapped[str] = mapped_column(String(40), default="")
+    # ĐỢT QUY-2a 04/11/2026 — KHOÁ CHỐNG TRÙNG CỦA CỬA TẢI LÔ.
+    #
+    # Số trên tờ phiếu quỹ GIẤY, do thủ quỹ đánh. Lấy số ấy làm khoá nghĩa là nạp lại cùng một tệp
+    # KHÔNG lập phiếu thứ hai. Để TRỐNG với phiếu lập tay trên màn hình — ở đấy không có tờ giấy
+    # nào có trước, nên không có số gốc nào để chống trùng.
+    so_goc: Mapped[str] = mapped_column(String(40), default="", index=True)
     journal_entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_by: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
