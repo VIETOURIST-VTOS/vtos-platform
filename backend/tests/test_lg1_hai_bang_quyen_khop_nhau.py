@@ -81,14 +81,25 @@ DA_BIET = (
     ("/cham-soc", "robot_ks"),
     ("/cong-no", "robot_ks"),
     ("/cong-no", "sales_admin"),
-    ("/doi-xe", "robot_ks"),
+    # ("/doi-xe", "robot_ks"), ("/hieu-qua-doi-xe", "robot_ks") và ("/lai-lo-doi-xe", "robot_ks")
+    #   — MÓN NỢ ĐÃ TRẢ ngày 04/11/2026, KS-25.
+    #
+    #   Trả được vì ba cửa đọc của đội xe thôi khai tay nhóm vai: `GET /fleet/hieu-qua`, `/fleet/lai-lo`,
+    #   `/fleet/lai-lo/theo-chuyen` và `/fleet/chi-phi-ky` nay SUY THẲNG từ `MENU_ROLES` của đúng màn hình
+    #   chúng phục vụ (`XEM_HIEU_QUA` / `XEM_LAI_LO` trong `app/api/v1/fleet.py`). `MENU_ROLES` chứa
+    #   `BASE_VIEW`, mà `BASE_VIEW` có `robot_ks` — nên robot Kiểm soát gọi được cửa, hết lệch.
+    #
+    #   `/doi-xe` cũng hết lệch theo: phép đo xét theo TIỀN TỐ `/api/v1/fleet`, và nay đã có cửa trong
+    #   tiền tố ấy mà robot_ks gọi được.
+    #
+    #   Mục đích ban đầu của bản sửa KS-25 không phải mở cửa cho robot_ks mà là ĐÓNG cửa cho `cntt` —
+    #   `READ` đang mở cho vai mà `test_ma_tran_quyen` khẳng định không được xem màn Hiệu quả. Suy từ
+    #   một bảng thay vì chép tay hai bảng thì sửa được cả hai chiều cùng lúc.
     # ("/hach-toan", "robot_ks") và ("/ket-so", "robot_ks") — GẠCH 02/11/2026, SUA-2: cửa đọc mới
     #   `GET /api/v1/hach-toan/bang` (danh mục hình thức thanh toán) mở cho nhóm vai đề nghị chi, trong đó có
     #   robot_ks; phép đo xét theo TIỀN TỐ `/api/v1/hach-toan` nên hai cặp này hết lệch.
-    ("/hieu-qua-doi-xe", "robot_ks"),
     ("/hop-dong-khach", "robot_ks"),
     ("/ir-phap-che", "robot_ks"),
-    ("/lai-lo-doi-xe", "robot_ks"),
     ("/lai-lo-tour", "robot_ks"),
     ("/lai-lo-tour", "sales_admin"),
     # ("/lenh-dieu-xe", "robot_ks") — MÓN NỢ ĐÃ TRẢ ngày 11/10/2026, DL-1.
