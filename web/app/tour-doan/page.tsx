@@ -3,7 +3,7 @@
  *  Hai mục:
  *   · Thiết kế khách gửi: mỗi mã một dòng (phiên bản mới nhất), mở xem từng ngày, dòng tạm tính, mục «Sales báo giá».
  *     Sales thấy GIÁ BÁN; Điều hành / Kế toán / BKS / Chủ tịch / TGĐ thấy thêm GIÁ VỐN và biên (máy chủ lọc).
- *   · Đơn giá dịch vụ đoàn (giá vốn): xe theo số chỗ, HDV, trưởng đoàn, bảo hiểm, nước, visa, hội nghị, team building,
+ *   · Đơn giá dịch vụ đoàn (giá vốn): xe theo số chỗ, HDV, trưởng đoàn, bảo hiểm, nước, hội nghị, team building,
  *     Vé máy bay theo chặng (nối API vé sau). Điều hành nhập → TP Điều hành duyệt (người nhập không tự duyệt; Chủ tịch / TGĐ tự duyệt
  *     được). Chỉ dòng «Hiệu lực» vào tạm tính. Sửa một dòng = về «Chờ duyệt».
  *  Khách sạn và nhà hàng KHÔNG nhập ở đây: lấy gói giá khách sạn VTD và thực đơn nhà hàng đã duyệt. */
@@ -16,7 +16,7 @@ const d = (n?: number | null) => (n || n === 0 ? Math.round(n).toLocaleString("v
 const ngay = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "—");
 const MAU_BG: Record<string, string> = { nhap: "grey", cho_duyet: "warn", tra_lai: "red", da_duyet: "navy", khach_dong_y: "ok", het_han: "grey", thay_the: "grey" };
 const MAU: Record<string, string> = { cho_duyet: "warn", hieu_luc: "ok", tu_choi: "red", ngung: "grey" };
-const TRONG = { loai: "xe", ten: "", pham_vi: "ca_hai", gia: "", tu_cho: "", tu_diem: "", den_diem: "", hang_ve: "pho_thong", gia_tre_em: "", gia_em_be: "", tu_ngay: "", den_ngay: "", ghi_chu: "" };
+const TRONG = { loai: "xe", ten: "", pham_vi: "ca_hai", khu_vuc: "", gia: "", tu_cho: "", tu_diem: "", den_diem: "", hang_ve: "pho_thong", gia_tre_em: "", gia_em_be: "", tu_ngay: "", den_ngay: "", ghi_chu: "" };
 
 function Trang() {
   const { toast } = useShell();
@@ -109,7 +109,11 @@ function Trang() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 10 }}>
           <label>Loại<select value={f.loai} onChange={(e) => setF({ ...f, loai: e.target.value })}>{Object.entries(dg.loai).map(([k, v]: any) => <option key={k} value={k}>{v.ten} ({v.don_vi})</option>)}</select></label>
           <label>Tên hiển thị<input value={f.ten} placeholder={f.loai === "xe" ? "Xe 29 chỗ" : f.loai === "ve_may_bay" ? "SGN → DAD phổ thông" : ""} onChange={(e) => setF({ ...f, ten: e.target.value })} /></label>
-          <label>Phạm vi<select value={f.pham_vi} onChange={(e) => setF({ ...f, pham_vi: e.target.value })}>{Object.entries(dg.pham_vi).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
+          <label>Phạm vi<select value={f.pham_vi} onChange={(e) => setF({ ...f, pham_vi: e.target.value, khu_vuc: e.target.value === "nn" ? f.khu_vuc : "" })}>{Object.entries(dg.pham_vi).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
+          {f.pham_vi === "nn" && f.loai !== "ve_may_bay" && <label>Khu vực áp dụng<select value={f.khu_vuc || ""} onChange={(e) => setF({ ...f, khu_vuc: e.target.value })}>
+            <option value="">Mọi nước</option>
+            {Object.entries(dg.khu_vuc || {}).map(([c, ds]: any) => <optgroup key={c} label={c}><option value={c}>Cả {c}</option>
+              {ds.map((n: string) => <option key={n} value={n}>{n}</option>)}</optgroup>)}</select></label>}
           {f.loai === "xe" && <label>Số chỗ khách<input inputMode="numeric" value={f.tu_cho} onChange={(e) => setF({ ...f, tu_cho: e.target.value.replace(/\D/g, "") })} /></label>}
           {f.loai === "ve_may_bay" && <>
             <label>Điểm đi<input value={f.tu_diem} placeholder="TP HCM" onChange={(e) => setF({ ...f, tu_diem: e.target.value })} /></label>
@@ -129,13 +133,13 @@ function Trang() {
           <td>{r.loai_ten}</td>
           <td>{r.ten}{r.loai === "xe" && <><br /><small className="muted">{r.tu_cho} chỗ</small></>}
             {r.loai === "ve_may_bay" && <><br /><small className="muted">{r.tu_diem} → {r.den_diem} · {dg.hang_ve[r.hang_ve] || ""}</small></>}</td>
-          <td>{dg.pham_vi[r.pham_vi]}</td>
+          <td>{dg.pham_vi[r.pham_vi]}{r.pham_vi === "nn" && r.loai !== "ve_may_bay" && <><br /><small className="muted">Khu vực: {r.khu_vuc || "Mọi nước"}</small></>}</td>
           <td>{d(r.gia)} / {r.don_vi}{r.loai === "ve_may_bay" && <><br /><small className="muted">TE {d(r.gia_tre_em)} · EB {d(r.gia_em_be)}</small></>}</td>
           <td>{ngay(r.tu_ngay)} – {r.den_ngay ? ngay(r.den_ngay) : "…"}</td>
           <td><Tag cls={MAU[r.trang_thai] || "grey"}>{r.trang_thai_ten}</Tag>{r.ly_do && <><br /><small className="muted">{r.ly_do}</small></>}</td>
           <td><small>{r.tao_boi}{r.duyet_boi ? ` · ${r.duyet_boi}` : ""}</small></td>
           <td style={{ whiteSpace: "nowrap" }}>
-            {dg.duoc.nhap && <button className="act grey" onClick={() => setF({ ...TRONG, ...r, gia: String(r.gia ?? ""), tu_cho: r.tu_cho ?? "", gia_tre_em: r.gia_tre_em ?? "", gia_em_be: r.gia_em_be ?? "" })}>Sửa</button>}
+            {dg.duoc.nhap && <button className="act grey" onClick={() => setF({ ...TRONG, ...r, khu_vuc: r.khu_vuc || "", gia: String(r.gia ?? ""), tu_cho: r.tu_cho ?? "", gia_tre_em: r.gia_tre_em ?? "", gia_em_be: r.gia_em_be ?? "" })}>Sửa</button>}
             {dg.duoc.duyet && r.trang_thai === "cho_duyet" && <>
               <button className="act teal" disabled={busy} onClick={() => lam(() => api(`/tour-doan/don-gia/${r.id}/duyet`, { method: "POST", json: { dong_y: true } }))}>Duyệt</button>
               <button className="act grey" disabled={busy} onClick={() => { const l = window.prompt("Lý do từ chối"); if (l) lam(() => api(`/tour-doan/don-gia/${r.id}/duyet`, { method: "POST", json: { dong_y: false, ly_do: l } })); }}>Từ chối</button></>}
