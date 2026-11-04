@@ -68,9 +68,12 @@ def bc(phan_bo="khong", who="ketoan"):
     return r.json()
 
 
-def them(nhom, so_tien, vehicle_id=None, mo_ta="", who="ketoan"):
+def them(nhom, so_tien, vehicle_id=None, mo_ta="", who="ketoan", chung_tu="HD-TEST"):
+    # `chung_tu` mặc định có giá trị vì khoản chi từ ngưỡng `xe_chung_tu_bat_buoc_tu` trở lên bắt buộc
+    # phải có chứng từ gốc (chặn cứng B6). Các phép thử dưới đây kiểm phân bổ và chốt chống nhân đôi,
+    # không kiểm hàng rào chứng từ – nên chúng gửi kèm chứng từ như người nhập thật vẫn làm.
     return client.post("/api/v1/fleet/chi-phi-ky", headers=login(who),
-                       json={"ky": KY, "nhom": nhom, "so_tien": so_tien,
+                       json={"ky": KY, "nhom": nhom, "so_tien": so_tien, "chung_tu": chung_tu,
                              "vehicle_id": vehicle_id, "mo_ta": mo_ta})
 
 

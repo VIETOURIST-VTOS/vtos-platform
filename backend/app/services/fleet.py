@@ -717,9 +717,13 @@ def nhap_chuyen_hang_loat(db: Session, nguon: str, rows: list[dict], boi: str,
                                 source=f"Nạp từ {nguon}", verify="nguon_ghi"))
             da_tao_xe.append(v.plate)
 
+        # `quyet_toan` mặc định TRUE: nguồn không nói gì thì đây là chuyến đã quyết toán xong, đúng như
+        # mọi lần nạp trước bản này. Nguồn phải NÓI RÕ `quyet_toan: False` cho chuyến đang chạy — im lặng
+        # không bao giờ được hiểu thành "chưa xong", vì im lặng là trạng thái của mọi báo cáo cũ.
         t = Trip(vehicle_id=v.id, driver_id=v.driver_id, ten_tour=(r.get("ten_tour") or "")[:160],
                  ngay_di=d1, ngay_ve=d2, km_dau=r.get("km_dau"), km_cuoi=r.get("km_cuoi"),
                  km_nguon="nhap_tay", doanh_thu=float(r.get("doanh_thu") or 0),
+                 quyet_toan=bool(r.get("quyet_toan", True)),
                  status="da_xac_nhan", confirmed_at=datetime.now(), confirmed_by=boi,
                  ma_phieu=ma, nguon=nguon, note=(r.get("note") or "")[:300],
                  created_by=boi)

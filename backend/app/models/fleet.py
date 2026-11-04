@@ -316,6 +316,18 @@ class Trip(Base):
     created_by: Mapped[str] = mapped_column(String(50), default="")
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     confirmed_by: Mapped[str] = mapped_column(String(50), default="")
+    # ĐÃ QUYẾT TOÁN CHƯA — người nạp nói thẳng, hệ thống không suy đoán.
+    #
+    # Vì sao cần một cột riêng thay vì suy từ "đã có dòng chi phí nào chưa": một chuyến đang chạy có thể đã
+    # biết doanh thu (hợp đồng chốt trước) mà chưa có đồng chi phí nào; cộng nó vào ô tiền thì biên lợi nhuận
+    # của tháng đang chạy vọt lên gần 100% rồi tụt dần khi chứng từ về. Nhưng "chưa có dòng chi phí" cũng
+    # KHÔNG đồng nghĩa "chưa quyết toán": một chuyến quyết toán xong mà thật sự không tốn đồng nào vẫn phải
+    # được tính tiền. Hai việc khác nhau thì phải có hai chỗ ghi khác nhau.
+    #
+    # Mặc định TRUE: mọi chuyến đã có trong sổ trước bản này đều là chuyến đã quyết toán xong, nên số liệu
+    # lịch sử không đổi một đồng nào sau khi nâng cấp. Chỉ cửa nạp báo cáo ngoài mới chủ động đặt FALSE cho
+    # chuyến đang chạy.
+    quyet_toan: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1", nullable=False)
 
 
 class TripCost(Base):
@@ -333,6 +345,12 @@ class TripCost(Base):
     # TRA_BANG để biết vì sao không suy từ `kind`.
     tra_bang: Mapped[str] = mapped_column(String(24), default="")
     ref_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # id giao dịch nguồn nếu khớp tự động
+    # KHÓA NỐI VỚI PHIẾU BẢO DƯỠNG – chống cộng trùng một khoản sửa xe.
+    # Cùng một hóa đơn garage trước nay có thể nằm ở HAI chỗ: một dòng chi phí chuyến kind="sua_chua"
+    # và một phiếu trong fleet_maintenance. Không có khóa nào nối hai bảng, nên báo cáo cộng cả hai và
+    # không ai nhìn ra. Khai `maintenance_id` thì báo cáo biết hai bản ghi ấy là MỘT khoản, và chỉ tính
+    # một lần – thay vì đoán bằng cách so ngày và số tiền.
+    maintenance_id: Mapped[int | None] = mapped_column(ForeignKey("fleet_maintenance.id"), nullable=True)
     note: Mapped[str] = mapped_column(String(300), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     created_by: Mapped[str] = mapped_column(String(50), default="")
