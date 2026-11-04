@@ -28,6 +28,10 @@ có bảng chưa gộp về (chuỗi bán hàng V6), và bảng đã bỏ thì d
 from sqlalchemy.orm import Session
 
 CUA_TAY = (
+# ĐỢT QUY-1 04/11/2026. Sổ quỹ tiền mặt: Kế toán và thủ quỹ lập từng phiếu qua cửa
+# `POST /api/v1/quy/phieu` (khối «Sổ quỹ» màn /collections — Đợt QUY-2). Máy KHÔNG sinh một phiếu
+# quỹ nào: mỗi phiếu là một tờ chứng từ có người lập, nên đây là cửa tay thật.
+"phieu_quy",
 # KS-10 29/10/2026. Đơn phòng OTA: Điều hành dựng đơn ở màn /don-khach-san-ota. Môi trường
 # «Chạy thật» thì Điều hành DÁN sáu con số tra từ Agoda; môi trường «Thử» máy sinh mã giả để
 # chạy thử sáu bước. Không có đường nối tự động sang Agoda, nên đây là cửa tay thật.

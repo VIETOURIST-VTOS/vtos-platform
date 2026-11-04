@@ -183,6 +183,82 @@ def confirm_receipt(rid: int, u: User = Depends(require_roles("ketoan",)), db: S
     return {"message": f"Kế toán đã xác nhận {r.code}"}
 
 
+class PhieuQuyIn(BaseModel):
+    """Thân yêu cầu lập phiếu quỹ. Đợt QUY-1 04/11/2026.
+
+    `ngay` là CHUỖI yyyy-mm-dd chứ không phải `date`: tệp này chỉ nhập `datetime`, và nối thêm
+    một tên vào dòng nhập ấy là dựng lại cái bẫy "neo quá dài" — main thêm tên vào cuối dòng nhập
+    là bản vá sau không còn khớp. Đổi ở trong thân hàm thì không neo vào dòng nhập nào.
+    """
+    chieu: str
+    so_tien: float
+    ly_do: str
+    ngay: str = ""
+    noi_dung: str = ""
+    ten_doi_tuong: str = ""
+    ma_doi_tuong: str = ""
+    booking_id: int | None = None
+    khoan_muc: str = ""
+
+
+@router.post("/receipts/quy/phieu", status_code=201)
+# ĐỢT QUY-1 04/11/2026 — CỬA LẬP PHIẾU QUỸ TIỀN MẶT.
+#
+# HAI VAI, KHÔNG THÊM BƯỚC XÁC NHẬN (Chủ tịch chốt 04/11/2026). `access.MAN_HINH_THU_QUY` đã cấp
+# màn hình /collections cho `thu_quy` từ Đợt E2b-0, nên đây KHÔNG phải nới một quyền mới.
+#
+# `confirm_receipt` ngay trên KHÔNG bị đụng: mở cả lập lẫn xác nhận cho một vai là bỏ tách bạch
+# trách nhiệm, và đó là một quyết định phải có chữ ký riêng. Luật 7 đo cả hai chiều.
+def lap_phieu_quy(data: PhieuQuyIn,
+                  u: User = Depends(require_roles("ketoan", "thu_quy",
+                                                  mo_ta="lập phiếu quỹ tiền mặt")),
+                  db: Session = Depends(get_db)):
+    from datetime import date as _date
+    from app.services import phieu_quy as PQ
+    try:
+        ngay = _date.fromisoformat(data.ngay) if data.ngay else _date.today()
+    except ValueError:
+        raise HTTPException(422, "Ngày phải dạng yyyy-mm-dd")
+    try:
+        p, bt = PQ.lap(db, u, chieu=data.chieu, ngay=ngay, so_tien=data.so_tien,
+                       ly_do=data.ly_do, noi_dung=data.noi_dung,
+                       ten_doi_tuong=data.ten_doi_tuong, ma_doi_tuong=data.ma_doi_tuong,
+                       booking_id=data.booking_id, khoan_muc=data.khoan_muc)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    return {"phieu": PQ.ra(p), "but_toan": bt,
+            "message": f"Đã lập và ghi sổ {p.code} theo quy tắc {p.quy_tac}"}
+
+
+@router.get("/receipts/quy/phieu")
+def danh_sach_phieu_quy(tu_ngay: str = "", den_ngay: str = "", chieu: str = "",
+                        u: User = Depends(require_roles("ketoan", "thu_quy",
+                                                        mo_ta="đọc sổ quỹ tiền mặt")),
+                        db: Session = Depends(get_db)):
+    from datetime import date as _date
+    from app.services import phieu_quy as PQ
+    try:
+        tn = _date.fromisoformat(tu_ngay) if tu_ngay else None
+        dn = _date.fromisoformat(den_ngay) if den_ngay else None
+    except ValueError:
+        raise HTTPException(422, "Ngày phải dạng yyyy-mm-dd")
+    return {"phieu": [PQ.ra(p) for p in PQ.danh_sach(db, tn, dn, chieu)]}
+
+
+@router.get("/receipts/quy/ly-do")
+def ly_do_phieu_quy(chieu: str = "thu",
+                    u: User = Depends(require_roles("ketoan", "thu_quy",
+                                                    mo_ta="danh mục lý do phiếu quỹ")),
+                    db: Session = Depends(get_db)):
+    """Những lý do bảng quy ước ĐANG nhận. Đọc sống từ bảng quy tắc — thêm một quy tắc là một lý
+    do mới tự hiện ra ở ô chọn, không ai phải sửa hai chỗ."""
+    from app.services import phieu_quy as PQ
+    try:
+        return {"ly_do": PQ.ly_do_nhan_duoc(db, chieu)}
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+
+
 class CashIn(BaseModel):
     booking_id: int
     amount: float

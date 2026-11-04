@@ -71,3 +71,34 @@ class Retention(Base):
     resolved_by: Mapped[str] = mapped_column(String(50), default="")
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     resolve_note: Mapped[str] = mapped_column(String(300), default="")
+
+
+class PhieuQuy(Base):
+    """Phiếu quỹ tiền mặt — phiếu thu quỹ (PTQ) và phiếu chi quỹ (PCQ). Đợt QUY-1 04/11/2026.
+
+    VÌ SAO KHÔNG DÙNG `Receipt`: `Receipt.booking_id` là NOT NULL ở tầng cơ sở dữ liệu, nên một
+    khoản nộp quỹ / hoàn ký quỹ / thu khác không thể là một `Receipt`. Và `Receipt` là phiếu thu
+    CỦA KHÁCH — nó mang `payer`, `bank_txn_id`, `method`. Ở đây `booking_id` RỖNG ĐƯỢC, và đó
+    chính là lý do bảng này tồn tại.
+
+    `ly_do` là KHOÁ, không phải ghi chú: nó là giá trị `muc_thu` / `muc_chi` mà bảng quy ước đọc
+    để chọn cặp tài khoản. `quy_tac` ghi lại quy tắc ĐÃ KHỚP lúc lập, để sau này trả lời được câu
+    "phiếu này ghi theo quy ước nào" mà không phải tra lại lịch sử bảng quy tắc.
+    """
+    __tablename__ = "phieu_quy"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True)                    # PTQ2611-0001 / PCQ2611-0001
+    chieu: Mapped[str] = mapped_column(String(4), index=True)                     # thu / chi
+    ngay: Mapped[date] = mapped_column(Date, index=True)
+    so_tien: Mapped[float] = mapped_column(TIEN)
+    ly_do: Mapped[str] = mapped_column(String(40), index=True)                    # muc_thu / muc_chi của bảng quy ước
+    noi_dung: Mapped[str] = mapped_column(String(200), default="")
+    ten_doi_tuong: Mapped[str] = mapped_column(String(160), default="")
+    ma_doi_tuong: Mapped[str] = mapped_column(String(60), default="")
+    khoan_muc: Mapped[str] = mapped_column(String(40), default="")
+    booking_id: Mapped[int | None] = mapped_column(ForeignKey("bookings.id"), nullable=True)
+    quy_tac: Mapped[str] = mapped_column(String(40), default="")
+    journal_entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_by: Mapped[str] = mapped_column(String(50), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)

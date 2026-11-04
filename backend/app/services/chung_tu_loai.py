@@ -62,6 +62,10 @@ LOAI_CHUNG_TU: dict[str, str] = {
 NGHIEP_VU: dict[str, tuple[str, str]] = {
     # mã                        (tên hiển thị,                                        loại chứng từ)
     "thu_tien_khach":           ("Thu tiền khách hàng",                                "PT"),
+    # ĐỢT QUY-1 04/11/2026 — PT và PC, KHÔNG phải PKT: một phiếu quỹ LÀ tờ phiếu thu / phiếu chi,
+    # không phải phiếu kế toán. Loại chứng từ quyết định mẫu in và cách đánh số của cả bộ sổ.
+    "thu_quy_tien_mat":         ("Phiếu thu quỹ tiền mặt",                             "PT"),
+    "chi_quy_tien_mat":         ("Phiếu chi quỹ tiền mặt",                             "PC"),
     "huy_bao_luu":              ("Hủy tiền bảo lưu, trả về doanh thu",                 "PKT"),
     "phat_hanh_hoa_don":        ("Phát hành hóa đơn bán ra",                           "HDB"),
     "de_nghi_chi":              ("Ghi nhận đề nghị chi đã duyệt",                      "PKT"),
@@ -119,6 +123,7 @@ NGHIEP_VU: dict[str, tuple[str, str]] = {
 # ════════════════════════════════════════════════════════════════════════════════════════════════
 NGUON: dict[str, str] = {
     "thu_cong":     "Kế toán lập tay trên màn hình chứng từ",
+    "phieu_quy":    "Phiếu quỹ tiền mặt do Kế toán / thủ quỹ lập",
     "thu_tien":     "Phiếu thu tiền khách",
     "bao_luu":      "Hủy tiền bảo lưu",
     "hoa_don":      "Hóa đơn bán ra đã phát hành",
