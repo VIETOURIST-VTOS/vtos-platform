@@ -107,6 +107,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const [incMeta, setIncMeta] = useState<any>(null);
   const [rates, setRates] = useState<any[]>([]);
   const [fRate, setFRate] = useState<any>({ route: "", days: "", internal_price: "", partner_price: "", effective_from: new Date().toISOString().slice(0, 10) });
+  const [suaRate, setSuaRate] = useState<any>(null);   // XE-SUA: Chủ tịch sửa dòng giá xe đang hiệu lực
   const [fInc, setFInc] = useState<any>({ employee_id: "", level: "2", description: "", occurred_on: new Date().toISOString().slice(0, 10) });
   // SỬA HỒ SƠ — 12/10/2026. Cửa `PUT /employees/{id}` đã có đủ từ lâu (nhận mọi trường, kiểm
   // phiên bản, tự ghi lịch sử điều chuyển), nhưng màn hình chỉ gọi nó đúng một kiểu — gửi
@@ -635,10 +636,18 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
         <label>Giá xe hợp tác<input type="number" value={fRate.partner_price} onChange={(e) => setFRate({ ...fRate, partner_price: e.target.value })} /></label>
         <label>Hiệu lực từ<input type="date" value={fRate.effective_from} onChange={(e) => setFRate({ ...fRate, effective_from: e.target.value })} /></label>
       </div><button className="act orange" disabled={!fRate.route || !fRate.internal_price} onClick={() => post("/vehicle-rates", { ...fRate, days: Number(fRate.days) || 0, internal_price: Number(fRate.internal_price), partner_price: Number(fRate.partner_price) || 0 }).then((r) => r && setFRate({ ...fRate, route: "", days: "", internal_price: "", partner_price: "" }))}>Trình {tenKy(rates[0]?.ten_vai_ky) || "người ký theo luật"}</button></div>}
+      {suaRate && <div className="panel"><b>Sửa giá tuyến (Chủ tịch — có hiệu lực ngay, ghi nhật ký)</b><div className="grid">
+        <label>Tuyến<input value={suaRate.route} onChange={(e) => setSuaRate({ ...suaRate, route: e.target.value })} /></label>
+        <label>Số ngày<input type="number" value={suaRate.days} onChange={(e) => setSuaRate({ ...suaRate, days: e.target.value })} /></label>
+        <label>Giá xe Vietrip – VTD<input type="number" value={suaRate.internal_price} onChange={(e) => setSuaRate({ ...suaRate, internal_price: e.target.value })} /></label>
+        <label>Giá xe hợp tác<input type="number" value={suaRate.partner_price} onChange={(e) => setSuaRate({ ...suaRate, partner_price: e.target.value })} /></label>
+      </div><button className="act orange" disabled={!suaRate.route || !Number(suaRate.internal_price)} onClick={() => post(`/vehicle-rates/${suaRate.id}/sua`, { route: suaRate.route, days: Number(suaRate.days) || 0, internal_price: Number(suaRate.internal_price), partner_price: Number(suaRate.partner_price) || 0 }).then((r) => r && setSuaRate(null))}>Lưu</button>
+        <button className="act grey" onClick={() => setSuaRate(null)}>Hủy</button></div>}
       <div className="panel wrap"><table><thead><tr><th>Tuyến</th><th>Ngày</th><th style={{ textAlign: "right" }}>Xe Vietrip – VTD</th><th style={{ textAlign: "right" }}>Xe hợp tác</th><th>Hiệu lực</th><th>Trạng thái</th><th>Chữ ký</th>{["chutich", "tgd"].includes(role) && <th></th>}</tr></thead>
         <tbody>{rates.map((r) => <tr key={r.id} style={{ opacity: r.status === "rejected" ? 0.5 : 1 }}><td><b>{r.route}</b></td><td>{r.days || "–"}</td><td style={{ textAlign: "right" }}>{vnd(r.internal_price)}</td><td style={{ textAlign: "right" }}>{r.partner_price ? vnd(r.partner_price) : "–"}</td><td>{fmtD(r.effective_from)}</td>
           <td><Tag cls={r.status === "active" ? "ok" : r.status === "pending" ? "warn" : ""}>{r.status === "active" ? "Hiệu lực" : r.status === "pending" ? "Chờ ký" : "Hết hiệu lực"}</Tag></td><td><KyO ky={r.chu_ky} /></td>
-          {["chutich", "tgd"].includes(role) && <td>{r.status === "pending" && <button className="act" style={{ margin: 0 }} onClick={() => post(`/vehicle-rates/${r.id}/sign`)}>Ký</button>}</td>}</tr>)}</tbody></table></div>
+          {["chutich", "tgd"].includes(role) && <td>{r.status === "pending" && <button className="act" style={{ margin: 0 }} onClick={() => post(`/vehicle-rates/${r.id}/sign`)}>Ký</button>}
+            {r.status === "active" && role === "chutich" && <button className="act grey" style={{ margin: 0 }} onClick={() => setSuaRate({ id: r.id, route: r.route, days: String(r.days || ""), internal_price: String(r.internal_price || ""), partner_price: String(r.partner_price || "") })}>Sửa</button>}</td>}</tr>)}</tbody></table></div>
       <p className="muted">Bảng giá 6/5/2026 (anh Tuấn cung cấp 05/9/2026); cột xe hợp tác áp dụng từ 5/8/2026 cho 50E-955.31, 50H-496.23. Đội xe Vietrip hạch toán riêng như trung tâm lợi nhuận; lệnh điều xe lấy giá theo tuyến và loại xe; tuyến không có trong bảng → giá theo ngày ở hồ sơ xe. Quyết toán tháng do CNTT/AI.</p>
     </>}
 

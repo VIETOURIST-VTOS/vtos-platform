@@ -54,6 +54,8 @@ function HachToanPage() {
 
   const RONG = { ma: "", ten: "", nguon: "", tk_no: "", tk_co: "", tk_thue: "", ben_thue: "",
                  ty_le_thue: 0, doi_tuong: "", can_cong_trinh: false, dien_giai: "", uu_tien: 100,
+                 // DOT R4c-2 02/11/2026 — hai o nay mo hinh cua da khai tu Dot R4c-1.
+                 hinh_thuc_tt: "", can_khoan_muc: false,
                  can_cu: "", ghi_chu: "", effective_from: "", dieu_kien_json: "{}" };
 
   const moBieu = (r?: any) => setBieu(r
@@ -75,6 +77,7 @@ function HachToanPage() {
         tk_no: bieu.tk_no.trim(), tk_co: bieu.tk_co.trim(), tk_thue: bieu.tk_thue.trim(),
         ben_thue: bieu.ben_thue, ty_le_thue: Number(bieu.ty_le_thue) || 0,
         doi_tuong: bieu.doi_tuong, can_cong_trinh: !!bieu.can_cong_trinh,
+        hinh_thuc_tt: bieu.hinh_thuc_tt, can_khoan_muc: !!bieu.can_khoan_muc,
         dien_giai: bieu.dien_giai, uu_tien: Number(bieu.uu_tien) || 100,
         can_cu: bieu.can_cu, ghi_chu: bieu.ghi_chu, effective_from: bieu.effective_from } });
       toast(r.message || "Đã trình"); setBieu(null); load();
@@ -169,6 +172,15 @@ function HachToanPage() {
                     <option value="">—</option>
                     {Object.entries(d?.doi_tuong || {}).map(([k, t]: any) => <option key={k} value={k}>{t}</option>)}
                   </select></label>
+                {/* DOT R4c-2 — HINH THUC THANH TOAN LA MOT PHAN CUA KHOA khop quy tac
+                    (`_khop_hinh_thuc`), nen no dung giua Doi tuong va Thu tu xet chu khong
+                    xuong cuoi cung voi cac o trinh bay. */}
+                <label>Hình thức thanh toán
+                  <select value={bieu.hinh_thuc_tt}
+                          onChange={(e) => setBieu({ ...bieu, hinh_thuc_tt: e.target.value })}>
+                    {Object.entries(d?.hinh_thuc_tt || {}).map(([k, t]: any) => (
+                      <option key={k} value={k}>{t}</option>))}
+                  </select></label>
                 <label>Thứ tự xét (số nhỏ xét trước)
                   <input type="number" value={bieu.uu_tien}
                          onChange={(e) => setBieu({ ...bieu, uu_tien: e.target.value })} /></label>
@@ -190,6 +202,12 @@ function HachToanPage() {
                        checked={!!bieu.can_cong_trinh}
                        onChange={(e) => setBieu({ ...bieu, can_cong_trinh: e.target.checked })} />
                 Bắt buộc có mã đơn / mã tour thì mới ghi được
+              </label>
+              <label>
+                <input type="checkbox" style={{ width: "auto", marginRight: 6 }}
+                       checked={!!bieu.can_khoan_muc}
+                       onChange={(e) => setBieu({ ...bieu, can_khoan_muc: e.target.checked })} />
+                Bắt buộc chọn khoản mục chi phí thì mới ghi được
               </label>
               <label>Ghi chú
                 <textarea value={bieu.ghi_chu} rows={2}
