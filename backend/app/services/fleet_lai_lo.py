@@ -52,7 +52,9 @@ def _km(t: Trip) -> int:
 def theo_chuyen(db: Session, ky: str) -> list[dict]:
     """Quyết toán theo TOUR: mỗi chuyến một dòng, lãi gộp và suất tiêu hao của chính chuyến đó."""
     d1, d2 = QT.ky_range(ky)
-    trips = list(db.execute(select(Trip).where(Trip.ngay_di >= d1, Trip.ngay_di <= d2)
+    # Nháp và đã hủy không phải số liệu – xem chú thích cùng luật ở fleet_ai.hieu_qua_ky.
+    trips = list(db.execute(select(Trip).where(Trip.ngay_di >= d1, Trip.ngay_di <= d2,
+                                               Trip.status.not_in(("nhap", "huy")))
                             .order_by(Trip.ngay_di)).scalars())
     chi: dict[int, list] = {}
     if trips:
@@ -65,9 +67,13 @@ def theo_chuyen(db: Session, ky: str) -> list[dict]:
         v = veh.get(t.vehicle_id)
         cs = chi.get(t.id, [])
         km = _km(t)
-        tien_dau = sum((c.amount or 0) for c in cs if c.kind == "dau")
-        lit = sum(c.lit or 0 for c in cs if c.kind == "dau")
-        cp = sum((c.amount or 0) for c in cs)
+        # BÊN CHỊU: dòng `chu_xe` là khoản chủ xe tự gánh – có thật, nhưng không nằm trong lãi lỗ của
+        # Vietourist. Tách ra chứ không bỏ đi, để còn đối chiếu được tổng tiền đã chi cho chuyến.
+        cs_vt = [c for c in cs if c.ben_chiu != "chu_xe"]
+        tien_dau = sum((c.amount or 0) for c in cs_vt if c.kind == "dau")
+        lit = sum(c.lit or 0 for c in cs_vt if c.kind == "dau")
+        cp = sum((c.amount or 0) for c in cs_vt)
+        cp_chu_xe = sum((c.amount or 0) for c in cs if c.ben_chiu == "chu_xe")
         did = t.driver_id or (v.driver_id if v else None)
         out.append({
             "trip_id": t.id, "ma_phieu": t.ma_phieu, "xe": v.plate if v else "",
@@ -91,7 +97,7 @@ def _rong(v: Vehicle | None, vid: int | None) -> dict:
     return {"vehicle_id": vid, "xe": v.plate if v else "", "ma_xe": v.code if v else "",
             "tai_xe": "", "so_chuyen": 0, "doanh_thu": 0.0, "chi_phi_chuyen": 0.0,
             "km": 0, "so_lit": 0.0, "ngay_khai_thac": set(), "chi_phi_xe": 0.0,
-            "chi_tiet_cp_xe": {}}
+            "chi_phi_chu_xe": 0.0, "chi_tiet_cp_xe": {}}
 
 
 def ngoai_so(db: Session, d1: date, d2: date) -> dict:
@@ -168,8 +174,17 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
                                 for i in range((t.ngay_ve - t.ngay_di).days + 1)}
 
     # --- Tầng 2: chi phí của xe trong kỳ ---
+    # Cùng luật với fleet_ai: phiếu đã được một dòng chi phí chuyến nối tới thì đã tính ở tầng 1.
+    da_tinh_o_chuyen = {c.maintenance_id for c in db.execute(
+        select(TripCost).where(TripCost.maintenance_id.isnot(None))).scalars()}
     for m in db.execute(select(Maintenance).where(Maintenance.ngay >= d1, Maintenance.ngay <= d2)).scalars():
+        if m.id in da_tinh_o_chuyen: continue
         r = rows.setdefault(m.vehicle_id, _rong(veh.get(m.vehicle_id), m.vehicle_id))
+        # `Maintenance.ben_chiu` mặc định là "chu_xe". Cộng thẳng 100% là tính cho Vietourist khoản của
+        # chủ xe – cùng luật với dòng chi phí chuyến ở trên.
+        if m.ben_chiu == "chu_xe":
+            r["chi_phi_chu_xe"] = r.get("chi_phi_chu_xe", 0) + (m.so_tien or 0)
+            continue
         r["chi_phi_xe"] += (m.so_tien or 0)
         r["chi_tiet_cp_xe"]["bao_duong"] = r["chi_tiet_cp_xe"].get("bao_duong", 0) + (m.so_tien or 0)
 

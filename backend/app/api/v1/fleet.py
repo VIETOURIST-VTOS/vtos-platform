@@ -29,6 +29,25 @@ router = APIRouter(prefix="/api/v1/fleet", tags=["fleet"])
 # Trước đó ông mang chung vai trò với tài xế nên bị khoá ngoài, trong khi tham số xe_nguoi_lap_lenh lại chỉ
 # định ông là người DUY NHẤT được lập lệnh điều xe – kết quả là không ai lập được lệnh.
 READ = ("chutich", "tgd", "ptgd_doan", "tp_dh", "nv_dh", "ketoan", "bks", "cntt", "hcns", "gd_doi_xe")
+
+# HAI CỬA ĐỌC HẸP HƠN `READ`, LẤY THẲNG TỪ MA TRẬN MÀN HÌNH.
+#
+# Vì sao phải có: `READ` mở cho cả 10 vai trò, nên trước bản này `GET /hieu-qua` trả số cho `cntt`,
+# `nv_dh`, `ptgd_doan` – đúng những vai mà `MENU_ROLES` đã đóng. Phép thử `test_ma_tran_quyen.py::
+# test_cntt_khong_xem_dong_tien_va_hieu_qua_doi_xe` khẳng định CNTT không xem được màn Hiệu quả đội xe,
+# và nó vẫn XANH, vì nó chỉ kiểm menu. Giấu một màn hình khỏi menu không phải là đóng cửa: ai gọi thẳng
+# API vẫn lấy được số. Hàng rào tiền tố `/api/v1/fleet` cũng không tách được `/hieu-qua` khỏi `/xe`.
+#
+# Vì sao SUY TỪ `MENU_ROLES` chứ không chép tay ra đây: chép là để hai nơi trôi khỏi nhau lần nữa – đúng
+# cái vừa xảy ra. Suy ra thì sửa ma trận một chỗ là cửa API đổi theo, và `test_cua_doc_khop_ma_tran`
+# canh cho chúng không bao giờ lệch.
+def _vai_tro_cua_man(man: str) -> tuple:
+    from app.services import access as AC
+    return tuple(AC.MENU_ROLES[man])
+
+
+XEM_HIEU_QUA = _vai_tro_cua_man("/hieu-qua-doi-xe")
+XEM_LAI_LO = _vai_tro_cua_man("/lai-lo-doi-xe")
 # Sửa hồ sơ xe: người phụ trách đội xe và CNTT. Kế toán không sửa hồ sơ xe, BKS chỉ đọc.
 WRITE = ("cntt", "hcns", "tp_dh", "nv_dh", "gd_doi_xe")
 
@@ -370,6 +389,7 @@ def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict) -> dict:
                             (t.km_dau is not None and t.km_cuoi is not None and t.km_gps) else None),
             "km_chay": (t.km_cuoi - t.km_dau) if (t.km_dau is not None and t.km_cuoi is not None) else None,
             "doanh_thu": t.doanh_thu, "status": t.status, "co": t.co, "co_ly_do": t.co_ly_do,
+            "quyet_toan": t.quyet_toan,
             "note": t.note, "ma_phieu": t.ma_phieu, "nguon": t.nguon,
             "chi_phi": [{"id": c.id, "kind": c.kind, "kind_ten": COST_KINDS.get(c.kind, c.kind),
                          "amount": c.amount, "lit": c.lit, "ben_chiu": c.ben_chiu,
@@ -436,6 +456,8 @@ class ChiPhiIn(BaseModel):
     chung_tu: str = ""
     nguon: str = "nhap_tay"
     note: str = ""
+    # Khai khi dòng này CHÍNH LÀ phiếu bảo dưỡng kia, để báo cáo không cộng một khoản hai lần.
+    maintenance_id: int | None = None
 
 
 @router.post("/chuyen/{tid}/chi-phi", status_code=201)
@@ -475,6 +497,10 @@ class SuaChuyenIn(BaseModel):
     doanh_thu: float | None = None
     driver_id: int | None = None
     note: str | None = None
+    # Bật khi chuyến đang chạy đã quyết toán xong. Đi cùng đường sửa nhật trình, nên vẫn phải mở lại
+    # chuyến (kèm lý do) mới đổi được — chốt một chuyến vào ô tiền là việc để lại dấu vết, không phải
+    # một cú gạt công tắc lặng lẽ.
+    quyet_toan: bool | None = None
 
 
 @router.put("/chuyen/{tid}")
@@ -490,7 +516,7 @@ def sua_chuyen(tid: int, data: SuaChuyenIn, u: User = Depends(require_roles(*WRI
         raise HTTPException(422, "Chuyến đã xác nhận – mở lại (kèm lý do) rồi mới sửa được")
     truoc = {"ten_tour": t.ten_tour, "ngay_di": str(t.ngay_di), "ngay_ve": str(t.ngay_ve),
              "km_dau": t.km_dau, "km_cuoi": t.km_cuoi, "km_gps": t.km_gps, "km_nguon": t.km_nguon,
-             "doanh_thu": t.doanh_thu}
+             "doanh_thu": t.doanh_thu, "quyet_toan": t.quyet_toan}
     d = data.model_dump(exclude_none=True)
     from app.services import ghi_mot_lan as GML
     GML.kiem_phien_ban(t, d.pop("phien_ban", None), f"Chuyến {t.id}",
@@ -545,6 +571,46 @@ def mo_lai_chuyen(tid: int, data: MoLaiIn, u: User = Depends(require_roles(*KETO
     return {"id": t.id, "status": t.status, "message": "Đã mở lại chuyến để sửa – nhớ xác nhận lại sau khi sửa xong"}
 
 
+@router.post("/chuyen/{tid}/huy")
+def huy_chuyen(tid: int, data: MoLaiIn, u: User = Depends(require_roles(*KETOAN, "chutich", "tgd", "tp_dh")),
+               db: Session = Depends(get_db)):
+    """Hủy một chuyến ghi nhầm. Bắt buộc có lý do.
+
+    VÌ SAO HỦY CHỨ KHÔNG XÓA: chuyến đã có mã phiếu gốc, đã có dòng chi phí, có thể đã được ai đó đối
+    chiếu. Xóa đi thì sổ hôm nay không khớp sổ hôm qua mà không còn dấu vết nào giải thích. Chuyến `huy`
+    nằm lại trong cơ sở dữ liệu, giữ nguyên mã phiếu (nên nạp lại báo cáo cũ vẫn không sinh bản thứ hai),
+    và bị loại khỏi MỌI ô tiền và ô đếm của báo cáo.
+
+    Trước bản này `TRIP_STATUS` có khai giá trị "huy" nhưng không dòng mã nào gán nó – nên một chuyến gõ
+    nhầm không có đường nào ra. Hai phiếu dò khuôn ZZPROBE-1/2 ngày 19/10/2026 còn nằm trong sổ vì thế.
+
+    Cùng hàng rào với mở lại: kỳ quyết toán ĐÃ ĐÓNG thì không hủy ngược vào được."""
+    t = db.get(Trip, tid)
+    if not t: raise HTTPException(404, "Không có chuyến")
+    if not (data.ly_do or "").strip():
+        raise HTTPException(422, "Hủy một chuyến phải ghi lý do – một chuyến biến khỏi báo cáo mà không ai "
+                                 "biết vì sao là cách nhanh nhất làm lãi lỗ tháng không đối chiếu được")
+    if t.status == "huy":
+        raise HTTPException(422, "Chuyến này đã hủy rồi")
+    ky = f"{t.ngay_di:%Y-%m}"
+    v = db.get(Vehicle, t.vehicle_id)
+    if v is not None and v.partner_id:
+        st = db.execute(select(Settlement).where(Settlement.ky == ky, Settlement.partner_id == v.partner_id,
+                                                 Settlement.status == "dong_ky")).scalars().first()
+        if st is not None:
+            raise HTTPException(422, f"Kỳ {ky} của chủ xe đã ĐÓNG – hủy một chuyến đã quyết toán phải đi "
+                                     "bằng dòng điều chỉnh ở kỳ sau")
+    from datetime import datetime as _dt
+    truoc = {"status": t.status, "doanh_thu": t.doanh_thu}
+    t.status = "huy"
+    t.note = (f"[Hủy {_dt.now():%d/%m %H:%M} bởi {u.username}: {data.ly_do.strip()}] " + (t.note or ""))[:300]
+    R.audit(db, u.username, u.role, "huy_chuyen", f"trip:{tid}", before=truoc,
+            after={"status": "huy", "ly_do": data.ly_do})
+    db.commit()
+    return {"id": t.id, "status": t.status,
+            "message": "Đã hủy chuyến – chuyến vẫn nằm trong sổ kèm lý do, nhưng không còn vào báo cáo nào"}
+
+
 class SuaChiPhiIn(BaseModel):
     amount: float | None = None
     lit: float | None = None
@@ -580,15 +646,21 @@ def sua_chi_phi(tid: int, cid: int, data: SuaChiPhiIn,
 
 
 @router.delete("/chuyen/{tid}/chi-phi/{cid}")
-def xoa_chi_phi(tid: int, cid: int, u: User = Depends(require_roles(*WRITE, *KETOAN, "chutich", "tgd")),
+def xoa_chi_phi(tid: int, cid: int, ly_do: str = "",
+                u: User = Depends(require_roles(*WRITE, *KETOAN, "chutich", "tgd")),
                 db: Session = Depends(get_db)):
-    """Xóa một dòng chi phí nhập nhầm, chỉ khi chuyến chưa xác nhận. Nhật ký kiểm toán giữ lại nội dung đã xóa."""
+    """Xóa một dòng chi phí nhập nhầm, chỉ khi chuyến chưa xác nhận. Bắt buộc ghi lý do.
+
+    Lý do là bắt buộc vì đây là cùng một loại hành vi với `DELETE /chi-phi-ky/{cid}`, `mo-lai` và
+    `go-khoi-theo-doi` – những cửa đã đòi lý do từ đầu. Trước bản này riêng cửa này không đòi, nên một
+    khoản chi phí có thể biến khỏi báo cáo mà nhật ký chỉ ghi được SỐ đã xóa, không ghi được VÌ SAO."""
     t = db.get(Trip, tid); c = db.get(TripCost, cid)
     if not t or not c or c.trip_id != tid: raise HTTPException(404, "Không có dòng chi phí này trong chuyến")
+    if not ly_do.strip(): raise HTTPException(422, "Xóa một dòng chi phí phải ghi lý do")
     if t.status == "da_xac_nhan": raise HTTPException(422, "Chuyến đã xác nhận – mở lại rồi mới xóa được")
     R.audit(db, u.username, u.role, "xoa_chi_phi_chuyen", f"trip:{tid}",
             before={"kind": c.kind, "amount": c.amount, "lit": c.lit, "ben_chiu": c.ben_chiu,
-                    "chung_tu": c.chung_tu})
+                    "chung_tu": c.chung_tu}, after={"ly_do": ly_do})
     db.delete(c); db.flush()
     kt = FL.kiem_chuyen(db, t); t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
     db.commit()
@@ -1445,7 +1517,7 @@ def de_lap_lenh(tu: date, den: date, u: User = Depends(require_roles(*READ)),
 
 # ====================== LÃI LỖ ĐỘI XE ======================
 @router.get("/lai-lo")
-def lai_lo(ky: str, phan_bo: str = "khong", u: User = Depends(require_roles(*READ)),
+def lai_lo(ky: str, phan_bo: str = "khong", u: User = Depends(require_roles(*XEM_LAI_LO)),
            db: Session = Depends(get_db)):
     """Lãi lỗ đội xe của một kỳ: ba tầng chi phí để riêng, không tầng nào lẫn vào tầng nào.
 
@@ -1462,7 +1534,7 @@ def lai_lo(ky: str, phan_bo: str = "khong", u: User = Depends(require_roles(*REA
 
 
 @router.get("/lai-lo/theo-chuyen")
-def lai_lo_chuyen(ky: str, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+def lai_lo_chuyen(ky: str, u: User = Depends(require_roles(*XEM_LAI_LO)), db: Session = Depends(get_db)):
     """Quyết toán theo TOUR: mỗi chuyến một dòng kèm lãi gộp và suất tiêu hao của chính chuyến đó."""
     try:
         QT.ky_range(ky)
@@ -1472,7 +1544,7 @@ def lai_lo_chuyen(ky: str, u: User = Depends(require_roles(*READ)), db: Session 
 
 
 @router.get("/chi-phi-ky")
-def chi_phi_ky(ky: str = "", u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+def chi_phi_ky(ky: str = "", u: User = Depends(require_roles(*XEM_LAI_LO)), db: Session = Depends(get_db)):
     q = select(FleetPeriodCost).order_by(FleetPeriodCost.ky.desc(), FleetPeriodCost.id.desc())
     if ky: q = q.where(FleetPeriodCost.ky == ky)
     xe = {v.id: v.plate for v in db.execute(select(Vehicle)).scalars()}
@@ -1526,6 +1598,16 @@ def them_chi_phi_ky(data: ChiPhiKyIn, u: User = Depends(require_roles(*QT_WRITE)
                                  f"{(' – ' + data.mo_ta) if data.mo_ta else ''}' "
                                  f"({trung.so_tien:,.0f} đ). Sửa dòng đã có, đừng ghi thêm dòng thứ hai "
                                  "– nhập lại bảng tháng lần nữa là chi phí nhân đôi.")
+    # CHẶN CỨNG B6 CŨNG ÁP Ở ĐÂY. Trước bản này ngưỡng chứng từ chỉ áp cho chi phí CHUYẾN và đề nghị chi,
+    # còn sổ chi phí kỳ nhận `chung_tu` như chuỗi tự do không ai kiểm – trong khi đây đúng là chỗ ghi
+    # những khoản lớn nhất của đội xe: bảo hiểm, bảo dưỡng, bãi xe, lãi vay.
+    #
+    # ĐẶT SAU chốt chống nhân đôi, cố ý: người nhập lại đúng bảng tháng lần thứ hai cần nghe "khoản này
+    # đã có rồi", không phải "thiếu chứng từ". Báo sai lý do thì họ đi tìm chứng từ rồi nhập lại lần nữa.
+    nguong = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
+    if (data.so_tien or 0) >= nguong and not (data.chung_tu or "").strip():
+        raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc có chứng từ gốc đính kèm "
+                                 "(chặn cứng B6)")
     r = FleetPeriodCost(ky=data.ky, pham_vi=pham_vi, vehicle_id=data.vehicle_id, nhom=data.nhom,
                         mo_ta=data.mo_ta[:200], so_tien=data.so_tien, chung_tu=data.chung_tu[:200],
                         boi=u.username)
@@ -1542,6 +1624,10 @@ def sua_chi_phi_ky(cid: int, data: ChiPhiKyIn, u: User = Depends(require_roles(*
     r = db.get(FleetPeriodCost, cid)
     if r is None: raise HTTPException(404, "Không có khoản này")
     if (data.so_tien or 0) <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
+    nguong = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
+    if (data.so_tien or 0) >= nguong and not (data.chung_tu or "").strip():
+        raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc có chứng từ gốc đính kèm "
+                                 "(chặn cứng B6)")
     truoc = {"so_tien": r.so_tien, "mo_ta": r.mo_ta}
     r.so_tien = data.so_tien; r.mo_ta = data.mo_ta[:200]; r.chung_tu = data.chung_tu[:200]
     R.audit(db, u.username, u.role, "sua_chi_phi_ky_doi_xe", f"chi_phi_ky:{r.id}", before=truoc,
@@ -1565,7 +1651,7 @@ def xoa_chi_phi_ky(cid: int, ly_do: str = "", u: User = Depends(require_roles(*Q
 
 
 @router.get("/hieu-qua")
-def hieu_qua(ky: str, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+def hieu_qua(ky: str, u: User = Depends(require_roles(*XEM_HIEU_QUA)), db: Session = Depends(get_db)):
     """Hiệu quả xe và tài xế của một kỳ. Chỉ đọc và tính, không ghi số liệu nghiệp vụ nào."""
     try:
         QT.ky_range(ky)

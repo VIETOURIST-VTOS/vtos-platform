@@ -125,7 +125,11 @@ def test_sua_va_xoa_duoc_dong_chi_phi_nhap_nham(chuyen):
     ct = next(x for x in client.get("/api/v1/fleet/chuyen", headers=h).json() if x["id"] == chuyen)
     assert ct["tong_chi_vietourist"] == 5_500_000
 
-    assert client.delete(f"/api/v1/fleet/chuyen/{chuyen}/chi-phi/{cid}", headers=h).status_code == 200
+    # Xóa một dòng chi phí phải ghi lý do – cùng luật với DELETE /chi-phi-ky và mo-lai.
+    assert client.delete(f"/api/v1/fleet/chuyen/{chuyen}/chi-phi/{cid}", headers=h).status_code == 422, \
+        "xóa mà không ghi lý do thì phải bị chặn"
+    assert client.delete(f"/api/v1/fleet/chuyen/{chuyen}/chi-phi/{cid}?ly_do=nhập nhầm số lít",
+                         headers=h).status_code == 200
     ct = next(x for x in client.get("/api/v1/fleet/chuyen", headers=h).json() if x["id"] == chuyen)
     assert ct["tong_chi_vietourist"] == 0
 
