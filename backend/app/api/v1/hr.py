@@ -1846,6 +1846,34 @@ def rate_sign(rid: int, u: User = Depends(require_roles(*_CK.can_ky("gia_xe"))),
     return {"message": "Đã ký" + (" – bảng giá có hiệu lực" if r.status == "active" else ", chờ chữ ký còn lại")}
 
 
+class SuaGiaXeIn(BaseModel):
+    route: str
+    days: int = 0
+    internal_price: float
+    partner_price: float | None = None
+
+
+@router.post("/vehicle-rates/{rid}/sua")
+def rate_sua(rid: int, data: SuaGiaXeIn, u: User = Depends(require_roles(*_CK.can_ky("gia_xe"))), db: Session = Depends(get_db)):
+    """XE-SUA (Chủ tịch 04/11/2026: «thay nút ngừng bằng nút sửa»; Đà Lạt 4 ngày chốt 16tr). Người ký giá xe sửa thẳng
+    một dòng ĐANG HIỆU LỰC — người ký chính là người sửa nên không qua vòng trình/ký lại. Ghi nhật ký trước/sau."""
+    r = db.get(VehicleRate, rid)
+    if not r or r.status != "active": raise HTTPException(404, "Không có dòng giá xe đang hiệu lực")
+    route = (data.route or "").strip()
+    if not route: raise HTTPException(400, "Nhập tên tuyến")
+    if data.internal_price is None or data.internal_price <= 0: raise HTTPException(400, "Giá xe Vietrip – VTD phải lớn hơn 0")
+    if data.partner_price is not None and data.partner_price < 0: raise HTTPException(400, "Giá xe hợp tác không âm")
+    if data.days < 0 or data.days > 60: raise HTTPException(400, "Số ngày không hợp lệ")
+    truoc = {"route": r.route, "days": r.days, "internal_price": r.internal_price, "partner_price": r.partner_price}
+    r.route, r.days, r.internal_price, r.partner_price = route[:120], data.days, data.internal_price, data.partner_price or 0
+    sau = {"route": r.route, "days": r.days, "internal_price": r.internal_price, "partner_price": r.partner_price}
+    if sau == truoc: return {"message": "Không có thay đổi"}
+    r.note = ((r.note or "") + f" | Sửa {date.today():%d/%m/%Y} ({u.username})")[:200]
+    R.audit(db, u.username, u.role, "sua_gia_xe", f"rate:{r.id}", before=truoc, after=sau)
+    db.commit()
+    return {"message": f"Đã sửa giá tuyến {r.route}"}
+
+
 def _owner(v, cos: dict) -> dict:
     """Xe của một pháp nhân trong phạm vi hợp nhất → lệnh điều xe là giao dịch nội bộ, phải loại trừ khi hợp nhất."""
     c = cos.get(v.company_id) if v is not None and v.company_id else None
