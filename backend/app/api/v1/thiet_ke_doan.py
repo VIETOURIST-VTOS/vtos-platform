@@ -89,6 +89,7 @@ class DonGiaIn(BaseModel):
     loai: str
     ten: str
     pham_vi: str = "ca_hai"
+    khu_vuc: str = ""
     gia: float | None = None
     tu_cho: int | None = None
     tu_diem: str = ""

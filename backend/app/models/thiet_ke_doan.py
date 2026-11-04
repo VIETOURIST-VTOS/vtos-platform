@@ -26,7 +26,7 @@ LOAI_DON_GIA = {
     "truong_doan": ("Trưởng đoàn kiêm hướng dẫn viên (tour xa)", "ngay"),
     "bao_hiem": ("Bảo hiểm du lịch", "khach"),
     "nuoc": ("Nước suối", "khach_ngay"),
-    "visa": ("Visa nhập cảnh", "khach"),
+    # Visa KHÔNG có đơn giá chung (Chủ tịch 04/11/2026: mỗi nước một loại visa, giá khác nhau) — Sales báo giá.
     "hoi_nghi": ("Phòng hội nghị (MICE)", "doan"),
     "team_building": ("Team building", "khach"),
     "khac": ("Dịch vụ khác", "doan"),
@@ -48,6 +48,9 @@ class DonGiaDoan(Base):
     ten: Mapped[str] = mapped_column(String(160))                              # «Xe 29 chỗ», «Bảo hiểm quốc tế gói A»
     pham_vi: Mapped[str] = mapped_column(String(8), default="ca_hai")
     tu_cho: Mapped[int | None] = mapped_column(Integer, nullable=True)        # chỉ loại xe: số chỗ khách
+    # TK-3 (Chủ tịch 04/11/2026): đơn giá nước ngoài gắn CHÂU LỤC hoặc NƯỚC — rỗng = mọi nước. Tạm tính chọn dòng
+    # khớp nhất với nước khách đi (nước > châu lục > mọi nước); visa Schengen không bị tính cho tour Thái Lan.
+    khu_vuc: Mapped[str] = mapped_column(String(60), default="")
     gia: Mapped[float] = mapped_column(TIEN)                                   # GIÁ VỐN theo đơn vị của loại
     # chỉ loại ve_may_bay: chặng, hạng vé, giá trẻ em / em bé (rỗng = chưa có, KHÔNG phải 0)
     tu_diem: Mapped[str] = mapped_column(String(80), default="")

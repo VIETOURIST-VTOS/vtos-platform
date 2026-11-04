@@ -7,7 +7,7 @@ một phiên bản ThietKeDoan bất biến. Gửi lại cùng mã = phiên bả
 TẠM TÍNH — chỉ tính từ nguồn giá có thật trong VTOS, mọi con số trình duyệt gửi lên đều bị bỏ qua:
   · Khách sạn: gói giá VTD đã duyệt, đang bán, phủ đủ các đêm (khach_san_vtd.gia_luu) × số phòng × (1 + thuế phí %).
   · Bữa trưa / tối: thực đơn nhà hàng đang mở đặt (nha_hang) × người lớn + trẻ em (thiếu giá trẻ em → giá người lớn).
-  · Xe, HDV, trưởng đoàn, bảo hiểm, nước, visa, hội nghị, team building, vé máy bay theo chặng: DonGiaDoan Điều hành
+  · Xe, HDV, trưởng đoàn, bảo hiểm, nước, hội nghị, team building, vé máy bay theo chặng: DonGiaDoan Điều hành
     nhập và đã được duyệt.
   · Vé máy bay đi qua NGUON_VE — hôm nay chỉ có nguồn «Điều hành nhập»; nối API vé sau thì thêm một nguồn vào danh sách,
     phần còn lại không đổi.
@@ -53,6 +53,16 @@ CHAU_AU = ["Pháp", "Ý", "Tây Ban Nha", "Bồ Đào Nha", "Đức", "Thụy S�
            "Bulgaria", "Romania", "Moldova", "Ukraine", "Belarus", "Nga", "Litva", "Latvia", "Estonia", "Malta", "Monaco",
            "San Marino", "Vatican", "Andorra", "Liechtenstein", "Kosovo"]
 TOUR_XA = set(CHAU_AU) | {"Hoa Kỳ", "Canada", "Anh", "Scotland", "Ireland"}
+# TK-3 · Danh mục nước ngoài theo châu lục — CHỮ cố định, khớp với danh mục điểm đến của cổng khách
+# (web/components/cong/tuThietKeDuLieu.ts DD.nn). Dùng gắn đơn giá dịch vụ đoàn vào châu lục / nước.
+NUOC_NGOAI: dict[str, list[str]] = {
+    "Châu Á": ["Hàn Quốc", "Nhật Bản", "Trung Quốc", "Hồng Kông", "Ma Cao", "Đài Loan", "Mông Cổ", "Triều Tiên", "Thái Lan", "Campuchia", "Lào", "Myanmar", "Malaysia", "Singapore", "Indonesia", "Philippines", "Brunei", "Đông Timor", "Ấn Độ", "Nepal", "Bhutan", "Sri Lanka", "Maldives", "Bangladesh", "Pakistan", "Afghanistan", "Kazakhstan", "Uzbekistan", "Kyrgyzstan", "Tajikistan", "Turkmenistan", "Iran", "Iraq", "Thổ Nhĩ Kỳ", "Gruzia", "Armenia", "Azerbaijan", "UAE (Dubai)", "Qatar", "Ả Rập Xê Út", "Oman", "Bahrain", "Kuwait", "Jordan", "Israel", "Palestine", "Liban", "Syria", "Yemen", "Síp"],
+    "Châu Âu": ["Pháp", "Ý", "Tây Ban Nha", "Bồ Đào Nha", "Đức", "Thụy Sĩ", "Áo", "Hà Lan", "Bỉ", "Luxembourg", "Anh", "Ireland", "Scotland", "Đan Mạch", "Na Uy", "Thụy Điển", "Phần Lan", "Iceland", "Ba Lan", "Séc", "Slovakia", "Hungary", "Slovenia", "Croatia", "Serbia", "Bosnia & Herzegovina", "Montenegro", "Bắc Macedonia", "Albania", "Hy Lạp", "Bulgaria", "Romania", "Moldova", "Ukraine", "Belarus", "Nga", "Litva", "Latvia", "Estonia", "Malta", "Monaco", "San Marino", "Vatican", "Andorra", "Liechtenstein", "Kosovo"],
+    "Châu Mỹ": ["Hoa Kỳ", "Canada", "Mexico", "Cuba", "Jamaica", "Bahamas", "Cộng hòa Dominica", "Haiti", "Puerto Rico", "Panama", "Costa Rica", "Nicaragua", "Honduras", "El Salvador", "Guatemala", "Belize", "Colombia", "Venezuela", "Ecuador", "Peru", "Bolivia", "Brazil", "Paraguay", "Uruguay", "Argentina", "Chile", "Guyana", "Suriname", "Trinidad & Tobago", "Barbados", "Dominica", "Grenada", "Saint Lucia", "Saint Vincent & Grenadines", "Antigua & Barbuda", "Saint Kitts & Nevis"],
+    "Châu Phi": ["Ai Cập", "Maroc", "Tunisia", "Algeria", "Libya", "Sudan", "Ethiopia", "Kenya", "Tanzania (Zanzibar)", "Uganda", "Rwanda", "Nam Phi", "Namibia", "Botswana", "Zimbabwe", "Zambia", "Mozambique", "Madagascar", "Mauritius", "Seychelles", "Ghana", "Nigeria", "Senegal", "Bờ Biển Ngà", "Cameroon", "Angola", "Cabo Verde", "Mali", "Niger", "Chad", "Burkina Faso", "Guinea", "Sierra Leone", "Liberia", "Togo", "Benin", "Gabon", "Cộng hòa Congo", "CHDC Congo", "Cộng hòa Trung Phi", "Nam Sudan", "Eritrea", "Djibouti", "Somalia", "Malawi", "Lesotho", "Eswatini", "Comoros", "Gambia", "Guinea-Bissau", "Guinea Xích Đạo", "São Tomé & Príncipe", "Mauritania", "Burundi"],
+    "Châu Đại Dương": ["Úc", "New Zealand", "Fiji", "Papua New Guinea", "Samoa", "Tonga", "Vanuatu", "Polynesia thuộc Pháp (Tahiti)", "New Caledonia", "Palau", "Guam", "Quần đảo Solomon", "Kiribati", "Tuvalu", "Nauru", "Quần đảo Marshall", "Micronesia"],
+}
+_CHAU_CUA = {n: c for c, ds in NUOC_NGOAI.items() for n in ds}
 
 
 class LoiThietKe(ValueError):
@@ -202,15 +212,34 @@ def khung(tk: dict) -> list[dict]:
 
 
 # ══ NGUỒN GIÁ ═══════════════════════════════════════════════════════════════════════════════════════
-def _dg_hieu_luc(db: Session, loai: str, pv: str, ngay: date) -> list[DonGiaDoan]:
-    return db.execute(select(DonGiaDoan).where(
+def muc_khu_vuc(khu_vuc: str, nuoc: list[str]) -> int | None:
+    """TK-3: dòng đơn giá khớp chuyến đi tới đâu — 2 đúng nước, 1 đúng châu lục, 0 mọi nước, None không áp."""
+    if not khu_vuc:
+        return 0
+    if khu_vuc in nuoc:
+        return 2
+    if any(_CHAU_CUA.get(n) == khu_vuc for n in nuoc):
+        return 1
+    return None
+
+
+def _dg_hieu_luc(db: Session, loai: str, pv: str, ngay: date, nuoc: list[str] | None = None) -> list[DonGiaDoan]:
+    """Đơn giá đang hiệu lực. `nuoc` (tour nước ngoài): chỉ giữ dòng áp cho các nước khách đi, dòng khớp nhất đứng
+    đầu (nước > châu lục > mọi nước), cùng mức thì dòng mới hơn. Trong nước bỏ mọi dòng có gắn khu vực."""
+    ds = db.execute(select(DonGiaDoan).where(
         DonGiaDoan.loai == loai, DonGiaDoan.trang_thai == "hieu_luc", DonGiaDoan.pham_vi.in_([pv, "ca_hai"]),
         or_(DonGiaDoan.tu_ngay.is_(None), DonGiaDoan.tu_ngay <= ngay),
         or_(DonGiaDoan.den_ngay.is_(None), DonGiaDoan.den_ngay >= ngay)).order_by(DonGiaDoan.id.desc())).scalars().all()
+    if pv != "nn":
+        return [x for x in ds if not x.khu_vuc]
+    if nuoc is None:
+        return ds
+    co = [(m, x) for x in ds if (m := muc_khu_vuc(x.khu_vuc or "", nuoc)) is not None]
+    return [x for _, x in sorted(co, key=lambda t: -t[0])]       # sorted giữ thứ tự id giảm trong cùng mức
 
 
-def _mot_gia(db: Session, loai: str, pv: str, ngay: date) -> DonGiaDoan | None:
-    ds = _dg_hieu_luc(db, loai, pv, ngay)
+def _mot_gia(db: Session, loai: str, pv: str, ngay: date, nuoc: list[str] | None = None) -> DonGiaDoan | None:
+    ds = _dg_hieu_luc(db, loai, pv, ngay, nuoc)
     return ds[0] if ds else None
 
 
@@ -544,7 +573,8 @@ def du_toan(db: Session, tk: dict) -> dict:
         bg.append("Ăn sáng tại khách sạn")
 
     # ── phương tiện từng chặng
-    xe_ds = _dg_hieu_luc(db, "xe", pv, di)
+    nuoc_di = [h["ten"] for h in tk["diem"]] if pv == "nn" else None
+    xe_ds = _dg_hieu_luc(db, "xe", pv, di, nuoc_di)
     for d in N:
         if d["chang_i"] is None:
             continue
@@ -599,7 +629,11 @@ def du_toan(db: Session, tk: dict) -> dict:
                 them("Dịch vụ", r["ten"], r["chi_tiet"], r["von"])
                 bg.append("Hướng dẫn viên suốt tuyến")
                 continue
-        dg = _mot_gia(db, k_, pv, di)
+        if k_ == "visa":                         # Chủ tịch 04/11/2026: mỗi nước một loại visa, giá khác → để trống
+            thieu_gia("Dịch vụ", "Visa nhập cảnh", "mỗi nước một loại visa — Sales báo giá")
+            bg.append("Visa nhập cảnh")
+            continue
+        dg = _mot_gia(db, k_, pv, di, nuoc_di)
         ten = LOAI_DON_GIA[k_][0] if k_ in LOAI_DON_GIA else DICH_VU_KHACH.get(k_, k_)
         if dg is None:
             thieu_gia("Dịch vụ", ten, "Điều hành chưa nhập đơn giá")
@@ -817,7 +851,7 @@ def lich_su(db: Session, u: User, ma: str) -> list[dict]:
 
 def _dg_out(x: DonGiaDoan) -> dict:
     return {"id": x.id, "loai": x.loai, "loai_ten": LOAI_DON_GIA.get(x.loai, (x.loai,))[0], "ten": x.ten, "pham_vi": x.pham_vi,
-            "don_vi": DON_VI.get(LOAI_DON_GIA.get(x.loai, ("", "doan"))[1], ""), "tu_cho": x.tu_cho, "gia": x.gia,
+            "khu_vuc": x.khu_vuc or "", "don_vi": DON_VI.get(LOAI_DON_GIA.get(x.loai, ("", "doan"))[1], ""), "tu_cho": x.tu_cho, "gia": x.gia,
             "tu_diem": x.tu_diem, "den_diem": x.den_diem, "hang_ve": x.hang_ve, "gia_tre_em": x.gia_tre_em, "gia_em_be": x.gia_em_be,
             "tu_ngay": x.tu_ngay.isoformat() if x.tu_ngay else None, "den_ngay": x.den_ngay.isoformat() if x.den_ngay else None,
             "ghi_chu": x.ghi_chu, "trang_thai": x.trang_thai, "trang_thai_ten": TRANG_THAI_DG.get(x.trang_thai, x.trang_thai),
@@ -828,7 +862,7 @@ def ds_don_gia(db: Session, u: User) -> dict:
     _quyen(u, VAI_GIA_VON, "Đơn giá đoàn là giá vốn — chỉ Điều hành, Kế toán, BKS, Chủ tịch, TGĐ xem")
     ds = db.execute(select(DonGiaDoan).order_by(DonGiaDoan.loai, DonGiaDoan.trang_thai, DonGiaDoan.id.desc())).scalars().all()
     return {"don_gia": [_dg_out(x) for x in ds], "loai": {k: {"ten": v[0], "don_vi": DON_VI[v[1]]} for k, v in LOAI_DON_GIA.items()},
-            "pham_vi": PHAM_VI, "hang_ve": HANG_VE, "trang_thai": TRANG_THAI_DG,
+            "pham_vi": PHAM_VI, "hang_ve": HANG_VE, "trang_thai": TRANG_THAI_DG, "khu_vuc": NUOC_NGOAI,
             "duoc": {"nhap": _co(u, VAI_NHAP_GIA), "duyet": _co(u, VAI_DUYET_GIA)}}
 
 
@@ -862,6 +896,15 @@ def luu_don_gia(db: Session, u: User, d: dict, dg_id: int | None = None, now: da
          "tu_cho": None, "tu_diem": "", "den_diem": "", "hang_ve": "", "gia_tre_em": None, "gia_em_be": None}
     if o["tu_ngay"] and o["den_ngay"] and o["den_ngay"] < o["tu_ngay"]:
         raise LoiThietKe("Ngày hết hiệu lực phải sau ngày bắt đầu")
+    kv = _sach(d.get("khu_vuc"), 60)
+    if kv and loai != "ve_may_bay":
+        if kv not in NUOC_NGOAI and kv not in _CHAU_CUA:
+            raise LoiThietKe("Khu vực phải là một châu lục hoặc một nước trong danh mục")
+        if pv != "nn":
+            raise LoiThietKe("Khu vực chỉ dùng cho đơn giá nước ngoài — chọn phạm vi «Nước ngoài»")
+        o["khu_vuc"] = kv
+    else:
+        o["khu_vuc"] = ""
     if loai == "xe":
         o["tu_cho"] = _so(d.get("tu_cho"), 0, 80)
         if not o["tu_cho"]:
