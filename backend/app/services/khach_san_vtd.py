@@ -1386,6 +1386,11 @@ def chi_tiet_cong(db: Session, kid: int, vao, ra, nguoi_lon: int = 2, tre_em: in
     video = VD.video_cong(db, "khach_san_vtd", [k.id]).get(k.id, [])
     for p in phong:
         p["anh"] = [_anh_out(a, True) for a in anh if a.loai_phong_id == p["id"]][:6]
+        # KS-ANH (Chủ tịch 05/11/2026: «khách sạn nào chưa có ảnh phòng em lấy ảnh đại diện khách sạn»): loại phòng
+        # chưa có ảnh riêng thì hiện ảnh đại diện (ảnh bìa — `_anh_duyet` xếp bìa lên đầu), gắn cờ để màn hình biết.
+        p["anh_dai_dien"] = not p["anh"] and bool(anh)
+        if p["anh_dai_dien"]:
+            p["anh"] = [_anh_out(anh[0], True)]
         p["video"] = [v for v in video if v["loai_phong_id"] == p["id"]]
     from app.services import danh_gia_ks as DGK
     the = _the_cong(k, anh, phong, DGK.tom_tat(db, [k.id])[k.id], dat_24h(db, [k.id]).get(k.id, 0))
