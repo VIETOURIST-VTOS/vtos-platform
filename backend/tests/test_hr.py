@@ -233,3 +233,17 @@ def test_vehicle_rate_table_and_dispatch_pricing():
     assert client.post("/api/v1/dispatch", json={**base, "vehicle_id": veh["50F-009.60"]["id"], "rate_id": new["id"]}, headers=login("dh.lan")).status_code == 422
     client.post(f"/api/v1/vehicle-rates/{new['id']}/sign", headers=login("tgd"))
     assert "hiệu lực" in client.post(f"/api/v1/vehicle-rates/{new['id']}/sign", headers=login("chutich")).json()["message"]
+
+
+def test_xe_sua_dong_gia_xe():
+    """XE-SUA (Chủ tịch 04/11/2026): Chủ tịch sửa thẳng dòng giá xe đang hiệu lực, ghi nhật ký; người khác không sửa được."""
+    rates = client.get("/api/v1/vehicle-rates", headers=login("chutich")).json()
+    act = [x for x in rates if x["status"] == "active"][0]
+    body = {"route": act["route"], "days": act["days"], "internal_price": 16_000_000, "partner_price": 18_000_000}
+    assert client.post(f"/api/v1/vehicle-rates/{act['id']}/sua", json=body, headers=login("cntt")).status_code == 403
+    assert client.post(f"/api/v1/vehicle-rates/{act['id']}/sua", json={**body, "internal_price": 0}, headers=login("chutich")).status_code == 400
+    r = client.post(f"/api/v1/vehicle-rates/{act['id']}/sua", json=body, headers=login("chutich"))
+    assert r.status_code == 200 and "Đã sửa" in r.json()["message"]
+    sau = next(x for x in client.get("/api/v1/vehicle-rates", headers=login("chutich")).json() if x["id"] == act["id"])
+    assert sau["status"] == "active" and sau["internal_price"] == 16_000_000 and sau["partner_price"] == 18_000_000 and "Sửa" in sau["note"]
+    assert client.post("/api/v1/vehicle-rates/999999/sua", json=body, headers=login("chutich")).status_code == 404
