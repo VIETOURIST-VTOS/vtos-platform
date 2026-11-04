@@ -109,7 +109,8 @@ def _gan_doi_tuong(lines: list[dict], ten: str, ma: str) -> None:
 
 def lap(db: Session, u: User, chieu: str, ngay: date, so_tien: float, ly_do: str,
         noi_dung: str = "", ten_doi_tuong: str = "", ma_doi_tuong: str = "",
-        booking_id: int | None = None, khoan_muc: str = "") -> tuple[PhieuQuy, dict]:
+        booking_id: int | None = None, khoan_muc: str = "",
+        so_goc: str = "") -> tuple[PhieuQuy, dict]:
     """Lập một phiếu quỹ và ghi sổ NGAY. Không khớp quy tắc nào thì ném lỗi, không lưu gì."""
     if chieu not in CHIEU:
         raise ValueError(f"Chiều phiếu quỹ phải là 'thu' hoặc 'chi', không phải {chieu!r}")
@@ -170,7 +171,7 @@ def lap(db: Session, u: User, chieu: str, ngay: date, so_tien: float, ly_do: str
         noi_dung=(noi_dung or "")[:200], ten_doi_tuong=(ten_doi_tuong or "")[:160],
         ma_doi_tuong=(ma_doi_tuong or "")[:60], khoan_muc=(khoan_muc or "").strip().upper()[:40],
         booking_id=booking_id, quy_tac=bt["quy_tac"][:40], journal_entry_id=e.id,
-        created_by=u.username)
+        so_goc=(so_goc or "").strip()[:40], created_by=u.username)
     db.add(p)
     db.flush()
     db.commit()
@@ -195,6 +196,7 @@ def ra(p: PhieuQuy) -> dict:
     return {"id": p.id, "code": p.code, "chieu": p.chieu, "ngay": str(p.ngay),
             "so_tien": p.so_tien, "ly_do": p.ly_do, "noi_dung": p.noi_dung,
             "ten_doi_tuong": p.ten_doi_tuong, "ma_doi_tuong": p.ma_doi_tuong,
-            "khoan_muc": p.khoan_muc, "booking_id": p.booking_id, "quy_tac": p.quy_tac,
+            "khoan_muc": p.khoan_muc, "so_goc": p.so_goc,
+            "booking_id": p.booking_id, "quy_tac": p.quy_tac,
             "journal_entry_id": p.journal_entry_id, "created_by": p.created_by,
             "created_at": p.created_at.isoformat() if p.created_at else ""}

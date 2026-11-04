@@ -389,7 +389,9 @@ BO_NAP.update(_pr.bo_nap(_c))
 # CHUNG mot nha may dung cot, va viet tay tam lan la tam cho de hai cua noi hai dieu khac
 # nhau ve cung mot con so.
 from app.services import intake_so_du_dau_ky as _sddk   # noqa: E402
+from app.services import intake_so_quy as _sq   # noqa: E402
 BO_NAP.update(_sddk.bo_nap(_c))
+BO_NAP.update(_sq.bo_nap(_c))
 
 
 # Ai được nạp loại dữ liệu nào. Phân quyền đặt Ở ĐÂY chứ không đặt ở màn hình: mở được trang nạp dữ liệu
@@ -418,6 +420,7 @@ VAI_TRO.update(_mkt.vai_tro(QUAN_TRI))
 VAI_TRO.update(_th.vai_tro(QUAN_TRI))
 VAI_TRO.update(_pr.vai_tro(QUAN_TRI))
 VAI_TRO.update(_sddk.vai_tro(QUAN_TRI))
+VAI_TRO.update(_sq.vai_tro(QUAN_TRI))
 
 
 # P4 (08/9/2026) – TÁCH QUYỀN THEO TỪNG CỬA, không phải theo màn hình.
@@ -437,7 +440,8 @@ VAI_TRO.update(_sddk.vai_tro(QUAN_TRI))
 # mục nhà cung cấp, danh sách hướng dẫn viên thì không.
 BO_NAP_CHAM_TIEN = ("doi_chieu_h1_2026",
                     "don_dich_vu", "chuyen_xe", "quyet_toan_tour", "sao_ke_ngan_hang", "cham_cong"
-                    ) + _pb2.CHAM_TIEN + _pb3.CHAM_TIEN + _kho.CHAM_TIEN + _sddk.CHAM_TIEN
+                    ) + _pb2.CHAM_TIEN + _pb3.CHAM_TIEN + _kho.CHAM_TIEN + _sddk.CHAM_TIEN \
+                    + _sq.CHAM_TIEN
 NHAN_VIEN = ("nv_dh", "nv_kd", "tn_kd", "nv_mkt", "nv_visa", "tai_xe", "hdv", "hanh_chinh")
 # Suy ra từ VAI_TRO chứ không khai tay lần thứ hai: hai bảng khai tay thì sớm muộn cũng lệch, và lúc
 # lệch thì không ai biết bảng nào đúng.
