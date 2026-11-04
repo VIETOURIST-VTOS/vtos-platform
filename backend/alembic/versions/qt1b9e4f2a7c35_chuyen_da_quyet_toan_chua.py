@@ -20,17 +20,22 @@ MẶC ĐỊNH TRUE, CÓ CHỦ Ý: mọi chuyến đã nằm trong sổ trước 
 Đặt mặc định FALSE sẽ làm toàn bộ doanh thu lịch sử biến mất khỏi ô tiền ngay khi nâng cấp — một bản
 nâng cấp không được phép đổi một đồng nào của quá khứ.
 
+NỐI LẠI MẠCH 04/11/2026: bản này ban đầu nối sau `tk2a3c5e7f9b1d4062`. Trong lúc đang viết, làn TK-3
+(`tk3b4d6f8a0c2e5173`, đơn giá khu vực) cũng nối sau đúng bản ấy — hai bản cùng một cha là hai đầu
+mạch, và `alembic upgrade head` với hai đầu thì máy chủ KHÔNG LÊN. Đổi cha sang `tk3b4d6f8a0c2e5173`
+để mạch còn đúng một đầu. KHÔNG đổi nội dung bản nâng cấp, chỉ đổi chỗ nối.
+
 ĐỔI NGƯỢC ĐƯỢC: `downgrade` xoá cột. Mất thông tin chuyến nào đang chạy, nhưng không mất tiền: mọi
 chuyến quay về được tính như đã quyết toán, đúng hành vi trước bản này.
 
 Revision ID: qt1b9e4f2a7c35
-Revises: tk2a3c5e7f9b1d4062
+Revises: tk3b4d6f8a0c2e5173
 """
 import sqlalchemy as sa
 from alembic import op
 
 revision = "qt1b9e4f2a7c35"
-down_revision = "tk2a3c5e7f9b1d4062"
+down_revision = "tk3b4d6f8a0c2e5173"
 branch_labels = None
 depends_on = None
 
