@@ -70,7 +70,7 @@ def test_diem_trung_binh_tu_3_bai(db, k3):
         assert (tt["diem_tb"] is None) == (i < 3)
     tt = G.tom_tat(db, [k.id])[k.id]
     assert tt["diem_tb"] == 9.0 and tt["nhan"] == "Xuất sắc" and tt["muc"]["diem_sach"] == 9.5
-    the = KS.tim(db, "Đà Nẵng", VAO, RA, hom_nay=NAY.date())["khach_san"][0]
+    the = KS.chi_tiet_cong(db, k.id, VAO, RA, hom_nay=NAY.date())   # KS-19: danh sách chỉ hiện KS còn phòng
     assert the["danh_gia"]["diem_tb"] == 9.0 and the["danh_gia"]["so_bai"] == 3
     assert [b["diem"] for b in G.cong(db, k.id, xep="thap")["bai"]] == [8, 9, 10]
 

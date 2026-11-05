@@ -57,12 +57,10 @@ def test_ks17_2_thue_chua_xac_nhan_thi_khong_duyet_gia_khong_mo_thanh_toan(db):
         S.duyet_goi(db, _u(db, "tp"), g.id, True)
     with pytest.raises(S.LoiKhachSan, match="thuế phí"):
         S.bat_tt_ks(db, _u(db, "tp"), k.id, True)
-    with pytest.raises(S.LoiKhachSan, match="ghi mức %"):
-        S.luu_ks(db, _u(db, "dh"), {"ten": k.ten, "tinh_thanh": "Đà Nẵng", "sao": 3, "mo_ta": k.mo_ta,
-                                    "thue_phi_xac_nhan": True}, k.id)
-    # chiều ngược lại: xác nhận 0% (khách sạn không thu) là hợp lệ, và lúc ấy duyệt được
+    # KS-19: giá đã gồm 8% VAT — chỉ cần đánh dấu «đã xác nhận với khách sạn», ô % cũ luôn lưu 0
     S.luu_ks(db, _u(db, "dh"), {"ten": k.ten, "tinh_thanh": "Đà Nẵng", "sao": 3, "mo_ta": k.mo_ta,
-                                "thue_phi_pt": 0, "thue_phi_xac_nhan": True}, k.id)
+                                "thue_phi_pt": 15, "thue_phi_xac_nhan": True}, k.id)
+    assert k.thue_phi_pt == 0
     assert S.duyet_goi(db, _u(db, "tp"), g.id, True).trang_thai == "da_duyet"
     assert S.bat_tt_ks(db, _u(db, "tp"), k.id, True).mo_thanh_toan is True
     # trả lại thì vẫn trả được dù thuế chưa xác nhận — chỉ chặn chiều mở bán

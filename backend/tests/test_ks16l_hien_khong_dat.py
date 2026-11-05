@@ -25,6 +25,6 @@ def test_bat_loat_va_link_ngoai(db):
     nk = db.execute(select(AuditLog).where(AuditLog.action == "ks_vtd_bat_loat")).scalars().one()
     assert len(nk.entity) <= 60                         # cột entity String(60) — Postgres không cho dài hơn
     the = {k["ten"]: k for k in S.tim(db, "", VAO, RA, 2, 0, 1, HN)["khach_san"]}
-    assert the["Khách sạn Không Phòng"]["dat_ngay"] is False and the["Khách sạn Không Phòng"]["link_ngoai"] == S.LINK_KS_NGOAI
+    assert "Khách sạn Không Phòng" not in the            # KS-19 (Chủ tịch 05/11/2026): không đặt được thì không hiện
     assert the["Khách sạn Có Phòng"]["dat_ngay"] is True
     assert "Khách sạn Chưa Ảnh" not in the

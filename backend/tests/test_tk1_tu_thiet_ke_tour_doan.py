@@ -117,7 +117,7 @@ def test_tk1_2_tam_tinh_tu_nguon_that(db, nen):
     d = {x["nhom"] + "|" + x["ten"]: x for x in dt_["dong"]}
     p = KS.gia_luu(nen["g"], KS._mua_cua(db, [nen["g"].id])[nen["g"].id], dt.date(2026, 12, 18), dt.date(2026, 12, 20))
     ks = next(x for x in dt_["dong"] if x["nhom"] == "Khách sạn")
-    assert ks["von"] == round(p["tong"] * 11 * 1.15)
+    assert ks["von"] == round(p["tong"] * 11)                       # KS-19: giá KS đã gồm 8% VAT — không cộng thuế phí
     an = next(x for x in dt_["dong"] if x["nhom"] == "Ăn uống")
     assert an["von"] == 300_000 * 22                                   # trẻ em chưa có giá → tính giá người lớn
     xe = next(x for x in dt_["dong"] if x["nhom"] == "Xe")

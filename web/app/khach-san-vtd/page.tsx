@@ -18,7 +18,7 @@ import DanhGiaKsNoiBo from "@/components/khach-san-vtd/DanhGiaKsNoiBo";
 const tien = (n?: number | null) => (n || n === 0 ? Math.round(n).toLocaleString("vi-VN") : "");
 const TT_DN: Record<string, string> = { cho_tp: "chờ robot", cho_kt: "robot dừng — bổ sung NCC", cho_duyet: "chờ TGĐ / CT duyệt", cho_chi: "lệnh chi chờ", da_chi: "đã chi", tu_choi: "từ chối" };   // KS-16d
 const KS0 = { ten: "", tinh_thanh: "", khu_vuc: "", dia_chi: "", sao: 0, loai: "khach_san", km_trung_tam: "", gan: "", noi_bat: "", mo_ta: "",
-  tien_ich: [] as string[], gio_nhan: "14:00", gio_tra: "12:00", cs_tre_em: "", cs_giuong_phu: "", cs_vat_nuoi: "", cs_khac: "", thue_phi_pt: "" as any, thue_phi_xac_nhan: false,
+  tien_ich: [] as string[], gio_nhan: "14:00", gio_tra: "12:00", cs_tre_em: "", cs_giuong_phu: "", cs_vat_nuoi: "", cs_khac: "", thue_phi_pt: "" as any, thue_phi_xac_nhan: false, phu_hop: [] as string[],
   lien_he_noi_bo: "", ghi_chu_noi_bo: "", link_ggmap: "",
   cs_nhan_tre_em: "chua_xac_nhan", cs_tre_tu_tuoi: "" as any, cs_moc_tuoi: [] as any[], cs_phi_giuong_phu: "" as any, cs_giuong_phu_an_sang: false, cs_noi: "",
   cs_so_tre_mien_phi: "" as any, cs_tre_mp_tinh_suc_chua: false, cs_giuong_phu_kieu: "co_dinh" };
@@ -142,14 +142,13 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
         {o("link_ggmap", "Link Google Maps (sửa ghim)", "https://www.google.com/maps/place/…/@16.06,108.24,17z")}
         <label>Hạng sao<select value={f.sao} disabled={!nhap} onChange={(e) => setF({ ...f, sao: Number(e.target.value) })}>{[0, 1, 2, 3, 4, 5].map((s) => <option key={s} value={s}>{s ? `${s} sao` : "Chưa xếp hạng"}</option>)}</select></label>
         <label>Loại chỗ ở<select value={f.loai} disabled={!nhap} onChange={(e) => setF({ ...f, loai: e.target.value })}>{Object.entries(x.loai).map(([k2, v]: any) => <option key={k2} value={k2}>{v}</option>)}</select></label>
-        {o("km_trung_tam", "Cách trung tâm (km)", "2.5", "number")}{o("gan", "Gần đâu (hiện trên thẻ)", "120 m tới biển · 3 km tới cầu Rồng")}
+        {o("km_trung_tam", "Cách trung tâm (km) — trống: máy tính từ vị trí", "2.5", "number")}{o("gan", "Gần đâu (hiện trên thẻ)", "120 m tới biển · 3 km tới cầu Rồng")}
         {o("noi_bat", "Một dòng nổi bật", "Hồ bơi tầng thượng nhìn biển, bữa sáng buffet")}
         {o("gio_nhan", "Giờ nhận phòng", "14:00")}{o("gio_tra", "Giờ trả phòng", "12:00")}
-        {o("thue_phi_pt", "Thuế phí cộng thêm (%)", "15", "number")}
-        {/* KS-17: 0% mặc định không phải xác nhận. Chưa xác nhận → không duyệt giá, không mở thanh toán. */}
+        {/* KS-19 (Chủ tịch 05/11/2026): giá nhập đã gồm 8% VAT — máy không cộng thuế phí. Chưa xác nhận → không duyệt giá, không mở thanh toán. */}
         <label style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={!!f.thue_phi_xac_nhan} disabled={!nhap}
-          onChange={(e) => setF({ ...f, thue_phi_xac_nhan: e.target.checked })} />Đã xác nhận thuế phí với khách sạn (theo hợp đồng)</label>
-        {!f.thue_phi_xac_nhan && <span className="muted" style={{ color: "#d99a2b", fontSize: 12 }}>Thuế phí chưa xác nhận — chưa duyệt giá, chưa mở thanh toán được.</span>}</div>
+          onChange={(e) => setF({ ...f, thue_phi_xac_nhan: e.target.checked })} />Đã xác nhận với khách sạn: giá nhập đã gồm 8% VAT</label>
+        {!f.thue_phi_xac_nhan && <span className="muted" style={{ color: "#d99a2b", fontSize: 12 }}>Chưa xác nhận giá gồm VAT — chưa duyệt giá, chưa mở thanh toán được.</span>}</div>
       {h && <span className="muted" style={{ fontSize: 12 }}>Vị trí bản đồ: {h.khach_san.vi_do != null ? <>{h.khach_san.vi_do}, {h.khach_san.kinh_do} · {h.khach_san.toa_do_nguon === "tay" ? "Điều hành dán link" : "máy lấy từ địa chỉ"}
         {" · "}<a href={`https://www.google.com/maps/search/?api=1&query=${h.khach_san.vi_do},${h.khach_san.kinh_do}`} target="_blank" rel="noopener noreferrer">kiểm tra trên Google Maps ↗</a></>
         : h.khach_san.toa_do_nguon === "khong_thay" ? "máy không tìm thấy địa chỉ — dán link Google Maps" : "chưa có (lưu hồ sơ để máy lấy)"}</span>}
@@ -158,6 +157,10 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(170px,1fr))", gap: 6 }}>{Object.entries(x.tien_ich).map(([k2, v]: any) =>
           <label key={k2} style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" disabled={!nhap} checked={f.tien_ich.includes(k2)}
             onChange={(e) => setF({ ...f, tien_ich: e.target.checked ? [...f.tien_ich, k2] : f.tien_ich.filter((y: string) => y !== k2) })} />{v}</label>)}</div></fieldset>
+      {x.phu_hop && <fieldset style={{ border: "1px solid var(--line, #2a3b4d)", borderRadius: 8, padding: 10 }}><legend>Phù hợp cho (bộ lọc trên cổng)</legend>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(170px,1fr))", gap: 6 }}>{Object.entries(x.phu_hop).map(([k2, v]: any) =>
+          <label key={k2} style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" disabled={!nhap} checked={(f.phu_hop || []).includes(k2)}
+            onChange={(e) => setF({ ...f, phu_hop: e.target.checked ? [...(f.phu_hop || []), k2] : (f.phu_hop || []).filter((y: string) => y !== k2) })} />{v}</label>)}</div></fieldset>}
       <CsTre f={f} setF={setF} x={x} nhap={nhap} />
       <div className="grid">{o("cs_tre_em", "Ghi chú thêm về trẻ em")}{o("cs_giuong_phu", "Ghi chú thêm về giường phụ")}{o("cs_vat_nuoi", "Vật nuôi")}</div>
       {ta("cs_khac", "Chính sách khác", 2)}
@@ -344,7 +347,7 @@ function Phong({ h, x, toast, goi, busy }: { h: any; x: any; toast: (m: string, 
   };
   const nhap = x.duoc_nhap;
   return <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-    <p className="muted" style={{ margin: 0 }}>Giá bán / phòng / đêm, CHƯA gồm thuế phí ({h.khach_san.thue_phi_pt || 0}% — sửa ở tab Thông tin). Đêm thứ Sáu, thứ Bảy dùng «giá cuối tuần» nếu có.
+    <p className="muted" style={{ margin: 0 }}>Giá bán / phòng / đêm, ĐÃ GỒM 8% VAT (máy không cộng thêm thuế phí). Đêm thứ Sáu, thứ Bảy dùng «giá cuối tuần» nếu có.
       Đêm nào không nằm trong mùa giá nào thì gói đó không bán cho kỳ ở ấy. Sửa gói đã duyệt → về Nháp, thôi hiện trên cổng tới khi duyệt lại.</p>
     {nhap && !lp && <button className="act teal" style={{ alignSelf: "flex-start" }} onClick={() => setLp({ ...LP0 })}>+ Thêm loại phòng</button>}
     {lp && <div className="panel" style={{ margin: 0, display: "flex", flexDirection: "column", gap: 10 }}><b>{lp.id ? `Sửa ${lp.ten}` : "Loại phòng mới"}</b>

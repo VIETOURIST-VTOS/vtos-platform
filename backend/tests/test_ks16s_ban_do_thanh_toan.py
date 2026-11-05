@@ -90,15 +90,18 @@ def test_gio_den_va_email_xac_nhan(db, k3, monkeypatch):
         _dat(db, k, g, gio_den="3 giờ sáng")
     d = _dat(db, k, g, gio_den="20:00–21:00", email="lan@example.com")
     assert d.gio_den == "20:00–21:00" and D.ra_khach(db, d, NAY)["gio_den"] == "20:00–21:00"
-    P.match_transaction(db, _txn(db, d.tong, d.ma)); db.commit()
     gui = []
     monkeypatch.setattr(D, "GUI_XAC_NHAN", lambda don, ten: gui.append((don.ma, ten, don.ma_xac_nhan_ks)) or True)
+    P.match_transaction(db, _txn(db, d.tong, d.ma)); db.commit()
+    # KS-19: đủ tiền là máy xác nhận + gửi email ngay; Điều hành ghi mã khách sạn sau, không gửi email lần hai
+    assert d.trang_thai == "da_xac_nhan" and d.xac_nhan_boi == "may" and gui == [(d.ma, k.ten, "")]
+    assert [x["ma"] for x in D.ds_vtos(db, _u(db, "dh"), "cho_chot", now=NAY)["don"]] == [d.ma]
     D.dh_xac_nhan(db, _u(db, "dh"), d.id, "BX-7781", NAY); db.commit()
-    assert gui == [(d.ma, k.ten, "BX-7781")]
+    assert gui == [(d.ma, k.ten, "")] and d.ma_xac_nhan_ks == "BX-7781" and d.xac_nhan_boi == "may"
+    assert D.ds_vtos(db, _u(db, "dh"), "cho_chot", now=NAY)["don"] == []
     d2 = _dat(db, k, g, tk=_tk(db, 2))
-    P.match_transaction(db, _txn(db, d2.tong, d2.ma, sid="T2")); db.commit()
     monkeypatch.setattr(D, "GUI_XAC_NHAN", lambda *a: (_ for _ in ()).throw(RuntimeError("smtp")))
-    D.dh_xac_nhan(db, _u(db, "dh"), d2.id, "BX-7782", NAY); db.commit()
+    P.match_transaction(db, _txn(db, d2.tong, d2.ma, sid="T2")); db.commit()   # email lỗi không làm hỏng xác nhận
     assert d2.trang_thai == "da_xac_nhan"
 
 
