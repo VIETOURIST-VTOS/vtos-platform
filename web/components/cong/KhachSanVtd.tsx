@@ -649,6 +649,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
     ...(["loai", "khu", "ti", "tn", "ph"] as const).flatMap((k) => L[k].map((m) => [k === "loai" ? (ds.loai || {})[m] || m : m, { [k]: L[k].filter((x) => x !== m) }] as [string, Partial<Loc>])),
     ...(L.ten.trim() ? [[`«${L.ten.trim()}»`, { ten: "" }] as [string, Partial<Loc>]] : [])];
   const gA = gNhap?.a ?? (L.min || giaMin0), gB = gNhap?.b ?? (L.max || giaMax);
+  const phanTram = (v: number) => giaMax > giaMin0 ? Math.min(100, Math.max(0, (v - giaMin0) / (giaMax - giaMin0) * 100)) : 0;   // KS-19e: dải xanh giữa hai nút kéo
   const apGia = () => { const a = Math.max(0, Math.min(gA, gB)), b = Math.max(gA, gB); setLoc({ ...L, min: a <= giaMin0 ? 0 : a, max: b >= giaMax ? 0 : b }); setGNhap(null); };
   const coDiem = coTrongTp((k: any) => (k.danh_gia?.diem_tb || 0) > 0);
   const goiY = Array.from(new Set(trongTp.flatMap((k: any) => [k.ten, k.khu_vuc].filter(Boolean)))) as string[];
@@ -670,7 +671,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
           <div className="fsec"><label className="ksv-pill"><Ico d={P.kinh} s={18} /><input placeholder="Tên khách sạn hoặc khu vực" value={L.ten} list="ksv-goi-y" onChange={(e) => setLoc({ ...L, ten: e.target.value })} aria-label="Tìm theo tên khách sạn hoặc khu vực" /></label>
             <datalist id="ksv-goi-y">{goiY.map((t) => <option key={t} value={t} />)}</datalist></div>
           <div className="fsec"><h4>Ngân sách mỗi đêm</h4><small className="ksv-muted">VND · 1 phòng / 1 đêm · đã gồm 8% VAT</small>
-            <div className="ksv-r2"><input type="range" min={giaMin0} max={giaMax} step={50000} value={Math.min(gA, gB)} onChange={(e) => setGNhap({ a: Number(e.target.value), b: gB })} aria-label="Giá tối thiểu mỗi đêm" />
+            <div className="ksv-r2"><span className="ksv-r2f" style={{ left: `${phanTram(Math.min(gA, gB))}%`, right: `${100 - phanTram(Math.max(gA, gB))}%` }} /><input type="range" min={giaMin0} max={giaMax} step={50000} value={Math.min(gA, gB)} onChange={(e) => setGNhap({ a: Number(e.target.value), b: gB })} aria-label="Giá tối thiểu mỗi đêm" />
               <input type="range" min={giaMin0} max={giaMax} step={50000} value={Math.max(gA, gB)} onChange={(e) => setGNhap({ a: gA, b: Number(e.target.value) })} aria-label="Giá tối đa mỗi đêm" /></div>
             <div className="ksv-mm"><label>TỐI THIỂU<input inputMode="numeric" value={`₫ ${vnd(gA)}`} onChange={(e) => setGNhap({ a: Number(e.target.value.replace(/\D/g, "")) || 0, b: gB })} /></label>
               <label>TỐI ĐA<input inputMode="numeric" value={`₫ ${vnd(gB)}`} onChange={(e) => setGNhap({ a: gA, b: Number(e.target.value.replace(/\D/g, "")) || 0 })} /></label></div>
@@ -1188,8 +1189,8 @@ const CSS = `
 .ksv-b.navy{background:var(--ksv-navy);color:#fff}.ksv-b.purple{background:var(--ksv-purple);color:#fff}.ksv-b.green{background:var(--ksv-oksoft);color:var(--ksv-ok)}.ksv-b.out{border:1px solid var(--ksv-line);color:#3c4657;font-weight:500}
 .ksv-b.aw{position:absolute;left:8px;top:8px}
 /* tìm */
-.ksv-hero{border-radius:16px;overflow:hidden;background:linear-gradient(180deg,#2a7fb6 0%,#3fa7d3 55%,#7fd0e8 100%);padding:36px 16px 0;position:relative}
-.ksv-hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:70px;background:linear-gradient(180deg,transparent,rgba(241,226,184,.85))}
+.ksv-hero{border-radius:16px;overflow:visible;z-index:3;background:linear-gradient(180deg,#2a7fb6 0%,#3fa7d3 55%,#7fd0e8 100%);padding:36px 16px 0;position:relative}
+.ksv-hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:70px;border-radius:0 0 16px 16px;background:linear-gradient(180deg,transparent,rgba(241,226,184,.85))}
 .ksv-hero-in{position:relative;z-index:1;max-width:880px;margin:0 auto;display:flex;flex-direction:column;align-items:center}
 .ksv-hero h1{color:#fff;font-size:28px;font-weight:800;text-align:center;margin:0 0 18px;text-shadow:0 2px 10px rgba(0,0,0,.3);text-wrap:balance}
 .ksv-sbox2{width:100%;background:#fff;border-radius:16px;box-shadow:0 8px 28px rgba(16,24,40,.18);margin-bottom:32px}
@@ -1248,17 +1249,22 @@ const CSS = `
   background:repeating-linear-gradient(0deg,transparent 0 38px,#fff 38px 41px),repeating-linear-gradient(90deg,#eef2e6 0 70px,#f3d36a 70px 75px);}
 .ksv-map span{color:#e5484d}.ksv-map b{font-size:13px;letter-spacing:.5px;background:#fff;padding:3px 10px;border-radius:99px}
 .ksv-chips{display:flex;flex-wrap:wrap;gap:8px}
-.ksv-r2{position:relative;height:28px}.ksv-r2 input{position:absolute;left:0;right:0;top:6px;width:100%;margin:0;pointer-events:none;background:none;-webkit-appearance:none;appearance:none}
-.ksv-r2 input::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid var(--ksv-blue,#1557b0);cursor:pointer}
-.ksv-r2 input::-moz-range-thumb{pointer-events:auto;width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid var(--ksv-blue,#1557b0);cursor:pointer}
-.ksv-r2 input::-webkit-slider-runnable-track{height:4px;background:var(--ksv-line,#dce3ea);border-radius:2px}
-.ksv-r2 input:first-child::-webkit-slider-runnable-track{background:var(--ksv-line,#dce3ea)}
+/* KS-19e: chặn kiểu ô nhập chung của trang (nền tối, đệm 12px, viền) đè lên thanh kéo — trước đây thành dải đen đè ô số. */
+.ksv-r2{position:relative;height:30px;margin:4px 2px 8px}
+.ksv-r2::before{content:"";position:absolute;left:0;right:0;top:13px;height:4px;border-radius:2px;background:var(--ksv-line,#dce3ea)}
+.ksv-r2 .ksv-r2f{position:absolute;top:13px;height:4px;border-radius:2px;background:var(--ksv-blue,#1557b0)}
+.ksv .ksv-r2 input[type=range]{position:absolute;left:0;right:0;top:0;width:100%;height:30px;margin:0;padding:0!important;border:0!important;box-shadow:none!important;border-radius:0!important;background:transparent!important;pointer-events:none;-webkit-appearance:none;appearance:none;outline:none}
+.ksv .ksv-r2 input[type=range]::-webkit-slider-runnable-track{height:30px;background:transparent;border:0}
+.ksv .ksv-r2 input[type=range]::-moz-range-track{height:4px;background:transparent;border:0}
+.ksv .ksv-r2 input[type=range]::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:24px;height:24px;margin-top:3px;border-radius:50%;background:#fff;border:2px solid var(--ksv-blue,#1557b0);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.ksv .ksv-r2 input[type=range]::-moz-range-thumb{pointer-events:auto;width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid var(--ksv-blue,#1557b0);cursor:pointer}
+.ksv .ksv-r2 input[type=range]:focus-visible::-webkit-slider-thumb{outline:3px solid rgba(21,87,176,.35)}
 .ksv-mo{opacity:.45}
 .ksv-dang{align-items:center}
 .ksv-khop{display:block;background:#f2f7ff;border-radius:8px;padding:6px 9px;font-size:12.5px;color:var(--ksv-ok,#1d7a4a);margin-top:4px}.ksv-khop b{color:var(--ksv-ink,#14263b)}
 .ksv-f3{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}.ksv-f3 .ksv-fld{min-width:170px}
 .ksv-an{flex-direction:row;flex-wrap:wrap;gap:10px;align-items:center;font-size:13.5px}
-@media(max-width:640px){.ksv-r2 input::-webkit-slider-thumb{width:28px;height:28px}.ksv-mm input{font-size:16px}}
+@media(max-width:640px){.ksv .ksv-r2 input[type=range]::-webkit-slider-thumb{width:28px;height:28px;margin-top:1px}.ksv-mm input{font-size:16px}}
 .ksv-sold{display:inline-flex;gap:6px;align-items:center;background:var(--ksv-redsoft);color:var(--ksv-price);border-radius:8px;padding:6px 10px;font-size:12.5px;font-weight:600;align-self:flex-start}
 .ksv-room{grid-template-columns:290px minmax(0,1fr);border:1px solid var(--ksv-line);border-radius:14px}
 .ksv-rl{border-right:1px solid var(--ksv-line2);padding:12px}

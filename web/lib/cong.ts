@@ -36,8 +36,18 @@ export async function goiCong(path: string, json?: any): Promise<any> {
   if (json !== undefined) headers["Content-Type"] = "application/json";
   const r = await fetch(`/api/v1/cong${path}`, json === undefined ? { headers } : { method: "POST", headers, body: JSON.stringify(json) });
   const t = await r.text(); let d: any = null; try { d = t ? JSON.parse(t) : null; } catch { d = t; }
-  if (!r.ok && r.status === 401 && json !== undefined && !p) {
-    try { window.dispatchEvent(new CustomEvent(SU_KIEN_CAN_DANG_NHAP)); } catch { /* bỏ qua */ }
+  // KS-19e: 401 = chưa có phiên HOẶC phiên cũ đã hết hạn. Phiên hết hạn thì bỏ luôn (để các lệnh xem sau đi cửa
+  // /cong/mo như khách chưa đăng nhập). Lệnh GHI bị 401 → khung trang riêng hiện ô «Đăng nhập để tiếp tục»; khi ấy
+  // không ném thêm dòng đỏ «phiên đã hết hạn» (message rỗng) vì ô đăng nhập đã nói đủ.
+  // Chỉ 401 về PHIÊN (máy chủ trả chữ, không kèm «ma»); 401 sai mật khẩu ở cửa đăng nhập (ma = sai_dn) giữ nguyên lời báo.
+  if (!r.ok && r.status === 401 && !(d?.detail && typeof d.detail === "object" && d.detail.ma)) {
+    if (p) xoaPhienCong();
+    if (json !== undefined) {
+      // Có khung trang riêng nghe (nó gọi preventDefault và hiện ô đăng nhập) thì bỏ dòng đỏ; nơi khác giữ lời máy chủ.
+      let daHoi = false;
+      try { daHoi = !window.dispatchEvent(new CustomEvent(SU_KIEN_CAN_DANG_NHAP, { cancelable: true })); } catch { /* bỏ qua */ }
+      if (daHoi) throw { status: 401, message: "", ma: "can_dang_nhap", canDangNhap: true };
+    }
   }
   if (!r.ok) { const x = d?.detail; throw { status: r.status, message: typeof x === "string" ? x : x?.message || `Lỗi ${r.status}`, ma: x?.ma || "" }; }
   return d;
@@ -76,7 +86,10 @@ const CUA_MO: [RegExp, string][] = [
   [/^\/dat-ban\/nha-hang\b/, "/mo/nha-hang"],
 ];
 export async function xemCong(path: string): Promise<any> {
-  if (phienCong()) return goiCong(path);
+  if (phienCong()) {
+    // KS-19e: phiên cũ hết hạn (401) → goiCong đã bỏ phiên; xem lại bằng cửa mở thay vì để trang trắng.
+    try { return await goiCong(path); } catch (e: any) { if (e?.status !== 401 || phienCong()) throw e; }
+  }
   for (const [re, moi] of CUA_MO) {
     if (re.test(path)) {
       const p = moi === "/mo/ks-vtd/" ? path.replace(/^\/ks-vtd\//, moi) : path.replace(/^\/khach\/tour|^\/dat-ban\/nha-hang/, moi);
