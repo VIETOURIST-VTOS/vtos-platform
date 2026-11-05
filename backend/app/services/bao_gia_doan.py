@@ -82,7 +82,7 @@ def tinh(bg: BaoGiaDoan) -> None:
 
 
 def bien_thuc(bg: BaoGiaDoan) -> float | None:
-    if not bg.tong_ban:
+    if bg.tong_ban is None or not bg.tong_ban:      # K2: rỗng = chưa có giá bán → chưa có biên
         return None
     return (float(bg.tong_ban) - float(bg.tong_von or 0)) / float(bg.tong_ban)
 
@@ -115,7 +115,8 @@ def ra(bg: BaoGiaDoan, von: bool) -> dict:
          "han_luc": bg.han_luc.isoformat(timespec="minutes") if bg.han_luc else None, "ly_do_tra": bg.ly_do_tra,
          "hop_dong_id": bg.hop_dong_id, "khach_dong_y_luc": bg.khach_dong_y_luc.isoformat(timespec="minutes") if bg.khach_dong_y_luc else None}
     if von:
-        o.update({"tong_von": bg.tong_von, "bien_pt": float(bg.bien_pt or 0), "bien_thuc": round(b, 4) if b is not None else None,
+        o.update({"tong_von": bg.tong_von, "bien_pt":  # k2-doc-an-toan: tong_von chỉ chuyển nguyên giá trị ra (rỗng = chưa đủ giá vốn), không tính
+                   float(bg.bien_pt or 0), "bien_thuc": round(b, 4) if b is not None else None,
                   "cap_duyet": bg.cap_duyet or ("tp_dh" if b is not None and b >= NGUONG - 1e-9 else "ct_tgd"),
                   "ly_do_bien": bg.ly_do_bien})
     return o
@@ -250,7 +251,8 @@ def duyet(db: Session, u: User, bid: int, dong_y: bool, ly_do: str = "", now: da
         bg.trang_thai, bg.duyet_boi, bg.duyet_luc = "da_duyet", u.username, now
         bg.han_luc = now + timedelta(hours=HAN_GIO)
         bg.ma_bam = _bam(bg)
-        _ghi_lead(db, tk, f"Báo giá {bg.ma} đã gửi khách: {int(bg.tong_ban):,} đ, hiệu lực đến {bg.han_luc:%d/%m %H:%M}".replace(",", "."))
+        gia = f"{int(bg.tong_ban):,} đ" if bg.tong_ban is not None else "chưa có giá"   # K2: rỗng không thành «0 đ»
+        _ghi_lead(db, tk, f"Báo giá {bg.ma} đã gửi khách: {gia}, hiệu lực đến {bg.han_luc:%d/%m %H:%M}".replace(",", "."))
     R.audit(db, u.username, u.role, "bao_gia_doan_duyet", f"bao_gia_doan:{bg.ma}",
             after={"trang_thai": bg.trang_thai, "ly_do": bg.ly_do_tra})
     db.commit()

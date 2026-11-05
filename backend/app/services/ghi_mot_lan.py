@@ -157,6 +157,9 @@ PHIEN_BAN_NGHIA_KHAC = {
                        "nào, không phải khoá sửa",
     "hop_dong_nha_hang": "số bản HỢP ĐỒNG nhà hàng – ký lại thì dựng dòng mới bản + 1, dòng cũ thôi dùng; "
                          "không sửa đè dòng cũ (app/services/nha_hang.py)",
+    # TK-1 · bảng thiết kế tour đoàn của khách. Thêm 06/11/2026 (KS-19j) khi phép thử VPM-8 bắt được.
+    "thiet_ke_doan": "số bản THIẾT KẾ tour đoàn khách gửi – mỗi lần khách gửi lại là một dòng mới cùng mã, "
+                     "bản + 1; dòng cũ bất biến, không có cửa sửa (app/services/thiet_ke_doan.py)",
 }
 
 

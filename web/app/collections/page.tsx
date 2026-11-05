@@ -22,7 +22,9 @@ const VAI_LAP_PHIEU_THU = ["ketoan", "thu_quy"];
 // `api/v1/payments.py::lap_phieu_quy`, Đợt QUY-1). Gõ rời hai chỗ thì sửa một bên quên bên kia, và
 // lúc ấy nút hiện ra để bấm vào nhận 403 — hoặc biến mất với người vẫn còn quyền. `test_quy2b_2`
 // đọc cả hai chỗ rồi so, nên lệch là đỏ.
-const VAI_SO_QUY = ["ketoan", "thu_quy"];
+// KS-19j (06/11/2026): cùng ĐÚNG bộ vai với VAI_LAP_PHIEU_THU — đọc chung một hằng số để chỉ gõ «thu_quy» một chỗ
+// (phép thử R4c-4 luật 6). Cửa sổ quỹ và cửa phiếu thu tiền mặt đều là require_roles("ketoan", "thu_quy").
+const VAI_SO_QUY = VAI_LAP_PHIEU_THU;
 
 const CHIEU_QUY: [string, string][] = [["thu", "Phiếu thu quỹ"], ["chi", "Phiếu chi quỹ"]];
 

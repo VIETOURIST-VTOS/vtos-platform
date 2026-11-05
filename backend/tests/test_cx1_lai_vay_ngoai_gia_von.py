@@ -71,9 +71,11 @@ def bc(phan_bo="khong"):
 
 
 def them(nhom, so_tien, vehicle_id=None, mo_ta=""):
+    # KS-19j (06/11/2026): sổ chi phí kỳ nay chặn cứng B6 — khoản từ ngưỡng `xe_chung_tu_bat_buoc_tu` phải kèm
+    # chứng từ gốc. Phép thử này canh LÃI VAY NGOÀI GIÁ VỐN, không canh B6, nên ghi kèm số chứng từ.
     return client.post("/api/v1/fleet/chi-phi-ky", headers=login("ketoan"),
                        json={"ky": KY, "nhom": nhom, "so_tien": so_tien,
-                             "vehicle_id": vehicle_id, "mo_ta": mo_ta})
+                             "vehicle_id": vehicle_id, "mo_ta": mo_ta, "chung_tu": f"CT-CX1 {mo_ta}"})
 
 
 def _xe_id():

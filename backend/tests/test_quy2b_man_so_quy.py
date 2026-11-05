@@ -41,6 +41,22 @@ def _man() -> str:
     return open(MAN, encoding="utf-8").read()
 
 
+def _vai_so_quy(s: str) -> list:
+    """Bộ vai của khối Sổ quỹ trên màn hình.
+
+    KS-19j (06/11/2026): `VAI_SO_QUY` được phép là BÍ DANH của `VAI_LAP_PHIEU_THU` (cùng đúng hai vai) —
+    luật 6 của R4c-4 đòi chữ «thu_quy» chỉ gõ MỘT chỗ trên màn hình, nên hai hằng số không được gõ rời.
+    Phép so với máy chủ vẫn y nguyên: đọc ra danh sách thật rồi so.
+    """
+    m = re.search(r"const VAI_SO_QUY\s*=\s*\[([^\]]*)\]", s)
+    if not m:
+        bd = re.search(r"const VAI_SO_QUY\s*=\s*(\w+)\s*;", s)
+        assert bd, "không đọc được hằng số VAI_SO_QUY trong page.tsx"
+        m = re.search(r"const %s\s*=\s*\[([^\]]*)\]" % bd.group(1), s)
+        assert m, f"VAI_SO_QUY trỏ tới {bd.group(1)} nhưng không đọc được hằng số ấy"
+    return re.findall(r'"([^"]+)"', m.group(1))
+
+
 def _khong_ghi_chu(s: str) -> str:
     """Bỏ ghi chú `//` và `/* */` — những đoạn giải thích CÓ nhắc 1111/1121 để nói với người đọc."""
     s = re.sub(r"/\*.*?\*/", " ", s, flags=re.S)
@@ -89,9 +105,7 @@ def test_quy2b_2_man_hinh_va_may_chu_noi_CUNG_MOT_CAU_ve_ai_duoc_bam():
     với người vẫn còn quyền. Cả hai đều chỉ lộ ra khi có người thật đi làm thật.
     """
     s = _man()
-    m = re.search(r"const VAI_SO_QUY\s*=\s*\[([^\]]*)\]", s)
-    assert m, "không đọc được hằng số VAI_SO_QUY trong page.tsx"
-    man = sorted(re.findall(r'"([^"]+)"', m.group(1)))
+    man = sorted(_vai_so_quy(s))
     may_chu = sorted(_vai_cua_may_chu("lap_phieu_quy"))
     assert man == may_chu, (
         f"màn hình gác {man} còn cửa máy chủ nhận {may_chu} — hai chỗ đang nói hai câu khác nhau")
@@ -156,8 +170,7 @@ def test_quy2b_6_thu_quy_mo_duoc_man_hinh_nay():
     vì đợt này dựa vào điều đó và KHÔNG nới thêm một quyền nào.
     """
     from app.services import access as AC
-    m = re.search(r"const VAI_SO_QUY\s*=\s*\[([^\]]*)\]", _man())
-    vai = re.findall(r'"([^"]+)"', m.group(1))
+    vai = _vai_so_quy(_man())
     mr = getattr(AC, "MENU_ROLES", None)
     assert mr, "access.py khong con MENU_ROLES — bang cap man hinh da doi, do lai"
     # Tra theo khoa CHUA chu "collections" chu khong go cung mot dang khoa: bang nay doi dang

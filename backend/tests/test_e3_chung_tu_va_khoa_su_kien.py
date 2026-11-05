@@ -113,6 +113,10 @@ GOI_QUA_BANG = {
                              "sai sót kỳ trước — nên Kế toán phải CHỌN, và cái chọn ấy thành một "
                              "biến. Danh sách hợp lệ hẹp đúng hai giá trị ảy, khóa là thứ màn hình gửi "
                              "lên — Đợt E14 13/10/2026"),
+    "services/phieu_quy.py": ("NGHIEP_VU_THEO_CHIEU",
+                              "Phiếu quỹ tiền mặt có HAI chiều — thu ghi «thu_quy_tien_mat», chi ghi "
+                              "«chi_quy_tien_mat» — chiều do người lập chọn nên tên nghiệp vụ là một biến. "
+                              "QUY-1 02/11/2026; khai bảng ở KS-19j 06/11/2026"),
 }
 
 
