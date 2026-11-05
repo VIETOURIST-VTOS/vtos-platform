@@ -217,6 +217,8 @@ PHAI_LOC = {
     "Tour":           "chuyến của pháp nhân nào thì doanh thu và giá vốn của pháp nhân ấy",
     "Booking":        "booking mang tiền khách – nền của mọi báo cáo bán hàng",
     "Receipt":        "phiếu thu là tiền vào của một pháp nhân cụ thể",
+    # KS-19j 06/11/2026: QUY-1 thêm bảng phiếu quỹ có cột pháp nhân mà chưa khai (phép thử bắt trên main).
+    "PhieuQuy":       "phiếu thu / chi tiền mặt của sổ quỹ — tiền mặt tại quỹ của đúng một pháp nhân",
     "PaymentRequest": "đề nghị chi là tiền ra của một pháp nhân cụ thể",
     "JournalEntry":   "bút toán ghi sổ – vào thẳng báo cáo tài chính từng pháp nhân",
     "BaoGia":         "báo giá là cam kết với khách, và cam kết do một pháp nhân đứng tên",

@@ -795,7 +795,11 @@ PHAM_VI_DA_CHOT = {
     #
     # HÀNG RÀO NÀY REO LÀ ĐÚNG VIỆC CỦA NÓ: em nới `MOI_NHAN_VIEN` cho một mục đích (đơn nghỉ
     # phép) và nó bắt em đếm lại CẢ phạm vi, kể cả ba màn hình em không nghĩ tới lúc sửa.
-    "ketoan_truong": 122, "ketoan_tt": 32, "thu_quy": 28,
+    # KS-19j 06/11/2026: thu_quy 28 → 30 = màn /nap-du-lieu và hai cửa sau nó (/api/v1/nap-du-lieu,
+    # /api/v1/quyet-toan-tour). Lý do: Chủ tịch 02/11 «thủ quỹ nhập tay từng phiếu VÀ tải lô sổ quỹ»; QUY-2a mở bộ
+    # nạp «so_quy» cho thủ quỹ nhưng màn hình chưa mở (quyền có, cửa không). Cửa quyết toán tour vẫn tự chặn bằng
+    # require_roles riêng của nó; thủ quỹ chỉ nạp được bộ «so_quy».
+    "ketoan_truong": 122, "ketoan_tt": 32, "thu_quy": 30,
     "robot_pq": 18, "robot_ks": 153, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
