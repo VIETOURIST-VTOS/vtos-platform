@@ -1363,6 +1363,10 @@ MAN_HINH_THU_QUY = (
     # ĐÚNG hai màn hình, và chỉ vì bốn cửa của thủ quỹ nằm sau chúng: /collections (xác nhận
     # phiếu thu, phiếu thu tiền mặt, đọc giao dịch để đối chiếu quỹ) và /expenses (bấm ĐÃ CHI).
     "/collections", "/expenses",
+    # KS-19j (06/11/2026): QUY-2a cho thủ quỹ tải lô «Sổ quỹ tiền mặt» và /collections chỉ thủ quỹ sang
+    # /nap-du-lieu — mà màn ấy chưa mở cho vai này (quyền có, cửa không). Cửa API intake mở kèm; từng bộ
+    # nạp vẫn tự chặn (intake_so_quy chỉ cho thủ quỹ bộ «so_quy»).
+    "/nap-du-lieu",
 )
 
 

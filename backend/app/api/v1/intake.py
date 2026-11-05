@@ -20,7 +20,10 @@ router = APIRouter(prefix="/api/v1/nap-du-lieu", tags=["nap-du-lieu"])
 # hoặc phải mở cho mọi phòng – ai cũng nạp được mọi thứ – hoặc phải đóng bớt phòng, và phòng bị đóng sẽ
 # nhờ người khác nạp hộ, tức là nhật ký ghi sai tên người chịu trách nhiệm.
 READ = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "ketoan", "bks", "cntt", "hcns",
-        "gd_doi_xe", "tp_hd", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt")
+        "gd_doi_xe", "tp_hd", "gd_kd", "tp_kd", "tn_kd", "nv_kd", "nv_mkt",
+        # KS-19j (06/11/2026): thủ quỹ — Chủ tịch 02/11 «thủ quỹ nhập tay từng phiếu VÀ tải lô sổ quỹ» (QUY-2a).
+        # Bộ nạp vẫn chặn từng bộ: intake_so_quy chỉ mở «so_quy» cho vai này, các bộ khác trả 403.
+        "thu_quy")
 WRITE = READ
 
 

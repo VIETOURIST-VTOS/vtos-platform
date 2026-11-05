@@ -33,6 +33,9 @@ CHIEU = {
     "thu": ("tien_vao", "PTQ", "thu_quy_tien_mat"),
     "chi": ("tien_ra", "PCQ", "chi_quy_tien_mat"),
 }
+# KS-19j (06/11/2026): `post_entry` nhận tên nghiệp vụ qua BIẾN (theo chiều thu/chi) — khai bảng riêng để
+# phép thử E3 (test_e3_3b/3c) kiểm được từng giá trị có trong `chung_tu_loai.NGHIEP_VU`.
+NGHIEP_VU_THEO_CHIEU = {k: v[2] for k, v in CHIEU.items()}
 
 
 def ly_do_nhan_duoc(db: Session, chieu: str) -> list[dict]:
@@ -143,7 +146,8 @@ def lap(db: Session, u: User, chieu: str, ngay: date, so_tien: float, ly_do: str
                 "do mới thì Kế toán trình quy tắc hạch toán cho nó (cần hai chữ ký) rồi lập lại "
                 "phiếu — máy KHÔNG đoán hộ cặp tài khoản.")
 
-    nguon, tien_to, nghiep_vu = CHIEU[chieu]
+    nguon, tien_to, _ = CHIEU[chieu]
+    nghiep_vu = NGHIEP_VU_THEO_CHIEU[chieu]
     code = MTS.tiep_theo(db, PhieuQuy, f"{tien_to}{ngay:%y%m}-", 4)
     bc = _boi_canh(code, ngay, chieu, ly_do, noi_dung, ten_doi_tuong, ma_doi_tuong,
                    booking_id, khoan_muc)

@@ -63,6 +63,10 @@ DO_RIENG = {
     "DK-1b":    {"backend/app/services/ks_cua_nhap.py": '"don_dang_ky"'},
     "DK-2b":    {"backend/app/services/ks_cua_nhap.py": '"may_da_nho"'},
     "DỌN-MISA": {"backend/app/main.py": ""},
+    # KS-19j (06/11/2026): PL-1 (eb29437) chỉ thêm hai tham số lọc loai/bac ở hai cửa này, KHÔNG ghi mã PL-1 vào
+    # tệp — dòng sổ vẫn khai hai tệp. Dấu thay thế là chính lời gọi PL-1 thêm vào.
+    "PL-1":     {"backend/app/api/v1/cong_khach.py": "loai=loai, bac=bac",
+                 "backend/app/api/v1/dat_ban.py": "loai=loai, bac=bac"},
 }
 
 DANG_LAM = "đang làm"
@@ -211,7 +215,7 @@ def test_donpq_7_so_cua_dot_o_lan_phan_quyen_va_khong_cho_nao_khac():
 
     khac = [t for t in _nguon()
             if os.path.abspath(t) != os.path.abspath(TEP_DOT)
-            and "DON-PQ" in open(t, encoding="utf-8").read()]
+            and re.search(r"DON-PQ(?!\w)", open(t, encoding="utf-8").read())]   # KS-19j: DON-PQ2 là đợt khác
     assert not khac, f"đợt này còn ghi vào {khac}"
 
 

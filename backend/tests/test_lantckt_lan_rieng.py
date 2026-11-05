@@ -121,8 +121,10 @@ def test_lantckt_5_khong_doi_mot_dong_nao_cua_lan_khac():
     assert pq, "không đọc được phan-quyen.md"
     assert all(d["lan"] != TEN_LAN for d in pq), \
         "có dòng TC-KT nằm trong phan-quyen.md — đợt này đã dời dòng, hoặc ghi nhầm tệp"
-    assert sum(1 for d in pq if d["trang_thai"] == "đang làm") >= 16, \
-        "số dòng «đang làm» của phan-quyen.md GIẢM — đợt này đã đụng vào sổ của làn khác"
+    # KS-19j (06/11/2026): bỏ phép đếm «còn ≥ 16 dòng đang làm». Con số ấy là ẢNH CHỤP lúc đợt LAN-TCKT gộp
+    # (02/11). Từ đó làn Phân quyền đã đóng sổ đúng luật (robot «Đóng sổ khi gộp», DỌN-6) nên số dòng giảm
+    # là ĐÚNG, không phải dấu hiệu TC-KT sửa sổ người khác. Phần còn kiểm được trên main là câu ở trên:
+    # không có dòng TC-KT nào nằm trong phan-quyen.md.
 
 
 # ───────────────────────────────────────────────────────────────────── LUẬT 6

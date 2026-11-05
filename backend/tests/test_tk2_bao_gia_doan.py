@@ -115,7 +115,7 @@ def test_tk2_4_khach_dong_y_tao_hop_dong_nhap(db, nen):
     from app.services import thiet_ke_doan as S
     _bang_gia(db)
     tk = _da_duyet(db, nen)
-    mine = S.cua_toi(db, _tk(db))[0]["bao_gia"]
+    mine = S.cua_toi(db, _tk(db), NOW)[0]["bao_gia"]
     assert mine["trang_thai"] == "da_duyet" and "tong_von" not in mine and all("von" not in x for x in mine["dong"])
     with pytest.raises(B.LoiBaoGia, match="Không tìm thấy"):
         B.khach_dong_y(db, _tk(db, 2), mine["id"], mine["ma_bam"], True, NOW)
@@ -133,7 +133,7 @@ def test_tk2_4b_qua_24_gio_het_han(db, nen):
     from app.services import thiet_ke_doan as S
     _bang_gia(db)
     _da_duyet(db, nen)
-    mine = S.cua_toi(db, _tk(db))[0]["bao_gia"]
+    mine = S.cua_toi(db, _tk(db), NOW)[0]["bao_gia"]
     with pytest.raises(B.LoiBaoGia, match="hết hạn") as e:
         B.khach_dong_y(db, _tk(db), mine["id"], mine["ma_bam"], True, NOW + dt.timedelta(hours=25))
     assert e.value.status == 410

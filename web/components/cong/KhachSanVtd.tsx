@@ -1240,7 +1240,7 @@ const CSS = `
 .ksv-gal>button>.ksv-see,.ksv-gal>button>.ksv-ct{position:absolute;grid-row:auto}.ksv-gal>button>.ksv-see{background:#fff}.ksv-gal>button>.ksv-ct{background:rgba(20,20,30,.66);cursor:pointer}
 .ksv-see{position:absolute;right:10px;bottom:10px;background:#fff;color:#1b2230;border-radius:99px;padding:6px 12px;font-weight:600;font-size:13px;display:flex;gap:6px;align-items:center;box-shadow:var(--ksv-sh)}
 .ksv-sub{position:sticky;top:0;z-index:15;background:#fff;border:1px solid var(--ksv-line);border-radius:12px;box-shadow:var(--ksv-sh);display:flex;align-items:center;gap:8px;padding:0 12px}
-.ksv-sub .tb{display:flex;gap:2px;overflow-x:auto;flex:1;min-width:0}
+.ksv-sub .tb{display:flex;gap:2px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:none}.ksv-sub .tb::-webkit-scrollbar{display:none}   /* KS-19i: KS-19h ẩn nhầm lớp .ksv-tabs — thanh mục thật là .ksv-sub .tb */
 .ksv-sub .tb a{padding:14px 12px;font-weight:600;color:#3c4657;border-bottom:3px solid transparent;white-space:nowrap;text-decoration:none}.ksv-sub .tb a:hover{color:var(--ksv-accent);border-color:var(--ksv-accent)}
 .ksv-sub .from{display:flex;align-items:baseline;gap:6px;white-space:nowrap}.ksv-sub .from .ksv-btn{align-self:center}
 .ksv-g2{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start;scroll-margin-top:70px}
