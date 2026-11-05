@@ -503,7 +503,8 @@ def ra_khach(db: Session, d: DonKsVtd, now: datetime | None = None) -> dict:
             "vao": d.vao.isoformat(), "ra": d.ra.isoformat(), "dem": (d.ra - d.vao).days, "nguoi_lon": d.nguoi_lon,
             "tre_em": d.tre_em, "dong": d.dong, "so_phong": d.so_phong, "tien_phong": int(d.tien_phong),
             "thue_phi": int(d.thue_phi or 0), "tong": int(d.tong or 0), "da_tra": tra,
-            "vat_pt": S.VAT_PT, "vat_trong": S.vat_trong(int(d.tong or 0)),   # KS-19: VAT nằm trong giá "con_phai_tra": max(0, int(d.tong or 0) - tra),
+            "vat_pt": S.VAT_PT, "vat_trong": S.vat_trong(int(d.tong or 0)),   # KS-19: VAT nằm trong giá
+            "con_phai_tra": max(0, int(d.tong or 0) - tra),   # KS-19g: KS-19 lỡ để dòng này trong chú thích → nút «Trả ngay ₫ —»
             "giam_voucher": int(d.giam_voucher or 0), "voucher": _ma_voucher_don(db, d),
             "trang_thai": d.trang_thai, "trang_thai_ten": TRANG_THAI_DON.get(d.trang_thai, d.trang_thai),
             "giu_den": d.giu_den.isoformat(timespec="seconds") if d.giu_den else None,

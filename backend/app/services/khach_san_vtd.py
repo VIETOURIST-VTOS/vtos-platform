@@ -1011,7 +1011,8 @@ def _ks_noi_bo(k: KhachSanVtd) -> dict:
     return {**{x: getattr(k, x) for x in TRUONG_KS}, "cs_moc_tuoi": [chuan_moc(m) for m in (k.cs_moc_tuoi or []) if m.get("cach") != "nguoi_lon"],
             "cs_phi_giuong_phu": float(k.cs_phi_giuong_phu) if k.cs_phi_giuong_phu is not None else None, "id": k.id, "ma": k.ma, "hien_cong": k.hien_cong, "hien_boi": k.hien_boi,
             "tat_ly_do": k.tat_ly_do, "ngung": k.ngung,
-            "vi_do": k.vi_do, "kinh_do": k.kinh_do, "toa_do_nguon": k.toa_do_nguon or "", "mo_thanh_toan": bool(k.mo_thanh_toan),   # KS-16s "sua_boi": k.sua_boi, "tao_boi": k.tao_boi,
+            "vi_do": k.vi_do, "kinh_do": k.kinh_do, "toa_do_nguon": k.toa_do_nguon or "", "mo_thanh_toan": bool(k.mo_thanh_toan),   # KS-16s
+            "sua_boi": k.sua_boi, "tao_boi": k.tao_boi,   # KS-19g: hai trường này trước đây nằm lẫn trong chú thích
             "sua_luc": k.sua_luc.isoformat(timespec="minutes") if k.sua_luc else None}
 
 
