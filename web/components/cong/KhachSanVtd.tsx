@@ -501,7 +501,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{ks.gia_tu && <span className="ksv-b navy">Giá hợp đồng VTD</span>}{diem?.dang_bat && <span className="ksv-b purple">Tích điểm VTD</span>}
               {ks.loai_ten && <span className="ksv-b out">{ks.loai_ten}</span>}</div>
             <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}><h2 className="ksv-h1">{ks.ten}</h2>{ks.sao > 0 && <span className="ksv-stars" aria-label={`${ks.sao} sao`}>{"★".repeat(ks.sao)}</span>}</div>
-            <span className="ksv-muted" style={{ fontSize: 13.5 }}>{[ks.dia_chi, ks.khu_vuc, ks.tinh_thanh].filter(Boolean).join(", ")} · <a className="ksv-link" href="#ksv-vt" onClick={(e) => { e.preventDefault(); keo("ksv-vt"); }}>XEM VỊ TRÍ</a></span></div>
+            <span className="ksv-muted" style={{ fontSize: 13.5 }}>{ks.dia_chi || [ks.khu_vuc, ks.tinh_thanh].filter(Boolean).join(", ")} · <a className="ksv-link" href="#ksv-vt" onClick={(e) => { e.preventDefault(); keo("ksv-vt"); }}>XEM VỊ TRÍ</a></span></div>
           {(ks.noi_bat || ks.gan || ks.mo_ta || ks.co_mien_phi_huy || ks.co_bua_sang) && <div className="ksv-panel" style={{ padding: 18 }}><h2 className="ksv-h2">Điểm nổi bật</h2>
             {ks.noi_bat && <div className="ksv-hlr"><span className="ic"><Ico d={P.sao} s={20} fill /></span><div><b>{ks.noi_bat}</b></div></div>}
             {ks.gan && <div className="ksv-hlr"><span className="ic"><Ico d={P.ghim} s={20} fill /></span><div><b>Vị trí</b> — {ks.gan}{ks.km_trung_tam != null && <div className="ksv-muted">{phay(ks.km_trung_tam)} km tới trung tâm</div>}</div></div>}
@@ -585,8 +585,8 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
             <div className="act">{con > 0 ? <>
               <select className="ksv-sel" aria-label={`Số phòng ${p.ten} ${g.ten}`} disabled={tat} value={chon[g.id] || 0}
                 onChange={(e) => setChon({ ...chon, [g.id]: Number(e.target.value) })}>{Array.from({ length: Math.min(conCho(p, g.id), 9) + 1 }, (_, n) => <option key={n} value={n}>{n} phòng</option>)}</select>
-              <button type="button" className={`ksv-btn ${chon[g.id] ? "" : "line"}`} disabled={tat || busy} onClick={() => sangGui({ ...chon, [g.id]: chon[g.id] || 1 })}>
-                Đặt ngay{ts && <small style={{ display: "block", fontWeight: 500, fontSize: 12 }}>Trả sau</small>}</button>
+              <button type="button" className={`ksv-btn ksv-dat ${chon[g.id] ? "" : "line"}`} disabled={tat || busy} onClick={() => sangGui({ ...chon, [g.id]: chon[g.id] || 1 })}>
+                Đặt ngay{ts && <small>Trả sau</small>}</button>
               {ts && !tat && <span className="ksv-okc" style={{ fontSize: 12.5, fontWeight: 600 }}>Hôm nay chưa trả</span>}</>
               : <b style={{ color: "var(--ksv-price)" }}>Hết phòng</b>}</div>
           </div>; }) : <div style={{ padding: 16, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
@@ -1104,7 +1104,9 @@ const CSS = `
 .ksv-gal span{position:relative;background:var(--ksv-soft)}.ksv-gal span:first-child{grid-row:span 2}
 .ksv-gal img{width:100%;height:100%;object-fit:cover;display:block}
 .ksv-more{display:grid;place-items:center;color:#fff;font-weight:700;background:linear-gradient(160deg,#3c4a63,#8d99ad)!important}
-.ksv-tabs{position:sticky;top:0;z-index:15;background:#fff;border:1px solid var(--ksv-line);border-radius:10px;display:flex;gap:2px;align-items:center;overflow-x:auto;padding:0 8px}
+.ksv-tabs{position:sticky;top:0;z-index:15;background:#fff;border:1px solid var(--ksv-line);border-radius:10px;display:flex;gap:2px;align-items:center;overflow-x:auto;padding:0 8px;scrollbar-width:none}.ksv-tabs::-webkit-scrollbar{display:none}
+/* KS-19h: nút «Đặt ngay / Trả sau» hai dòng — không bị chặn chiều cao, dòng phụ cùng màu chữ của nút */
+.ksv .ksv-dat{height:auto!important;min-height:48px;padding:6px 18px!important;gap:1px;line-height:1.2}.ksv .ksv-dat small{display:block;color:inherit!important;opacity:.9;font-weight:500;font-size:12px}
 .ksv-tabs a{padding:12px;font-weight:600;color:var(--ksv-muted);white-space:nowrap;text-decoration:none}.ksv-tabs a:hover{color:var(--ksv-ink)}
 .ksv-tp{margin-left:auto;display:flex;align-items:center;gap:10px;white-space:nowrap;padding:6px 0}
 .ksv-two{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px}

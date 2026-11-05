@@ -646,7 +646,9 @@ table.bang-doc{width:100%}
   /* Chốt chặn cuối: thân trang không được rộng hơn màn hình. Nếu một bảng cũ (chưa đổi sang
      BangDoc) còn nằm trong .wrap thì nó tự cuộn trong khung của nó – phần còn lại của trang
      không bị kéo lệch theo. */
-  html,body{overflow-x:hidden}
+  /* KS-19h: «clip» chặn tràn ngang như «hidden» nhưng không biến body thành khung cuộn riêng — «hidden» làm mọi
+     thanh position:sticky (tổng tiền đặt phòng, thanh mục) không dính trên điện thoại. Trình duyệt cũ vẫn dùng hidden. */
+  html,body{overflow-x:hidden;overflow-x:clip}
   main,.panel,.the{max-width:100%}
   .wrap{max-width:100%}
 }
