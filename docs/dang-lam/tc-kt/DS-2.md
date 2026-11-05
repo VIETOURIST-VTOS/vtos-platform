@@ -1,0 +1,8 @@
+# Sổ giữ chỗ — làn TC-KT · Đợt DS-2
+
+Một đợt một tệp (Đợt SO-DOT 02/11/2026). Luật: [../README.md](../README.md).
+Mọi dòng trong tệp này PHẢI có cột `Làn` là `TC-KT`.
+
+| Làn | Mã việc | Tệp sẽ đụng | Bắt đầu | Trạng thái |
+|---|---|---|---|---|
+| TC-KT | **DS-2 — HỎI GIT, ĐÓNG MỌI DÒNG ĐÃ GỘP (mọi làn)**. Bước một của hai; bước hai là treo chuông ba ngày. Chủ tịch chốt 05/11/2026: dọn trước, treo chuông sau — vì đo được chín dòng đã quá ba ngày, và treo chuông chặn ngay sẽ làm main đỏ lập tức, chặn cả những làn đang chạy việc khác. NGUYÊN TẮC LÀ CỦA ĐỢT ĐS-1 (Chủ tịch duyệt 28/10/2026): HỎI GIT, KHÔNG GÕ TAY DANH SÁCH — mã ở đầu mô tả (`**TR-2 — …**`) khớp mã ở đầu tiêu đề commit trên main (`TR-2: …` hoặc `Dot TR-2: …`) thì làn ấy đã gộp, đóng dòng. Vì sao không dùng bảng bằng chứng gõ tay như Đợt DỌN-TCKT2: ở đây có 18 dòng của bảy nhóm việc khác nhau, và một bảng gõ tay cho ngần ấy thì sớm muộn nói về một ảnh cũ — git thì không bao giờ nói về một ảnh cũ. KHÔNG ĐOÁN: đọc được dưới 50 tiêu đề commit thì DỪNG LẠI (lịch sử bị cắt nông thì mọi câu trả lời đều là "chưa gộp", và đó là câu trả lời sai nguy hiểm nhất); mã không thấy trên main thì ĐỂ NGUYÊN và in ra. Khớp phải có DẤU HAI CHẤM nên `TK-1` không nuốt `TK-1b`. QUÉT MỌI LÀN chứ không riêng «Phân quyền»: chuông sắp treo canh cả sổ, nên dọn nửa sổ là dựng một cái chuông kêu mãi. Hai luật của ĐS-1 cũng vào đây: mỗi dòng phải đọc được MÃ VIỆC (không có mã thì không bao giờ đóng tự động được, dòng ấy sống mãi và giữ tệp mãi) và đọc được NGÀY BẮT ĐẦU (một cái chuông có lỗ thủng thì không phải cái chuông). Bốn luật ở `test_ds2_hoi_git_dong_dong.py`. | docs/dang-lam/, backend/tests/test_ds2_hoi_git_dong_dong.py, docs/dang-lam/tc-kt/DS-2.md | 05-11-2026 12:10 | đang làm |
