@@ -59,14 +59,14 @@ def test_dat_phong_tra_the_sepay(db, k3, bat_sepay):
     assert "form" in r and "url" not in r
     t = db.execute(select(S.ThanhToanKsVtd).where(S.ThanhToanKsVtd.don_id == d.id)).scalars().one()
     assert t.kenh == "sepay" and dict(r["form"]["fields"])["order_invoice_number"] == t.ma_gd
-    assert dict(r["form"]["fields"])["order_amount"] == "4370000"
+    assert dict(r["form"]["fields"])["order_amount"] == "3800000"
     # lệch số → không thành công, đơn vẫn chờ
     S.sepay_ket_qua(db, SP.doc_ipn(_ipn(t.ma_gd, 100000)), NAY)
     assert t.trang_thai == "that_bai" and d.trang_thai == "cho_tra"
-    S.sepay_ket_qua(db, SP.doc_ipn(_ipn(t.ma_gd, 4370000)), NAY + dt.timedelta(minutes=2))
-    assert t.trang_thai == "thanh_cong" and d.trang_thai == "da_tra" and "VISA" in t.ghi_chu
-    S.sepay_ket_qua(db, SP.doc_ipn(_ipn(t.ma_gd, 4370000)), NAY + dt.timedelta(minutes=3))   # gửi lại: không đổi
-    assert S.da_tra(db, d) == 4370000
+    S.sepay_ket_qua(db, SP.doc_ipn(_ipn(t.ma_gd, 3800000)), NAY + dt.timedelta(minutes=2))
+    assert t.trang_thai == "thanh_cong" and d.trang_thai == "da_xac_nhan" and "VISA" in t.ghi_chu
+    S.sepay_ket_qua(db, SP.doc_ipn(_ipn(t.ma_gd, 3800000)), NAY + dt.timedelta(minutes=3))   # gửi lại: không đổi
+    assert S.da_tra(db, d) == 3800000
     S.kt_doi_soat(db, _u(db, "kt"), t.id, 80000, NAY)
     assert t.trang_thai == "da_doi_soat" and t.but_toan
 
@@ -84,9 +84,9 @@ def test_ipn_khoa_sai_va_dinh_tuyen(db, k3, bat_sepay, monkeypatch):
     app.dependency_overrides[get_db] = lambda: db
     try:
         c = TestClient(app)
-        assert c.post("/api/v1/sepay-pg/ipn", json=_ipn(t.ma_gd, 4370000), headers={"X-Secret-Key": "sai"}).status_code == 401
+        assert c.post("/api/v1/sepay-pg/ipn", json=_ipn(t.ma_gd, 3800000), headers={"X-Secret-Key": "sai"}).status_code == 401
         assert t.trang_thai == "cho"
-        r = c.post("/api/v1/sepay-pg/ipn", json=_ipn(t.ma_gd, 4370000), headers={"X-Secret-Key": "khoa-ipn"})
+        r = c.post("/api/v1/sepay-pg/ipn", json=_ipn(t.ma_gd, 3800000), headers={"X-Secret-Key": "khoa-ipn"})
         assert r.status_code == 200 and r.json()["ghi"] is True
         db.refresh(t)
         assert t.trang_thai == "thanh_cong"

@@ -117,7 +117,7 @@ def test_dat_giuong_phu_cho_xac_nhan(db, k3):  # noqa: F811
                                   "chon": [{"goi_id": g.id, "so": 1}], "ho_ten": "Nguyễn Thị Lan", "lien_he": "0901 000 001",
                                   "dong_y": True}, NAY)
     assert int(d.tien_phong) == PHONG + pt and d.dong[0]["giuong_phu_cho_xac_nhan"] is True
-    assert int(d.thue_phi) == round((PHONG + pt) * 0.15) and d.yeu_cau.startswith("Tuổi trẻ em: 4, 8")
+    assert int(d.thue_phi) == 0 and d.yeu_cau.startswith("Tuổi trẻ em: 4, 8")
     with pytest.raises(D.LoiDon, match="Chọn tuổi"):
         D.dat(db, _tk(db, 2), k.id, {"vao": VAO, "ra": RA, "nguoi_lon": 2, "tre_em": 1, "chon": [{"goi_id": g.id, "so": 1}],
                                      "ho_ten": "Trần Văn Bình", "lien_he": "0901 000 002", "dong_y": True}, NAY)

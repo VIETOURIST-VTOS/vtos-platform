@@ -525,7 +525,7 @@ def du_toan(db: Session, tk: dict) -> dict:
                 if p is None:
                     thieu_gia("Khách sạn", f"{k.ten} · {lp.ten}", f"chưa có giá cho {vao:%d/%m}–{ra_:%d/%m}")
                 elif so_phong:
-                    von = p["tong"] * so_phong * (1 + float(k.thue_phi_pt or 0) / 100)
+                    von = p["tong"] * so_phong
                     them("Khách sạn", f"{k.ten} · {lp.ten} · {g.ten}", f"{so_phong} phòng × {dem} đêm ({h['ten']})", von)
                     bg.append(f"{k.ten}" + (f" ({k.sao}★)" if k.sao else "") + f" tại {h['ten']}, {dem} đêm")
                     if ph["p3"] or ph["p1"]:
@@ -717,8 +717,8 @@ def nguon(db: Session, diem: str, vao, ra, nl: int = 2, te: int = 0, so_phong: i
             ps = []
             for p in phong.get(k.id, []):
                 gs = [{"id": g["id"], "ten": g["ten"], "bua_sang": g["bua_sang"], "mien_phi_huy": g["mien_phi_huy"],
-                       "gia_dem": ban(g["gia_dem"] * (1 + float(k.thue_phi_pt or 0) / 100)),
-                       "tong_phong": ban(g["tong"] * (1 + float(k.thue_phi_pt or 0) / 100))} for g in p["goi"]]
+                       "gia_dem": ban(g["gia_dem"]),
+                       "tong_phong": ban(g["tong"])} for g in p["goi"]]
                 if gs:
                     ps.append({"id": p["id"], "ten": p["ten"], "giuong": p["giuong"], "suc_chua": p["suc_chua"], "goi": gs})
             ks_ra.append({"id": k.id, "ten": k.ten, "sao": k.sao, "khu_vuc": k.khu_vuc, "phong": ps,

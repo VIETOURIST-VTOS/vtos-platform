@@ -37,7 +37,8 @@ NHOM_TUOI = {"so_sinh": "Trẻ sơ sinh", "tre_em": "Trẻ em"}
 KIEU_GIA = {"co_dinh": "Cố định (đ / đêm)", "phan_tram": "% giá phòng / đêm"}
 CHE_DO_TRE_GOI = {"": "Theo phòng / khách sạn", "rieng": "Giá trẻ em riêng cho gói", "nhu_nguoi_lon": "Tính trẻ em như người lớn"}
 TIEN_NGHI_PHONG = ("Máy lạnh", "Wifi", "Vòi sen", "Bồn tắm", "Ban công", "Hướng biển", "Không hút thuốc", "Minibar",
-                   "Két sắt", "Bếp nhỏ", "Hồ bơi riêng", "TV", "Máy sấy tóc", "Bàn làm việc")
+                   "Két sắt", "Bếp nhỏ", "Hồ bơi riêng", "TV", "Máy sấy tóc", "Bàn làm việc",
+                   "Hướng thành phố", "Hướng núi / vườn", "Máy giặt")   # KS-19: thêm cho bộ lọc hướng nhìn / tiện nghi
 NGUON_LP = {"agoda": "Agoda", "booking": "Booking.com", "ks_gui": "Khách sạn gửi", "hop_dong": "Hợp đồng", "khac": "Khác"}
 CAN_XAC_NHAN = {"ten_hang": "Tên hạng thực tế", "dien_tich": "Diện tích", "giuong": "Giường", "tre_em": "Trẻ em / giường phụ",
                 "tien_nghi": "Tiện nghi mâu thuẫn", "hop_dong": "Hợp đồng", "han_muc": "Hạn mức", "gia": "Giá VTD"}
@@ -86,6 +87,7 @@ class KhachSanVtd(Base):
     # KS-17: 0% mặc định KHÔNG phải xác nhận «khách sạn không thu thuế». Chưa xác nhận thì không duyệt được gói giá
     # và không mở được thanh toán của khách sạn.
     thue_phi_xac_nhan: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    phu_hop: Mapped[list] = mapped_column(JSON, default=list)   # KS-19: khoá trong PHU_HOP (dịch vụ) — bộ lọc «Phù hợp cho»
     lien_he_noi_bo: Mapped[str] = mapped_column(String(300), default="")  # KHÔNG ra cổng
     ghi_chu_noi_bo: Mapped[str] = mapped_column(Text, default="")         # KHÔNG ra cổng
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), nullable=True, index=True)

@@ -110,8 +110,8 @@ def test_cong_tim_chi_tiet_anh(db):
     assert o["gia_tu"]["gia_dem"] == round(3_800_000 / 3) and o["co_bua_sang"] and o["co_mien_phi_huy"]
     assert o["anh"] and o["anh"][0]["nho"].startswith("/api/v1/ks-vtd-anh/") and "goc" not in o["anh"][0]
     assert "lien_he_noi_bo" not in o and "ghi_chu_noi_bo" not in o
-    # 3 người lớn / 1 phòng: phòng tối đa 2 → không có giá từ
-    assert S.tim(db, "Đà Nẵng", VAO, RA, 3, 0, 1, hom_nay=HN)["khach_san"][0]["gia_tu"] is None
+    # 3 người lớn / 1 phòng: phòng tối đa 2 → không đặt được → KS-19: không hiện trên danh sách
+    assert S.tim(db, "Đà Nẵng", VAO, RA, 3, 0, 1, hom_nay=HN)["khach_san"] == []
     ct = S.chi_tiet_cong(db, a.id, VAO, RA, 2, 0, 1, hom_nay=HN)
     assert ct["phong"][0]["goi"][0]["tong"] == 3_800_000 and ct["phong"][0]["goi"][0]["huy_han"] == "2026-12-16"
     with pytest.raises(S.LoiKhachSan):
@@ -155,7 +155,9 @@ def test_tinh_lai_va_yeu_cau_giu(db):
     k = _ks(db)
     lp, g, _x = _mo_ban(db, k)
     t = S.tinh_lua_chon(db, k.id, VAO, RA, [{"goi_id": g.id, "so": 2}], hom_nay=HN)
-    assert t["tien_phong"] == 7_600_000 and t["thue_phi"] == 1_140_000 and t["tong"] == 8_740_000
+    # KS-19: giá đã gồm 8% VAT — không cộng thuế phí (ô 15% cũ bị bỏ qua); VAT trong giá = 8/108
+    assert t["tien_phong"] == 7_600_000 and t["thue_phi"] == 0 and t["tong"] == 7_600_000
+    assert t["vat_pt"] == 8 and t["vat_trong"] == round(7_600_000 * 8 / 108)
     with pytest.raises(S.LoiKhachSan, match="tối đa 3"):
         S.tinh_lua_chon(db, k.id, VAO, RA, [{"goi_id": g.id, "so": 4}], hom_nay=HN)
     tk = TaiKhoanNgoai(loai="khach_hang", dien_thoai="0901000009", ho_ten="Lan", trang_thai="hoat_dong")
@@ -165,7 +167,7 @@ def test_tinh_lai_va_yeu_cau_giu(db):
                           hom_nay=HN)
     don = db.get(DonKhachSanOta, r["id"])
     assert don.tai_khoan_ngoai_id == tk.id and don.so_phong == 1 and "Biển Xanh" in don.noi_den
-    assert "3.800.000 đ / 3 đêm" in don.yeu_cau_them and "4.370.000" in don.yeu_cau_them and "Tầng cao" in don.yeu_cau_them
+    assert "3.800.000 đ / 3 đêm" in don.yeu_cau_them and "đã gồm 8% VAT" in don.yeu_cau_them and "Tầng cao" in don.yeu_cau_them
     # gói bị sửa (về nháp) → yêu cầu có chọn phòng bị chặn, giá cũ không lọt qua
     S.luu_goi(db, _u(db, "dh"), lp.id, {"ten": "Có bữa sáng", "mua": [{"tu_ngay": "2026-12-01", "den_ngay": "2026-12-31", "gia_thuong": 20000}]}, g.id)
     with pytest.raises(S.LoiKhachSan, match="đã thay đổi"):

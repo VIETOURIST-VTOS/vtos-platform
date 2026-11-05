@@ -35,13 +35,13 @@ def test_khach_san_chot_lap_de_nghi(db, k3, bat):
     S.dh_xac_nhan(db, _u(db, "dh"), d.id, "BX-9", NAY); db.commit()
     S.kt_chot(db, _u(db, "kt"), d.id, 400_000, SAU); db.commit()
     r = db.get(PaymentRequest, d.payment_request_id)
-    assert r.category == "tra_ncc_thu_ho" and int(r.amount) == 3_970_000 == d.phai_tra_ks
+    assert r.category == "tra_ncc_thu_ho" and int(r.amount) == 3_400_000 == d.phai_tra_ks
     assert r.has_document and d.ma in r.description and "BX-9" in r.document_ref
     assert r.company_id == db.execute(select(Company.id).where(Company.kind == "me")).scalar_one()
     # robot kế toán: xác nhận thay bộ phận; khách sạn chưa gắn NCC → DỪNG ở bước kiểm, ghi lý do
     assert r.status == "cho_kt" and r.tp_by == "robot" and "chưa gắn nhà cung cấp" in r.robot_ghi_chu
     kt = S.hang_ke_toan(db, _u(db, "kt"), SAU)["phai_tra_ks"][0]["de_nghi_chi"]
-    assert kt == [{"don": d.ma, "id": r.id, "code": r.code, "status": "cho_kt", "so_tien": 3_970_000}]
+    assert kt == [{"don": d.ma, "id": r.id, "code": r.code, "status": "cho_kt", "so_tien": 3_400_000}]
     for ai, buoc in (("tp", "confirm"), ("kt", "check")):
         with pytest.raises(ValueError, match="robot"):
             O.step(db, _u(db, ai), r, buoc)
@@ -57,7 +57,7 @@ def test_khach_san_chot_lap_de_nghi(db, k3, bat):
     with pytest.raises(S.LoiDon, match="đang chờ kiểm"):
         S.robot_kiem_de_nghi(db, _u(db, "kt"), r)
     O._post_liability(db, r); db.commit()
-    assert _dong(db, r) == [("331", 0, 3_970_000), ("3388", 3_970_000, 0)]
+    assert _dong(db, r) == [("331", 0, 3_400_000), ("3388", 3_400_000, 0)]
     assert db.execute(select(PaymentRequest).where(PaymentRequest.category == "tra_ncc_thu_ho")).scalars().all() == [r]
     with pytest.raises(ValueError, match="máy tự lập"):
         O.create_request(db, _u(db, "kt"), {"category": "tra_ncc_thu_ho", "supplier_name": "X", "amount": 1, "description": "x"})

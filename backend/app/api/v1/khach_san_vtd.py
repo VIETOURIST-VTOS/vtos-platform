@@ -127,6 +127,7 @@ class KsIn(BaseModel):
     cs_giuong_phu_kieu: str = "co_dinh"
     thue_phi_pt: float | None = 0
     thue_phi_xac_nhan: bool = False                 # KS-17
+    phu_hop: list[str] | None = None                # KS-19: «Phù hợp cho»
     lien_he_noi_bo: str = ""
     ghi_chu_noi_bo: str = ""
     link_ggmap: str = ""            # KS-16s: dán link Google Maps để sửa ghim bản đồ

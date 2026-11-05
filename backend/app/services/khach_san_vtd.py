@@ -108,6 +108,7 @@ def _kiem_ky(vao, ra, hom_nay: date | None = None) -> tuple[date, date]:
 TRUONG_KS = ("ten", "tinh_thanh", "khu_vuc", "dia_chi", "sao", "loai", "km_trung_tam", "gan", "noi_bat", "mo_ta",
              "tien_ich", "gio_nhan", "gio_tra", "cs_tre_em", "cs_giuong_phu", "cs_vat_nuoi", "cs_khac", "thue_phi_pt",
              "thue_phi_xac_nhan",                                                                   # KS-17
+             "phu_hop",                                                                             # KS-19
              "lien_he_noi_bo", "ghi_chu_noi_bo",
              # KS-16j
              "cs_nhan_tre_em", "cs_tre_tu_tuoi", "cs_moc_tuoi", "cs_phi_giuong_phu", "cs_giuong_phu_an_sang", "cs_noi",
@@ -253,14 +254,14 @@ def _kiem_ks(d: dict) -> dict:
         if len(v) != 5 or v[2] != ":" or not (v[:2] + v[3:]).isdigit() or int(v[:2]) > 23 or int(v[3:]) > 59:
             raise LoiKhachSan("Giờ nhận / trả phòng dạng HH:MM")
         o[k] = v
-    t = d.get("thue_phi_pt")
-    o["thue_phi_pt"] = 0.0 if t in (None, "") else float(t)
-    if not 0 <= o["thue_phi_pt"] <= 30:
-        raise LoiKhachSan("Thuế phí 0–30%")
-    # KS-17: xác nhận là một ô RIÊNG — ô trống không bao giờ được hiểu là «đã xác nhận 0%».
+    # KS-19 (Chủ tịch 05/11/2026: «giá đã gồm 8% VAT»): máy KHÔNG cộng thuế phí vào giá nữa — ô % cũ luôn lưu 0.
+    # thue_phi_xac_nhan nay là «Đã xác nhận với khách sạn: giá nhập đã gồm 8% VAT» — vẫn là điều kiện duyệt giá / mở bán.
+    o["thue_phi_pt"] = 0.0
     o["thue_phi_xac_nhan"] = bool(d.get("thue_phi_xac_nhan"))
-    if o["thue_phi_xac_nhan"] and t in (None, ""):
-        raise LoiKhachSan("Xác nhận thuế phí thì ghi mức % theo hợp đồng (ghi 0 nếu khách sạn xác nhận không thu)")
+    ph = d.get("phu_hop") or []
+    if any(x not in PHU_HOP for x in ph):
+        raise LoiKhachSan("«Phù hợp cho» không hợp lệ")
+    o["phu_hop"] = list(dict.fromkeys(ph))
     for k, n in (("khu_vuc", 120), ("dia_chi", 300), ("gan", 300), ("noi_bat", 300), ("cs_tre_em", 300),
                  ("cs_giuong_phu", 300), ("cs_vat_nuoi", 300), ("lien_he_noi_bo", 300)):
         o[k] = str(d.get(k) or "").strip()[:n]
@@ -302,7 +303,42 @@ def luu_ks(db: Session, u: User, d: dict, kid: int | None = None, now: datetime 
 # KS-16l (Chủ tịch 01/11/2026): khách sạn lên cổng khi đủ hồ sơ + ảnh + giới thiệu, KHÔNG cần loại phòng đang bán.
 # Chưa có gói đặt được thì chưa book trên cổng — bấm vào khách sạn mở trang ngoài LINK_KS_NGOAI ở tab mới.
 # KS-16n (Chủ tịch 01/11/2026): www.vietourist.vn/hotel chưa có (404) → TẠM trỏ trang chủ; web chính có trang thì đổi lại.
-LINK_KS_NGOAI = "/hotel"   # KS-16q: trang riêng kh.vietourist.vn/hotel (cùng tên miền cổng)
+LINK_KS_NGOAI = "/hotel"
+VAT_PT = 8   # KS-19: giá phòng VTD đã gồm 8% VAT
+
+
+def vat_trong(tong: float) -> int:
+    """Phần VAT nằm TRONG tổng tiền (để xuất hóa đơn) — không cộng thêm."""
+    return int(round(float(tong or 0) * VAT_PT / (100 + VAT_PT)))
+
+
+# KS-19: «Phù hợp cho» (Điều hành chọn ở hồ sơ khách sạn) — bộ lọc trên cổng.
+PHU_HOP = {"gia_dinh": "Gia đình có trẻ nhỏ", "cap_doi": "Cặp đôi", "cong_tac": "Công tác", "nhom_ban": "Nhóm bạn"}
+# KS-19: tâm thành phố (vĩ độ, kinh độ) — máy tính «cách trung tâm» từ tọa độ khách sạn khi Điều hành chưa ghi km.
+TAM_TP = {"Hà Nội": (21.0285, 105.8542), "Hạ Long": (20.9529, 107.0800), "Hải Phòng": (20.8449, 106.6881),
+          "Ninh Bình": (20.2506, 105.9745), "Sa Pa": (22.3364, 103.8438), "Hà Giang": (22.8233, 104.9836),
+          "Mộc Châu": (20.8431, 104.6340), "Cao Bằng": (22.6657, 106.2570), "Thanh Hóa": (19.8067, 105.7852),
+          "Vinh": (18.6796, 105.6813), "Đồng Hới": (17.4688, 106.6223), "Huế": (16.4637, 107.5909),
+          "Đà Nẵng": (16.0678, 108.2208), "Hội An": (15.8801, 108.3380), "Quy Nhơn": (13.7820, 109.2192),
+          "Tuy Hòa": (13.0955, 109.3209), "Nha Trang": (12.2388, 109.1967), "Phan Rang": (11.5643, 108.9886),
+          "Pleiku": (13.9833, 108.0000), "Buôn Ma Thuột": (12.6667, 108.0500), "Kon Tum": (14.3545, 108.0076),
+          "Đà Lạt": (11.9404, 108.4583), "TP. Hồ Chí Minh": (10.7769, 106.7009), "Vũng Tàu": (10.3460, 107.0843),
+          "Phan Thiết – Mũi Né": (10.9289, 108.1021), "Cần Thơ": (10.0452, 105.7469), "Châu Đốc": (10.7009, 105.1169),
+          "Phú Quốc": (10.2270, 103.9637), "Bến Tre": (10.2415, 106.3759), "Trà Vinh": (9.9347, 106.3455),
+          "Cà Mau": (9.1769, 105.1524), "Côn Đảo": (8.6829, 106.6080)}
+
+
+def km_trung_tam(k: KhachSanVtd) -> float | None:
+    """Điều hành ghi km thì dùng số đó; chưa ghi mà có tọa độ thì máy tính đường chim bay tới tâm thành phố."""
+    if k.km_trung_tam is not None:
+        return k.km_trung_tam
+    tam = TAM_TP.get(k.tinh_thanh or "")
+    if k.vi_do is None or k.kinh_do is None or not tam:
+        return None
+    import math
+    la1, lo1, la2, lo2 = map(math.radians, (k.vi_do, k.kinh_do, tam[0], tam[1]))
+    h = math.sin((la2 - la1) / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin((lo2 - lo1) / 2) ** 2
+    return round(2 * 6371 * math.asin(math.sqrt(h)), 1)   # KS-16q: trang riêng kh.vietourist.vn/hotel (cùng tên miền cổng)
 
 
 # ══ KS-16s (Chủ tịch duyệt bản xem thử 01/11/2026): tọa độ cho «Xem trên bản đồ» ══════════════════════════
@@ -423,7 +459,7 @@ def bat_tt_ks(db: Session, u: User, kid: int, bat: bool) -> KhachSanVtd:
     _quyen(u, VAI_DUYET, "Chỉ TP Điều hành / Chủ tịch / TGĐ mở / đóng thanh toán của khách sạn")
     k = _ks(db, kid)
     if bat and not k.thue_phi_xac_nhan:
-        raise LoiKhachSan("Chưa xác nhận thuế phí với khách sạn — chưa mở thanh toán được")   # KS-17
+        raise LoiKhachSan("Chưa xác nhận thuế phí với khách sạn (giá đã gồm 8% VAT) — chưa mở thanh toán được")   # KS-17 → KS-19
     k.mo_thanh_toan = bool(bat)
     _audit(db, u, "ks_vtd_tt_mo" if bat else "ks_vtd_tt_dong", k.ma)
     db.commit()
@@ -695,7 +731,7 @@ def duyet_goi(db: Session, u: User, gid: int, dong_y: bool, ly_do: str = "", now
         lp0 = db.get(LoaiPhongVtd, g.loai_phong_id)
         k0 = db.get(KhachSanVtd, lp0.khach_san_id)
         if not k0.thue_phi_xac_nhan:
-            raise LoiKhachSan("Chưa xác nhận thuế phí của khách sạn — xác nhận ở hồ sơ khách sạn rồi mới duyệt giá")
+            raise LoiKhachSan("Chưa xác nhận thuế phí với khách sạn (giá đã gồm 8% VAT) — xác nhận ở hồ sơ khách sạn rồi mới duyệt giá")
         if lp0.toi_da_nguoi_lon is None:
             raise LoiKhachSan("Loại phòng chưa xác nhận số người lớn tối đa — xác nhận rồi mới duyệt giá")
     g.trang_thai = "da_duyet" if dong_y else "tra_lai"
@@ -949,7 +985,7 @@ def ds_vtos(db: Session, u: User) -> dict:
                      "bia": _anh_out(bia)["nho"] if bia else None, "thieu_anh": max(0, ANH_CHUAN - len(a))})
     return {"khach_san": dong, "thanh_pho": [{"ten": t, "mien": MIEN[m]} for t, (m, _k) in THANH_PHO.items()],
             "loai": LOAI_CHO_O, "tien_ich": TIEN_ICH, "nhom_anh": NHOM_ANH_KS,
-            "nhan_tre_em": NHAN_TRE_EM, "cach_tinh_tre": CACH_TINH_TRE, "tien_nghi_phong": TIEN_NGHI_PHONG,   # KS-16j
+            "nhan_tre_em": NHAN_TRE_EM, "cach_tinh_tre": CACH_TINH_TRE, "tien_nghi_phong": TIEN_NGHI_PHONG, "phu_hop": PHU_HOP, "vat_pt": VAT_PT,   # KS-16j · KS-19
             "nguon_lp": NGUON_LP, "can_xac_nhan": CAN_XAC_NHAN, "trang_thai_dc": TRANG_THAI_DC,
             "nhom_tuoi": NHOM_TUOI, "kieu_gia": KIEU_GIA, "che_do_tre_goi": CHE_DO_TRE_GOI,   # KS-16k
             "mui_gio_huy": MUI_GIO_HUY,                                                          # KS-17
@@ -1326,14 +1362,16 @@ def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict], dg: 
     goi = [g for p in phong if p["vua"] and p.get("con", 1) > 0 for g in p["goi"] if g.get("vua", True)]   # KS-16k: theo từng gói   # KS-14: bỏ loại phòng đã hết
     re_nhat = min(goi, key=lambda g: g["gia_dem"]) if goi else None
     return {"id": k.id, "ten": k.ten, "sao": k.sao, "loai": k.loai, "loai_ten": LOAI_CHO_O.get(k.loai, k.loai),
-            "tinh_thanh": k.tinh_thanh, "khu_vuc": k.khu_vuc, "km_trung_tam": k.km_trung_tam, "gan": k.gan,
+            "tinh_thanh": k.tinh_thanh, "khu_vuc": k.khu_vuc, "km_trung_tam": km_trung_tam(k), "gan": k.gan,
             "noi_bat": k.noi_bat, "tien_ich": [TIEN_ICH[t] for t in (k.tien_ich or []) if t in TIEN_ICH],
             "mien": THANH_PHO.get(k.tinh_thanh, ("",))[0],
             "anh": [_anh_out(a, True) for a in anh[:8]], "so_anh": len(anh),
             "gia_tu": ({"gia_dem": re_nhat["gia_dem"], "niem_yet_dem": re_nhat["niem_yet_dem"], "bua_sang": re_nhat["bua_sang"],
                         "mien_phi_huy": re_nhat["mien_phi_huy"]} if re_nhat else None),
             "co_mien_phi_huy": any(g["mien_phi_huy"] for g in goi), "co_bua_sang": any(g["bua_sang"] for g in goi),
-            "thue_phi_pt": k.thue_phi_pt,
+            "thue_phi_pt": 0, "vat_pt": VAT_PT,                              # KS-19: giá đã gồm VAT
+            "tien_nghi_phong": sorted({t for p in phong if p["vua"] and p.get("con", 1) > 0 and p["goi"] for t in (p.get("tien_nghi") or [])}),
+            "phu_hop": [PHU_HOP[x] for x in (k.phu_hop or []) if x in PHU_HOP],
             "het_phong": bool(co_gia) and not goi,
             # KS-16l: chưa có gói đặt được → chưa book trên cổng; bấm vào mở trang ngoài ở tab mới
             "dat_ngay": any(p["goi"] for p in phong), "link_ngoai": LINK_KS_NGOAI,
@@ -1365,7 +1403,13 @@ def tim(db: Session, tinh: str, vao, ra, nguoi_lon: int = 2, tre_em: int = 0, so
     chung = tt_chung(db)
     the = [{**_the_cong(k, anh.get(k.id, []), phong.get(k.id, []), dg.get(k.id), d24.get(k.id, 0)),
             "mo_thanh_toan": mo_thanh_toan(db, k, chung)} for k in ks]
-    the.sort(key=lambda o: (o["gia_tu"] is None, o["ten"]))
+    # KS-19 (Chủ tịch 05/11/2026: «bỏ luôn» luồng gửi yêu cầu): chỉ hiện khách sạn còn đủ phòng đặt được cho ngày,
+    # số khách và số phòng đã chọn — không còn thẻ «gửi yêu cầu / báo giá riêng».
+    the = [o for o in the if o["gia_tu"] is not None]
+    dem_tp = {}
+    for o in the:
+        dem_tp[o["tinh_thanh"]] = dem_tp.get(o["tinh_thanh"], 0) + 1
+    the.sort(key=lambda o: o["ten"])
     return {"khach_san": the, "tong": len(the), "dem": (ra - vao).days, "vao": vao.isoformat(), "ra": ra.isoformat(),
             "nguoi_lon": nl, "tre_em": te, "so_phong": sp, "tuoi": tu or [],
             "thanh_pho": [{"ten": t, "so": dem_tp[t]} for t in sorted(dem_tp, key=lambda t: -dem_tp[t])],
@@ -1473,9 +1517,9 @@ def tinh_lua_chon(db: Session, kid: int, vao, ra, chon: list[dict], hom_nay: dat
             x["tong"] += pt["phu_thu"]
     tien = sum(x["tong"] for x in dong)
     so = sum(x["so"] for x in dong)
-    thue = round(tien * (k.thue_phi_pt or 0) / 100)
+    thue = 0                                                          # KS-19: giá đã gồm 8% VAT — không cộng thêm
     return {"dong": dong, "so_phong": so, "tien_phong": tien, "phu_thu": sum(x.get("phu_thu", 0) for x in dong),
-            "thue_phi": thue, "tong": tien + thue, "dem": dem, "cho_xac_nhan": any(x.get("cho_xac_nhan") for x in dong),
+            "thue_phi": thue, "tong": tien + thue, "vat_pt": VAT_PT, "vat_trong": vat_trong(tien + thue), "dem": dem, "cho_xac_nhan": any(x.get("cho_xac_nhan") for x in dong),
             # KS-16p: «Đặt giữ, trả sau» được không, và hạn trả
             "han_tra_sau": _han_tra_sau(dong, hom_nay), "mo_thanh_toan": mo_thanh_toan(db, k),   # KS-16s
             "huy_mien_phi_den": min((x["huy_han"] for x in dong if x.get("huy_han")), default=None) if dong and all(x.get("huy_han") for x in dong) else None}
@@ -1505,7 +1549,7 @@ def gui_yeu_cau_giu(db: Session, tk, kid: int, d: dict, hom_nay: date | None = N
     if lc and lc["dong"]:
         for x in lc["dong"]:
             dong.append(f"- {x['so']} × {x['loai_phong']} · {x['goi']}: {x['tong']:,.0f} đ / {lc['dem']} đêm".replace(",", "."))
-        dong.append(f"Giá VTD lúc gửi: phòng {lc['tien_phong']:,.0f} đ + thuế phí {lc['thue_phi']:,.0f} đ = {lc['tong']:,.0f} đ".replace(",", "."))
+        dong.append(f"Giá VTD lúc gửi (đã gồm {VAT_PT}% VAT): {lc['tong']:,.0f} đ".replace(",", "."))
         if lc.get("ghi_chu_tre"):
             dong.append("Chưa gồm phụ thu trẻ em / giường phụ: " + lc["ghi_chu_tre"])
     elif d.get("loai_phong"):

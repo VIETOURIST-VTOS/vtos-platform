@@ -314,7 +314,7 @@ def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict]
             x["tien"] += pt["phu_thu"]
         if pt["cho_xac_nhan"]:
             x["giuong_phu_cho_xac_nhan"] = True     # Điều hành hỏi khách sạn; không xếp được → báo hết phòng, hoàn 100%
-        x["thue"] = int(round(x["tien"] * float(k.thue_phi_pt or 0) / 100))
+        x["thue"] = 0                                   # KS-19: giá đã gồm 8% VAT — không cộng thuế phí
     return dong
 
 
@@ -381,7 +381,7 @@ def dat(db: Session, tk, kid: int, d: dict, now: datetime | None = None) -> DonK
         if can[lp.id] > con[lp.id]:
             raise LoiDon(f"«{lp.ten}» chỉ còn {con[lp.id]} phòng cho các ngày này" if con[lp.id] else f"«{lp.ten}» đã hết phòng cho các ngày này", 409)
     tien = sum(x["tien"] for x in dong)
-    thue = int(round(tien * float(k.thue_phi_pt or 0) / 100))
+    thue = 0                                                          # KS-19: giá đã gồm 8% VAT
     v = None
     if str(d.get("ma_voucher") or "").strip():                      # KS-16: khách tự nhập voucher, VTD chịu
         from app.services import rewards as RW
@@ -437,6 +437,17 @@ def _sau_khi_tra(db: Session, d: DonKsVtd, now: datetime) -> None:
             return
     d.trang_thai, d.tra_luc, d.han_chot = "da_tra", now, cong_gio_lam(now)
     R.audit(db, "may", "may", "ks_vtd_da_tra", f"don_ks_vtd:{d.ma}", after={"tong": int(d.tong)})
+    # KS-19 (Chủ tịch 05/11/2026: «khách thanh toán xong là xác nhận luôn»): phòng VTD đã khoá tồn lúc đặt nên đủ tiền
+    # là xác nhận ngay. Điều hành vẫn báo khách sạn và ghi mã của khách sạn sau (hàng «Chờ chốt»). Đơn có giường phụ
+    # / trẻ em cần khách sạn xác nhận thì giữ «Đã thanh toán» chờ Điều hành như cũ.
+    if not any(x.get("giuong_phu_cho_xac_nhan") for x in (d.dong or [])):
+        d.trang_thai, d.xac_nhan_boi, d.xac_nhan_luc = "da_xac_nhan", "may", now
+        R.audit(db, "may", "may", "ks_vtd_tu_xac_nhan", f"don_ks_vtd:{d.ma}", after={"tong": int(d.tong)})
+        try:
+            k = db.get(KhachSanVtd, d.khach_san_id)
+            GUI_XAC_NHAN(d, k.ten if k else "")
+        except Exception:   # noqa: BLE001 — email là phụ
+            pass
     db.flush()
 
 
@@ -491,7 +502,8 @@ def ra_khach(db: Session, d: DonKsVtd, now: datetime | None = None) -> dict:
                                        "gio_nhan": k.gio_nhan, "gio_tra": k.gio_tra, "dia_chi": k.dia_chi} if k else None,
             "vao": d.vao.isoformat(), "ra": d.ra.isoformat(), "dem": (d.ra - d.vao).days, "nguoi_lon": d.nguoi_lon,
             "tre_em": d.tre_em, "dong": d.dong, "so_phong": d.so_phong, "tien_phong": int(d.tien_phong),
-            "thue_phi": int(d.thue_phi or 0), "tong": int(d.tong or 0), "da_tra": tra, "con_phai_tra": max(0, int(d.tong or 0) - tra),
+            "thue_phi": int(d.thue_phi or 0), "tong": int(d.tong or 0), "da_tra": tra,
+            "vat_pt": S.VAT_PT, "vat_trong": S.vat_trong(int(d.tong or 0)),   # KS-19: VAT nằm trong giá "con_phai_tra": max(0, int(d.tong or 0) - tra),
             "giam_voucher": int(d.giam_voucher or 0), "voucher": _ma_voucher_don(db, d),
             "trang_thai": d.trang_thai, "trang_thai_ten": TRANG_THAI_DON.get(d.trang_thai, d.trang_thai),
             "giu_den": d.giu_den.isoformat(timespec="seconds") if d.giu_den else None,
@@ -754,7 +766,8 @@ def ds_vtos(db: Session, u: User, loc: str = "", kid: int | None = None, now: da
     if kid:
         q = q.where(DonKsVtd.khach_san_id == kid)
     if loc == "cho_chot":
-        q = q.where(DonKsVtd.trang_thai == "da_tra")
+        q = q.where(or_(DonKsVtd.trang_thai == "da_tra",                        # KS-19: máy tự xác nhận — còn phải
+                        (DonKsVtd.trang_thai == "da_xac_nhan") & (func.coalesce(DonKsVtd.ma_xac_nhan_ks, "") == "")))   # báo KS
     elif loc in TRANG_THAI_DON:
         q = q.where(DonKsVtd.trang_thai == loc)
     else:
@@ -770,14 +783,19 @@ def dh_xac_nhan(db: Session, u: User, did: int, ma_ks: str, now: datetime | None
     now = now or datetime.now()
     _quyen(u, VAI_DH, "chốt đơn với khách sạn")
     d = _don(db, did)
-    if d.trang_thai != "da_tra":
+    tu_dong = d.trang_thai == "da_xac_nhan" and not (d.ma_xac_nhan_ks or "")   # KS-19: máy đã xác nhận, ĐH ghi mã KS
+    if d.trang_thai != "da_tra" and not tu_dong:
         raise LoiDon("Chỉ chốt đơn đã thanh toán", 409)
     ma_ks = str(ma_ks or "").strip()
     if len(ma_ks) < 3:
         raise LoiDon("Ghi mã xác nhận của khách sạn")
-    d.trang_thai, d.ma_xac_nhan_ks, d.xac_nhan_boi, d.xac_nhan_luc = "da_xac_nhan", ma_ks[:60], u.username, now
+    d.ma_xac_nhan_ks = ma_ks[:60]
+    if not tu_dong:
+        d.trang_thai, d.xac_nhan_boi, d.xac_nhan_luc = "da_xac_nhan", u.username, now
     R.audit(db, u.username, u.role, "ks_vtd_xac_nhan", f"don_ks_vtd:{d.ma}", after={"ma_ks": ma_ks[:60]})
     db.flush()
+    if tu_dong:
+        return d                                                       # khách đã nhận email xác nhận lúc trả tiền
     try:                                                               # KS-16s: email xác nhận cho khách
         k = db.get(KhachSanVtd, d.khach_san_id)
         GUI_XAC_NHAN(d, k.ten if k else "")
@@ -796,9 +814,10 @@ def _gui_xac_nhan_email(d: DonKsVtd, ks_ten: str) -> bool:
     m = EmailMessage()
     m["Subject"] = f"Đặt phòng {d.ma} đã được xác nhận — {ks_ten}"
     m["From"], m["To"] = settings.SMTP_FROM, d.email
-    m.set_content(f"Chào {d.ho_ten},\n\nKhách sạn {ks_ten} đã xác nhận đặt phòng của bạn.\n"
-                  f"Mã đơn Vietourist: {d.ma}\nMã xác nhận của khách sạn: {d.ma_xac_nhan_ks}\n"
-                  f"Nhận phòng {d.vao:%d/%m/%Y} · trả phòng {d.ra:%d/%m/%Y} · {d.so_phong} phòng"
+    m.set_content(f"Chào {d.ho_ten},\n\nĐặt phòng của bạn tại {ks_ten} đã được xác nhận.\n"
+                  f"Mã đơn Vietourist: {d.ma}\n" + (f"Mã xác nhận của khách sạn: {d.ma_xac_nhan_ks}\n" if d.ma_xac_nhan_ks else "")
+                  + f"Đã thanh toán: {int(d.tong or 0):,} đ (đã gồm {S.VAT_PT}% VAT)\n".replace(",", ".")
+                  + f"Nhận phòng {d.vao:%d/%m/%Y} · trả phòng {d.ra:%d/%m/%Y} · {d.so_phong} phòng"
                   + (f"\nGiờ đến dự kiến: {d.gio_den}" if d.gio_den else "")
                   + "\nXem đơn ở «Đơn của tôi» trên cổng Vietourist.\n\n" + settings.COMPANY_NAME)
     cls = smtplib.SMTP_SSL if settings.SMTP_SSL else smtplib.SMTP
