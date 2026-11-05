@@ -23,7 +23,7 @@ export default function KhungRieng({ dang, toi, xong, children }: { dang: TrangR
   const [hoi, setHoi] = useState(false);
   useEffect(() => {
     setGoc({ hotel: duongRieng("hotel"), restaurant: duongRieng("restaurant"), tours: duongRieng("tours") });
-    const nghe = () => setHoi(true);
+    const nghe = (e: Event) => { e.preventDefault(); setHoi(true); };   // KS-19e: báo goiCong là ô đăng nhập đã hiện
     window.addEventListener(SU_KIEN_CAN_DANG_NHAP, nghe);
     return () => window.removeEventListener(SU_KIEN_CAN_DANG_NHAP, nghe);
   }, []);
