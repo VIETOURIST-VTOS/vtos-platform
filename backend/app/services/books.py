@@ -350,6 +350,35 @@ def cash_book_xlsx(rep: dict) -> bytes:
                   "Gửi vào (Nợ)" if is_bank else "Thu (Nợ)", "Rút ra (Có)" if is_bank else "Chi (Có)", "Tồn"],
                  [14, 16, 14, 48, 14, 16, 16, 18], data, total, _cut_note(rep))
 
+def so_du_tien(db: Session, den_ngay: date, account: str = CASH_ACCOUNT,
+               tu_ngay: date | None = None) -> dict:
+    """Số dư tiền tính ĐẾN một ngày, kèm phát sinh thu/chi trong kỳ. Đợt QUY-3 05/11/2026.
+
+    DÙNG ĐÚNG CÁI MÁY MÀ SỔ CÁI ĐANG DÙNG — `_subtree`, `_opening`, `_totals` — chứ không cộng
+    lại bằng một đường riêng. Đây là cả lý do hàm này nằm ở `books.py` thay vì ở `phieu_quy.py`:
+    một con số tồn quỹ cộng bằng cách duyệt bảng `phieu_quy` là một SỔ THỨ HAI, và sổ thứ hai thì
+    sớm muộn cũng lệch với sổ cái — lặng lẽ, vì không gì bắt chúng phải bằng nhau.
+
+    Lệch ở đâu thì thấy ngay: `test_quy3_1` lập phiếu thật rồi so con số này với `cash_book(...)`.
+
+    GỒM CẢ TÀI KHOẢN CON (`1111`, `1112`…) vì `_subtree` làm việc ấy. Và `_opening` / `_totals`
+    tính bằng MỘT câu SQL, không nạp dòng sổ nào lên bộ nhớ — nên gọi hàm này mỗi lần mở màn hình
+    không kéo theo hai nghìn dòng sổ như `cash_book`.
+    """
+    accs = _accounts(db)
+    acc = accs.get(account)
+    if not acc:
+        raise ValueError(f"Tài khoản {account} không có trong danh mục")
+    codes = sorted(_subtree(account, _children_map(accs)))
+    tu = tu_ngay or den_ngay.replace(day=1)
+    dau_ky = _opening(db, codes, tu)
+    ps = _totals(db, den_ngay, tu, codes)
+    return {"tai_khoan": account, "ten": acc.name, "tai_khoan_con": codes,
+            "tu_ngay": tu, "den_ngay": den_ngay,
+            "dau_ky": dau_ky, "thu": ps["debit"], "chi": ps["credit"], "so_dong": ps["count"],
+            "so_du": round(dau_ky + ps["debit"] - ps["credit"], 0)}
+
+
 
 def bank_accounts(db: Session, since: date, upto: date) -> list[dict]:
     """Các đối tượng có phát sinh trên TK 112 trong kỳ, kèm dư đầu – phát sinh – dư cuối.

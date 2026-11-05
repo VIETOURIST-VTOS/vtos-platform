@@ -183,6 +183,33 @@ def confirm_receipt(rid: int, u: User = Depends(require_roles("ketoan",)), db: S
     return {"message": f"Kế toán đã xác nhận {r.code}"}
 
 
+@router.get("/receipts/quy/so-du")
+# ĐỢT QUY-3 05/11/2026 — SỐ DƯ QUỸ TIỀN MẶT.
+#
+# Nằm dưới nhóm `/api/v1/receipts` ĐÃ KHAI, không mở nhóm mới — cùng lý do với ba cửa của Đợt
+# QUY-1: mở một nhóm mới làm `PHAM_VI_DA_CHOT` lệch mười sáu dòng vai và hai con số ghim trong
+# `test_lg9`, hai bảng CÓ CHỮ KÝ, trong khi KHÔNG vai nào bấm được thêm một cửa nào.
+#
+# Hai vai đúng bằng hai vai cửa lập phiếu. Thủ quỹ phải thấy tồn quỹ: đó là con số họ cần nhất
+# lúc cầm tờ phiếu chi trên tay.
+def so_du_quy(den_ngay: str = "", tu_ngay: str = "",
+              u: User = Depends(require_roles("ketoan", "thu_quy",
+                                              mo_ta="xem số dư quỹ tiền mặt")),
+              db: Session = Depends(get_db)):
+    """Tồn quỹ tính đến một ngày, cộng bằng ĐÚNG cái máy của sổ cái (`books.so_du_tien`)."""
+    from datetime import date as _date
+    from app.services import books as B
+    try:
+        dn = _date.fromisoformat(den_ngay) if den_ngay else _date.today()
+        tn = _date.fromisoformat(tu_ngay) if tu_ngay else None
+    except ValueError:
+        raise HTTPException(422, "Ngày phải dạng yyyy-mm-dd")
+    try:
+        return B.so_du_tien(db, dn, tu_ngay=tn)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+
+
 class PhieuQuyIn(BaseModel):
     """Thân yêu cầu lập phiếu quỹ. Đợt QUY-1 04/11/2026.
 

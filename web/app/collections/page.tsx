@@ -99,6 +99,15 @@ function Collections() {
     chieu: "thu", ngay: new Date().toISOString().slice(0, 10), so_tien: "", ly_do: "",
     noi_dung: "", ten_doi_tuong: "", ma_doi_tuong: "", khoan_muc: "",
   });
+  // ĐỢT QUY-3 05/11/2026 — TỒN QUỸ. Đọc từ cửa `/receipts/quy/so-du`, KHÔNG cộng danh sách phiếu
+  // bày trên màn. Cộng tại chỗ thì con số ấy chỉ đúng với những phiếu màn hình đang giữ (một trang,
+  // một khoảng ngày) và sẽ lệch với sổ cái mà không gì kêu lên. `test_quy3_4` canh đúng điều đó.
+  const [soDu, setSoDu] = useState<any>(null);
+  const loadSoDu = useCallback(() => {
+    if (!VAI_SO_QUY.includes(user?.role || "")) return;
+    api("/receipts/quy/so-du").then(setSoDu).catch(() => setSoDu(null));
+  }, [user]);
+  useEffect(() => { loadSoDu(); }, [loadSoDu]);
   const [dangLap, setDangLap] = useState(false);
   const loadQuy = useCallback(() => {
     if (!VAI_SO_QUY.includes(user?.role || "")) return;
@@ -116,7 +125,7 @@ function Collections() {
       const r = await api("/receipts/quy/phieu", { method: "POST", json: { ...pq, so_tien: Number(pq.so_tien) } });
       toast(r.message);
       setPq({ ...pq, so_tien: "", noi_dung: "", ten_doi_tuong: "", ma_doi_tuong: "", khoan_muc: "" });
-      loadQuy();
+      loadQuy(); loadSoDu();
     } catch (x) { toast(errMsg(x), true); }
     setDangLap(false);
   };
@@ -236,6 +245,16 @@ function Collections() {
       </div><button className="act" disabled={!cash.booking_id || !cash.amount} onClick={() => post("/receipts/cash", { booking_id: Number(cash.booking_id), amount: Number(cash.amount), payer: cash.payer, note: cash.note }).then(() => setCash({ booking_id: "", amount: "", payer: "", note: "" }))}>Lập phiếu thu</button></div></>}
 
     {laSoQuy && <><h2>Sổ quỹ tiền mặt</h2>
+      <div className="kpis">
+        <div className="kpi"><b>{soDu ? vnd(soDu.so_du) : "…"}</b><span>Tồn quỹ tiền mặt (đ)</span></div>
+        <div className="kpi"><b>{soDu ? vnd(soDu.dau_ky) : "…"}</b><span>Tồn đầu kỳ</span></div>
+        <div className="kpi"><b>{soDu ? vnd(soDu.thu) : "…"}</b><span>Thu trong kỳ</span></div>
+        <div className="kpi"><b>{soDu ? vnd(soDu.chi) : "…"}</b><span>Chi trong kỳ</span></div>
+      </div>
+      {soDu && soDu.so_du < 0 && <p className="muted" style={{ color: "var(--orange)" }}>
+        <b>Tồn quỹ đang ÂM.</b> Một két tiền mặt không thể âm, nên đây là dấu của sổ chưa đúng: thiếu
+        một phiếu thu chưa nhập, hoặc một phiếu chi ghi nhầm ngày. Đối chiếu sổ quỹ giấy trước khi
+        lập thêm phiếu.</p>}
       <p className="muted">Phiếu thu quỹ và phiếu chi quỹ — <b>ghi sổ ngay</b> khi lập, không có bước
         xác nhận thứ hai. Màn hình này không chọn tài khoản: nó gửi <b>lý do</b> bạn chọn, và bảng quy
         ước hạch toán quyết định ghi Nợ/Có vào đâu. Lý do chưa có quy ước thì phiếu <b>bị từ chối</b> và
