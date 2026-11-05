@@ -71,6 +71,15 @@ HANG_RAO = (
     "tests/test_le2b_ba_vai_ke_toan.py",
     "tests/test_hach_toan.py",
     "tests/test_misa.py",
+    # ── CAI CHUONG, them ngay 06/11/2026 (Dot DS-3) ───────────────────────────────────────────
+    # No KHONG canh mot bang khai tay nhu nam tep tren, va cung khong canh hai lan dung nhau.
+    # No canh CHINH QUYEN SO ma hai hang rao kia dung len: mot dong `dang lam` qua ba ngay thi
+    # quyen so khong con noi dung ve thuc te, va luc do `test_giu_cho_lan` van xanh trong khi
+    # no dang so sanh nhung dong khong con that.
+    #
+    # Do duoc 05/11/2026: so da don toi 28 dong oi ma khong gi keu len, va dung chuyen ay da
+    # chan Dot QUY-2a hom 04/11. Cua hep la cho duy nhat chay du nhanh de bat truoc khi gop.
+    "tests/test_ds3_chuong_ba_ngay.py",
 )
 
 
