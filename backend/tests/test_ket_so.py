@@ -12,6 +12,7 @@ Bộ test này canh bốn cách một kỳ sổ có thể trông đã xong mà t
      khi bảng lương có ngoại lệ – và đúng lúc đó thì không ai phát hiện, vì cả hai đều "đúng công
      thức". Lệnh giao việc 08/9 nêu đích danh điều này.
 """
+import itertools
 import os, sys, tempfile
 _DB = os.path.join(tempfile.gettempdir(), "vtos_test_ketso.db")
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB}"; os.environ["SEED_DEMO"] = "1"; os.environ["ENV"] = "dev"
@@ -60,6 +61,24 @@ def txn(db, chieu, so_tien, noi_dung, ngay=f"{KY}-15", ma=""):
     return t
 
 
+# ĐỢT TKS-1 06/11/2026 — MÃ NGUỒN CỦA PHÉP THỬ PHẢI DUY NHẤT DO CÁCH DỰNG.
+#
+# Trước đợt này mã nguồn là `f"test:{datetime.now().timestamp()}"`. `datetime.now()` trên Windows
+# nhảy từng ~15,6 ms, nên hai bút toán gọi liền nhau trong cùng một nhịp nhận CÙNG MỘT mã — và
+# khoá chống ghi sổ hai lần của Đợt E3 (nguồn + mã nguồn + loại nghiệp vụ) chặn cái thứ hai.
+#
+# Phép thử ấy vì thế xanh trên máy chậm và đỏ trên máy nhanh: nó đo tốc độ máy chứ không đo mã.
+# Đo được 06/11/2026 — hai vòng bấm Đợt DS-3 đỏ ở đây, ba vòng hôm trước đều xanh.
+#
+# Bộ đếm làm mã duy nhất DO CÁCH DỰNG. Đồng hồ vẫn ghép vào cho dễ đọc nhật ký, nhưng nó không
+# còn là thứ bảo đảm tính duy nhất. KHÔNG nới khoá của `post_entry`: khoá ấy đang đúng.
+_DEM_MA_NGUON = itertools.count(1)
+
+
+def _ma_nguon() -> str:
+    return f"test:{datetime.now().timestamp()}:{next(_DEM_MA_NGUON)}"
+
+
 def but_toan(db, ngay, lines, mo_ta="thử"):
     from app.services import accounting as ACC
     from app.models.core import User
@@ -68,7 +87,7 @@ def but_toan(db, ngay, lines, mo_ta="thử"):
         l.setdefault("partner_code", "KH-THU"); l.setdefault("partner", "Khách thử")
         l.setdefault("project_code", "TOUR-THU")
     return ACC.post_entry(db, u.username, u.role, date.fromisoformat(ngay), mo_ta, lines,
-                          "thu_cong", f"test:{datetime.now().timestamp()}")
+                          "thu_cong", _ma_nguon())
 
 
 # ====================== SAO KÊ VÀO SỔ HÀNG LOẠT ======================

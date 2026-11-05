@@ -354,14 +354,14 @@ def gia_xe_bang(db: Session, tk: dict, so_ngay: int, ngoi: int, ngay: date) -> d
         if rs:
             r = sorted(rs, key=lambda x: (x.effective_from or date.min, x.id))[-1]
             return {"ten": f"Xe {XE_BANG_CHO} chỗ · tuyến {r.route} (bảng giá xe)", "loai": f"xe {XE_BANG_CHO} chỗ",
-                    "chi_tiet": f"{so} xe × trọn chuyến {so_ngay} ngày", "von": float(r.internal_price) * so,
+                    "chi_tiet": f"{so} xe × trọn chuyến {so_ngay} ngày", "von": float(r.internal_price) * so,  # k2-doc-an-toan: tuyen chỉ giữ dòng internal_price > 0
                     "nguon": f"vehicle_rates:{r.id}"}
     xs = [v for v in db.execute(select(Vehicle).where(Vehicle.active.is_(True), Vehicle.kind == "noi_bo")).scalars()
           if (v.internal_rate_per_day or 0) > 0 and (v.seats or 0) > 0]
     if xs:
         theo_cho: dict[int, float] = {}
         for v in xs:
-            theo_cho[v.seats] = min(theo_cho.get(v.seats, float(v.internal_rate_per_day)), float(v.internal_rate_per_day))
+            theo_cho[v.seats] = min(theo_cho.get(v.seats, float(v.internal_rate_per_day)), float(v.internal_rate_per_day))  # k2-doc-an-toan: xs chỉ giữ xe internal_rate_per_day > 0
         vua = sorted(c for c in theo_cho if c >= ngoi)
         cho = vua[0] if vua else max(theo_cho)
         n = 1 if vua else math.ceil(ngoi / cho)
@@ -370,7 +370,7 @@ def gia_xe_bang(db: Session, tk: dict, so_ngay: int, ngoi: int, ngay: date) -> d
     tl = [r for r in tuyen if int(r.days or 0) > 0]
     if tl:
         r = sorted(tl, key=lambda x: (abs(int(x.days) - so_ngay), -(x.effective_from or date.min).toordinal(), -x.id))[0]
-        ngay_gia = float(r.internal_price) / int(r.days)
+        ngay_gia = float(r.internal_price) / int(r.days)  # k2-doc-an-toan: tl lấy từ tuyen — internal_price > 0
         return {"ten": f"Xe {XE_BANG_CHO} chỗ · theo tuyến {r.route} {int(r.days)} ngày, quy theo ngày (bảng giá xe)",
                 "loai": f"xe {XE_BANG_CHO} chỗ", "chi_tiet": f"{so} xe × {so_ngay} ngày",
                 "von": ngay_gia * so_ngay * so, "nguon": f"vehicle_rates:{r.id}:quy_ngay"}
@@ -801,14 +801,14 @@ def gui(db: Session, tk_: TaiKhoanNgoai, d: dict, now: datetime | None = None) -
             "message": f"Đã gửi thiết kế {ma} (phiên bản {pb}) — Sales Vietourist liên hệ báo giá chính thức"}
 
 
-def cua_toi(db: Session, tk_: TaiKhoanNgoai) -> list[dict]:
+def cua_toi(db: Session, tk_: TaiKhoanNgoai, now: datetime | None = None) -> list[dict]:   # KS-19j: now cho phép thử
     _khach(tk_)
     ds = db.execute(select(ThietKeDoan).where(ThietKeDoan.tai_khoan_id == tk_.id, ThietKeDoan.trang_thai == "da_gui")
                     .order_by(ThietKeDoan.tao_luc.desc()).limit(30)).scalars().all()
     from app.services import bao_gia_doan as BG
     ra_ = [{"ma": x.ma, "phien_ban": x.phien_ban, "tom_tat": x.tom_tat, "ngay_di": x.ngay_di.isoformat() if x.ngay_di else None,
             "tong_ban": x.tong_ban, "gui_luc": x.tao_luc.isoformat(timespec="minutes"), "thiet_ke": x.thiet_ke,
-            "du_toan": cho_khach(x.du_toan or {}), "bao_gia": BG.cho_khach(db, tk_, x.ma)} for x in ds]   # TK-2
+            "du_toan": cho_khach(x.du_toan or {}), "bao_gia": BG.cho_khach(db, tk_, x.ma, now)} for x in ds]   # TK-2
     db.commit()
     return ra_
 
@@ -827,7 +827,7 @@ def _ra(x: ThietKeDoan, von: bool, db: Session | None = None) -> dict:
     return {"id": x.id, "ma": x.ma, "phien_ban": x.phien_ban, "yeu_cau_id": x.yeu_cau_id, "tom_tat": x.tom_tat,
             "ngay_di": x.ngay_di.isoformat() if x.ngay_di else None, "so_khach": x.so_khach, "tong_ban": x.tong_ban,
             "gui_luc": x.tao_luc.isoformat(timespec="minutes"), "trang_thai": x.trang_thai, "thiet_ke": x.thiet_ke,
-            "du_toan": dt if von else cho_khach(dt), **({"tong_von": x.tong_von} if von else {}), "bao_gia": bg}
+            "du_toan": dt if von else cho_khach(dt), **({"tong_von": x.tong_von} if von else {}), "bao_gia": bg}  # k2-doc-an-toan: tong_von chỉ chuyển nguyên giá trị ra, không tính
 
 
 def ds_vtos(db: Session, u: User) -> dict:

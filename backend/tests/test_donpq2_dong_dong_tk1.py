@@ -144,6 +144,11 @@ def test_donpq2_4_doc_DU_MOI_NGUON_SO_chu_khong_mot_tep():
     from tests.test_giu_cho_lan import _nguon, _doc_mot_tep
 
     dang = [d for t in _nguon() for d in _doc_mot_tep(t) if d["trang_thai"] == "đang làm"]
+    # KS-19j (06/11/2026): chỉ xét những dòng mà ĐỢT NÀY đóng (XET). Bản cũ đòi hai tệp nóng không bao giờ
+    # được làn Phân quyền giữ nữa — nghĩa là MỌI đợt sau của làn này đụng `access.py` (tệp phân quyền gốc)
+    # đều đỏ oan. Vẫn đọc ĐỦ mọi nguồn sổ (tệp phẳng + thư mục) như ý định gốc.
+    dang = [d for d in dang if any(("**" + ma + " —") in d["ma_viec"] or d["ma_viec"].startswith(ma + " —")
+                                   for ma in XET)]
     for tep in ("backend/app/services/ks_cua_nhap.py", "backend/app/services/access.py"):
         giu = sorted({d["lan"] for d in dang if tep in d["tep"]})
         assert "Phân quyền" not in giu, (
