@@ -16,6 +16,8 @@ export function laTenMienCong(): boolean {
   try { return TEN_MIEN_CONG.includes(location.hostname.toLowerCase()); } catch { return false; }
 }
 
+/* KS-19e: /cong/toi trả email ĐÃ CHE (vi•••@gmail.com) để hiện cho xem — không bao giờ điền bản che vào ô nhập. */
+export function emailThat(e: any): string { return typeof e === "string" && e && !e.includes("•") ? e : ""; }
 export function phienCong(): string { try { return localStorage.getItem(KHOA_PHIEN_CONG) || ""; } catch { return ""; } }
 export function luuPhienCong(p: string) { try { localStorage.setItem(KHOA_PHIEN_CONG, p); } catch { /* trình duyệt chặn lưu */ } }
 export function xoaPhienCong() { try { localStorage.removeItem(KHOA_PHIEN_CONG); } catch { /* bỏ qua */ } }

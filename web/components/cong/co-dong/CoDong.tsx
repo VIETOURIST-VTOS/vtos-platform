@@ -6,7 +6,7 @@
    · Liên hệ IR: câu hỏi có mã IR-xxxx; IR trả lời bằng thông tin đã công bố, như nhau với mọi cổ đông.
    · Ưu đãi, cổ tức, hồ sơ sở hữu: Đợt 2 — KHÔNG hiện số mẫu như thật. */
 import { useCallback, useEffect, useState } from "react";
-import { goiCong, phienCong } from "@/lib/cong";
+import { emailThat, goiCong, phienCong } from "@/lib/cong";
 import { svg } from "../khach/icons";
 import KhachSanOta from "../KhachSanOta";
 import KhachSanVtd from "../KhachSanVtd";
@@ -200,7 +200,7 @@ export default function CoDong({ toi, thoat }: { toi: any; thoat: () => void }) 
           <UuDai />
           {dv === "tour" ? <TourCoDong toi={toi} daGui={setMsg} />
             : dv === "khach_san" ? <><KhachSanVtd /><h3 className="ksv-ota-dau">Hoặc đặt qua đối tác OTA của Vietourist</h3><KhachSanOta ghiChu="Mức ưu đãi cổ đông cho phòng đặt qua OTA: Vietourist công bố sau." /></>
-            : dv === "nha_hang" ? <><NhaHangKhach ten={ten} lienHe={toi.dien_thoai || toi.email} coSdt={!!toi.dien_thoai} sdtCho={toi.dien_thoai || ""} daGui={setMsg} /><DatBanCuaToi /></>
+            : dv === "nha_hang" ? <><NhaHangKhach ten={ten} lienHe={toi.dien_thoai || emailThat(toi.email)} coSdt={!!toi.dien_thoai} sdtCho={toi.dien_thoai || ""} daGui={setMsg} /><DatBanCuaToi /></>
             : <VeMayBayOta />}
         </>}
 

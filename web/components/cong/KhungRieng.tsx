@@ -37,7 +37,7 @@ export default function KhungRieng({ dang, toi, xong, children }: { dang: TrangR
         <nav className="kr-nav" aria-label="Dịch vụ">{MUC.map(([k, t]) =>
           <a key={k} href={goc[k]} aria-current={dang === k ? "page" : undefined}>{t}</a>)}</nav>
         {!xong ? <span className="kr-acc kr-ghost">…</span>
-          : toi ? <a className="kr-acc" href="/cong"><b>{ten}</b><span>Đơn của tôi</span></a>
+          : toi ? <a className="kr-acc" href="/cong?tab=bookings"><b>{ten}</b><span>Đơn của tôi</span></a>
           : <a className="kr-acc" href={duongDangNhap()} onClick={(e) => { e.currentTarget.href = duongDangNhap(); }}><b>Đăng nhập</b></a>}
       </div></header>
       <div id="vtd-access" data-role="khach-hang" className="kr-body"><section className="v3-app kr-app" data-portal="khach-hang"><div className="kr-in">{children}</div></section></div>
