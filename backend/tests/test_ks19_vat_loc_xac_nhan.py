@@ -42,3 +42,21 @@ def test_ks19b_goi_ban_cung_mot_offer_va_du_phong_moi_dem(db):
     assert o2["tong"] == 7_600_000 and o2["dem_gia"] == round(3_800_000 / 3)     # giá lọc tính trên 1 phòng / 1 đêm
     # cần 4 phòng mà loại phòng chỉ còn 3 ở các đêm → không có offer → khách sạn không hiện
     assert S.tim(db, "Đà Nẵng", VAO, RA, 4, 0, 4, hom_nay=HN)["khach_san"] == []
+
+
+def test_ks19c_may_tu_lay_toa_do_theo_lich(db, monkeypatch):
+    import datetime as _dt
+    from app.services import khach_san_vtd as S
+    from app.services import lich_trong as LT
+    assert "vtos_ks_toa_do" in LT.THEO_MA                                   # máy tự chạy, không ai phải bấm
+    a = _ks(db, "Khách sạn Biển Xanh"); b = _ks(db, "Khách sạn Ghim Tay"); c = _ks(db, "Khách sạn Không Thấy")
+    b.vi_do, b.kinh_do, b.toa_do_nguon = 16.0, 108.2, "tay"
+    c.toa_do_nguon = "khong_thay"
+    a.vi_do = a.kinh_do = None; a.toa_do_nguon = ""
+    db.commit()
+    hoi = []
+    monkeypatch.setattr(S, "LAY_TOA_DO", lambda q: hoi.append(q) or (16.07, 108.24))
+    so, tb = S.may_lay_toa_do(db, nghi=0, now=_dt.datetime(2026, 11, 5, 9, 0))
+    assert so == 1 and a.vi_do == 16.07 and a.toa_do_nguon == "tu_dong" and b.toa_do_nguon == "tay" and c.vi_do is None
+    so2, _ = S.may_lay_toa_do(db, nghi=0, now=_dt.datetime(2026, 11, 6, 2, 0))   # 2 giờ sáng: thử lại chỗ không thấy
+    assert so2 == 1 and c.vi_do == 16.07
