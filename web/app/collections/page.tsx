@@ -17,6 +17,15 @@ const S = (s: string) => <Tag cls={ST[s]?.[1] || ""}>{ST[s]?.[0] || s}</Tag>;
 // voi nguoi van con quyen.
 const VAI_LAP_PHIEU_THU = ["ketoan", "thu_quy"];
 
+// ĐỢT QUY-2b 04/11/2026 — KHỐI «SỔ QUỸ TIỀN MẶT». Cùng bài học R4c-4: một hằng số, không gõ rời.
+// Bộ vai này phải bằng ĐÚNG bộ vai cửa máy chủ nhận (`require_roles("ketoan", "thu_quy")` ở
+// `api/v1/payments.py::lap_phieu_quy`, Đợt QUY-1). Gõ rời hai chỗ thì sửa một bên quên bên kia, và
+// lúc ấy nút hiện ra để bấm vào nhận 403 — hoặc biến mất với người vẫn còn quyền. `test_quy2b_2`
+// đọc cả hai chỗ rồi so, nên lệch là đỏ.
+const VAI_SO_QUY = ["ketoan", "thu_quy"];
+
+const CHIEU_QUY: [string, string][] = [["thu", "Phiếu thu quỹ"], ["chi", "Phiếu chi quỹ"]];
+
 function Collections() {
   const { user, toast } = useShell();
   const isKT = ["ketoan", "cntt"].includes(user?.role || "");
@@ -76,6 +85,41 @@ function Collections() {
   const load = useCallback(() => Promise.all([api("/collections/summary").then(setSum), api(`/bank-transactions${filter ? `?status=${filter}` : ""}`).then(setTxns), api("/receipts").then(setRcs)]), [filter]);
   useEffect(() => { load(); }, [load]);
   const post = async (path: string, json?: any) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || "Xong"); load(); } catch (x) { toast(errMsg(x), true); } };
+  // ĐỢT QUY-2b 04/11/2026 — SỔ QUỸ TIỀN MẶT.
+  //
+  // Màn hình KHÔNG tự chọn một cặp tài khoản nào, và cũng không được phép: nó gửi lý do người lập
+  // chọn, rồi bảng quy ước trên máy chủ quyết định ghi Nợ/Có vào đâu. Ô «Lý do» đọc SỐNG từ cửa
+  // `/receipts/quy/ly-do`, nên thêm một quy tắc hạch toán là một lý do mới tự hiện ra — không ai
+  // phải sửa màn hình. Lý do không có trong bảng thì máy chủ TỪ CHỐI lập phiếu và nói rõ đang nhận
+  // những lý do nào; câu ấy hiện nguyên văn lên đây chứ không bị nuốt thành "có lỗi".
+  const laSoQuy = VAI_SO_QUY.includes(user?.role || "");
+  const [quy, setQuy] = useState<any[]>([]);
+  const [quyLyDo, setQuyLyDo] = useState<any[]>([]);
+  const [pq, setPq] = useState({
+    chieu: "thu", ngay: new Date().toISOString().slice(0, 10), so_tien: "", ly_do: "",
+    noi_dung: "", ten_doi_tuong: "", ma_doi_tuong: "", khoan_muc: "",
+  });
+  const [dangLap, setDangLap] = useState(false);
+  const loadQuy = useCallback(() => {
+    if (!VAI_SO_QUY.includes(user?.role || "")) return;
+    api("/receipts/quy/phieu").then((r) => setQuy(r.phieu || [])).catch(() => setQuy([]));
+  }, [user]);
+  useEffect(() => { loadQuy(); }, [loadQuy]);
+  useEffect(() => {
+    if (!VAI_SO_QUY.includes(user?.role || "")) return;
+    api(`/receipts/quy/ly-do?chieu=${pq.chieu}`).then((r) => setQuyLyDo(r.ly_do || []))
+      .catch(() => setQuyLyDo([]));
+  }, [pq.chieu, user]);
+  const lapPhieuQuy = async () => {
+    setDangLap(true);
+    try {
+      const r = await api("/receipts/quy/phieu", { method: "POST", json: { ...pq, so_tien: Number(pq.so_tien) } });
+      toast(r.message);
+      setPq({ ...pq, so_tien: "", noi_dung: "", ten_doi_tuong: "", ma_doi_tuong: "", khoan_muc: "" });
+      loadQuy();
+    } catch (x) { toast(errMsg(x), true); }
+    setDangLap(false);
+  };
   const dueRows = (sum?.bookings || []).filter((b: any) => b.due > 0);
   return (<>
     <h1>Thu tiền – robot R1 (SePay) &amp; phiếu thu</h1>
@@ -190,6 +234,48 @@ function Collections() {
         <label>Người nộp<input value={cash.payer} onChange={(e) => setCash({ ...cash, payer: e.target.value })} /></label>
         <label>Ghi chú<input value={cash.note} onChange={(e) => setCash({ ...cash, note: e.target.value })} /></label>
       </div><button className="act" disabled={!cash.booking_id || !cash.amount} onClick={() => post("/receipts/cash", { booking_id: Number(cash.booking_id), amount: Number(cash.amount), payer: cash.payer, note: cash.note }).then(() => setCash({ booking_id: "", amount: "", payer: "", note: "" }))}>Lập phiếu thu</button></div></>}
+
+    {laSoQuy && <><h2>Sổ quỹ tiền mặt</h2>
+      <p className="muted">Phiếu thu quỹ và phiếu chi quỹ — <b>ghi sổ ngay</b> khi lập, không có bước
+        xác nhận thứ hai. Màn hình này không chọn tài khoản: nó gửi <b>lý do</b> bạn chọn, và bảng quy
+        ước hạch toán quyết định ghi Nợ/Có vào đâu. Lý do chưa có quy ước thì phiếu <b>bị từ chối</b> và
+        máy chủ nói rõ đang nhận những lý do nào — Kế toán trình quy tắc cho lý do ấy (cần hai chữ ký)
+        rồi lập lại. Cả sổ quỹ một lần thì dùng cửa tải lô «Sổ quỹ tiền mặt» ở
+        trang <a href="/nap-du-lieu">Nạp dữ liệu</a>; hai cửa đi qua đúng một đường.</p>
+      <div className="panel"><div className="grid">
+        <label>Chiều phiếu<select value={pq.chieu} onChange={(e) => setPq({ ...pq, chieu: e.target.value, ly_do: "" })}>
+          {CHIEU_QUY.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+        <label>Ngày<input type="date" value={pq.ngay} onChange={(e) => setPq({ ...pq, ngay: e.target.value })} /></label>
+        <label>Số tiền (đ)<input type="number" value={pq.so_tien} onChange={(e) => setPq({ ...pq, so_tien: e.target.value })} /></label>
+        <label>Lý do<select value={pq.ly_do} onChange={(e) => setPq({ ...pq, ly_do: e.target.value })}>
+          <option value="">– để trống: thu/chi tiền mặt thẳng với khách –</option>
+          {quyLyDo.map((g: any) => <option key={g.gia_tri} value={g.gia_tri}>{g.ten || g.gia_tri}</option>)}</select></label>
+        <label>Nội dung<input value={pq.noi_dung} onChange={(e) => setPq({ ...pq, noi_dung: e.target.value })} /></label>
+        <label>Tên đối tượng<input value={pq.ten_doi_tuong} placeholder="khách / NCC / nhân viên / ngân hàng"
+          onChange={(e) => setPq({ ...pq, ten_doi_tuong: e.target.value })} /></label>
+        <label>Mã đối tượng<input value={pq.ma_doi_tuong} onChange={(e) => setPq({ ...pq, ma_doi_tuong: e.target.value })} /></label>
+        <label>Khoản mục chi phí<input value={pq.khoan_muc} onChange={(e) => setPq({ ...pq, khoan_muc: e.target.value })} /></label>
+      </div>
+      <button className="act" disabled={dangLap || !(Number(pq.so_tien) > 0)} onClick={lapPhieuQuy}>
+        {dangLap ? "Đang lập…" : "Lập phiếu quỹ"}</button>
+      <p className="muted">Một số tài khoản bắt buộc có mã đối tượng (131, 331, 3388, 141, 341). Thiếu
+        thì phiếu không ghi sổ được, và máy chủ nói ra tài khoản nào thiếu.</p></div>
+
+      <div className="panel wrap"><table><thead><tr><th>Số phiếu</th><th>Ngày</th><th>Chiều</th><th>Số tiền</th>
+        <th>Lý do</th><th>Nội dung</th><th>Đối tượng</th><th>Quy ước đã khớp</th><th>Số gốc</th><th>Lập bởi</th></tr></thead>
+        <tbody>{quy.length ? quy.map((p: any) => <tr key={p.id}>
+          <td><b>{p.code}</b></td><td>{p.ngay}</td>
+          <td>{p.chieu === "thu" ? <Tag cls="ok">Thu</Tag> : <Tag cls="warn">Chi</Tag>}</td>
+          <td style={{ textAlign: "right" }}>{vnd(p.so_tien)}</td>
+          <td>{p.ly_do || <span className="muted">(để trống)</span>}</td>
+          <td>{p.noi_dung}</td>
+          <td>{p.ten_doi_tuong}{p.ma_doi_tuong && <div className="muted">{p.ma_doi_tuong}</div>}</td>
+          {/* Quy ước ĐÃ khớp lúc lập, chứ không tra lại bảng bây giờ: bảng quy ước có hiệu lực theo
+              ngày, nên tra lại hôm nay có thể ra một câu trả lời khác câu đã ghi vào sổ. */}
+          <td className="muted">{p.quy_tac}</td>
+          <td className="muted">{p.so_goc}</td>
+          <td className="muted">{p.created_by}</td></tr>)
+          : <tr><td colSpan={10} className="muted">Chưa có phiếu quỹ nào.</td></tr>}</tbody></table></div></>}
 
     <h2>Công nợ phải thu theo booking</h2>
     <div className="panel wrap"><table><thead><tr><th>Booking</th><th>Tour</th><th>Khách</th><th>Phải thu</th><th>Đã thu</th><th>Còn lại</th></tr></thead>
