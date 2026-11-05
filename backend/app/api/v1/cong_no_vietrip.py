@@ -189,6 +189,35 @@ def xem(ngay: date | None = None, u: User = Depends(require_roles(*XEM)), db: Se
     return kq
 
 
+# ─────────────────── VT-1 · THỬ ĐƯỜNG SANG VIETRIP (05/11/2026) ───────────────────
+#
+# Vietrip mở hai cửa JSON chỉ đọc (`/receipts`, `/receivables`) thay cho hai đường VTOS đang
+# dùng: nạp tay mỗi sáng, và bộ đọc HTML đăng nhập bằng mật khẩu. Vòng này CHƯA đồng bộ gì —
+# nó chỉ dựng một cửa để NGƯỜI THẬT tự xem đường có thông không.
+#
+# VÌ SAO PHẢI CÓ CỬA NÀY TRƯỚC KHI VIẾT BỘ ĐỒNG BỘ. Không máy nào trong tay làn này gọi được
+# tới `app.vietrip.com.vn` — cả máy Chủ tịch lẫn máy của làn đều bị chặn ra miền ấy. Viết bộ
+# đồng bộ ngay bây giờ là viết dựa trên một tệp PDF chứ không dựa trên thứ máy chủ Vietrip
+# thật sự trả về. Máy chủ VTOS trên Render thì gọi được — nên chỗ đầu tiên biết sự thật là nó.
+#
+# ĐẶT Ở ROUTER NÀY, KHÔNG PHẢI `routes.py`: vòng KS-18 đang giữ `routes.py` và chưa gộp. Hai
+# vòng cùng sửa một tệp là một lần xung đột không cần thiết.
+#
+# CHỈ ĐỌC, KHÔNG GHI: cửa này không chạm cơ sở dữ liệu. Vai đọc đúng bằng `XEM` của màn công
+# nợ — ai xem được công nợ thì xem được đường lấy công nợ ấy có thông không.
+@router.get("/thu-ket-noi")
+def thu_ket_noi(cua: str = "receivables", u: User = Depends(require_roles(*XEM))):
+    """Thử gọi Vietrip MỘT lần nhẹ nhất (`pageSize=1`) và nói kết quả bằng tiếng Việt.
+
+    KHÔNG trả về dòng dữ liệu nào, và KHÔNG BAO GIỜ in khoá — kể cả khi hỏng. Cửa này sinh ra
+    để Chủ tịch tự mở xem, đúng cách `/he-thong/gio-may-chu` của vòng KS-18.
+    """
+    from app.services import vietrip_tai_chinh as VTC
+    if cua not in VTC.CUA:
+        raise HTTPException(422, f"cửa lạ «{cua}» — chỉ có {', '.join(VTC.CUA)}")
+    return {**VTC.thu_ket_noi(cua), "ten_bien_moi_truong": VTC.TEN_BIEN}
+
+
 @router.get("/lich-su")
 def lich_su(so_ngay: int = 60, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
     tu = date.today() - timedelta(days=max(1, min(so_ngay, 400)))
