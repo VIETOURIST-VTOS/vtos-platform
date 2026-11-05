@@ -27,3 +27,18 @@ def test_ks19_1_phu_hop_tien_nghi_va_km(db):
 def test_ks19_2_vat_nam_trong_gia(db):
     from app.services import khach_san_vtd as S
     assert S.vat_trong(8_470_000) == 627_407 and S.vat_trong(0) == 0
+
+
+def test_ks19b_goi_ban_cung_mot_offer_va_du_phong_moi_dem(db):
+    from app.services import khach_san_vtd as S
+    k = _ks(db, "Khách sạn Biển Xanh")
+    lp, g, _x = _mo_ban(db, k)                                          # 3 phòng, gói có bữa sáng + hủy miễn phí
+    lp.tien_nghi = ["Ban công", "Không hút thuốc"]; db.commit()
+    o = S.tim(db, "Đà Nẵng", VAO, RA, 2, 0, 1, hom_nay=HN)["khach_san"][0]
+    gb = o["goi_ban"]
+    assert len(gb) == 1 and gb[0]["goi"] == g.id and gb[0]["bua_sang"] and gb[0]["mien_phi_huy"] and gb[0]["khong_hut"]
+    assert gb[0]["tong"] == 3_800_000 and gb[0]["dem_gia"] == round(3_800_000 / 3)
+    o2 = S.tim(db, "Đà Nẵng", VAO, RA, 4, 0, 2, hom_nay=HN)["khach_san"][0]["goi_ban"][0]
+    assert o2["tong"] == 7_600_000 and o2["dem_gia"] == round(3_800_000 / 3)     # giá lọc tính trên 1 phòng / 1 đêm
+    # cần 4 phòng mà loại phòng chỉ còn 3 ở các đêm → không có offer → khách sạn không hiện
+    assert S.tim(db, "Đà Nẵng", VAO, RA, 4, 0, 4, hom_nay=HN)["khach_san"] == []
