@@ -8,7 +8,7 @@
      …) hiện «Sắp ra mắt» — KHÔNG hiện số mẫu như thật. KH-4 mở đánh giá, góp ý, hỗ trợ.
    · «Gửi yêu cầu» thay «Đặt thử»: chưa giữ chỗ, chưa thu tiền; Sales gọi lại và báo giá cuối. */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { duongRieng, goiCong, moNgoai } from "@/lib/cong";
+import { duongRieng, emailThat, goiCong, moNgoai } from "@/lib/cong";
 import { svg } from "./icons";
 import NhaHangKhach from "./NhaHangKhach";
 import QrThanhToan from "./QrThanhToan";
@@ -76,7 +76,8 @@ function SapRaMat({ tab }: { tab: Tab }) {
 export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void }) {
   const [tab, setTab] = useState<Tab>("home");
   // DT-2: quay về từ trang thẻ OnePay (?dat_ban=…) → mở thẳng «Đơn của tôi», nơi có «Đặt bàn của tôi».
-  useEffect(() => { try { if (new URLSearchParams(window.location.search).get("dat_ban")) setTab("bookings"); } catch { /* bỏ qua */ } }, []);
+  // KS-19e: nút «Đơn của tôi» trên trang riêng (khách sạn / tour / nhà hàng) mở /cong?tab=bookings → vào thẳng «Đơn của tôi».
+  useEffect(() => { try { const u = new URLSearchParams(window.location.search); if (u.get("dat_ban") || u.get("tab") === "bookings") setTab("bookings"); } catch { /* bỏ qua */ } }, []);
   // KS-16h: khách mở link kh.vietourist.vn/CTV-xxxx (app/cong/page.tsx lưu mã) → gửi mã CTV một lần, trong 30 ngày.
   useEffect(() => {
     try {
@@ -132,7 +133,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
     try { setHs(await goiCong("/khach/ho-so", patch)); setMsg("Đã lưu hồ sơ"); } catch (x: any) { setErr(x.message); }
   };
   const ten = hs?.ho_ten ?? toi.ho_ten;
-  const lienHe = toi.dien_thoai || toi.email;
+  const lienHe = toi.dien_thoai || emailThat(toi.email);   // KS-19e: không điền email đã che
   const tamTinh = useMemo(() => (tourMo ? tourMo.gia * Number(yc.so_khach || 0) : 0), [tourMo, yc.so_khach]);
   const coSdt = !!toi.dien_thoai;
   const menuTab: Tab = tab === "deals" || tab === "tour" || tab === "request" ? "home" : tab === "booking" ? "bookings" : tab;

@@ -7,7 +7,7 @@
    · Công nợ hai chiều hiện riêng, KHÔNG bù trừ thành một số.
    · CTV không giữ chỗ, không thu tiền: giới thiệu khách thành nhu cầu cho Sales. */
 import { useCallback, useEffect, useState } from "react";
-import { goiCong } from "@/lib/cong";
+import { emailThat, goiCong } from "@/lib/cong";
 import { svg } from "../khach/icons";
 import QrThanhToan from "../khach/QrThanhToan";
 import KhachSanOta from "../KhachSanOta";
@@ -297,7 +297,7 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
               <tbody>{no.hoa_hong.map((m: any) => <tr key={m.ky}><th scope="row">{thang(m.ky)}</th><td>{tien(m.hoa_hong)}</td><td>{tien(m.da_tra)}</td><td>{tien(m.con_phai_tra)}</td></tr>)}</tbody></table></div></section>}
         </>)}
 
-        {blv && tab === "nha_hang" && <NhaHangKhach doiTac ten={blv.doi_tac?.ten || toi.ten_don_vi || ""} lienHe={toi.dien_thoai || toi.email} coSdt={false} sdtCho=""
+        {blv && tab === "nha_hang" && <NhaHangKhach doiTac ten={blv.doi_tac?.ten || toi.ten_don_vi || ""} lienHe={toi.dien_thoai || emailThat(toi.email)} coSdt={false} sdtCho=""
           daGui={(m) => { di("dat_ban"); setMsg(m); }} />}
         {blv && tab === "dat_ban" && <DatBanCuaToi doiTac />}
         {blv && tab === "refer" && <div className="v3-two">

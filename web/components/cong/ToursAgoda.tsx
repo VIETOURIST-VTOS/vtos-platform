@@ -10,7 +10,7 @@
    (Sales gọi lại, không giữ chỗ, không thu tiền) — máy chủ cũng chặn đặt online bằng 409. */
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
-import { diCongThe, duongRieng, goiCong, phienCong } from "@/lib/cong";
+import { diCongThe, duongRieng, emailThat, goiCong, phienCong } from "@/lib/cong";
 import { CSS_KSV } from "./KhachSanVtd";
 import QrThanhToan from "./khach/QrThanhToan";
 import TuThietKeTour from "./TuThietKeTour";   // TK-1: khách tự thiết kế tour đoàn
@@ -143,7 +143,7 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
   const [buoc, setBuoc] = useState<"ds" | "sp" | "dat" | "doan" | "da_gui" | "don">(moDon ? "don" : "ds");
   const [don, setDon] = useState(moDon || "");
   const [gia, setGia] = useState<any>(null);
-  const [kh, setKh] = useState<any>({ ho_ten: toi?.ho_ten || "", dien_thoai: toi?.dien_thoai || "", email: toi?.email || "", cach: "coc", yeu_cau: "",
+  const [kh, setKh] = useState<any>({ ho_ten: toi?.ho_ten || "", dien_thoai: toi?.dien_thoai || "", email: emailThat(toi?.email), cach: "coc", yeu_cau: "",
     vat: false, mst: "", cty: "", dc: "", vat_email: "", dong_y: false, khach: [] as any[] });
   const [yc, setYc] = useState<any>({ so_khach: 20, tu: "", den: "", noi: "", ngan_sach: "", hang_ks: "", cong_ty: "", hoa_don: false, dien_thoai: "", ghi_chu: "", dong_y: false });
   const [loi, setLoi] = useState(""); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState("");
