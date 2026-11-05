@@ -133,7 +133,8 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
     try { setHs(await goiCong("/khach/ho-so", patch)); setMsg("Đã lưu hồ sơ"); } catch (x: any) { setErr(x.message); }
   };
   const ten = hs?.ho_ten ?? toi.ho_ten;
-  const lienHe = toi.dien_thoai || emailThat(toi.email);   // KS-19e: không điền email đã che
+  const lienHe = toi.dien_thoai || emailThat(toi.email);   // KS-19f: điền sẵn vào ô nhập — không điền email đã che
+  const lienHeHien = toi.dien_thoai || toi.email || "";     // KS-19h: chỉ để HIỆN (email che vẫn đọc được), không điền vào ô
   const tamTinh = useMemo(() => (tourMo ? tourMo.gia * Number(yc.so_khach || 0) : 0), [tourMo, yc.so_khach]);
   const coSdt = !!toi.dien_thoai;
   const menuTab: Tab = tab === "deals" || tab === "tour" || tab === "request" ? "home" : tab === "booking" ? "bookings" : tab;
@@ -149,7 +150,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
     <div className="v3-mobile-nav"><Nut i="menu" onClick={() => setMenuMo(!menuMo)}>Danh mục chức năng</Nut><strong>{nhanMenu}</strong></div>
     <div className="v3-layout">
       <aside className={`v3-sidebar ${menuMo ? "open" : ""}`}>
-        <div className="v3-side-profile"><span className="v3-avatar"><I n="luggage" /></span><strong>Xin chào{ten ? `, ${ten}` : ", bạn"}!</strong><small>{lienHe}</small></div>
+        <div className="v3-side-profile"><span className="v3-avatar"><I n="luggage" /></span><strong>Xin chào{ten ? `, ${ten}` : ", bạn"}!</strong><small>{lienHeHien}</small></div>
         <nav aria-label="Chức năng Khách hàng">{MENU.map(([k, t, i]) =>
           <button key={k} type="button" className="cursor-interaction" aria-current={menuTab === k ? "page" : undefined} onClick={() => di(k)}><I n={i} /><span>{t}</span></button>)}</nav>
         <div className="v3-side-bottom"><Nut kieu="quiet" i="log-out" onClick={thoat}>Đăng xuất</Nut></div>
@@ -176,7 +177,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
                 <p>Đơn {home.chuyen_toi.ma} · {home.chuyen_toi.so_khach} khách</p>
                 <Badge c={home.chuyen_toi.muc}>{home.chuyen_toi.phuc_vu}</Badge> <Badge c={home.chuyen_toi.thanh_toan === "Đã thu đủ" ? "good" : "warn"}>{home.chuyen_toi.thanh_toan}</Badge></div>
               <Nut i="arrow-right" onClick={() => { setDonMo(home.chuyen_toi); di("booking"); }}>Xem đơn</Nut></div>
-              : <p>{home ? "Chưa có chuyến sắp đi gắn với " + lienHe + "." : "Đang tải…"}{home?.yeu_cau_dang_cho ? ` Bạn có ${home.yeu_cau_dang_cho} yêu cầu đang chờ Sales liên hệ.` : ""}</p>}
+              : <p>{home ? "Chưa có chuyến sắp đi gắn với " + lienHeHien + "." : "Đang tải…"}{home?.yeu_cau_dang_cho ? ` Bạn có ${home.yeu_cau_dang_cho} yêu cầu đang chờ Sales liên hệ.` : ""}</p>}
           </section>
           <div className="v3-section-title"><h2>Tour cho hành trình mới</h2><Nut kieu="quiet" i="arrow-right" onClick={() => moNgoai(duongRieng("tours"))}>Xem tất cả</Nut></div>
           <div className="v3-products">{(home?.tour || []).map((t: any) => <TheTour key={t.id} t={t} mo={moTour} />)}</div>
@@ -245,7 +246,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
             <h2>{loaiYc === "tour" ? tourMo?.ten : "Tour đoàn theo yêu cầu"}</h2>
             <p>{loaiYc === "tour" ? `${ngay(tourMo?.khoi_hanh)} · ${tourMo?.thoi_gian}` : "Gia đình, doanh nghiệp, hội nhóm — Sales thiết kế hành trình riêng."}</p>
             <label className="v3-field">Số khách<input type="number" min={1} max={200} value={yc.so_khach} onChange={(e) => setYc({ ...yc, so_khach: Number(e.target.value) })} /></label>
-            <div className="v3-field">Người gửi<div className="v3-readonly">{ten || "Khách hàng"} · {lienHe}</div></div>
+            <div className="v3-field">Người gửi<div className="v3-readonly">{ten || "Khách hàng"} · {lienHeHien}</div></div>
             <label className="v3-field">Số điện thoại Sales gọi lại{coSdt ? " (để trống = số đã xác thực)" : ""}
               <input inputMode="tel" value={yc.dien_thoai} placeholder={coSdt ? toi.dien_thoai : "09xx xxx xxx"} onChange={(e) => setYc({ ...yc, dien_thoai: e.target.value })} /></label>
             {loaiYc === "tour_doan" && <label className="v3-field">Ngày mong muốn khởi hành<input type="date" value={yc.ngay_mong_muon} onChange={(e) => setYc({ ...yc, ngay_mong_muon: e.target.value })} /></label>}
@@ -271,7 +272,7 @@ export default function KhachHang({ toi, thoat }: { toi: any; thoat: () => void 
               <tbody>{don.don.map((d: any) => <tr key={d.ma}><th scope="row">{d.ma}<small>{d.ten} · {ngay(d.khoi_hanh)}</small></th>
                 <td><Badge c={d.muc}>{d.phuc_vu}</Badge></td><td>{d.thanh_toan}</td><td>{tien(d.gia_tri)}</td>
                 <td><Nut kieu="quiet" i="chevron-right" onClick={() => { setDonMo(d); di("booking"); }}>Chi tiết</Nut></td></tr>)}</tbody></table></div>
-              : <p>Chưa có đơn nào gắn với {lienHe}. Đơn hiện ở đây khi số điện thoại hoặc email trên booking trùng liên hệ bạn đã xác thực.</p>}
+              : <p>Chưa có đơn nào gắn với {lienHeHien}. Đơn hiện ở đây khi số điện thoại hoặc email trên booking trùng liên hệ bạn đã xác thực.</p>}
           </section>
           <DatBanCuaToi />
           <PhongCuaToi />
