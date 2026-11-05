@@ -126,8 +126,10 @@ def test_huy_theo_goi_va_hoan_hai_nguoi(db, k3):
     from app.services import payments as P
     k, lp, g = k3
     d = _dat(db, k, g)
+    assert S.ra_khach(db, d, NAY)["con_phai_tra"] == d.tong == 3_800_000    # KS-19g: nút «Trả ngay ₫ …» có số
     P.match_transaction(db, _txn(db, d.tong, d.ma)); db.commit()
-    assert S.ra_khach(db, d, NAY)["hoan_neu_huy"] == 3_800_000
+    r = S.ra_khach(db, d, NAY)
+    assert r["hoan_neu_huy"] == 3_800_000 and r["con_phai_tra"] == 0
     S.huy_boi_khach(db, _tk(db), d.ma, "Đổi kế hoạch", NAY); db.commit()
     assert d.trang_thai == "da_huy" and d.so_hoan == 3_800_000 and d.hoan_tt == "cho_sales"
     with pytest.raises(S.LoiDon, match="Sales"):
