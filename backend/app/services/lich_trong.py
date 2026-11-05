@@ -109,6 +109,12 @@ def _quet_im_lang(db: Session) -> tuple[int | None, str]:
     return n, f"{n} tác vụ đang quá hạn" if n else "Không có tác vụ nào quá hạn"
 
 
+def _ks_toa_do(db: Session) -> tuple[int | None, str]:
+    """KS-19c: máy tự lấy tọa độ khách sạn VTD từ địa chỉ (thay nút «Lấy tọa độ» của TP Điều hành)."""
+    from app.services import khach_san_vtd as KS
+    return KS.may_lay_toa_do(db)
+
+
 # ────────────────────────────── BẢN KHAI ──────────────────────────────
 # `kieu` quyết định mã kỳ:
 #   ("moi_phut", n)      – mốc tròn n phút trong ngày
@@ -133,6 +139,12 @@ LICH = [
               "kiện kỹ thuật cho robot Kiểm soát.",
      "kieu": ("moi_phut", 10), "han_toi_da_phut": 40, "quan_trong": False,
      "phong_ban": "cntt", "chay": _quet_im_lang},
+
+    {"ma": "vtos_ks_toa_do", "ten": "Lấy tọa độ khách sạn VTD",
+     "mo_ta": "Khách sạn chưa có vị trí bản đồ thì máy tra địa chỉ qua OpenStreetMap (tối đa 20 khách sạn mỗi giờ). "
+              "Ghim do Điều hành dán link Google Maps không bị ghi đè. Có tọa độ thì máy tính «cách trung tâm».",
+     "kieu": ("moi_phut", 60), "han_toi_da_phut": 180, "quan_trong": False,
+     "phong_ban": "dieu_hanh", "chay": _ks_toa_do},
 
     {"ma": "vtos_bao_cao_ngay", "ten": "Báo cáo ngày",
      "mo_ta": "Lập báo cáo ngày, lưu vào kho báo cáo tự động.",

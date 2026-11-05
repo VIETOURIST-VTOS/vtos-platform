@@ -414,6 +414,27 @@ def _tu_lay_toa_do(k: KhachSanVtd, nghi: float = 0) -> bool:
     return False
 
 
+def may_lay_toa_do(db: Session, toi_da: int = 20, nghi: float = LOAT_NGHI_GIAY, now: datetime | None = None) -> tuple[int, str]:
+    """KS-19c (Chủ tịch 05/11/2026: «máy tự bấm nút lấy tọa độ»): việc theo lịch, không cần ai bấm. Mỗi giờ lấy
+    tọa độ cho khách sạn chưa có (bỏ qua ghim tay); khách sạn máy đã thử mà không thấy địa chỉ thì chỉ thử lại
+    lúc 2 giờ sáng — không gọi dịch vụ ngoài mỗi giờ cho cùng một địa chỉ hỏng."""
+    import time
+    now = now or datetime.now()
+    q = select(KhachSanVtd).where(KhachSanVtd.vi_do.is_(None), KhachSanVtd.toa_do_nguon != "tay", KhachSanVtd.ngung.is_(False))
+    if now.hour != 2:
+        q = q.where(KhachSanVtd.toa_do_nguon != "khong_thay")
+    ds = db.execute(q.order_by(KhachSanVtd.ma)).scalars().all()
+    co, khong = [], []
+    for i, k in enumerate(ds[:toi_da]):
+        if i and nghi:
+            time.sleep(nghi)
+        (co if _tu_lay_toa_do(k, nghi) else khong).append(k.ma)
+    if co or khong:
+        db.commit()
+    return len(co), (f"Lấy được tọa độ {len(co)} khách sạn" + (f", chưa thấy {len(khong)}: {', '.join(khong[:10])}" if khong else "")
+                     + (f"; còn {len(ds) - toi_da} chờ lượt sau" if len(ds) > toi_da else "")) if ds else "Mọi khách sạn đã có tọa độ"
+
+
 def lay_toa_do_loat(db: Session, u: User, toi_da: int = LOAT_TOI_DA, nghi: float = LOAT_NGHI_GIAY) -> dict:
     """Nút «Lấy tọa độ cho tất cả khách sạn»: khách sạn chưa có tọa độ (bỏ qua ghim tay), tối đa `toi_da` mỗi lần."""
     import time
