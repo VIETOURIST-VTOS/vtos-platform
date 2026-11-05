@@ -60,3 +60,31 @@ def test_ks19c_may_tu_lay_toa_do_theo_lich(db, monkeypatch):
     assert so == 1 and a.vi_do == 16.07 and a.toa_do_nguon == "tu_dong" and b.toa_do_nguon == "tay" and c.vi_do is None
     so2, _ = S.may_lay_toa_do(db, nghi=0, now=_dt.datetime(2026, 11, 6, 2, 0))   # 2 giờ sáng: thử lại chỗ không thấy
     assert so2 == 1 and c.vi_do == 16.07
+
+
+def test_ks19d_tra_dia_chi_nhieu_cach_va_bo_ket_qua_sai(db, monkeypatch):
+    """KS-19d: địa chỉ theo đơn vị hành chính mới không tra ra thì thử phố + thành phố; bỏ kết quả là tâm thành phố
+    hoặc nằm xa thành phố của khách sạn (cùng tên phố ở tỉnh khác); lỗi dịch vụ ngoài được ghi vào nhật ký."""
+    import datetime as _dt
+    from app.services import khach_san_vtd as S
+    k = _ks(db, "Khách sạn Việt Úc")
+    k.dia_chi, k.tinh_thanh, k.khu_vuc = "144 Hùng Vương, khu vực Bến Tre, Vĩnh Long, Việt Nam", "Bến Tre", "Hùng Vương · ven sông"
+    k.vi_do = k.kinh_do = None; k.toa_do_nguon = ""
+    db.commit()
+    cau = S._cau_tim(k)
+    assert "Hùng Vương, Bến Tre" in cau and "144 Hùng Vương, Bến Tre" in cau
+    def gia(q):
+        if q == "144 Hùng Vương, Bến Tre":
+            return [(10.2415, 106.3759, "city"), (20.8, 106.7, "tertiary")]   # tâm tỉnh + phố trùng tên ở Hải Phòng → bỏ
+        if q == "Hùng Vương, Bến Tre":
+            return [(10.2338, 106.3697, "tertiary")]
+        return []
+    monkeypatch.setattr(S, "LAY_TOA_DO", gia)
+    so, _ = S.may_lay_toa_do(db, nghi=0, now=_dt.datetime(2026, 11, 5, 9, 0))
+    assert so == 1 and (k.vi_do, k.kinh_do) == (10.2338, 106.3697)
+    k.vi_do = None; k.toa_do_nguon = ""; db.commit()
+    def hong(q):
+        raise OSError("bị chặn")
+    monkeypatch.setattr(S, "LAY_TOA_DO", hong)
+    so, tb = S.may_lay_toa_do(db, nghi=0, now=_dt.datetime(2026, 11, 5, 10, 0))
+    assert so == 0 and "LỖI GỌI DỊCH VỤ BẢN ĐỒ" in tb and "bị chặn" in tb

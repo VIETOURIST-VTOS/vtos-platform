@@ -350,20 +350,41 @@ LOAT_TOI_DA = 60
 LOAT_NGHI_GIAY = 1.1
 
 
-def _nominatim(q: str) -> tuple[float, float] | None:
+PHOTON = "https://photon.komoot.io/api/"   # KS-19d: dịch vụ tra địa chỉ dự phòng (cũng dữ liệu OpenStreetMap)
+LOI_TOA_DO: list[str] = []                 # KS-19d: lỗi gọi dịch vụ ngoài của lượt gần nhất — ghi vào nhật ký việc tự động
+
+
+def _get_json(url: str):
     import json
-    import urllib.parse
     import urllib.request
-    url = NOMINATIM + "?" + urllib.parse.urlencode({"format": "json", "limit": 1, "countrycodes": "vn", "q": q})
     req = urllib.request.Request(url, headers={"User-Agent": NOMINATIM_UA, "Accept-Language": "vi"})
     with urllib.request.urlopen(req, timeout=10) as r:
-        ds = json.loads(r.read().decode("utf-8"))
-    if not ds:
-        return None
-    return round(float(ds[0]["lat"]), 6), round(float(ds[0]["lon"]), 6)
+        return json.loads(r.read().decode("utf-8"))
 
 
-LAY_TOA_DO = _nominatim   # phép thử thay bằng hàm giả
+def _nominatim(q: str) -> list[tuple[float, float, str]]:
+    """Nhiều ứng viên (lat, lon, loại) — người gọi tự chọn cái nằm gần tâm thành phố. Nominatim lỗi thì thử Photon."""
+    import urllib.parse
+    ra: list[tuple[float, float, str]] = []
+    try:
+        ds = _get_json(NOMINATIM + "?" + urllib.parse.urlencode({"format": "json", "limit": 3, "countrycodes": "vn", "q": q}))
+        ra = [(round(float(x["lat"]), 6), round(float(x["lon"]), 6), str(x.get("type") or "")) for x in ds]
+    except Exception as ex:   # noqa: BLE001
+        LOI_TOA_DO.append(f"Nominatim: {type(ex).__name__} {str(ex)[:80]}")
+    if ra:
+        return ra
+    try:
+        ds = _get_json(PHOTON + "?" + urllib.parse.urlencode({"q": q, "limit": 3}))
+        for f in ds.get("features") or []:
+            pr, co = f.get("properties") or {}, (f.get("geometry") or {}).get("coordinates") or []
+            if len(co) == 2 and (pr.get("countrycode") or "").upper() in ("VN", ""):
+                ra.append((round(float(co[1]), 6), round(float(co[0]), 6), str(pr.get("osm_value") or pr.get("type") or "")))
+    except Exception as ex:   # noqa: BLE001
+        LOI_TOA_DO.append(f"Photon: {type(ex).__name__} {str(ex)[:80]}")
+    return ra
+
+
+LAY_TOA_DO = _nominatim   # phép thử thay bằng hàm giả — trả list (lat, lon, loại) hoặc (lat, lon) / None như bản cũ
 
 
 def _trong_vn(lat: float, lng: float) -> bool:
@@ -389,12 +410,36 @@ def doc_link_ggmap(link: str) -> tuple[float, float]:
 
 
 def _cau_tim(k: KhachSanVtd) -> list[str]:
-    tp = k.tinh_thanh or ""
+    """KS-19d: địa chỉ ghi theo đơn vị hành chính mới (vd «Bến Tre, Vĩnh Long») bản đồ thường chưa có — thử thêm: phố đầu
+    + thành phố, phố bỏ số nhà + thành phố, khu vực + thành phố, tên khách sạn + thành phố."""
+    import re
+    tp = (k.tinh_thanh or "").replace("Phan Thiết – Mũi Né", "Phan Thiết").replace("TP. Hồ Chí Minh", "Hồ Chí Minh")
     ds = []
+    phan = [x.strip() for x in (k.dia_chi or "").split(",") if x.strip()]
     if k.dia_chi:
-        ds.append(", ".join(x for x in (k.dia_chi, tp, "Việt Nam") if x))
-    ds.append(", ".join(x for x in (k.ten, k.khu_vuc, tp) if x))
-    return list(dict.fromkeys(ds))
+        ds.append(", ".join(x for x in (k.dia_chi, "" if tp in k.dia_chi else tp, "" if "Việt Nam" in k.dia_chi else "Việt Nam") if x))
+    if phan:
+        ds.append(", ".join(phan[:2] + [tp]))
+        ds.append(f"{phan[0]}, {tp}")
+        ds.append(re.sub(r"^(số\s*)?[\d–\-/ ]+\s*", "", phan[0], flags=re.I) + f", {tp}")
+    kv = re.sub(r"^(Đường|Khu vực)\s*", "", (k.khu_vuc or "").split("·")[0].strip(), flags=re.I)
+    if kv:
+        ds.append(f"{kv}, {tp}")
+    ds.append(", ".join(x for x in (k.ten, tp) if x))
+    return [x for x in dict.fromkeys(ds) if len(x) > 4]
+
+
+def _hop_le_toa_do(k: KhachSanVtd, lat: float, lng: float, loai: str = "") -> bool:
+    """Trong Việt Nam, không phải tâm thành phố / tỉnh (loại city, state…), và cách tâm thành phố của khách sạn < 40 km."""
+    if not _trong_vn(lat, lng) or loai in ("city", "state", "province", "country", "county", "administrative"):
+        return False
+    tam = TAM_TP.get(k.tinh_thanh or "")
+    if not tam:
+        return True
+    import math
+    la1, lo1, la2, lo2 = map(math.radians, (lat, lng, tam[0], tam[1]))
+    h = math.sin((la2 - la1) / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin((lo2 - lo1) / 2) ** 2
+    return 2 * 6371 * math.asin(math.sqrt(h)) < 40
 
 
 def _tu_lay_toa_do(k: KhachSanVtd, nghi: float = 0) -> bool:
@@ -405,11 +450,15 @@ def _tu_lay_toa_do(k: KhachSanVtd, nghi: float = 0) -> bool:
             time.sleep(nghi)
         try:
             kq = LAY_TOA_DO(q)
-        except Exception:   # noqa: BLE001 — mạng / dịch vụ ngoài lỗi: để trống, lần sau lấy lại
+        except Exception as ex:   # noqa: BLE001 — mạng / dịch vụ ngoài lỗi: để trống, lần sau lấy lại
+            LOI_TOA_DO.append(f"{type(ex).__name__} {str(ex)[:80]}")
             return False
-        if kq and _trong_vn(*kq):
-            k.vi_do, k.kinh_do, k.toa_do_nguon = kq[0], kq[1], "tu_dong"
-            return True
+        ung = [kq] if isinstance(kq, tuple) else list(kq or [])
+        for x in ung:
+            lat, lng, loai = (x[0], x[1], x[2] if len(x) > 2 else "")
+            if _hop_le_toa_do(k, lat, lng, loai):
+                k.vi_do, k.kinh_do, k.toa_do_nguon = lat, lng, "tu_dong"
+                return True
     k.toa_do_nguon = "khong_thay"
     return False
 
@@ -425,6 +474,7 @@ def may_lay_toa_do(db: Session, toi_da: int = 20, nghi: float = LOAT_NGHI_GIAY, 
         q = q.where(KhachSanVtd.toa_do_nguon != "khong_thay")
     ds = db.execute(q.order_by(KhachSanVtd.ma)).scalars().all()
     co, khong = [], []
+    LOI_TOA_DO.clear()
     for i, k in enumerate(ds[:toi_da]):
         if i and nghi:
             time.sleep(nghi)
@@ -432,7 +482,9 @@ def may_lay_toa_do(db: Session, toi_da: int = 20, nghi: float = LOAT_NGHI_GIAY, 
     if co or khong:
         db.commit()
     return len(co), (f"Lấy được tọa độ {len(co)} khách sạn" + (f", chưa thấy {len(khong)}: {', '.join(khong[:10])}" if khong else "")
-                     + (f"; còn {len(ds) - toi_da} chờ lượt sau" if len(ds) > toi_da else "")) if ds else "Mọi khách sạn đã có tọa độ"
+                     + (f"; còn {len(ds) - toi_da} chờ lượt sau" if len(ds) > toi_da else "")
+                     + (f" · LỖI GỌI DỊCH VỤ BẢN ĐỒ: {'; '.join(dict.fromkeys(LOI_TOA_DO))[:300]}" if LOI_TOA_DO else "")) if ds \
+        else "Không còn khách sạn nào chờ lấy tọa độ (thiếu mà máy đã thử không thấy thì thử lại lúc 2 giờ sáng)"
 
 
 def lay_toa_do_loat(db: Session, u: User, toi_da: int = LOAT_TOI_DA, nghi: float = LOAT_NGHI_GIAY) -> dict:
