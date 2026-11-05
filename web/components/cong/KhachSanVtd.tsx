@@ -26,19 +26,35 @@ type Q = { tinh: string; vao: string; ra: string; nl: number; te: number; phong:
 // KS-16j: như Agoda — có trẻ em thì chọn tuổi từng bé (-1 = chưa chọn); máy tính phụ thu theo chính sách khách sạn.
 const tuoiStr = (q: Q) => { const t = (q.tuoi || []).slice(0, q.te); return q.te > 0 && t.length === q.te && t.every((x) => x >= 0) ? t.join(",") : ""; };
 const tuoiDs = (q: Q) => (tuoiStr(q) ? (q.tuoi || []).slice(0, q.te) : []);
-// KS-16s: bộ lọc kiểu Agoda — cách thanh toán (tt), điểm khách tối thiểu (dk), bữa ăn & ưu đãi (an), khoảng cách (kc), giường (gi)
+// KS-16s → KS-19b (Chủ tịch duyệt bộ lọc v1.3, 05/11/2026): bộ lọc kiểu Agoda. Điều kiện về GÓI (bữa sáng, hủy, trả sau,
+// giường, tiện nghi phòng, không hút thuốc, gia đình, giá) phải khớp trên CÙNG MỘT offer (k.goi_ban — máy chủ đã lọc
+// đủ phòng mọi đêm); điều kiện về KHÁCH SẠN (sao, loại, khu, tiện nghi KS, phù hợp, khoảng cách, điểm) xét trên hồ sơ.
+// Khác nhóm: AND. Trong nhóm nhiều lựa chọn thay thế (sao, loại, khu, khoảng cách, giường, phù hợp): OR. Tiện nghi: AND.
 type Loc = { min: number; max: number; coGia: boolean; huy: boolean; sang: boolean; diem9: boolean; conPhong: boolean; sao: number[]; loai: string[]; khu: string[]; ti: string[]; ten: string;
-  tt: string[]; dk: number; an: string[]; kc: string[]; gi: string[]; tn: string[]; ph: string[] };
-const LOC0: Loc = { min: 0, max: 0, coGia: false, huy: false, sang: false, diem9: false, conPhong: false, sao: [], loai: [], khu: [], ti: [], ten: "", tt: [], dk: 0, an: [], kc: [], gi: [], tn: [], ph: [] };
-const LOC_TT: [string, string, (k: any) => boolean][] = [["huy", "Miễn phí hủy", (k) => !!k.co_mien_phi_huy], ["sau", "Đặt giữ, trả sau", (k) => !!k.co_tra_sau],
-  ["ngay", "Trả ngay", (k) => !!k.co_tra_ngay], ["qr", "Không cần thẻ (QR chuyển khoản)", (k) => !!k.co_tra_ngay]];
-const LOC_AN: [string, string, (k: any) => boolean][] = [["sang", "Bao gồm bữa sáng", (k) => !!k.co_bua_sang], ["chi", "Chỉ phòng", (k) => !!k.co_chi_phong],
-  ["uudai", "Ưu đãi giảm giá", (k) => !!k.co_uu_dai]];
-const LOC_KC: [string, string, (k: any) => boolean][] = [["2", "Dưới 2 km", (k) => k.km_trung_tam != null && k.km_trung_tam < 2],
+  tt: string[]; dk: number; an: string[]; kc: string[]; gi: string[]; tn: string[]; ph: string[]; kh: boolean };
+const LOC0: Loc = { min: 0, max: 0, coGia: false, huy: false, sang: false, diem9: false, conPhong: false, sao: [], loai: [], khu: [], ti: [], ten: "", tt: [], dk: 0, an: [], kc: [], gi: [], tn: [], ph: [], kh: false };
+type Nhom = [string, string, (o: any) => boolean][];
+const LOC_TT: Nhom = [["ngay", "Trả ngay (QR / thẻ)", () => true], ["sau", "Đặt giữ, trả sau", (o) => !!o.tra_sau]];
+const LOC_AN: Nhom = [["sang", "Bao gồm bữa sáng", (o) => !!o.bua_sang], ["chi", "Chỉ phòng", (o) => !o.bua_sang],
+  ["uudai", "Ưu đãi giảm giá", (o) => (o.niem_yet_dem || 0) > (o.dem_gia || 0)]];
+const LOC_KC: Nhom = [["2", "Dưới 2 km", (k) => k.km_trung_tam != null && k.km_trung_tam < 2],
   ["5", "2–5 km", (k) => k.km_trung_tam != null && k.km_trung_tam >= 2 && k.km_trung_tam < 5], ["10", "5–10 km", (k) => k.km_trung_tam != null && k.km_trung_tam >= 5 && k.km_trung_tam <= 10]];
-const LOC_GI: [string, string, (k: any) => boolean][] = [["doi", "1 giường đôi lớn", (k) => (k.giuong_tom || []).includes("doi")],
-  ["don2", "2 giường đơn", (k) => (k.giuong_tom || []).includes("don2")], ["gd", "Phòng gia đình (≥4 khách)", (k) => !!k.gia_dinh]];
-const hopNhom = (ds: [string, string, (k: any) => boolean][], chon: string[], k: any) => !chon.length || ds.some(([m, , f]) => chon.includes(m) && f(k));
+const LOC_GI: Nhom = [["doi", "Giường đôi lớn (Queen / King)", (o) => (o.giuong || []).includes("doi")],
+  ["don2", "2 giường đơn (Twin)", (o) => (o.giuong || []).includes("don2")], ["gd", "Phòng gia đình (≥4 khách)", (o) => !!o.gia_dinh]];
+const hopNhom = (ds: Nhom, chon: string[], x: any) => !chon.length || ds.some(([m, , f]) => chon.includes(m) && f(x));
+/** Một offer có thỏa mọi điều kiện về gói không. */
+const hopGoi = (o: any, L: Loc) => (!L.huy || o.mien_phi_huy) && (!L.sang || o.bua_sang) && (!L.kh || o.khong_hut)
+  && hopNhom(LOC_TT, L.tt, o) && hopNhom(LOC_AN, L.an, o) && hopNhom(LOC_GI, L.gi, o)
+  && L.tn.every((t) => (o.tien_nghi || []).includes(t)) && o.dem_gia >= L.min && (!L.max || o.dem_gia <= L.max);
+/** Hồ sơ khách sạn có thỏa điều kiện về khách sạn không. */
+const hopHoSo = (k: any, L: Loc, k0: string) => (!L.sao.length || L.sao.includes(k.sao)) && (!L.loai.length || L.loai.includes(k.loai))
+  && (!L.khu.length || L.khu.includes(k.khu_vuc)) && L.ti.every((t) => (k.tien_ich || []).includes(t))
+  && (!L.ph.length || L.ph.some((t) => (k.phu_hop || []).includes(t))) && hopNhom(LOC_KC, L.kc, k)
+  && (!L.diem9 || (k.danh_gia?.diem_tb || 0) >= 9) && (!L.dk || (k.danh_gia?.diem_tb || 0) >= L.dk)
+  && (!k0 || khongDau(`${k.ten} ${k.khu_vuc} ${k.gan} ${k.tinh_thanh}`).includes(k0));
+/** Offer khớp (rẻ nhất trước) — rỗng nghĩa là khách sạn không khớp. */
+const goiKhop = (k: any, L: Loc) => (hopHoSo(k, L, khongDau(L.ten.trim())) ? (k.goi_ban || []).filter((o: any) => hopGoi(o, L)) : []);
+const locGoi = (L: Loc) => L.huy || L.sang || L.kh || L.tt.length > 0 || L.an.length > 0 || L.gi.length > 0 || L.tn.length > 0 || L.min > 0 || L.max > 0;
 // KS-16s: giờ đến dự kiến (như Agoda) — gửi khách sạn cùng đơn
 const GIO_DEN = ["Chưa rõ", ...Array.from({ length: 10 }, (_, i) => `${String(14 + i).padStart(2, "0")}:00–${String((15 + i) % 24).padStart(2, "0")}:00`), "Sau nửa đêm"];
 const ggDuong = (k: any) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(k.vi_do != null && k.kinh_do != null ? `${k.vi_do},${k.kinh_do}` : [k.ten, k.dia_chi, k.tinh_thanh].filter(Boolean).join(", "))}`;
@@ -137,7 +153,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
   const [q, setQ] = useState<Q>({ tinh: "", vao: themNgay(homNay, 7), ra: themNgay(homNay, 9), nl: 2, te: 0, phong: 1 });
   const [ds, setDs] = useState<any>(null);
   const [daTim, setDaTim] = useState(false);      // KS-16p: bước 1 là trang tìm; bấm TÌM mới sang danh sách
-  const [chiDat, setChiDat] = useState(false);
+  const [gNhap, setGNhap] = useState<{ a: number; b: number } | null>(null);   // KS-19b: khoảng giá đang kéo, chưa áp
   const [loi, setLoi] = useState("");
   const [loc, setLoc] = useState<Loc>(LOC0);
   const [sx, setSx] = useState("phu_hop");
@@ -198,55 +214,48 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
     } catch { /* bỏ qua */ }
   }, []);
 
-  const moKs = async (id: number, qq: Q = q) => {
+  const moKs = async (id: number, qq: Q = q, giuLoc = false) => {
     setLoi(""); setBusy(true);
     try {
       const p = new URLSearchParams({ vao: qq.vao, ra: qq.ra, nguoi_lon: String(qq.nl), tre_em: String(qq.te), so_phong: String(qq.phong), tuoi: tuoiStr(qq) });
-      setKs(await xemCong(`/ks-vtd/${id}?${p}`)); setChon({}); setLocP([]); setBuoc("ks"); len();
+      // KS-19b: giữ các bộ lọc về gói khách đã chọn ở danh sách khi sang trang chọn phòng
+      setKs(await xemCong(`/ks-vtd/${id}?${p}`)); setChon({});
+      setLocP(giuLoc ? [...(loc.sang || loc.an.includes("sang") ? ["sang"] : []), ...(loc.huy ? ["huy"] : []), ...(loc.tt.includes("sau") ? ["sau"] : []),
+        ...(loc.kh ? ["kh"] : []), ...(loc.gi.includes("gd") ? ["gd"] : []), ...(loc.tn.includes("Ban công") ? ["bc"] : []),
+        ...loc.gi.filter((x) => x !== "gd").map((x) => `g:${x}`), ...loc.tn.filter((t) => t.startsWith("Hướng")).slice(0, 1).map((t) => `h:${t}`)] : []);
+      setBuoc("ks"); len();
       if (rieng) { try { window.history.replaceState(null, "", duongRieng("hotel", id)); } catch { /* bỏ qua */ } }
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
   };
 
   // KS-16l → KS-16q: trên cổng, khách sạn chưa có gói đặt được mở trang riêng /hotel/<id> ở tab mới; ở chính trang
   // riêng thì mở chi tiết ngay tại chỗ (gửi yêu cầu giữ phòng).
-  const moThe = (k: any) => { if (!rieng && k.dat_ngay === false && k.link_ngoai) { moNgoai(duongRieng("hotel", k.id)); return; } moKs(k.id); };
+  const moThe = (k: any) => { if (!rieng && k.dat_ngay === false && k.link_ngoai) { moNgoai(duongRieng("hotel", k.id)); return; } moKs(k.id, q, true); };
 
   const loc2 = useMemo(() => {
     if (!ds) return [];
-    const L = loc, k0 = khongDau(L.ten.trim());
-    const r = ds.khach_san.filter((k: any) => (!q.tinh || k.tinh_thanh === q.tinh)).filter((k: any) => {
-      const g = k.gia_tu?.gia_dem;
-      if ((L.coGia || chiDat) && !k.gia_tu) return false;
-      if (L.huy && !k.co_mien_phi_huy) return false;
-      if (L.sang && !k.co_bua_sang) return false;
-      if (L.diem9 && !((k.danh_gia?.diem_tb || 0) >= 9)) return false;
-      if (L.conPhong && k.het_phong) return false;
-      if (L.sao.length && !L.sao.includes(k.sao)) return false;
-      if (L.loai.length && !L.loai.includes(k.loai)) return false;
-      if (L.khu.length && !L.khu.includes(k.khu_vuc)) return false;
-      if (L.ti.length && !L.ti.every((t) => (k.tien_ich || []).includes(t))) return false;
-      if (L.tn.length && !L.tn.every((t) => (k.tien_nghi_phong || []).includes(t))) return false;   // KS-19
-      if (L.ph.length && !L.ph.some((t) => (k.phu_hop || []).includes(t))) return false;
-      if (k0 && !khongDau(`${k.ten} ${k.khu_vuc} ${k.gan} ${k.tinh_thanh}`).includes(k0)) return false;
-      if (!hopNhom(LOC_TT, L.tt, k) || !hopNhom(LOC_AN, L.an, k) || !hopNhom(LOC_KC, L.kc, k) || !hopNhom(LOC_GI, L.gi, k)) return false;
-      if (L.dk && !((k.danh_gia?.diem_tb || 0) >= L.dk)) return false;
-      if (g != null && (g < L.min || (L.max && g > L.max))) return false;
-      return true;
-    });
-    const gia = (k: any, mac: number) => k.gia_tu?.gia_dem ?? mac;
-    const uuDai = (k: any) => (k.gia_tu?.niem_yet_dem && k.gia_tu.niem_yet_dem > k.gia_tu.gia_dem ? 1 - k.gia_tu.gia_dem / k.gia_tu.niem_yet_dem : 0);
+    // KS-19b: mỗi khách sạn mang theo offer rẻ nhất còn khớp (_g) — thẻ hiện đúng giá / gói ấy, sắp xếp theo giá ấy.
+    const r = ds.khach_san.filter((k: any) => (!q.tinh || k.tinh_thanh === q.tinh))
+      .map((k: any) => ({ ...k, _g: goiKhop(k, loc)[0] })).filter((k: any) => k._g);
+    const gia = (k: any, mac: number) => k._g?.dem_gia ?? mac;
+    const uuDai = (k: any) => (k._g?.niem_yet_dem && k._g.niem_yet_dem > k._g.dem_gia ? 1 - k._g.dem_gia / k._g.niem_yet_dem : 0);
     const f: Record<string, (a: any, b: any) => number> = {
-      phu_hop: (a, b) => (+!a.gia_tu) - (+!b.gia_tu) || (b.danh_gia?.diem_tb || 0) - (a.danh_gia?.diem_tb || 0) || a.ten.localeCompare(b.ten),
+      phu_hop: (a, b) => (b.danh_gia?.diem_tb || 0) - (a.danh_gia?.diem_tb || 0) || a.ten.localeCompare(b.ten),
       gia_thap: (a, b) => gia(a, 9e12) - gia(b, 9e12), gia_cao: (a, b) => gia(b, -1) - gia(a, -1),
       diem: (a, b) => (b.danh_gia?.diem_tb || 0) - (a.danh_gia?.diem_tb || 0), sao: (a, b) => b.sao - a.sao,
       gan: (a, b) => (a.km_trung_tam ?? 999) - (b.km_trung_tam ?? 999),
       uu_dai: (a, b) => uuDai(b) - uuDai(a) || gia(a, 9e12) - gia(b, 9e12),
     };
     return [...r].sort(f[sx]);
-  }, [ds, loc, sx, q.tinh, chiDat]);
+  }, [ds, loc, sx, q.tinh]);
   const trongTp = (ds?.khach_san || []).filter((k: any) => !q.tinh || k.tinh_thanh === q.tinh);
-  const dem2 = (f: (k: any) => boolean) => trongTp.filter(f).length;
-  const giaMax = Math.max(500000, ...trongTp.map((k: any) => k.gia_tu?.gia_dem || 0));
+  // KS-19b: số cạnh lựa chọn = số KHÁCH SẠN (không đếm gói) còn khớp nếu thêm lựa chọn đó vào các điều kiện đang chọn.
+  const soNeu = (them: Partial<Loc>) => { const L2 = { ...loc, ...them }; return trongTp.filter((k: any) => goiKhop(k, L2).length > 0).length; };
+  const coTrongTp = (f: (k: any) => boolean) => trongTp.some(f);
+  // Miền giá: từ mọi offer khớp các điều kiện KHÁC (bỏ chính bộ lọc giá), không cố định.
+  const giaDs = trongTp.flatMap((k: any) => goiKhop(k, { ...loc, min: 0, max: 0 }).map((o: any) => o.dem_gia)) as number[];
+  const giaMin0 = giaDs.length ? Math.floor(Math.min(...giaDs) / 50000) * 50000 : 0;
+  const giaMax = giaDs.length ? Math.ceil(Math.max(...giaDs) / 50000) * 50000 : 500000;
   const khuDs = Array.from(new Set(trongTp.map((k: any) => k.khu_vuc).filter(Boolean))) as string[];
   const tiDs = Array.from(new Set(trongTp.flatMap((k: any) => k.tien_ich || []))) as string[];
   const tnDs = Array.from(new Set(trongTp.flatMap((k: any) => k.tien_nghi_phong || []))).sort() as string[];   // KS-19
@@ -452,11 +461,21 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
   if (buoc === "ks" && ks) {
     const anh: any[] = ks.anh || [], video: any[] = (ks.video || []).slice(0, 3);
     const traSauCo = (g: any) => traSauGoi(g, homNay);
-    const hop = (g: any) => (!locP.includes("sang") || g.bua_sang) && (!locP.includes("huy") || g.mien_phi_huy) && (!locP.includes("sau") || traSauCo(g));
+    // KS-19b (bộ lọc v1.3): lọc phòng — mọi điều kiện phải khớp trên CÙNG một gói của CÙNG một loại phòng.
+    const tnP = (p: any) => p.tien_nghi || [];
+    const DK: Record<string, [string, (p: any, g: any) => boolean]> = {
+      sang: ["Bữa sáng", (_p, g) => g.bua_sang], huy: ["Hủy miễn phí", (_p, g) => g.mien_phi_huy], sau: ["Trả sau", (_p, g) => !!traSauCo(g)],
+      kh: ["Không hút thuốc", (p) => tnP(p).includes("Không hút thuốc")], gd: ["Gia đình", (p) => !!p.gia_dinh], bc: ["Ban công", (p) => tnP(p).includes("Ban công")] };
+    const dkLoc = (m: string): [string, (p: any, g: any) => boolean] => DK[m] || (m.startsWith("g:") ? [m === "g:doi" ? "Giường đôi lớn" : "2 giường đơn", (p) => (p.giuong_kieu || []).includes(m.slice(2))]
+      : [m.slice(2), (p) => tnP(p).includes(m.slice(2))]);
+    const hopPG = (p: any, g: any, ds_: string[] = locP) => ds_.every((m) => dkLoc(m)[1](p, g));
     const hetLoai = ks.phong.filter((p: any) => p.vua && p.goi.length && (p.con ?? 1) === 0).length;
-    const phongHien = ks.phong.filter((p: any) => !locP.length || p.goi.some(hop));
-    const chips: [string, string, boolean][] = [["sang", "Bữa sáng", ks.phong.some((p: any) => p.goi.some((g: any) => g.bua_sang))],
-      ["huy", "Miễn phí hủy", ks.phong.some((p: any) => p.goi.some((g: any) => g.mien_phi_huy))], ["sau", "Đặt giữ, trả sau", ks.phong.some((p: any) => p.goi.some((g: any) => traSauCo(g)))]];
+    const phongHien = ks.phong.filter((p: any) => !locP.length || p.goi.some((g: any) => hopPG(p, g)));
+    const coDk = (m: string) => ks.phong.some((p: any) => p.goi.some((g: any) => dkLoc(m)[1](p, g)));
+    const chips: [string, string, boolean][] = Object.entries(DK).map(([m, [t]]) => [m, t, coDk(m)]);
+    const huongDs = Array.from(new Set(ks.phong.flatMap((p: any) => tnP(p).filter((t: string) => t.startsWith("Hướng"))))) as string[];
+    const doiChon = (tienTo: string, v: string) => setLocP([...locP.filter((x) => !x.startsWith(tienTo)), ...(v ? [tienTo + v] : [])]);
+    const anGoi = ks.phong.reduce((a: number, p: any) => a + p.goi.filter((g: any) => !hopPG(p, g)).length, 0);
     const nhomDem = Object.entries(ks.nhom_anh || {}).map(([k, t]) => [k, t as string, anh.filter((a) => a.nhom === k).length] as const).filter((x) => x[2] > 0);
     const keo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
     const dg = ks.danh_gia || {};
@@ -513,12 +532,21 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
         <div className="ksv-panel" style={{ padding: 16 }}>
           <div className="ksv-rhead"><h2 className="ksv-h1" style={{ fontSize: 20 }}>Chọn phòng</h2><span className="ksv-okc" style={{ fontWeight: 600 }}>✓ Giá hợp đồng Vietourist</span></div>
           <span className="ksv-muted">{ngay(ks.vao)} → {ngay(ks.ra)} · {ks.dem} đêm · {q.nl} người lớn{q.te ? ` · ${q.te} trẻ em` : ""} · {q.phong} phòng</span>
-          {chips.some((c) => c[2]) && <><b style={{ fontSize: 14 }}>Lọc</b><div className="ksv-chips">{chips.filter((c) => c[2]).map(([k, t]) =>
-            <button key={k} type="button" className={`ksv-chip ${locP.includes(k) ? "on" : ""}`} aria-pressed={locP.includes(k)} onClick={() => setLocP(locP.includes(k) ? locP.filter((x) => x !== k) : [...locP, k])}>{t}</button>)}</div></>}</div>
+          {chips.some((c) => c[2]) && <><b style={{ fontSize: 14 }}>Lọc phòng</b><div className="ksv-chips">{chips.filter((c) => c[2] || locP.includes(c[0])).map(([k, t]) =>
+            <button key={k} type="button" className={`ksv-chip ${locP.includes(k) ? "on" : ""}`} aria-pressed={locP.includes(k)} onClick={() => setLocP(locP.includes(k) ? locP.filter((x) => x !== k) : [...locP, k])}>{t}</button>)}</div>
+            <div className="ksv-f3">
+              {(coDk("g:doi") || coDk("g:don2")) && <label className="ksv-fld">Loại giường<select className="ksv-sel" value={locP.find((x) => x.startsWith("g:"))?.slice(2) || ""} onChange={(e) => doiChon("g:", e.target.value)}>
+                <option value="">Tất cả</option>{coDk("g:doi") && <option value="doi">Giường đôi lớn</option>}{coDk("g:don2") && <option value="don2">2 giường đơn</option>}</select></label>}
+              {huongDs.length > 0 && <label className="ksv-fld">Hướng nhìn<select className="ksv-sel" value={locP.find((x) => x.startsWith("h:"))?.slice(2) || ""} onChange={(e) => doiChon("h:", e.target.value)}>
+                <option value="">Tất cả</option>{huongDs.map((t) => <option key={t} value={t}>{t}</option>)}</select></label>}
+              {coDk("sau") && <label className="ksv-fld">Thanh toán<select className="ksv-sel" value={locP.includes("sau") ? "sau" : ""} onChange={(e) => setLocP(e.target.value ? [...locP.filter((x) => x !== "sau"), "sau"] : locP.filter((x) => x !== "sau"))}>
+                <option value="">Tất cả (trả ngay)</option><option value="sau">Đặt giữ, trả sau</option></select></label>}
+              {locP.length > 0 && <button type="button" className="ksv-link" style={{ alignSelf: "flex-end" }} onClick={() => setLocP([])}>Bỏ lọc phòng</button>}</div></>}</div>
         {hetLoai > 0 && <div className="ksv-sold"><Ico d={P.gio} s={15} />Nhanh tay! {hetLoai} loại phòng đã hết cho ngày bạn chọn.</div>}
         {loiBox}
         {!ks.phong.some((p: any) => p.goi.length && (p.con ?? 1) > 0) && <div className="ksv-panel">Khách sạn hết phòng cho ngày bạn chọn — đổi ngày hoặc số khách để xem phòng trống.</div>}
-        {locP.length > 0 && !phongHien.length && <div className="ksv-panel">Không có gói nào khớp bộ lọc. <button type="button" className="ksv-btn line" onClick={() => setLocP([])}>Xóa bộ lọc</button></div>}
+        {locP.length > 0 && anGoi > 0 && <div className="ksv-panel ksv-an">{phongHien.length ? `${anGoi} gói khác bị ẩn vì không thỏa đồng thời các điều kiện.` : "Không có gói nào thỏa đồng thời các điều kiện đã chọn."}
+          <span style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>{locP.map((m) => <button key={m} type="button" className="ksv-link" onClick={() => setLocP(locP.filter((x) => x !== m))}>Bỏ «{dkLoc(m)[0]}»</button>)}</span></div>}
         {phongHien.map((p: any, iP: number) => { const aP = anh.filter((a) => a.loai_phong_id === p.id); const rieng = p.anh?.[0] || aP[0];
           const anhP = rieng || anhTamPhong(anh, iP), tam = !rieng && !!anhP;
           return <div key={p.id} className="ksv-room">
@@ -537,7 +565,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
             {p.mo_ta_dai && <details><summary style={{ cursor: "pointer", fontSize: 13 }} className="ksv-link">Xem thêm</summary><p className="ksv-muted" style={{ fontSize: 13, whiteSpace: "pre-line", margin: "4px 0 0" }}>{p.mo_ta_dai}</p></details>}
             {!p.vua && <small style={{ color: "var(--ksv-price)", fontWeight: 600 }}>{p.ly_do || `Không đủ chỗ cho ${q.nl} người lớn / ${q.phong} phòng — tăng số phòng`}</small>}
 </div>
-          <div className="ksv-rates">{p.goi.length ? p.goi.filter((g: any) => !locP.length || hop(g)).map((g: any) => { const ts = traSauCo(g), con = p.con ?? p.so_phong, tat = !p.vua || g.vua === false;
+          <div className="ksv-rates">{p.goi.length ? p.goi.filter((g: any) => !locP.length || hopPG(p, g)).map((g: any) => { const ts = traSauCo(g), con = p.con ?? p.so_phong, tat = !p.vua || g.vua === false;
             return <div key={g.id} className="ksv-rr">
             {con > 0 && con <= 3 && !tat && <div className="deal"><Ico d={P.gio} s={14} />Còn {con} phòng giá này</div>}
             <div className="ben">
@@ -603,17 +631,30 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
   </div>;
 
   const L = loc;
-  const ck = (on: boolean, doi: (v: boolean) => void, nd: any, so?: number, key?: string) => <label key={key} className="ksv-chk"><input type="checkbox" checked={on} onChange={(e) => doi(e.target.checked)} /><span>{nd}</span>{so != null && <small>{so}</small>}</label>;
+  // KS-19b: lựa chọn đang có 0 khách sạn (sau các điều kiện khác) thì mờ, vẫn bỏ chọn được.
+  const ck = (on: boolean, doi: (v: boolean) => void, nd: any, so?: number, key?: string) => <label key={key} className={`ksv-chk ${!on && so === 0 ? "ksv-mo" : ""}`}><input type="checkbox" checked={on} disabled={!on && so === 0} onChange={(e) => doi(e.target.checked)} /><span>{nd}</span>{so != null && <small>{so}</small>}</label>;
   const bat = (arr: string[], v: string, on: boolean) => (on ? [...arr, v] : arr.filter((x) => x !== v));
-  // KS-16s: nhóm lọc kiểu Agoda — chỉ hiện lựa chọn có ít nhất một khách sạn (số đếm thật)
-  const nhomLoc = (tieuDe: string, ds_: [string, string, (k: any) => boolean][], khoa: "tt" | "an" | "kc" | "gi") => {
-    const co = ds_.filter(([, , f]) => dem2(f) > 0);
-    return co.length > 0 && <div className="fsec"><h4>{tieuDe}</h4>{co.map(([m, t, f]) => ck(L[khoa].includes(m), (v) => setLoc({ ...L, [khoa]: bat(L[khoa], m, v) }), t, dem2(f), `${khoa}${m}`))}</div>;
+  // Nhóm theo GÓI: chỉ hiện lựa chọn có ít nhất một offer trong thành phố; số = khách sạn còn khớp nếu thêm lựa chọn.
+  const coGoi = (f: (o: any) => boolean) => coTrongTp((k: any) => (k.goi_ban || []).some(f));
+  const nhomLoc = (tieuDe: string, ds_: Nhom, khoa: "tt" | "an" | "kc" | "gi", hoSo = false) => {
+    const co = ds_.filter(([, , f]) => (hoSo ? coTrongTp(f) : coGoi(f)));
+    return co.length > 0 && <div className="fsec"><h4>{tieuDe}</h4>{co.map(([m, t]) => ck(L[khoa].includes(m), (v) => setLoc({ ...L, [khoa]: bat(L[khoa], m, v) }), t, soNeu({ [khoa]: bat(L[khoa], m, true) }), `${khoa}${m}`))}</div>;
   };
+  // KS-19b: thẻ «đang lọc» trên danh sách — bỏ từng điều kiện
+  const the_: [string, Partial<Loc>][] = [
+    ...(L.min || L.max ? [[`₫ ${vnd(L.min)} – ${L.max ? vnd(L.max) : "∞"}`, { min: 0, max: 0 }] as [string, Partial<Loc>]] : []),
+    ...([["huy", "Miễn phí hủy"], ["sang", "Bữa sáng"], ["kh", "Không hút thuốc"], ["diem9", "Khách chấm 9+"]] as const).filter(([k]) => L[k]).map(([k, t]) => [t, { [k]: false }] as [string, Partial<Loc>]),
+    ...([["tt", LOC_TT], ["an", LOC_AN], ["gi", LOC_GI], ["kc", LOC_KC]] as const).flatMap(([k, ds_]) => L[k].map((m) => [ds_.find((x) => x[0] === m)?.[1] || m, { [k]: L[k].filter((x) => x !== m) }] as [string, Partial<Loc>])),
+    ...L.sao.map((x) => [`${x}★`, { sao: L.sao.filter((y) => y !== x) }] as [string, Partial<Loc>]),
+    ...(["loai", "khu", "ti", "tn", "ph"] as const).flatMap((k) => L[k].map((m) => [k === "loai" ? (ds.loai || {})[m] || m : m, { [k]: L[k].filter((x) => x !== m) }] as [string, Partial<Loc>])),
+    ...(L.ten.trim() ? [[`«${L.ten.trim()}»`, { ten: "" }] as [string, Partial<Loc>]] : [])];
+  const gA = gNhap?.a ?? (L.min || giaMin0), gB = gNhap?.b ?? (L.max || giaMax);
+  const apGia = () => { const a = Math.max(0, Math.min(gA, gB)), b = Math.max(gA, gB); setLoc({ ...L, min: a <= giaMin0 ? 0 : a, max: b >= giaMax ? 0 : b }); setGNhap(null); };
+  const coDiem = coTrongTp((k: any) => (k.danh_gia?.diem_tb || 0) > 0);
   const goiY = Array.from(new Set(trongTp.flatMap((k: any) => [k.ten, k.khu_vuc].filter(Boolean)))) as string[];
   // KS-16s: bản đồ — ghim mọi khách sạn khớp bộ lọc có tọa độ; «Tìm khi di chuyển bản đồ» lọc danh sách theo vùng đang xem
   const coToaDo = (k: any) => k.vi_do != null && k.kinh_do != null;
-  const ghim = loc2.filter(coToaDo).map((k: any) => ({ id: k.id, vi_do: k.vi_do, kinh_do: k.kinh_do, nhan: giaGon(k.gia_tu?.gia_dem) }));
+  const ghim = loc2.filter(coToaDo).map((k: any) => ({ id: k.id, vi_do: k.vi_do, kinh_do: k.kinh_do, nhan: giaGon(k._g?.dem_gia) }));
   const trongKhung = (k: any) => !khung || !coToaDo(k) || (k.vi_do >= khung.s && k.vi_do <= khung.n && k.kinh_do >= khung.w && k.kinh_do <= khung.e);
   const dsHien = banDo && theoKhung ? loc2.filter((k: any) => coToaDo(k) && trongKhung(k)) : loc2;
   const khongViTri = loc2.filter((k: any) => !coToaDo(k)).length;
@@ -628,29 +669,35 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
         <div className="ksv-panel ksv-fbox">
           <div className="fsec"><label className="ksv-pill"><Ico d={P.kinh} s={18} /><input placeholder="Tên khách sạn hoặc khu vực" value={L.ten} list="ksv-goi-y" onChange={(e) => setLoc({ ...L, ten: e.target.value })} aria-label="Tìm theo tên khách sạn hoặc khu vực" /></label>
             <datalist id="ksv-goi-y">{goiY.map((t) => <option key={t} value={t} />)}</datalist></div>
-          <div className="fsec"><h4>Ngân sách mỗi đêm</h4>
-            <div className="ksv-mm"><label>TỐI THIỂU<input inputMode="numeric" value={`₫ ${vnd(L.min)}`} onChange={(e) => setLoc({ ...L, min: Number(e.target.value.replace(/\D/g, "")) || 0 })} /></label>
-              <label>TỐI ĐA<input inputMode="numeric" value={`₫ ${vnd(L.max || giaMax)}`} onChange={(e) => setLoc({ ...L, max: Number(e.target.value.replace(/\D/g, "")) || 0 })} /></label></div>
-            <input type="range" min={0} max={giaMax} step={50000} value={L.max || giaMax} onChange={(e) => setLoc({ ...L, max: Number(e.target.value) })} aria-label="Giá tối đa mỗi đêm" /></div>
-          <div className="fsec"><h4>Lọc phổ biến{q.tinh ? ` ở ${q.tinh}` : ""}</h4>
-            {([["huy", "Miễn phí hủy", (k: any) => k.co_mien_phi_huy], ["sang", "Bao gồm bữa sáng", (k: any) => k.co_bua_sang],
-              ["diem9", "Khách chấm 9+ Xuất sắc", (k: any) => (k.danh_gia?.diem_tb || 0) >= 9]] as const).map(([k, t, f]) =>
-              ck(L[k], (v) => setLoc({ ...L, [k]: v }), t, dem2(f), k))}</div>
-          {nhomLoc("Cách thanh toán", LOC_TT, "tt")}
-          {[9, 8, 7].some((d) => dem2((k) => (k.danh_gia?.diem_tb || 0) >= d)) && <div className="fsec"><h4>Điểm khách đánh giá</h4>{([[9, "9+ Xuất sắc"], [8, "8+ Rất tốt"], [7, "7+ Tốt"]] as const).map(([d, t]) =>
-            ck(L.dk === d, (v) => setLoc({ ...L, dk: v ? d : 0 }), t, dem2((k) => (k.danh_gia?.diem_tb || 0) >= d), `dk${d}`))}</div>}
-          {nhomLoc("Bữa ăn & ưu đãi", LOC_AN, "an")}
-          {nhomLoc("Khoảng cách tới trung tâm", LOC_KC, "kc")}
-          {nhomLoc("Phòng & giường", LOC_GI, "gi")}
-          {[5, 4, 3, 2, 1].some((s) => dem2((k) => k.sao === s)) && <div className="fsec"><h4>Hạng sao</h4>{[5, 4, 3, 2, 1].filter((s) => dem2((k) => k.sao === s)).map((s) =>
-            ck(L.sao.includes(s), (v) => setLoc({ ...L, sao: v ? [...L.sao, s] : L.sao.filter((x) => x !== s) }), <span className="ksv-stars">{"★".repeat(s)}</span>, dem2((k) => k.sao === s), `s${s}`))}</div>}
-          {khuDs.length > 1 && <div className="fsec"><h4>Khu vực</h4>{khuDs.map((t) => ck(L.khu.includes(t), (v) => setLoc({ ...L, khu: bat(L.khu, t, v) }), t, dem2((k) => k.khu_vuc === t), t))}</div>}
-          {Object.keys(ds.loai || {}).some((k) => dem2((x) => x.loai === k)) && <div className="fsec"><h4>Loại chỗ ở</h4>{Object.entries(ds.loai || {}).filter(([k]) => dem2((x) => x.loai === k)).map(([k, t]: any) =>
-            ck(L.loai.includes(k), (v) => setLoc({ ...L, loai: bat(L.loai, k, v) }), t, dem2((x) => x.loai === k), k))}</div>}
-          {tiDs.length > 0 && <div className="fsec"><h4>Tiện nghi khách sạn</h4>{tiDs.map((t) => ck(L.ti.includes(t), (v) => setLoc({ ...L, ti: bat(L.ti, t, v) }), t, dem2((k) => (k.tien_ich || []).includes(t)), t))}</div>}
-          {tnDs.length > 0 && <div className="fsec"><h4>Tiện nghi phòng &amp; hướng nhìn</h4>{tnDs.map((t) => ck(L.tn.includes(t), (v) => setLoc({ ...L, tn: bat(L.tn, t, v) }), t, dem2((k) => (k.tien_nghi_phong || []).includes(t)), `tn${t}`))}</div>}
-          {phDs.length > 0 && <div className="fsec"><h4>Phù hợp cho</h4>{phDs.map((t) => ck(L.ph.includes(t), (v) => setLoc({ ...L, ph: bat(L.ph, t, v) }), t, dem2((k) => (k.phu_hop || []).includes(t)), `ph${t}`))}</div>}
-          <div className="fsec"><button type="button" className="ksv-btn line wide" onClick={() => setLoc(LOC0)}>Xóa bộ lọc</button></div></div>
+          <div className="fsec"><h4>Ngân sách mỗi đêm</h4><small className="ksv-muted">VND · 1 phòng / 1 đêm · đã gồm 8% VAT</small>
+            <div className="ksv-r2"><input type="range" min={giaMin0} max={giaMax} step={50000} value={Math.min(gA, gB)} onChange={(e) => setGNhap({ a: Number(e.target.value), b: gB })} aria-label="Giá tối thiểu mỗi đêm" />
+              <input type="range" min={giaMin0} max={giaMax} step={50000} value={Math.max(gA, gB)} onChange={(e) => setGNhap({ a: gA, b: Number(e.target.value) })} aria-label="Giá tối đa mỗi đêm" /></div>
+            <div className="ksv-mm"><label>TỐI THIỂU<input inputMode="numeric" value={`₫ ${vnd(gA)}`} onChange={(e) => setGNhap({ a: Number(e.target.value.replace(/\D/g, "")) || 0, b: gB })} /></label>
+              <label>TỐI ĐA<input inputMode="numeric" value={`₫ ${vnd(gB)}`} onChange={(e) => setGNhap({ a: gA, b: Number(e.target.value.replace(/\D/g, "")) || 0 })} /></label></div>
+            {gA > gB && <small style={{ color: "var(--ksv-price)" }}>Tối thiểu đang lớn hơn tối đa — máy sẽ đổi chỗ hai số khi áp.</small>}
+            <button type="button" className="ksv-btn line wide" disabled={!gNhap} onClick={apGia}>Áp dụng giá</button>
+            <small className="ksv-muted">Miền giá ₫ {vnd(giaMin0)} – {vnd(giaMax)} lấy từ các gói còn phòng của tìm kiếm này.</small></div>
+          <div className="fsec"><h4>Khả năng đặt</h4>
+            {ck(true, () => {}, "Còn phòng đặt được", trongTp.length, "con")}
+            {coGoi((o) => o.mien_phi_huy) && ck(L.huy, (v) => setLoc({ ...L, huy: v }), "Miễn phí hủy", soNeu({ huy: true }), "huy")}</div>
+          {nhomLoc("Thanh toán", LOC_TT, "tt")}
+          {nhomLoc("Bữa ăn & ưu đãi trong gói", LOC_AN, "an")}
+          <div className="fsec"><h4>Phòng &amp; giường</h4>
+            {coGoi((o) => o.khong_hut) && ck(L.kh, (v) => setLoc({ ...L, kh: v }), "Không hút thuốc", soNeu({ kh: true }), "kh")}
+            {LOC_GI.filter(([, , f]) => coGoi(f)).map(([m, t]) => ck(L.gi.includes(m), (v) => setLoc({ ...L, gi: bat(L.gi, m, v) }), t, soNeu({ gi: bat(L.gi, m, true) }), `gi${m}`))}</div>
+          {tnDs.length > 0 && <div className="fsec"><h4>Tiện nghi phòng &amp; hướng nhìn</h4>{tnDs.map((t) => ck(L.tn.includes(t), (v) => setLoc({ ...L, tn: bat(L.tn, t, v) }), t, soNeu({ tn: bat(L.tn, t, true) }), `tn${t}`))}</div>}
+          {khuDs.length > 1 && <div className="fsec"><h4>Khu vực</h4>{khuDs.map((t) => ck(L.khu.includes(t), (v) => setLoc({ ...L, khu: bat(L.khu, t, v) }), t, soNeu({ khu: bat(L.khu, t, true) }), t))}</div>}
+          {nhomLoc("Khoảng cách tới trung tâm", LOC_KC, "kc", true)}
+          {tiDs.length > 0 && <div className="fsec"><h4>Tiện nghi khách sạn</h4>{tiDs.map((t) => ck(L.ti.includes(t), (v) => setLoc({ ...L, ti: bat(L.ti, t, v) }), t, soNeu({ ti: bat(L.ti, t, true) }), t))}</div>}
+          {[5, 4, 3, 2, 1].some((x) => coTrongTp((k: any) => k.sao === x)) && <div className="fsec"><h4>Hạng sao</h4>{[5, 4, 3, 2, 1].filter((x) => coTrongTp((k: any) => k.sao === x)).map((x) =>
+            ck(L.sao.includes(x), (v) => setLoc({ ...L, sao: v ? [...L.sao, x] : L.sao.filter((y) => y !== x) }), <span className="ksv-stars">{"★".repeat(x)}</span>, soNeu({ sao: [...L.sao.filter((y) => y !== x), x] }), `s${x}`))}</div>}
+          {Object.keys(ds.loai || {}).some((x) => coTrongTp((k: any) => k.loai === x)) && <div className="fsec"><h4>Loại chỗ ở</h4>{Object.entries(ds.loai || {}).filter(([x]) => coTrongTp((k: any) => k.loai === x)).map(([x, t]: any) =>
+            ck(L.loai.includes(x), (v) => setLoc({ ...L, loai: bat(L.loai, x, v) }), t, soNeu({ loai: bat(L.loai, x, true) }), x))}</div>}
+          {phDs.length > 0 && <div className="fsec"><h4>Phù hợp cho</h4>{phDs.map((t) => ck(L.ph.includes(t), (v) => setLoc({ ...L, ph: bat(L.ph, t, v) }), t, soNeu({ ph: bat(L.ph, t, true) }), `ph${t}`))}</div>}
+          <div className="fsec"><h4>Điểm khách đánh giá</h4>{coDiem ? ([[9, "9+ Xuất sắc"], [8, "8+ Rất tốt"], [7, "7+ Tốt"]] as const).map(([d, t]) =>
+            ck(L.dk === d, (v) => setLoc({ ...L, dk: v ? d : 0 }), t, soNeu({ dk: d }), `dk${d}`))
+            : <small className="ksv-muted">Chưa đủ đánh giá của khách VTD — chưa lọc theo điểm.</small>}</div>
+          <div className="fsec"><button type="button" className="ksv-btn line wide" onClick={() => { setLoc(LOC0); setGNhap(null); }}>Bỏ tất cả bộ lọc</button></div></div>
       </aside>
       <main className="ksv-col" style={{ minWidth: 0 }}>
         <div className="ksv-rhead"><h2 className="ksv-h1" style={{ fontSize: 20 }}>{loc2.length} chỗ ở{q.tinh ? ` tại ${q.tinh}` : ""}</h2>
@@ -659,9 +706,12 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
             <select className="ksv-sel" value={sx} onChange={(e) => setSx(e.target.value)} aria-label="Sắp xếp">
               {[["phu_hop", "Phù hợp nhất"], ["gia_thap", "Giá thấp nhất trước"], ["gia_cao", "Giá cao nhất trước"], ["diem", "Điểm khách cao nhất"], ["uu_dai", "Ưu đãi nhiều nhất"], ["sao", "Hạng sao"], ["gan", "Gần trung tâm nhất"]].map(([k, t]) =>
                 <option key={k} value={k}>Sắp xếp: {t}</option>)}</select></div></div>
+        {the_.length > 0 && <div className="ksv-chips ksv-dang">{the_.map(([t, bo], i) =>
+          <button key={i} type="button" className="ksv-chip on" onClick={() => { setLoc({ ...L, ...bo }); setGNhap(null); }} aria-label={`Bỏ lọc ${t}`}>{t} ✕</button>)}
+          <button type="button" className="ksv-link" onClick={() => { setLoc(LOC0); setGNhap(null); }}>Bỏ tất cả</button></div>}
         {loiBox}
-        {!loc2.length && <div className="ksv-panel" style={{ textAlign: "center" }}><b>{trongTp.length ? "Không có chỗ ở khớp bộ lọc." : "Chưa có khách sạn trống phòng ở đây cho ngày bạn chọn."}</b>
-          {trongTp.length > 0 ? <button type="button" className="ksv-btn line" onClick={() => { setLoc(LOC0); setChiDat(false); }}>Xóa bộ lọc</button>
+        {!loc2.length && <div className="ksv-panel" style={{ textAlign: "center" }}><b>{trongTp.length ? "Không có gói nào thỏa đồng thời các điều kiện đã chọn." : "Chưa có khách sạn trống phòng ở đây cho ngày bạn chọn."}</b>
+          {trongTp.length > 0 ? <span className="ksv-muted">Thử tăng ngân sách, đổi ngày hoặc bỏ bớt từng điều kiện ở các thẻ phía trên.</span>
             : <span className="ksv-muted">Không còn khách sạn trống phòng cho ngày và số khách bạn chọn — thử đổi ngày hoặc số phòng.</span>}</div>}
         {banDo && <div className="ksv-mapbox">
           <div className="ksv-mapbar"><label className="ksv-chk"><input type="checkbox" checked={theoKhung} onChange={(e) => setTheoKhung(e.target.checked)} /><span>Tìm khi di chuyển bản đồ</span></label>
@@ -669,7 +719,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
           <BanDoKs ghim={ghim} chon={ghimChon} cao="min(62vh, 560px)" onKhung={setKhung}
             onChon={(id) => { setGhimChon(id); document.getElementById(`ksv-the-${id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }} /></div>}
         {banDo && theoKhung && !dsHien.length && <div className="ksv-panel" style={{ textAlign: "center" }}>Không có khách sạn trong vùng bản đồ đang xem — kéo hoặc thu nhỏ bản đồ.</div>}
-        {dsHien.map((k: any) => { const i = (anhI[k.id] || 0) % Math.max(1, k.anh.length), a = k.anh[i], g = k.gia_tu;
+        {dsHien.map((k: any) => { const i = (anhI[k.id] || 0) % Math.max(1, k.anh.length), a = k.anh[i], g = k._g;
           return <article key={k.id} id={`ksv-the-${k.id}`} className={`ksv-card ${ghimChon === k.id ? "ksv-card-on" : ""}`} onMouseEnter={() => banDo && setGhimChon(k.id)}>
             {g && <div className="ksv-banner"><b>Giá hợp đồng Vietourist</b>{diem?.dang_bat ? " — tích điểm VTD sau kỳ ở" : ""}{k.co_mien_phi_huy ? " · có gói miễn phí hủy" : ""}</div>}
             <div className="ksv-crow">
@@ -689,15 +739,18 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
                   {k.con_it > 0 && <span className="ksv-b" style={{ background: "var(--ksv-price)", color: "#fff" }}>Chỉ còn {k.con_it} phòng</span>}
                   {k.dat_24h > 0 && <span style={{ color: "var(--ksv-price)", fontSize: 12.5, fontWeight: 600 }}>Đã đặt {k.dat_24h} lần trong 24 giờ qua</span>}</div>}
                 {k.tien_ich.length > 0 && <div className="ksv-feat sm">{k.tien_ich.slice(0, 4).map((t: string) => <span key={t}>{t}</span>)}</div>}
-                {k.noi_bat && <span className="ksv-hl"><Ico d={P.sao} s={14} fill /> {k.noi_bat}</span>}</div>
+                {k.noi_bat && <span className="ksv-hl"><Ico d={P.sao} s={14} fill /> {k.noi_bat}</span>}
+                {g && locGoi(L) && <span className="ksv-khop"><b>Gói khớp bộ lọc: {g.lp_ten} · {g.goi_ten}</b><br />
+                  {[g.bua_sang && "✓ Bữa sáng", g.mien_phi_huy && `✓ Hủy miễn phí${g.huy_han ? ` trước ${dmy(g.huy_han)}` : ""}`, g.tra_sau && "✓ Trả sau", `✓ Còn ${g.con} phòng cả ${dem} đêm`].filter(Boolean).join(" · ")}</span>}</div>
               <div className="ksv-side">
                 {k.danh_gia?.diem_tb ? <span className="ksv-score"><span><b>{k.danh_gia.nhan || nhan(k.danh_gia.diem_tb)}</b><small className="ksv-muted">{k.danh_gia.so_bai} đánh giá</small></span><b>{phay(k.danh_gia.diem_tb)}</b></span>
                   : <small className="ksv-muted">{k.danh_gia?.so_bai ? "Mới — chưa đủ đánh giá" : "Chưa có đánh giá"}</small>}
                 {g ? <div className="ksv-pblk">
-                  {g.niem_yet_dem > g.gia_dem && <><span className="ksv-vp">↓ Giá tốt</span><span><span className="ksv-old">{vnd(g.niem_yet_dem)}</span> <span className="ksv-pct">−{Math.round((1 - g.gia_dem / g.niem_yet_dem) * 100)}%</span></span></>}
-                  <span className="ksv-big"><small>₫</small>{vnd(g.gia_dem)}</span><small className="ksv-muted">Mỗi đêm, đã gồm 8% VAT</small>
-                  {k.co_mien_phi_huy && <span className="ksv-free">+ MIỄN PHÍ HỦY</span>}
-                  {duKien(g.gia_dem * dem * q.phong) > 0 && <span className="ksv-diem">+ khoảng {vnd(duKien(g.gia_dem * dem * q.phong))} điểm sau kỳ ở</span>}
+                  {g.niem_yet_dem > g.dem_gia && <><span className="ksv-vp">↓ Giá tốt</span><span><span className="ksv-old">{vnd(g.niem_yet_dem)}</span> <span className="ksv-pct">−{Math.round((1 - g.dem_gia / g.niem_yet_dem) * 100)}%</span></span></>}
+                  <span className="ksv-big"><small>₫</small>{vnd(g.dem_gia)}</span><small className="ksv-muted">Mỗi phòng mỗi đêm</small>
+                  <small>Tổng {dem} đêm{q.phong > 1 ? ` · ${q.phong} phòng` : ""}: <b>₫ {vnd(g.tong)}</b></small><small className="ksv-okc">Đã gồm 8% VAT</small>
+                  {g.mien_phi_huy && <span className="ksv-free">+ MIỄN PHÍ HỦY</span>}
+                  {duKien(g.tong) > 0 && <span className="ksv-diem">+ khoảng {vnd(duKien(g.tong))} điểm sau kỳ ở</span>}
                   <button type="button" className="ksv-btn wide" onClick={() => moThe(k)}>Chọn phòng</button></div>
                   : <div className="ksv-pblk"><span className="ksv-hetb">Hết phòng ngày bạn chọn</span><small className="ksv-muted">Đổi ngày để xem phòng trống</small></div>}</div>
             </div></article>; })}
@@ -1195,6 +1248,17 @@ const CSS = `
   background:repeating-linear-gradient(0deg,transparent 0 38px,#fff 38px 41px),repeating-linear-gradient(90deg,#eef2e6 0 70px,#f3d36a 70px 75px);}
 .ksv-map span{color:#e5484d}.ksv-map b{font-size:13px;letter-spacing:.5px;background:#fff;padding:3px 10px;border-radius:99px}
 .ksv-chips{display:flex;flex-wrap:wrap;gap:8px}
+.ksv-r2{position:relative;height:28px}.ksv-r2 input{position:absolute;left:0;right:0;top:6px;width:100%;margin:0;pointer-events:none;background:none;-webkit-appearance:none;appearance:none}
+.ksv-r2 input::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid var(--ksv-blue,#1557b0);cursor:pointer}
+.ksv-r2 input::-moz-range-thumb{pointer-events:auto;width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid var(--ksv-blue,#1557b0);cursor:pointer}
+.ksv-r2 input::-webkit-slider-runnable-track{height:4px;background:var(--ksv-line,#dce3ea);border-radius:2px}
+.ksv-r2 input:first-child::-webkit-slider-runnable-track{background:var(--ksv-line,#dce3ea)}
+.ksv-mo{opacity:.45}
+.ksv-dang{align-items:center}
+.ksv-khop{display:block;background:#f2f7ff;border-radius:8px;padding:6px 9px;font-size:12.5px;color:var(--ksv-ok,#1d7a4a);margin-top:4px}.ksv-khop b{color:var(--ksv-ink,#14263b)}
+.ksv-f3{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}.ksv-f3 .ksv-fld{min-width:170px}
+.ksv-an{flex-direction:row;flex-wrap:wrap;gap:10px;align-items:center;font-size:13.5px}
+@media(max-width:640px){.ksv-r2 input::-webkit-slider-thumb{width:28px;height:28px}.ksv-mm input{font-size:16px}}
 .ksv-sold{display:inline-flex;gap:6px;align-items:center;background:var(--ksv-redsoft);color:var(--ksv-price);border-radius:8px;padding:6px 10px;font-size:12.5px;font-weight:600;align-self:flex-start}
 .ksv-room{grid-template-columns:290px minmax(0,1fr);border:1px solid var(--ksv-line);border-radius:14px}
 .ksv-rl{border-right:1px solid var(--ksv-line2);padding:12px}

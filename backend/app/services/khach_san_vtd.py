@@ -1300,7 +1300,10 @@ def _phong_ban_duoc(db: Session, kids: list[int], vao: date, ra: date, nl: int, 
             # KS-16j/16k: mô tả chi tiết, tiện nghi, sức chứa, giường phụ; phụ thu trẻ em / giường phụ ở từng gói
             "mo_ta_dai": x.mo_ta_dai or "", "tien_nghi": x.tien_nghi or [], "giuong_phu_toi_da": x.giuong_phu_toi_da,
             "suc_chua": x.suc_chua or x.toi_da_nguoi_lon, "khach_them_toi_da": x.khach_them_toi_da,
-            "noi_cui": x.noi_cui, "ly_do": ly_do})
+            "noi_cui": x.noi_cui, "ly_do": ly_do,
+            # KS-19b: cho bộ lọc phòng — kiểu giường đọc từ ô giường, phòng gia đình theo sức chứa
+            "giuong_kieu": sorted(_kieu_giuong(x.giuong or "")),
+            "gia_dinh": (x.suc_chua or x.toi_da_nguoi_lon or 0) + (x.khach_them_toi_da or 0) >= 4})
     return ra_
 
 
@@ -1357,7 +1360,38 @@ def _loc_them(phong: list[dict], hom_nay: date | None = None) -> dict:
             "co_tra_ngay": bool(goi)}
 
 
-def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict], dg: dict | None = None, dat: int = 0) -> dict:
+def _goi_ban(phong: list[dict], so_phong: int = 1, dem: int = 1, hom_nay: date | None = None) -> list[dict]:
+    """KS-19b (Chủ tịch duyệt bộ lọc v1.3, 05/11/2026): mỗi «gói bán được» là MỘT offer — đúng loại phòng, đúng gói,
+    đủ giá mọi đêm, đủ sức chứa, và còn ≥ số phòng khách cần ở MỌI đêm. Bộ lọc trên cổng chỉ giữ khách sạn có ít nhất
+    một offer thỏa ĐỒNG THỜI mọi điều kiện (không ghép bữa sáng của gói này với hủy miễn phí của gói khác).
+    Giá lọc = tổng offer (gồm phụ thu bắt buộc, đã gồm 8% VAT) ÷ số đêm ÷ số phòng."""
+    from app.services import don_ks_vtd as KV
+    hn = hom_nay or date.today()
+    sp, dem = max(1, so_phong), max(1, dem)
+    ra = []
+    for p in phong:
+        if not p["vua"] or p.get("con", 0) < sp:
+            continue
+        tn = list(p.get("tien_nghi") or [])
+        for g in p["goi"]:
+            if g.get("vua") is False:
+                continue
+            tong = int(g["tong"]) * sp + int(g.get("phu_thu_ky") or 0)
+            tra_sau = bool(g.get("cho_tra_sau", True) and g.get("huy_han")
+                           and date.fromisoformat(g["huy_han"]) - timedelta(days=KV.TRA_SAU_TRUOC_HUY) > hn)
+            ra.append({"lp": p["id"], "lp_ten": p["ten"], "goi": g["id"], "goi_ten": g["ten"],
+                       "dem_gia": round(tong / dem / sp), "tong": tong, "niem_yet_dem": g.get("niem_yet_dem"),
+                       "bua_sang": bool(g["bua_sang"]), "mien_phi_huy": bool(g["mien_phi_huy"]), "huy_han": g.get("huy_han"),
+                       "tra_sau": tra_sau, "giuong": sorted(_kieu_giuong(p.get("giuong") or "")), "tien_nghi": tn,
+                       "khong_hut": "Không hút thuốc" in tn,
+                       "gia_dinh": (p.get("suc_chua") or p.get("toi_da_nguoi_lon") or 0) + (p.get("khach_them_toi_da") or 0) >= 4,
+                       "con": p.get("con", 0)})
+    ra.sort(key=lambda o: o["dem_gia"])
+    return ra
+
+
+def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict], dg: dict | None = None, dat: int = 0,
+              so_phong: int = 1, dem: int = 1) -> dict:
     co_gia = [g for p in phong if p["vua"] for g in p["goi"] if g.get("vua", True)]
     goi = [g for p in phong if p["vua"] and p.get("con", 1) > 0 for g in p["goi"] if g.get("vua", True)]   # KS-16k: theo từng gói   # KS-14: bỏ loại phòng đã hết
     re_nhat = min(goi, key=lambda g: g["gia_dem"]) if goi else None
@@ -1371,6 +1405,7 @@ def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict], dg: 
             "co_mien_phi_huy": any(g["mien_phi_huy"] for g in goi), "co_bua_sang": any(g["bua_sang"] for g in goi),
             "thue_phi_pt": 0, "vat_pt": VAT_PT,                              # KS-19: giá đã gồm VAT
             "tien_nghi_phong": sorted({t for p in phong if p["vua"] and p.get("con", 1) > 0 and p["goi"] for t in (p.get("tien_nghi") or [])}),
+            "goi_ban": _goi_ban(phong, so_phong, dem),                       # KS-19b: offer cho bộ lọc «cùng một gói»
             "phu_hop": [PHU_HOP[x] for x in (k.phu_hop or []) if x in PHU_HOP],
             "het_phong": bool(co_gia) and not goi,
             # KS-16l: chưa có gói đặt được → chưa book trên cổng; bấm vào mở trang ngoài ở tab mới
@@ -1401,11 +1436,11 @@ def tim(db: Session, tinh: str, vao, ra, nguoi_lon: int = 2, tre_em: int = 0, so
     dg = DGK.tom_tat(db, [k.id for k in ks])
     d24 = dat_24h(db, [k.id for k in ks])
     chung = tt_chung(db)
-    the = [{**_the_cong(k, anh.get(k.id, []), phong.get(k.id, []), dg.get(k.id), d24.get(k.id, 0)),
+    the = [{**_the_cong(k, anh.get(k.id, []), phong.get(k.id, []), dg.get(k.id), d24.get(k.id, 0), sp, (ra - vao).days),
             "mo_thanh_toan": mo_thanh_toan(db, k, chung)} for k in ks]
     # KS-19 (Chủ tịch 05/11/2026: «bỏ luôn» luồng gửi yêu cầu): chỉ hiện khách sạn còn đủ phòng đặt được cho ngày,
     # số khách và số phòng đã chọn — không còn thẻ «gửi yêu cầu / báo giá riêng».
-    the = [o for o in the if o["gia_tu"] is not None]
+    the = [o for o in the if o["gia_tu"] is not None and o["goi_ban"]]   # KS-19b: còn ≥ số phòng cần ở mọi đêm
     dem_tp = {}
     for o in the:
         dem_tp[o["tinh_thanh"]] = dem_tp.get(o["tinh_thanh"], 0) + 1
@@ -1437,7 +1472,7 @@ def chi_tiet_cong(db: Session, kid: int, vao, ra, nguoi_lon: int = 2, tre_em: in
             p["anh"] = [_anh_out(anh[0], True)]
         p["video"] = [v for v in video if v["loai_phong_id"] == p["id"]]
     from app.services import danh_gia_ks as DGK
-    the = _the_cong(k, anh, phong, DGK.tom_tat(db, [k.id])[k.id], dat_24h(db, [k.id]).get(k.id, 0))
+    the = _the_cong(k, anh, phong, DGK.tom_tat(db, [k.id])[k.id], dat_24h(db, [k.id]).get(k.id, 0), sp, (ra - vao).days)
     return {**the, "dia_chi": k.dia_chi, "mo_ta": k.mo_ta, "gio_nhan": k.gio_nhan, "gio_tra": k.gio_tra,
             "chinh_sach": {"tre_em": k.cs_tre_em, "giuong_phu": k.cs_giuong_phu, "vat_nuoi": k.cs_vat_nuoi, "khac": k.cs_khac,
                            "tre": chinh_sach_tre_cong(k)},   # KS-16j
