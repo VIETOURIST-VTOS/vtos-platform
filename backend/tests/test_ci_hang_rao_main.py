@@ -80,6 +80,12 @@ HANG_RAO = (
     # Do duoc 05/11/2026: so da don toi 28 dong oi ma khong gi keu len, va dung chuyen ay da
     # chan Dot QUY-2a hom 04/11. Cua hep la cho duy nhat chay du nhanh de bat truoc khi gop.
     "tests/test_ds3_chuong_ba_ngay.py",
+    # ── BANG MUI GIO, them ngay 06/11/2026 (Dot TZ-1) ─────────────────────────────────────────
+    # No canh mot thu khac voi moi tep tren: khong phai mot phep tinh, ma CHO HAI MAY NOI MOT
+    # CHUYEN. Luat 1 tu di tim moi khoa `ZoneInfo("...")` trong backend roi mo thu tung khoa
+    # ngay tren may dang chay, nen no do o DUNG cai may thieu bang — truoc khi nguoi ta kip hoc
+    # cach bo qua mau do.
+    "tests/test_tz1_mui_gio_mo_duoc_tren_moi_may.py",
 )
 
 
