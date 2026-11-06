@@ -86,6 +86,10 @@ HANG_RAO = (
     # ngay tren may dang chay, nen no do o DUNG cai may thieu bang — truoc khi nguoi ta kip hoc
     # cach bo qua mau do.
     "tests/test_tz1_mui_gio_mo_duoc_tren_moi_may.py",
+    # ── CUA DOC TAI KHOAN CHA, them ngay 06/11/2026 (Dot TKC-1) ───────────────────────────────
+    # Bon luat nay do BANG CUA THAT qua TestClient, khong doc ma nguon: mot luat doc ma nguon chi
+    # chung minh duoc rang chu ay co trong tep, khong chung minh duoc cua tra ve gi.
+    "tests/test_tkc1_but_toan_ghi_vao_tai_khoan_cha.py",
 )
 
 
