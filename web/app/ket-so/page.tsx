@@ -268,6 +268,7 @@ function KetSo() {
 
       <MucDoChan />
       <TachNhiem />
+      <TienCapCha />
 
       <style jsx>{`
         .wrap { padding: 16px; max-width: 1000px; }
@@ -649,6 +650,137 @@ function TachNhiem() {
             </tr>
           ))}
         </tbody></table>
+      ) : null}
+    </>
+  );
+}
+
+/** Đợt TKC-1 — THẺ ĐỌC: bút toán đã ghi vào tài khoản CHA.
+ *
+ *  Cửa `/accounting/tien-ghi-cap-cha` có trên main từ Đợt R4c-3, nhưng cho tới hôm nay KHÔNG màn
+ *  hình nào gọi nó — nên con số ấy có mà không ai nhìn thấy, và theo ranh giới 09/9/2026 thì một
+ *  con số không có chỗ để đọc là việc còn thiếu, không phải việc đã xong.
+ *
+ *  THẺ NÀY KHÔNG CÓ NÚT NÀO LÀM ĐỔI SỔ. Không sửa, không đảo, không sinh bút toán điều chỉnh —
+ *  Chủ tịch chốt 02/11/2026 để nguyên bút toán cũ. Nó chỉ ra CHỖ PHẢI NHÌN.
+ *
+ *  Hai bảng chứ không một, và đó là một phân biệt có lý do: bảng «từng chứng từ» bị cắt ở
+ *  `gioi_han` dòng, nên ai cộng nhẩm trên đó sẽ cộng một phần rồi tưởng là toàn bộ. Bảng «theo
+ *  tài khoản» đếm trên TOÀN BỘ, không cắt — nên con số tổng phải đọc ở bảng ấy.
+ */
+function TienCapCha() {
+  const { toast } = useShell();
+  const [d, setD] = useState<any>(null);
+  const [dang, setDang] = useState(false);
+  // Từ ĐẦU NĂM, không theo ô «Kỳ» ở đầu màn hình: câu hỏi «sổ đã ghi vào tài khoản cha bao nhiêu»
+  // là câu hỏi LŨY KẾ, không phải câu hỏi của một kỳ. Để trống thì nặng, nên mặc định là đầu năm
+  // và người đọc tự nới ra nếu muốn.
+  const dauNam = `${new Date().getFullYear()}-01-01`;
+  const homNay = new Date().toISOString().slice(0, 10);
+  const [tu, setTu] = useState(dauNam);
+  const [den, setDen] = useState(homNay);
+
+  const load = useCallback(async () => {
+    setDang(true);
+    try {
+      const q = new URLSearchParams();
+      if (tu) q.set("tu", tu);
+      if (den) q.set("den", den);
+      setD(await api<any>(`/accounting/tien-ghi-cap-cha?${q.toString()}`));
+    } catch (e: any) {
+      toast(e?.message || "không đọc được");
+    } finally {
+      setDang(false);
+    }
+  }, [tu, den, toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <>
+      <h2 style={{ marginTop: 28 }}>Bút toán đã ghi vào tài khoản cha</h2>
+
+      <div className="row">
+        <label>Từ ngày</label>
+        <input type="date" value={tu} onChange={(e) => setTu(e.target.value)} />
+        <label>Đến ngày</label>
+        <input type="date" value={den} onChange={(e) => setDen(e.target.value)} />
+        <button className="ghost" onClick={load} disabled={dang}>Xem lại</button>
+        <Tag cls="warn">CHỈ ĐỌC — không sửa, không đảo</Tag>
+      </div>
+
+      {d ? (
+        <div className="card">
+          <div className="row">
+            <span className="chip"><b>{d.so_tai_khoan_cha}</b> tài khoản cha trong danh mục</span>
+            <span className="chip"><b>{d.so_tai_khoan_co_but_toan}</b> tài khoản cha có bút toán</span>
+            <span className="chip"><b>{d.so_dong}</b> dòng sổ</span>
+            <span className="chip">tổng <b>{vnd(d.so_tien)}</b></span>
+          </div>
+
+          {d.so_dong === 0 ? (
+            <p className="ok">Không có bút toán nào ghi vào tài khoản cha trong khoảng này.</p>
+          ) : null}
+
+          <p className="muted small">{d.ghi_chu}</p>
+
+          {/* Cờ `is_detail` lệch với bảng quan hệ cha–con là một chuyện phải nói ra, không phải
+              một chi tiết kỹ thuật giấu đi: ai viết phép chặn dựa vào cờ ấy sẽ chặn sai chỗ. */}
+          {d.co_is_detail_lech?.length ? (
+            <div className="warn">
+              <p><b>{d.co_is_detail_lech.length} tài khoản có cờ `is_detail` lệch</b> với bảng
+                 quan hệ cha–con: {d.co_is_detail_lech.join(", ")}.</p>
+              <p className="small">Thẻ này đọc bảng quan hệ, nên số ở trên vẫn đúng. Nhưng phép
+                 chặn sau này mà đọc cờ thì sẽ chặn sai chỗ — phải dọn cờ trước.</p>
+            </div>
+          ) : null}
+
+          {d.theo_tai_khoan?.length ? (
+            <>
+              <h4 style={{ marginTop: 20 }}>Theo tài khoản</h4>
+              <table><thead><tr>
+                <th>Tài khoản cha</th><th>Tên</th><th className="num">Số con</th>
+                <th className="num">Dòng</th><th className="num">Nợ</th><th className="num">Có</th>
+              </tr></thead><tbody>
+                {d.theo_tai_khoan.map((g: any) => (
+                  <tr key={g.tai_khoan}>
+                    <td>{g.tai_khoan}</td>
+                    <td>{g.ten || <span className="muted">—</span>}</td>
+                    <td className="num">{g.so_con}</td>
+                    <td className="num">{g.so_dong}</td>
+                    <td className="num">{vnd(g.no)}</td>
+                    <td className="num">{vnd(g.co)}</td>
+                  </tr>
+                ))}
+              </tbody></table>
+            </>
+          ) : null}
+
+          {d.dong?.length ? (
+            <>
+              <h4 style={{ marginTop: 20 }}>Từng chứng từ</h4>
+              {d.cat_bot ? (
+                <p className="muted small">
+                  Hiện {d.dong.length} dòng gần nhất trên tổng {d.so_dong} — bảng này ĐÃ CẮT BỚT,
+                  nên đừng cộng nhẩm ở đây; số tổng đọc ở bảng «Theo tài khoản».
+                </p>
+              ) : null}
+              <table><thead><tr>
+                <th>Chứng từ</th><th>Ngày</th><th>Tài khoản</th><th>Diễn giải</th>
+                <th className="num">Nợ</th><th className="num">Có</th><th>Nguồn</th>
+              </tr></thead><tbody>
+                {d.dong.map((x: any, i: number) => (
+                  <tr key={`${x.chung_tu}-${i}`}>
+                    <td>{x.chung_tu}</td><td>{x.ngay}</td><td>{x.tai_khoan}</td>
+                    <td>{x.dien_giai || <span className="muted">—</span>}</td>
+                    <td className="num">{vnd(x.no)}</td><td className="num">{vnd(x.co)}</td>
+                    <td>{x.nguon || <span className="muted">—</span>}</td>
+                  </tr>
+                ))}
+              </tbody></table>
+            </>
+          ) : null}
+        </div>
       ) : null}
     </>
   );

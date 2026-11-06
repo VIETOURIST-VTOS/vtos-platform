@@ -750,7 +750,11 @@ def bbc_tu_choi(bid: int, data: BanBaoCaoTuChoiIn,
 # "CHỨNG TỪ NÀO đã ghi tiền ở cấp cha" — từng chứng từ, để đi tìm hồ sơ gốc. Một bảng gộp không
 # trả lời được câu ấy.
 
-TIEN_CAP_CHA = ("111", "112", "113")
+# DOT TKC-1 06/11/2026 — HANG SO `TIEN_CAP_CHA` DA BO.
+#
+# No liet ke tay ba tai khoan tien, va mot danh sach go tay thi chi dung bang cai nguoi go nghi
+# ra luc ay. Nay cua tu doc bang quan he cha–con cua `Account`, nen no dung ca khi Ke toan them
+# mot tieu khoan moi — khong ai phai nho sua mot hang so o day nua.
 
 
 # DOT DON-R4c3 04/11/2026 — DOI DUONG, KHONG DOI VIEC.
@@ -766,8 +770,29 @@ def tien_ghi_cap_cha(tu: date | None = None, den: date | None = None, gioi_han: 
     """Từng dòng sổ có vế tiền là tài khoản CHA. CHỈ ĐỌC."""
     from app.models.accounting import JournalEntry as _JE, JournalLine as _JL
 
+    # ĐỢT TKC-1 06/11/2026 — NỚI TỪ BA TÀI KHOẢN TIỀN RA MỌI TÀI KHOẢN CHA.
+    #
+    # Vì sao nới: câu Kế toán trưởng phải trả lời là «có chặn ghi vào tài khoản cha hay không»,
+    # và câu ấy nói về MỌI tài khoản cha. Cửa cũ soi đúng ba tài khoản tiền (111/112/113), nên nó
+    # trả lời một câu hẹp hơn câu được hỏi — mà một con số hẹp hơn câu hỏi thì dễ bị đọc như thể
+    # nó là câu trả lời đầy đủ.
+    #
+    # TỰ ĐI TÌM, KHÔNG GÕ TAY: tài khoản cha là tài khoản được một tài khoản khác khai làm cha.
+    # Đọc THẲNG từ bảng `Account` chứ không đọc cờ `is_detail`, vì cờ ấy chỉ được đặt trên đường
+    # nạp danh mục MISA; một tài khoản thêm bằng đường khác vẫn mang `is_detail=True` dù nó đã có
+    # con. Bảng quan hệ cha–con thì luôn đúng, nên nó là nguồn. (Luật 4 của đợt đo đúng chỗ lệch
+    # này và NÓI RA, chứ không lặng lẽ chọn một bên.)
+    cac_tk = db.execute(select(Account)).scalars().all()
+    ten_tk = {a.code: (a.name or "") for a in cac_tk}
+    lam_cha = {a.parent for a in cac_tk if a.parent}
+    cha = sorted(c for c in lam_cha if c in ten_tk)
+    so_con = {}
+    for a in cac_tk:
+        if a.parent:
+            so_con[a.parent] = so_con.get(a.parent, 0) + 1
+
     q = (select(_JL, _JE).join(_JE, _JE.id == _JL.entry_id)
-         .where(_JL.account_code.in_(TIEN_CAP_CHA))
+         .where(_JL.account_code.in_(cha))
          .order_by(_JE.entry_date.desc(), _JE.id.desc()))
     if tu:
         q = q.where(_JE.entry_date >= tu)
@@ -781,14 +806,38 @@ def tien_ghi_cap_cha(tu: date | None = None, den: date | None = None, gioi_han: 
         "nguon": e.source_type or "", "trang_thai": e.status or "",
     } for l, e in het[:gioi_han]]
 
+    # Gộp theo tài khoản. Bảng từng chứng từ bị cắt ở `gioi_han`, nên nếu chỉ có bảng ấy thì người
+    # đọc sẽ cộng nhẩm một phần rồi tưởng là toàn bộ. Bảng gộp này đếm TRÊN TOÀN BỘ, không cắt.
+    gop = {}
+    for l, _e in het:
+        g = gop.setdefault(l.account_code, {"tai_khoan": l.account_code,
+                                            "ten": ten_tk.get(l.account_code, ""),
+                                            "so_con": so_con.get(l.account_code, 0),
+                                            "so_dong": 0, "no": 0, "co": 0})
+        g["so_dong"] += 1
+        g["no"] += l.debit or 0
+        g["co"] += l.credit or 0
+    theo_tk = sorted(gop.values(), key=lambda g: g["no"] + g["co"], reverse=True)
+    for g in theo_tk:
+        g["no"], g["co"] = round(g["no"], 0), round(g["co"], 0)
+
+    # Cờ `is_detail` nói gì so với bảng quan hệ cha–con. Hai bên lệch nhau là một chuyện phải nói
+    # ra: nó nghĩa là cờ ấy đã cũ, và bất cứ ai sau này viết phép chặn dựa vào cờ sẽ chặn sai chỗ.
+    co_sai = sorted(a.code for a in cac_tk
+                    if (a.code in lam_cha) != (a.is_detail is False))
+
     return {
         "tu": str(tu) if tu else None, "den": str(den) if den else None,
-        "tai_khoan_cap_cha": list(TIEN_CAP_CHA),
+        "tai_khoan_cap_cha": cha,
+        "so_tai_khoan_cha": len(cha),
+        "so_tai_khoan_co_but_toan": len(theo_tk),
+        "theo_tai_khoan": theo_tk,
+        "co_is_detail_lech": co_sai,
         "so_dong": len(het), "cat_bot": len(het) > gioi_han, "dong": dong,
         "so_tien": round(sum((l.debit or 0) + (l.credit or 0) for l, _ in het), 0),
         "ghi_chu": ("Mỗi dòng ở đây là tiền đã ghi vào một tài khoản CHA. Nó KHÔNG đương nhiên "
-                    "sai số: số tiền đúng, chỉ ghi chưa đủ sâu, nên sổ chi tiết tiền theo từng "
-                    "tài khoản không thấy nó, và phép đối chiếu bảng quy ước xếp nó vào rổ ngoài "
+                    "sai số: số tiền đúng, chỉ ghi chưa đủ sâu, nên sổ chi tiết theo từng tài "
+                    "khoản con không thấy nó, và phép đối chiếu bảng quy ước xếp nó vào rổ ngoài "
                     "luật. Cửa này CHỈ ĐỌC: không sửa, không đảo. Chủ tịch chốt 02/11/2026 để "
                     "nguyên bút toán cũ, Kế toán trưởng quyết từng khoản."),
     }
