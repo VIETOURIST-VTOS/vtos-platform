@@ -8,7 +8,7 @@
      thẻ qua SePay, tải invoice). Tour đoàn riêng: «Gửi yêu cầu thiết kế tour».
    Máy chủ tính lại mọi con số. Công tắc thanh toán (chung + từng sản phẩm) chưa bật → nút cuối «Gửi yêu cầu giữ chỗ»
    (Sales gọi lại, không giữ chỗ, không thu tiền) — máy chủ cũng chặn đặt online bằng 409. */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import QRCode from "qrcode";
 import { diCongThe, duongRieng, emailThat, goiCong, phienCong } from "@/lib/cong";
 import { CSS_KSV } from "./KhachSanVtd";
@@ -200,12 +200,13 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
   const dem = (f: (s: any) => boolean, bo: keyof Loc) => tat.filter((s) => khop(s, bo) && f(s)).length;
   const bat = (a: string[], k: string, v: boolean) => (v ? [...a, k] : a.filter((x) => x !== k));
   // TR-4: «Giá mỗi khách» và «Phương tiện» luôn hiện đủ mức (mức chưa có tour thì mờ, số 0) — các nhóm khác ẩn mức trống.
-  const nhom = (tieuDe: string, muc: [string, string, (s: any) => boolean][], khoa: "loai" | "tl" | "gia" | "ud" | "pt", du = false) => {
+  const nhom = (tieuDe: string, muc: [string, string, (s: any) => boolean][], khoa: "loai" | "tl" | "gia" | "ud" | "pt", du = false,
+                them?: ReactNode) => {
     const co = du ? muc : muc.filter(([, , f]) => dem(f, khoa) > 0);
-    return co.length > 0 && <div className="ksv-panel"><b>{tieuDe}</b>{co.map(([m, t, f]) =>
+    return (co.length > 0 || !!them) && <div className="ksv-panel"><b>{tieuDe}</b>{co.map(([m, t, f]) =>
       <label key={khoa + m} className="ksv-chk" style={dem(f, khoa) === 0 ? { opacity: 0.55 } : undefined}><input type="checkbox" checked={(loc[khoa] as string[]).includes(m)}
         disabled={dem(f, khoa) === 0 && !(loc[khoa] as string[]).includes(m)}
-        onChange={(e) => setLoc({ ...loc, [khoa]: bat(loc[khoa] as string[], m, e.target.checked) })} /><span>{t}</span><small>{dem(f, khoa)}</small></label>)}</div>;
+        onChange={(e) => setLoc({ ...loc, [khoa]: bat(loc[khoa] as string[], m, e.target.checked) })} /><span>{t}</span><small>{dem(f, khoa)}</small></label>)}{them}</div>;
   };
 
   // ---------- đặt ----------
@@ -436,6 +437,9 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
 
   // ═══════════════════════════════════ 1–2 · TÌM + DANH SÁCH ═══════════════════════════════════
   const coWell = tat.some((s) => s.wellness);
+  // KS-19l (Chủ tịch chọn phương án C 06/11/2026): lối vào «Tour đoàn theo yêu cầu» nằm ngay dưới «Tour ghép» trong bộ lọc
+  // Loại tour. Điện thoại giấu bộ lọc sau nút «Bộ lọc», nên ở đó lối vào hiện thêm một ô ngay đầu danh sách.
+  const moDoan = () => { setMoLoc(false); setSp(null); setBuoc("doan"); len(); };
   return <div className="ksv tra">{css}{thanhTim()}
     {coWell && <button type="button" className="tra-well" onClick={() => setLoc({ ...LOC0, well: true })}>
       <span><b>Wellness &amp; Retreat</b><small>Nghỉ dưỡng, thiền, yoga, spa — trong nước và nước ngoài</small></span><em>Xem các tour wellness →</em></button>}
@@ -443,7 +447,8 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
     <div className="ksv-layout">
       <aside className={`ksv-loc${moLoc ? " open" : ""}`} aria-label="Bộ lọc">
         {moLoc && <button type="button" className="ksv-btn" onClick={() => setMoLoc(false)}>Xem {kq.length} tour</button>}
-        {nhom("Loại tour", [["ghep", "Tour ghép", (s) => s.loai === "ghep"], ["doan", "Tour đoàn riêng", (s) => s.loai === "doan"]], "loai")}
+        {nhom("Loại tour", [["ghep", "Tour ghép", (s) => s.loai === "ghep"], ["doan", "Tour đoàn riêng", (s) => s.loai === "doan"]], "loai", false,
+          <button type="button" className="tra-doan" onClick={moDoan}><b>Tour đoàn theo yêu cầu →</b><small>Tự thiết kế, xem giá tạm tính ngay</small></button>)}
         {dem((s) => s.wellness, "well") > 0 && <div className="ksv-panel"><b>Chủ đề</b><label className="ksv-chk"><input type="checkbox" checked={loc.well} onChange={(e) => setLoc({ ...loc, well: e.target.checked })} />
           <span>Wellness &amp; retreat</span><small>{dem((s) => s.wellness, "well")}</small></label></div>}
         {nhom("Thời lượng", TL.map(([k, t, f]) => [k, t, (s: any) => f(s.ngay)]), "tl")}
@@ -457,6 +462,8 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
             <select className="ksv-sel" value={sx} onChange={(e) => setSx(e.target.value)} aria-label="Sắp xếp">
               <option value="som">Khởi hành sớm nhất</option><option value="gia_thap">Giá thấp nhất</option><option value="gia_cao">Giá cao nhất</option>
               <option value="ngan">Ngắn ngày trước</option><option value="dai">Dài ngày trước</option></select></span></div>
+        <section className="ksv-panel tra-doan-dt"><b>Tour đoàn theo yêu cầu</b><span className="ksv-muted">Gia đình, doanh nghiệp, hội nhóm — tự chọn điểm đến, khách sạn, bữa ăn, phương tiện và xem giá tạm tính ngay.</span>
+          <button type="button" className="ksv-btn line" style={{ alignSelf: "flex-start" }} onClick={moDoan}>Tự thiết kế tour đoàn</button></section>
         {kq.map((s: any) => <article key={s.id} className="ksv-card">
           {(s.gio_chot || s.khuyen_mai) && <div className="ksv-bar"><span>{s.gio_chot ? "Giờ chót — khởi hành trong vài ngày tới" : "Đang khuyến mại"}</span>{s.it_cho && <em>Còn ít chỗ</em>}</div>}
           <div className="ksv-crow">
@@ -476,8 +483,6 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
               <button type="button" className="ksv-btn wide" onClick={() => moSp(s.id)}>{s.loai === "doan" || s.chua_co_lich ? "Xem & gửi yêu cầu" : "Xem ngày đi"}</button></div>
           </div></article>)}
         {ds && !kq.length && <section className="ksv-panel"><span>Không có tour khớp. Thử bỏ bớt bộ lọc, đổi khoảng ngày, hoặc gửi yêu cầu thiết kế tour riêng.</span></section>}
-        <section className="ksv-panel"><b>Tour đoàn theo yêu cầu</b><span className="ksv-muted">Gia đình, doanh nghiệp, hội nhóm — tự chọn điểm đến, khách sạn, bữa ăn, phương tiện và xem giá tạm tính ngay.</span>
-          <button type="button" className="ksv-btn line" style={{ alignSelf: "flex-start" }} onClick={() => { setSp(null); setBuoc("doan"); len(); }}>Tự thiết kế tour đoàn</button></section>
       </div>
     </div>
   </div>;
@@ -502,6 +507,11 @@ const CSS = `
 .tra-well{all:unset;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:linear-gradient(110deg,#e7f3ec,#f3efe2);border:1px solid #cfe2d6;border-radius:12px;padding:14px 18px}
 .tra-well span{display:flex;flex-direction:column;gap:2px}.tra-well b{font-size:18px;color:#1f4d36}.tra-well small{color:#41594c}.tra-well em{font-style:normal;font-weight:700;color:#1f4d36}
 .tra-well:focus-visible{outline:2px solid var(--ksv-accent)}
+.tra-doan{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px;margin-top:4px;border:1.5px solid var(--ksv-accent);border-radius:10px;padding:10px 12px;min-height:44px;box-sizing:border-box}
+.tra-doan b{font-size:14px;color:var(--ksv-accent)}.tra-doan small{font-size:12px;color:var(--ksv-muted)}
+.tra-doan:hover{background:var(--ksv-soft)}.tra-doan:focus-visible{outline:2px solid var(--ksv-accent);outline-offset:2px}
+.tra-doan-dt{display:none}
+@media (max-width:900px){.tra-doan-dt{display:flex}}
 .tra-tag{background:var(--ksv-soft);border-radius:99px;padding:3px 10px;font-size:12px;font-weight:600}
 .tra-tag.ok{background:var(--ksv-oksoft);color:var(--ksv-ok)}.tra-tag.hot{background:#fdecea;color:#a3261b}
 .tra-nb{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
