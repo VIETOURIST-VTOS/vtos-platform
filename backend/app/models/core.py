@@ -209,6 +209,10 @@ class User(Base):
     # xoá mất sự khác biệt ấy, và không cách nào lấy lại.
     gd_nen: Mapped[str] = mapped_column(String(8), default="")          # "" | "toi" | "sang" | "may"
     gd_co_chu: Mapped[int | None] = mapped_column(Integer, nullable=True)   # NULL | 14..20
+    # KS-NUT · 07/11/2026 — anh Tuấn duyệt cả hai phương án màu nút của bản xem thử «Navy bên trong
+    # VTOS» và cho NGƯỜI DÙNG TỰ CHỌN: "navy" = phương án A (nút navy #14538D viền #5A9BD4),
+    # "sang" = phương án B (nút xanh sáng #1E63C8). Cùng quy ước rỗng khác mặc định như hai cột trên.
+    gd_mau_nut: Mapped[str] = mapped_column(String(8), default="")      # "" | "navy" | "sang"
 
 
 # Bộ giá trị hợp lệ của giao diện, khai MỘT CHỖ để cửa ghi, phép thử và màn hình cùng đọc một
@@ -216,6 +220,8 @@ class User(Base):
 GIAO_DIEN_NEN = ("toi", "sang", "may")   # navy tối · trắng sáng · theo cài đặt máy
 GIAO_DIEN_CO_MIN, GIAO_DIEN_CO_MAX = 14, 20
 GIAO_DIEN_MAC_DINH_NEN, GIAO_DIEN_MAC_DINH_CO = "toi", 16
+GIAO_DIEN_MAU_NUT = ("navy", "sang")     # KS-NUT · navy đậm (A) · xanh sáng (B)
+GIAO_DIEN_MAC_DINH_MAU_NUT = "navy"
 
 
 GRANT_KINDS = {"menu": "Màn hình", "capability": "Năng lực"}
