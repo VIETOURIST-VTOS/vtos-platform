@@ -30,6 +30,12 @@ const PHONG_TOI_DA = 9;
 const voiChia = (q: Q, chia: Phong[]): Q => ({ ...q, chia, phong: chia.length, nl: chia.reduce((a, c) => a + c.nl, 0), te: chia.reduce((a, c) => a + c.te, 0),
   tuoi: chia.flatMap((c) => Array.from({ length: c.te }, (_x, i) => c.tuoi[i] ?? -1)) });
 const taNhom = (c: { nl: number; te: number; tuoi?: number[] }) => `${c.nl} người lớn${c.te ? ` + ${c.te} trẻ${(c.tuoi || []).length && (c.tuoi || []).every((t) => t >= 0) ? ` (${(c.tuoi || []).join(", ")} tuổi)` : ""}` : ""}`;
+/** KS-20c: «P1, P2» của một dòng đơn (đơn cũ không khai từng phòng thì «2 × Deluxe»). */
+const phongCua = (x: any) => ((x.khach || x.phong || []).length ? (x.khach ? x.khach.map((k: any) => k.phong) : x.phong).map((n: number) => `P${n}`).join(", ") : `${x.so} ×`);
+/** KS-20c: các phòng của đơn theo thứ tự P1, P2…; đơn không khai từng phòng → mỗi dòng một mục. */
+const donViDon = (dong: any[]) => (dong || []).flatMap((x: any) => ((x.khach || []).length ? x.khach.map((kh: any) => ({ x, kh, n: kh.phong })) : [{ x, kh: null, n: 99 }]))
+  .sort((a: any, b: any) => a.n - b.n);
+const nhanDV = (v: any) => (v.kh ? `P${v.kh.phong} ${v.x.loai_phong}` : `${v.x.so} × ${v.x.loai_phong}`);
 const chiaGui = (q: Q) => q.chia.map((c) => ({ nl: c.nl, te: c.te, tuoi: c.tuoi.slice(0, c.te) }));
 const thieuTuoi = (q: Q) => q.chia.some((c) => c.tuoi.slice(0, c.te).length < c.te || c.tuoi.slice(0, c.te).some((t) => t < 0));
 // KS-16j: như Agoda — có trẻ em thì chọn tuổi từng bé (-1 = chưa chọn); máy tính phụ thu theo chính sách khách sạn.
@@ -75,6 +81,7 @@ const THU_DAI = ["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ N�
 const ngay = (s: string) => { const d = new Date(s + "T00:00:00"); return `${THU[d.getDay()]}, ${d.getDate()} thg ${d.getMonth() + 1}`; };
 const ngayDai = (s: string) => { const d = new Date(s + "T00:00:00"); return `${d.getDate()} Th${d.getMonth() + 1} ${d.getFullYear()}`; };
 const thuDai = (s: string) => THU_DAI[new Date(s + "T00:00:00").getDay()];
+const thuNgan = (s: string) => THU[new Date(s + "T00:00:00").getDay()];
 export const dmy = (s?: string | null) => (s ? String(s).slice(0, 10).split("-").reverse().join("/") : "");
 const MAU: Record<string, string> = { bac: "#1f4e5f", trung: "#7a4a22", tay_nguyen: "#5b4a2e", nam: "#2f5d3a" };
 const khongDau = (s: string) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
@@ -135,8 +142,9 @@ function ChiaPhong({ chia, onDoi, luoi = false }: { chia: Phong[]; onDoi: (c: Ph
   </div>;
 }
 
-export function Buoc3({ toi, coGia = true }: { toi: 1 | 2 | 3; coGia?: boolean }) {
-  const ten = coGia ? ["Thông tin khách", "Thanh toán", "Đã xác nhận"] : ["Thông tin khách", "Gửi yêu cầu", "Vietourist báo lại"];
+export function Buoc3({ toi, coGia = true }: { toi: 1 | 2 | 3 | 4; coGia?: boolean }) {
+  // KS-20c (bản v1.3 D3 / D4): đặt có giá đi bốn bước Chọn phòng → Thông tin → Thanh toán → Xác nhận.
+  const ten = coGia ? ["Chọn phòng", "Thông tin", "Thanh toán", "Xác nhận"] : ["Thông tin khách", "Gửi yêu cầu", "Vietourist báo lại"];
   return <div className="ksv-bk"><div className="ksv-stp">{ten.map((t, i) => <span key={t} style={{ display: "contents" }}>
     {i > 0 && <span className={`ln ${i < toi ? "on" : ""}`} />}
     <span className={`s ${i + 1 < toi ? "dn" : i + 1 === toi ? "on" : ""}`}><i>{i + 1 < toi ? "✓" : i + 1}</i>{t}</span></span>)}</div></div>;
@@ -434,7 +442,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
     traSau={traSau} chon={dongChon} homNay={homNay} />;
   const loiBox = loi && <div className="ksv-loi">{loi}</div>;
 
-  if (buoc === "gui" && ks && tinh) return <div className="ksv">{css}<Buoc3 toi={1} coGia={coGia} />
+  if (buoc === "gui" && ks && tinh) return <div className="ksv">{css}<Buoc3 toi={coGia ? 2 : 1} coGia={coGia} />
     <div className="ksv-tmr" style={coGia ? undefined : { background: "var(--ksv-asoft)", color: "var(--ksv-ink)" }}><Ico d={P.gio} s={16} />
       {coGia ? (traSau ? <span>Gói này cho <b>đặt giữ, trả trước {dmy(tinh.han_tra_sau)}</b> — hôm nay chưa phải trả</span>
         : <span>Phòng được giữ <b>15 phút</b> khi bạn bấm thanh toán ở bước cuối</span>)
@@ -482,7 +490,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
       {tomTat}
     </div></div>;
 
-  if (buoc === "cuoi" && ks && tinh) return <div className="ksv">{css}<Buoc3 toi={2} />
+  if (buoc === "cuoi" && ks && tinh) return <div className="ksv">{css}<Buoc3 toi={3} />
     {traSau ? <div className="ksv-tmr" style={{ background: "var(--ksv-oksoft)", color: "var(--ksv-ok)" }}><Ico d={P.khien} s={16} fill /><span>Bấm đặt giữ: phòng được giữ cho bạn tới hết ngày <b>{dmy(tinh.han_tra_sau)}</b> — hôm nay chưa phải trả</span></div>
       : <div className="ksv-tmr"><Ico d={P.gio} s={16} /><span>Bấm thanh toán: phòng được giữ cho bạn <b>15 phút</b> để trả</span></div>}
     <button type="button" className="ksv-link" onClick={() => setBuoc("gui")}>← Sửa thông tin khách</button>
@@ -500,6 +508,9 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
             <span><b>Thẻ ATM nội địa / tín dụng / ghi nợ</b><span className="ksv-logos"><span>VISA</span><span>Mastercard</span><span>JCB</span><span>NAPAS</span></span>
               <span className="ksv-muted" style={{ display: "block", marginTop: 4 }}>Nhập thẻ trên trang bảo mật của cổng thanh toán SePay — Vietourist không thấy và không lưu số thẻ.</span></span></label>}</section>}
         {/* KS-19: VTD chỉ tích điểm — không còn ô mã voucher */}
+        {diem?.dang_bat && <div className="ksv13-diem"><b>Tích điểm VTD</b><span>Cộng điểm sau kỳ ở, theo hạng thành viên của bạn{duKien(tinh.tong - giam) > 0 && diem.cach_tinh !== "hoa_hong" ? ` — khoảng ${vnd(duKien(tinh.tong - giam))} điểm` : ""}.</span></div>}
+        {!traSau && (tinh.cho_xac_nhan ? <div className="ksv13-xn"><b>Có giường phụ chờ khách sạn xác nhận.</b> Thanh toán xong đơn ở «Đã thanh toán»; Vietourist xác nhận trong 2 giờ làm việc — không xếp được thì hoàn 100%.</div>
+          : <div className="ksv13-xn"><b>Thanh toán thành công = phòng được xác nhận ngay.</b> Mã đặt phòng hiện ngay trên màn hình{kh.email ? " và gửi qua email" : ""}; Vietourist báo thêm qua số điện thoại / Zalo của bạn.</div>)}
         <small className="ksv-muted" style={{ padding: "0 4px" }}>✉ Xác nhận gửi tới {kh.email ? <><b>{kh.email}</b> và </> : ""}Zalo / điện thoại <b>{kh.lien_he}</b></small>
         {loiBox}
         <div className="ksv-panel" style={{ padding: 16 }}>
@@ -907,7 +918,7 @@ function TomTatDon({ d }: { d: any }) {
       <span className="ksv-muted">{ngay(d.vao)} → {ngay(d.ra)} · {d.dem} đêm · {d.nguoi_lon} người lớn{d.tre_em ? ` · ${d.tre_em} trẻ em` : ""}</span>
       {d.gio_den && <span className="ksv-muted">Giờ đến dự kiến: <b>{d.gio_den}</b></span>}
       {["da_tra", "da_xac_nhan"].includes(d.trang_thai) || d.cach_tra === "sau" ? <button type="button" className="ksv-btn line" onClick={() => themLich(d)}><Ico d={P.lich} s={15} /> Thêm vào lịch</button> : null}
-      {d.dong.map((x: any, i: number) => <span key={i}><b>{x.so} × {x.loai_phong}</b> · {x.goi}<br />{x.huy_han ? <span className="ksv-okc">✓ Miễn phí hủy trước {x.huy_han.split("-").reverse().join("/")}</span> : <span className="ksv-muted">Không hoàn tiền</span>}</span>)}
+      {donViDon(d.dong).map(({ x, kh }: any, i: number) => <span key={i}><b>{kh ? `P${kh.phong} · ${x.loai_phong}` : `${x.so} × ${x.loai_phong}`}</b> · {x.goi}{kh && <small className="ksv-muted" style={{ display: "block" }}>{taNhom(kh)}</small>}{!kh && <br />}{x.huy_han ? <span className="ksv-okc">✓ Miễn phí hủy trước {x.huy_han.split("-").reverse().join("/")}</span> : <span className="ksv-muted">Không hoàn tiền</span>}</span>)}
       <span className="ksv-sum"><span>Giá phòng</span><span>₫ {vnd(d.tien_phong)}</span></span>
       {d.thue_phi > 0 && <span className="ksv-sum"><span>Thuế và phí</span><span>₫ {vnd(d.thue_phi)}</span></span>}
       {d.giam_voucher > 0 && <span className="ksv-sum ksv-okc"><span>Voucher {d.voucher?.ma}{d.voucher?.trang_thai === "da_hoan" ? " · đã trả điểm" : ""}</span><span>− ₫ {vnd(d.giam_voucher)}</span></span>}
@@ -948,7 +959,7 @@ function TraTien({ d, onDoi, onLai }: { d: any; onDoi: (d: any) => void; onLai: 
   const mm = `${String(Math.floor(con / 60)).padStart(2, "0")}:${String(con % 60).padStart(2, "0")}`;
   const sau = d.cach_tra === "sau";
   return <>
-    <Buoc3 toi={2} />
+    <Buoc3 toi={3} />
     {sau ? <div className="ksv-tmr" style={{ background: "var(--ksv-oksoft)", color: "var(--ksv-ok)" }}><span>Phòng được giữ cho bạn tới hết ngày <b>{dmy(d.han_tra)}</b> — trả trước hạn, trả xong là xác nhận ngay</span></div>
       : <div className="ksv-tmr">{con > 0 ? <><span>Phòng được giữ cho bạn trong</span><b>{mm}</b></> : <b>Hết giờ giữ phòng</b>}</div>}
     <div className="ksv-co">
@@ -977,26 +988,27 @@ function TraTien({ d, onDoi, onLai }: { d: any; onDoi: (d: any) => void; onLai: 
       <TomTatDon d={d} /></div></>;
 }
 
-function DonKs({ d, bao, loi: loi0, onDoi, onTra, onLai }: { d: any; bao?: string; loi?: string; onDoi: (d: any) => void; onTra: () => void; onLai: () => void }) {
+function DonKs({ d, bao, loi: loi0, onDoi, onTra, onLai, huyNgay = false }: { d: any; bao?: string; loi?: string; onDoi: (d: any) => void; onTra: () => void; onLai: () => void; huyNgay?: boolean }) {
   const [loi, setLoi] = useState(loi0 || "");
-  const [hoi, setHoi] = useState(false);
+  const [hoi, setHoi] = useState(huyNgay && !!d.co_the_huy);
   const [viet, setViet] = useState(false);
   const dg = d.danh_gia || {};
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(bao || "");
-  const huy = async () => {
+  const huy = async (lyDo = "") => {
     setBusy(true); setLoi("");
-    try { const r = await goiCong(`/ks-vtd/don/${encodeURIComponent(d.ma)}/huy`, { ly_do: "Khách hủy" }); setHoi(false); setMsg(r.message); onDoi(r.don); }
+    try { const r = await goiCong(`/ks-vtd/don/${encodeURIComponent(d.ma)}/huy`, { ly_do: lyDo ? `Khách hủy · ${lyDo}` : "Khách hủy" }); setHoi(false); setMsg(r.message); onDoi(r.don); }
     catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
   };
   const buoc = [["Đã đặt", d.tao_luc], ["Đã thanh toán", d.tra_luc], ["Đã xác nhận", d.xac_nhan_luc]] as const;
   const toi = d.trang_thai === "da_xac_nhan" ? 3 : d.trang_thai === "da_tra" ? 2 : 1;
   const giu = d.cach_tra === "sau" && d.trang_thai === "cho_tra";   // KS-16p: đặt giữ, trả sau — chưa trả
   const tot = ["da_tra", "da_xac_nhan"].includes(d.trang_thai) || giu;
-  return <><Buoc3 toi={tot ? 3 : 2} />
+  return <><Buoc3 toi={tot ? 4 : 3} />
     {tot && <div className="ksv-done"><span className="ck2"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg></span>
       <div><div className="ksv-h1" style={{ color: "var(--ksv-ok)" }}>{giu ? "Đã giữ phòng cho bạn!" : d.trang_thai === "da_xac_nhan" ? "Đặt phòng thành công!" : "Đã nhận thanh toán!"}</div>
         <div style={{ fontSize: 15, marginTop: 4 }}>Mã đơn <b>{d.ma}</b>{d.email ? <> · Xác nhận gửi tới {d.email}</> : ""}</div></div></div>}
+    {d.trang_thai === "da_xac_nhan" && <XacNhanV13 d={d} />}
     <div className="ksv-co">
     <div style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
       {msg && <div className="ksv-ok" style={{ padding: "10px 14px" }}>{msg}</div>}
@@ -1044,16 +1056,50 @@ function DonKs({ d, bao, loi: loi0, onDoi, onTra, onLai }: { d: any; bao?: strin
     <TomTatDon d={d} /></div></>;
 }
 
-function HoiHuy({ d, busy, onThoi, onHuy }: { d: any; busy: boolean; onThoi: () => void; onHuy: () => void }) {
-  return <section className="ksv-panel ksv-hoi" role="dialog" aria-label={`Hủy ${d.ma}`}>
-    <h3 style={{ margin: 0, fontSize: 19 }}>Hủy {d.ma}?</h3>
-    <div className="ksv-hoan"><span className="ksv-sum"><span>Đã trả</span><span>₫ {vnd(d.da_tra)}</span></span>
-      <span className="ksv-sum"><span>Giữ lại theo gói</span><span>₫ {vnd(d.da_tra - d.hoan_neu_huy)}</span></span>
-      <span className="ksv-sum" style={{ borderTop: "1px solid var(--ksv-line)", paddingTop: 8 }}><b>Hoàn lại</b><b className="ksv-okc">₫ {vnd(d.hoan_neu_huy)}</b></span></div>
-    <small className="ksv-muted">Hoàn theo chính sách từng gói: trước hạn miễn phí hủy hoàn đủ phần gói đó; sau hạn hoặc gói «Không hoàn tiền» không hoàn. Tiền về tài khoản / thẻ đã dùng trong 3–7 ngày làm việc.</small>
-    <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
-      <button type="button" className="ksv-btn line" onClick={onThoi}>Giữ phòng</button>
-      <button type="button" className="ksv-btn" style={{ background: "var(--ksv-price)" }} disabled={busy} onClick={onHuy}>{d.hoan_neu_huy > 0 ? `Hủy và hoàn ₫ ${vnd(d.hoan_neu_huy)}` : "Hủy phòng"}</button></div></section>;
+/** KS-20c (bản v1.3 D4 / M3): đặt phòng đã xác nhận — số đã nhận, nút tiếp theo, ngày giờ, hạn hủy miễn phí từng phòng. */
+function XacNhanV13({ d }: { d: any }) {
+  const k = d.khach_san || {};
+  const dv = donViDon(d.dong), khong = dv.filter((v: any) => !v.x.huy_han);
+  const hanNhom: Record<string, any[]> = {};
+  dv.filter((v: any) => v.x.huy_han).forEach((v: any) => { const h = `${dmy(v.x.huy_han)}${v.x.huy_gio_chot ? `, ${v.x.huy_gio_chot}` : ""}`; (hanNhom[h] = hanNhom[h] || []).push(v); });
+  return <section className="ksv-panel ksv13-xnhan">
+    <p style={{ margin: 0, fontSize: 15 }}>Đã nhận <b>₫ {vnd(d.da_tra)}</b>. {k.ten} giữ {d.so_phong} phòng cho bạn từ {dmy(d.vao)}.{d.email ? " Mã đặt phòng đã gửi qua email." : ""}</p>
+    <div className="ksv13-nut">
+      <a className="ksv-btn" href="/cong?tab=bookings">Xem trong Đơn của tôi</a>
+      <button type="button" className="ksv-btn line" onClick={() => window.print()}>In / lưu phiếu xác nhận (PDF)</button>
+      <a className="ksv-btn line" href={ggDuong(k)} target="_blank" rel="noopener noreferrer">Chỉ đường Google Maps ↗</a></div>
+    <div className="ksv13-xgrid">
+      <div><small className="ksv-muted">Nhận phòng</small><b>{thuNgan(d.vao)}, {dmy(d.vao)}{k.gio_nhan ? ` từ ${k.gio_nhan}` : ""}</b></div>
+      <div><small className="ksv-muted">Trả phòng</small><b>{thuNgan(d.ra)}, {dmy(d.ra)}{k.gio_tra ? ` trước ${k.gio_tra}` : ""}</b></div>
+      <div><small className="ksv-muted">Hủy miễn phí</small>
+        {Object.entries(hanNhom).map(([h, ds]) => <b key={h}>{ds.map(nhanDV).join(", ")} đến {h}</b>)}
+        {khong.length > 0 && <small className="ksv-muted">{khong.map(nhanDV).join(", ")} không hoàn hủy</small>}</div></div>
+  </section>;
+}
+
+/** KS-20c (bản v1.3 M4): hỏi hủy — từng phòng hoàn bao nhiêu, lý do (không bắt buộc). Điện thoại: tấm trượt từ dưới lên. */
+const LY_DO_HUY = ["Đổi kế hoạch", "Đặt nhầm ngày / phòng", "Tìm được chỗ khác", "Lý do khác"];
+function HoiHuy({ d, busy, onThoi, onHuy }: { d: any; busy: boolean; onThoi: () => void; onHuy: (lyDo: string) => void }) {
+  const [ly, setLy] = useState("");
+  const ds = ([...(d.hoan_dong || [])] as any[]).sort((a, b) => ((a.phong || [])[0] ?? 99) - ((b.phong || [])[0] ?? 99));
+  const tru = Math.max(0, ds.reduce((a, x) => a + x.hoan, 0) - d.hoan_neu_huy);
+  const han = ds.filter((x) => x.mien_phi).sort((a, b) => String(a.huy_han).localeCompare(String(b.huy_han)))[0];
+  return <><div className="ksv13-man" onClick={onThoi} aria-hidden="true" />
+    <section className="ksv-panel ksv-hoi ksv13-sheet" role="dialog" aria-label={`Hủy ${d.ma}`}>
+    <span className="ksv13-keo" aria-hidden="true" />
+    <h3 style={{ margin: 0, fontSize: 19 }}>Hủy đơn {d.ma}?</h3>
+    {d.da_tra > 0 ? <div className="ksv-hoan">
+      {ds.map((x, i) => <span key={i} className="ksv-sum"><span>{(x.phong || []).length ? `${phongCua(x)} ` : `${x.so} × `}{x.loai_phong} · {x.mien_phi ? "hủy miễn phí" : x.huy_han ? "quá hạn hủy miễn phí" : "không hoàn hủy"}</span>
+        <span className={x.hoan ? "ksv-okc" : "ksv13-do"}>{x.hoan ? `hoàn ${vnd(x.hoan)}` : "0"}</span></span>)}
+      {tru > 0 && <span className="ksv-sum"><span>Trừ phần voucher (điểm được trả lại)</span><span>− {vnd(tru)}</span></span>}
+      <span className="ksv-sum" style={{ borderTop: "1px solid var(--ksv-line)", paddingTop: 8 }}><b>Hoàn về tài khoản đã trả</b><b className="ksv-okc">₫ {vnd(d.hoan_neu_huy)}</b></span></div>
+      : <span>Đơn chưa thanh toán — hủy không mất phí, phòng được nhả ngay.</span>}
+    {d.da_tra > 0 && <small className="ksv-muted">{han ? `Hạn hủy miễn phí: ${dmy(han.huy_han)}${han.huy_gio_chot ? `, ${han.huy_gio_chot}` : ""} (giờ Việt Nam). ` : ""}Tiền hoàn về tài khoản / thẻ đã dùng trong 3–7 ngày làm việc.</small>}
+    <label className="ksv-fld">Lý do (không bắt buộc)<select className="ksv-sel" value={ly} onChange={(e) => setLy(e.target.value)}>
+      <option value="">— Chọn lý do —</option>{LY_DO_HUY.map((t) => <option key={t} value={t}>{t}</option>)}</select></label>
+    <div className="ksv13-hnut">
+      <button type="button" className="ksv-btn" style={{ background: "var(--ksv-price)" }} disabled={busy} onClick={() => onHuy(ly)}>Xác nhận hủy{d.hoan_neu_huy > 0 ? ` · hoàn ₫ ${vnd(d.hoan_neu_huy)}` : ""}</button>
+      <button type="button" className="ksv-btn line" onClick={onThoi}>Giữ đơn</button></div></section></>;
 }
 
 /** «Phòng đã đặt của tôi» — dùng ở mục Khách sạn (gọn) và ở «Đơn của tôi». */
@@ -1062,22 +1108,31 @@ export function PhongCuaToi({ gon = false, lamMoi = 0, onMo }: { gon?: boolean; 
   const [mo, setMo] = useState<any>(null);
   const [tra, setTra] = useState(false);
   const [loi, setLoi] = useState("");
+  const [the, setThe] = useState<"toi" | "qua" | "huy">("toi");      // KS-20c (bản v1.3 M4): Sắp tới / Đã qua / Đã hủy
+  const [moHuy, setMoHuy] = useState(false);
   const tai = () => goiCong("/ks-vtd/don").then((r) => setDs(r.don)).catch((x) => setLoi(x.status === 403 ? "" : x.message));
   useEffect(() => { tai(); }, [lamMoi]);  // eslint-disable-line react-hooks/exhaustive-deps
-  const hien = (ds || []).filter((d) => !gon || ["cho_tra", "da_tra", "da_xac_nhan"].includes(d.trang_thai) || (d.trang_thai === "da_huy" && d.hoan_tt && d.hoan_tt !== "da_hoan"));
+  const nay = iso(new Date());
+  const loaiThe = (d: any) => (["da_huy", "het_han"].includes(d.trang_thai) ? "huy" : d.ra < nay ? "qua" : "toi");
+  const hien = (ds || []).filter((d) => gon ? ["cho_tra", "da_tra", "da_xac_nhan"].includes(d.trang_thai) || (d.trang_thai === "da_huy" && d.hoan_tt && d.hoan_tt !== "da_hoan")
+    : loaiThe(d) === the);
+  const dem3 = (t: string) => (ds || []).filter((d) => loaiThe(d) === t).length;
   if (!ds || (!hien.length && gon)) return loi && !gon ? <div className="ksv"><style dangerouslySetInnerHTML={{ __html: CSS }} /><div className="ksv-loi">{loi}</div></div> : null;
   const xem = (d: any) => (onMo ? onMo(d) : setMo(d));
   return <div className="ksv">{gon ? null : <style dangerouslySetInnerHTML={{ __html: CSS }} />}
     {mo && !onMo && tra ? <TraTien d={mo} onDoi={(d) => { setMo(d); tai(); if (d.trang_thai !== "cho_tra") setTra(false); }} onLai={() => { setTra(false); setMo(null); }} />
-      : mo && !onMo ? <DonKs d={mo} onDoi={(d) => { setMo(d); tai(); }} onTra={() => setTra(true)} onLai={() => setMo(null)} />
+      : mo && !onMo ? <DonKs d={mo} huyNgay={moHuy} onDoi={(d) => { setMo(d); tai(); }} onTra={() => setTra(true)} onLai={() => { setMo(null); setMoHuy(false); }} />
       : <section className="ksv-panel" style={{ gap: 10 }}><b style={{ fontSize: 17 }}>Phòng khách sạn đã đặt của bạn</b>
-        {!hien.length && <span className="ksv-muted">Chưa có đơn đặt phòng nào.</span>}
+        {!gon && <nav className="ksv13-the" aria-label="Lọc đơn">{([["toi", "Sắp tới"], ["qua", "Đã qua"], ["huy", "Đã hủy"]] as const).map(([k, t]) =>
+          <button key={k} type="button" className={the === k ? "on" : ""} aria-pressed={the === k} onClick={() => setThe(k)}>{t} <small>{dem3(k)}</small></button>)}</nav>}
+        {!hien.length && <span className="ksv-muted">{gon || !(ds || []).length ? "Chưa có đơn đặt phòng nào." : "Không có đơn ở mục này."}</span>}
         {hien.map((d) => <div key={d.ma} className="ksv-donrow">
           <span style={{ flex: "1 1 240px", minWidth: 0 }}><b>{d.khach_san?.ten}</b><br /><small className="ksv-muted">{d.ma} · {ngay(d.vao)} → {ngay(d.ra)} · {d.so_phong} phòng</small>
             {d.cach_tra === "sau" && d.trang_thai === "cho_tra" && <><br /><small className="ksv-okc" style={{ fontWeight: 600 }}>Đặt giữ · trả trước {dmy(d.han_tra)}</small></>}</span>
           <span className={`ksv-tt ${MAU_TT[d.trang_thai] || ""}`}>{d.trang_thai === "da_huy" && d.so_hoan > 0 ? `Đã hủy · ${d.hoan_tt_ten || "đã hoàn"}` : d.trang_thai_ten}</span>
           <b style={{ minWidth: 110, textAlign: "right" }}>₫ {vnd(d.tong)}</b>
-          <button type="button" className="ksv-btn line" onClick={() => xem(d)}>{d.co_the_tra ? "Thanh toán" : d.danh_gia?.duoc_viet ? "Viết đánh giá" : "Xem"}</button></div>)}</section>}</div>;
+          <span className="ksv13-dnut"><button type="button" className="ksv-btn line" onClick={() => { setMoHuy(false); xem(d); }}>{d.co_the_tra ? "Thanh toán" : d.danh_gia?.duoc_viet ? "Viết đánh giá" : "Chi tiết"}</button>
+            {!onMo && !gon && d.co_the_huy && <button type="button" className="ksv-btn line ksv13-huy" onClick={() => { setMoHuy(true); setMo(d); }}>Hủy đơn</button>}</span></div>)}</section>}</div>;
 }
 
 function TomTat({ ks, q, tinh, giam = 0, maVc, hang, diemDk = 0, traSau = false, chon = [], homNay }: { ks: any; q: Q; tinh: any; giam?: number; maVc?: string; hang?: any; diemDk?: number;
@@ -1522,6 +1577,26 @@ const CSS = `
   .ksv13 .ksv-loc.open{background:#fff;z-index:120}html.ksv-loc-mo .kr-top{visibility:hidden}}
 /* KS-20b (bản v1.3 M1 / D2 / M2): khai từng phòng, «Chia phòng», «Số phòng», cột «Đã chọn x/y phòng» */
 .ksv13-pop{width:340px;max-height:72vh;overflow:auto}
+/* KS-20c (bản v1.3 D3 / D4 / M3 / M4) */
+.ksv13-diem{background:#f4effc;border-radius:10px;padding:10px 12px;font-size:13px;display:flex;flex-direction:column;gap:2px}.ksv13-diem b{color:#5b3a99}
+.ksv13-xn{background:#fff5d6;border-radius:10px;padding:10px 12px;font-size:13px;color:#4a3500}
+.ksv13-xnhan{padding:20px;gap:12px;border-color:#b9e0c9}
+.ksv13-nut{display:flex;flex-wrap:wrap;gap:10px}.ksv13-nut .ksv-btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-height:44px}
+.ksv13-xgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;border-top:1px solid var(--ksv-line);padding-top:12px;font-size:14px}
+.ksv13-xgrid>div{display:flex;flex-direction:column;gap:2px}
+.ksv13-do{color:#c2410c;font-weight:600}
+.ksv13-hnut{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.ksv13-keo{display:none}.ksv13-man{display:none}
+.ksv13-the{display:flex;border-bottom:1px solid var(--ksv-line);margin:0 -4px}
+.ksv13-the button{flex:1;background:none;border:0;border-bottom:3px solid transparent;padding:10px 6px;font:inherit;font-size:14px;color:var(--ksv-muted);cursor:pointer;min-height:44px}
+.ksv13-the button.on{color:var(--ksv-fg);font-weight:700;border-bottom-color:var(--ksv-accent,#1557b0)}.ksv13-the small{font-weight:400;color:var(--ksv-muted)}
+.ksv13-dnut{display:flex;gap:8px;flex-wrap:wrap}.ksv13-huy{color:#c2410c !important;border-color:#c2410c !important}
+@media (max-width:900px){.ksv13-man{display:block;position:fixed;inset:0;background:rgba(20,38,59,.45);z-index:140}
+  .ksv13-sheet{position:fixed;left:0;right:0;bottom:0;margin:0;z-index:141;border-radius:16px 16px 0 0;max-height:88vh;overflow:auto;padding:16px 16px 20px;box-shadow:0 -6px 20px rgba(20,38,59,.15)}
+  .ksv13-keo{display:block;width:40px;height:4px;border-radius:2px;background:var(--ksv-line);align-self:center}
+  .ksv13-hnut{flex-direction:column}.ksv13-hnut .ksv-btn{width:100%;min-height:48px}
+  .ksv13-nut{flex-direction:column}.ksv13-nut .ksv-btn{width:100%}
+  .ksv13-dnut{width:100%}.ksv13-dnut .ksv-btn{flex:1;min-height:44px}}
 .ksv13-chia{display:flex;flex-direction:column;gap:10px}
 .ksv13-chia-h{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
 .ksv13-chia-h>span{font-size:12px;background:#e8f0fb;color:#0e3f82;padding:3px 8px;border-radius:99px;font-weight:600}
