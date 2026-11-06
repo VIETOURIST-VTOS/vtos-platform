@@ -181,6 +181,12 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
   const [theoKhung, setTheoKhung] = useState(true);
   const [khung, setKhung] = useState<{ s: number; w: number; n: number; e: number } | null>(null);
   const [ghimChon, setGhimChon] = useState<number | null>(null);
+  // KS-20 (v1.3, Chủ tịch duyệt 05/11/2026): trang kết quả — thanh tóm tắt + «Sửa tìm kiếm»; điện thoại: nhóm lọc gập lại
+  const [suaTim, setSuaTim] = useState(false);
+  const [laDt, setLaDt] = useState(false);
+  // Ô lọc điện thoại phủ toàn màn — ẩn thanh đầu trang của cổng trong lúc mở (thanh ấy nằm đè lên ô lọc).
+  useEffect(() => { document.documentElement.classList.toggle("ksv-loc-mo", moLoc); return () => document.documentElement.classList.remove("ksv-loc-mo"); }, [moLoc]);
+  useEffect(() => { const m = window.matchMedia("(max-width:900px)"); const f = () => setLaDt(m.matches); f(); m.addEventListener("change", f); return () => m.removeEventListener("change", f); }, []);
   const diem = ks?.diem || ds?.diem;
   const duKien = (tien: number) => diem?.dang_bat && tien > 0 ? Math.floor(tien / (diem.dong_moi_diem || 10000) * diem.he_so) : 0;
   const dem = Math.max(1, Math.round((new Date(q.ra).getTime() - new Date(q.vao).getTime()) / 864e5));
@@ -636,9 +642,12 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
   const bat = (arr: string[], v: string, on: boolean) => (on ? [...arr, v] : arr.filter((x) => x !== v));
   // Nhóm theo GÓI: chỉ hiện lựa chọn có ít nhất một offer trong thành phố; số = khách sạn còn khớp nếu thêm lựa chọn.
   const coGoi = (f: (o: any) => boolean) => coTrongTp((k: any) => (k.goi_ban || []).some(f));
+  // KS-20 (v1.3 · M6): mỗi nhóm lọc là một mục gập được — máy tính mở sẵn, điện thoại gập và ghi «N đã chọn».
+  const nhomG = (tieuDe: string, soChon_: number, noiDung: any, vang = false) => <details key={tieuDe} className={`fsec ${vang ? "vang" : ""}`} open={!laDt || soChon_ > 0}>
+    <summary><h4>{tieuDe}</h4>{soChon_ > 0 && <small className="ksv-muted">{soChon_} đã chọn</small>}</summary>{noiDung}</details>;
   const nhomLoc = (tieuDe: string, ds_: Nhom, khoa: "tt" | "an" | "kc" | "gi", hoSo = false) => {
     const co = ds_.filter(([, , f]) => (hoSo ? coTrongTp(f) : coGoi(f)));
-    return co.length > 0 && <div className="fsec"><h4>{tieuDe}</h4>{co.map(([m, t]) => ck(L[khoa].includes(m), (v) => setLoc({ ...L, [khoa]: bat(L[khoa], m, v) }), t, soNeu({ [khoa]: bat(L[khoa], m, true) }), `${khoa}${m}`))}</div>;
+    return co.length > 0 && nhomG(tieuDe, L[khoa].length, co.map(([m, t]) => ck(L[khoa].includes(m), (v) => setLoc({ ...L, [khoa]: bat(L[khoa], m, v) }), t, soNeu({ [khoa]: bat(L[khoa], m, true) }), `${khoa}${m}`)));
   };
   // KS-19b: thẻ «đang lọc» trên danh sách — bỏ từng điều kiện
   const the_: [string, Partial<Loc>][] = [
@@ -659,57 +668,75 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
   const trongKhung = (k: any) => !khung || !coToaDo(k) || (k.vi_do >= khung.s && k.vi_do <= khung.n && k.kinh_do >= khung.w && k.kinh_do <= khung.e);
   const dsHien = banDo && theoKhung ? loc2.filter((k: any) => coToaDo(k) && trongKhung(k)) : loc2;
   const khongViTri = loc2.filter((k: any) => !coToaDo(k)).length;
-  return <div className="ksv">{css}{thanhTim("ds")}
+  // KS-20 (v1.3): thẻ đang lọc dùng ở hai chỗ — đầu danh sách (máy tính) và đầu ô lọc (điện thoại)
+  const chipDang = the_.length > 0 && <div className="ksv-chips ksv-dang">{the_.map(([t, bo], i) =>
+    <button key={i} type="button" className="ksv-chip on" onClick={() => { setLoc({ ...L, ...bo }); setGNhap(null); }} aria-label={`Bỏ lọc ${t}`}>{t} ✕</button>)}</div>;
+  const ggMap = (s: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s)}`;
+  const SX13: [string, string][] = [["phu_hop", "Phù hợp nhất"], ["gia_thap", "Giá thấp nhất"], ["sao", "Hạng sao cao"], ["diem", "Đánh giá cao"], ["gan", "Gần trung tâm"]];
+  const tomTatQ = `${q.phong} phòng · ${q.nl} người lớn${q.te ? ` · ${q.te} trẻ em` : ""}`;
+  return <div className="ksv ksv13">{css}
+    {/* KS-20 (v1.3 · D1): thanh tóm tắt tìm kiếm — bấm «Sửa tìm kiếm» mới mở thanh tìm đầy đủ */}
+    <div className="ksv13-tt"><div><b>{q.tinh || "Tất cả điểm đến"}</b><small>{dmy(q.vao)} – {dmy(q.ra)} · {dem} đêm</small></div>
+      <span className="ksv13-kh">{tomTatQ}</span>
+      <button type="button" className="ksv-btn line" aria-expanded={suaTim} onClick={() => setSuaTim(!suaTim)}>{suaTim ? "Đóng" : "Sửa tìm kiếm"}</button></div>
+    {suaTim && thanhTim("ds")}
     <PhongCuaToi gon lamMoi={lamMoi} onMo={moDon} />
     {ds.diem?.dang_bat && <div className="ksv-coupon"><Ico d={P.the} s={30} fill /><div><b style={{ fontSize: 15 }}>Hội viên {ds.diem.hang} · điểm ×{phay(ds.diem.he_so)}</b>
       <div style={{ fontSize: 13 }}>Mỗi kỳ ở qua Vietourist được tích điểm VTD Rewards.</div></div></div>}
     {!q.tinh && dsDiemDen}
     <div className="ksv-layout">
       <aside className={`ksv-loc ${moLoc ? "open" : ""}`} aria-label="Bộ lọc">
-        {moLoc && <div className="ksv-rhead"><b style={{ fontSize: 20 }}>Bộ lọc</b><button type="button" className="ksv-btn" onClick={() => setMoLoc(false)}>Xem {loc2.length} kết quả</button></div>}
+        {moLoc && <div className="ksv13-mhead"><button type="button" className="ksv13-x" aria-label="Đóng bộ lọc" onClick={() => setMoLoc(false)}>✕</button><b>Lọc khách sạn</b>
+          <button type="button" className="ksv-link" onClick={() => { setLoc(LOC0); setGNhap(null); }}>Bỏ tất cả</button></div>}
+        {moLoc && chipDang}
+        {!moLoc && <div className="ksv13-map"><button type="button" className="ksv13-mapo" onClick={() => { setBanDo(true); setKhung(null); }}><Ico d={P.ghim} s={18} fill /><span>Bản đồ khu vực {q.tinh || "các điểm đến"}</span></button>
+          <a href={ggMap(`khách sạn ${q.tinh || "Việt Nam"}`)} target="_blank" rel="noopener noreferrer">Xem trên Google Maps</a></div>}
         <div className="ksv-panel ksv-fbox">
+          {!moLoc && <div className="ksv13-fh"><b>Bộ lọc</b><button type="button" className="ksv-link" onClick={() => { setLoc(LOC0); setGNhap(null); }}>Bỏ tất cả</button></div>}
           <div className="fsec"><label className="ksv-pill"><Ico d={P.kinh} s={18} /><input placeholder="Tên khách sạn hoặc khu vực" value={L.ten} list="ksv-goi-y" onChange={(e) => setLoc({ ...L, ten: e.target.value })} aria-label="Tìm theo tên khách sạn hoặc khu vực" /></label>
             <datalist id="ksv-goi-y">{goiY.map((t) => <option key={t} value={t} />)}</datalist></div>
-          <div className="fsec"><h4>Ngân sách mỗi đêm</h4><small className="ksv-muted">VND · 1 phòng / 1 đêm · đã gồm 8% VAT</small>
+          {nhomG("Ngân sách mỗi đêm", L.min || L.max ? 1 : 0, <><small className="ksv-muted">VND · 1 phòng / 1 đêm · đã gồm 8% VAT</small>
             <div className="ksv-r2"><span className="ksv-r2f" style={{ left: `${phanTram(Math.min(gA, gB))}%`, right: `${100 - phanTram(Math.max(gA, gB))}%` }} /><input type="range" min={giaMin0} max={giaMax} step={50000} value={Math.min(gA, gB)} onChange={(e) => setGNhap({ a: Number(e.target.value), b: gB })} aria-label="Giá tối thiểu mỗi đêm" />
               <input type="range" min={giaMin0} max={giaMax} step={50000} value={Math.max(gA, gB)} onChange={(e) => setGNhap({ a: gA, b: Number(e.target.value) })} aria-label="Giá tối đa mỗi đêm" /></div>
             <div className="ksv-mm"><label>TỐI THIỂU<input inputMode="numeric" value={`₫ ${vnd(gA)}`} onChange={(e) => setGNhap({ a: Number(e.target.value.replace(/\D/g, "")) || 0, b: gB })} /></label>
               <label>TỐI ĐA<input inputMode="numeric" value={`₫ ${vnd(gB)}`} onChange={(e) => setGNhap({ a: gA, b: Number(e.target.value.replace(/\D/g, "")) || 0 })} /></label></div>
             {gA > gB && <small style={{ color: "var(--ksv-price)" }}>Tối thiểu đang lớn hơn tối đa — máy sẽ đổi chỗ hai số khi áp.</small>}
             <button type="button" className="ksv-btn line wide" disabled={!gNhap} onClick={apGia}>Áp dụng giá</button>
-            <small className="ksv-muted">Miền giá ₫ {vnd(giaMin0)} – {vnd(giaMax)} lấy từ các gói còn phòng của tìm kiếm này.</small></div>
-          <div className="fsec"><h4>Khả năng đặt</h4>
-            {ck(true, () => {}, "Còn phòng đặt được", trongTp.length, "con")}
-            {coGoi((o) => o.mien_phi_huy) && ck(L.huy, (v) => setLoc({ ...L, huy: v }), "Miễn phí hủy", soNeu({ huy: true }), "huy")}</div>
+            <small className="ksv-muted">Miền giá ₫ {vnd(giaMin0)} – {vnd(giaMax)} lấy từ các gói còn phòng của tìm kiếm này.</small></>, true)}
+          {nhomG("Khả năng đặt", L.huy ? 1 : 0, <>{ck(true, () => {}, "Còn phòng đặt được", trongTp.length, "con")}
+            {coGoi((o) => o.mien_phi_huy) && ck(L.huy, (v) => setLoc({ ...L, huy: v }), "Miễn phí hủy", soNeu({ huy: true }), "huy")}</>)}
           {nhomLoc("Thanh toán", LOC_TT, "tt")}
-          {nhomLoc("Bữa ăn & ưu đãi trong gói", LOC_AN, "an")}
-          <div className="fsec"><h4>Phòng &amp; giường</h4>
+          {nhomLoc("Bữa ăn & quyền lợi trong gói", LOC_AN, "an")}
+          {(coGoi((o) => o.khong_hut) || LOC_GI.some(([, , f]) => coGoi(f))) && nhomG("Phòng & giường", (L.kh ? 1 : 0) + L.gi.length, <>
             {coGoi((o) => o.khong_hut) && ck(L.kh, (v) => setLoc({ ...L, kh: v }), "Không hút thuốc", soNeu({ kh: true }), "kh")}
-            {LOC_GI.filter(([, , f]) => coGoi(f)).map(([m, t]) => ck(L.gi.includes(m), (v) => setLoc({ ...L, gi: bat(L.gi, m, v) }), t, soNeu({ gi: bat(L.gi, m, true) }), `gi${m}`))}</div>
-          {tnDs.length > 0 && <div className="fsec"><h4>Tiện nghi phòng &amp; hướng nhìn</h4>{tnDs.map((t) => ck(L.tn.includes(t), (v) => setLoc({ ...L, tn: bat(L.tn, t, v) }), t, soNeu({ tn: bat(L.tn, t, true) }), `tn${t}`))}</div>}
-          {khuDs.length > 1 && <div className="fsec"><h4>Khu vực</h4>{khuDs.map((t) => ck(L.khu.includes(t), (v) => setLoc({ ...L, khu: bat(L.khu, t, v) }), t, soNeu({ khu: bat(L.khu, t, true) }), t))}</div>}
+            {LOC_GI.filter(([, , f]) => coGoi(f)).map(([m, t]) => ck(L.gi.includes(m), (v) => setLoc({ ...L, gi: bat(L.gi, m, v) }), t, soNeu({ gi: bat(L.gi, m, true) }), `gi${m}`))}</>)}
+          {tnDs.length > 0 && nhomG("Tiện nghi phòng & hướng nhìn", L.tn.length, tnDs.map((t) => ck(L.tn.includes(t), (v) => setLoc({ ...L, tn: bat(L.tn, t, v) }), t, soNeu({ tn: bat(L.tn, t, true) }), `tn${t}`)))}
+          {khuDs.length > 1 && nhomG("Vị trí", L.khu.length, khuDs.map((t) => ck(L.khu.includes(t), (v) => setLoc({ ...L, khu: bat(L.khu, t, v) }), t, soNeu({ khu: bat(L.khu, t, true) }), t)))}
           {nhomLoc("Khoảng cách tới trung tâm", LOC_KC, "kc", true)}
-          {tiDs.length > 0 && <div className="fsec"><h4>Tiện nghi khách sạn</h4>{tiDs.map((t) => ck(L.ti.includes(t), (v) => setLoc({ ...L, ti: bat(L.ti, t, v) }), t, soNeu({ ti: bat(L.ti, t, true) }), t))}</div>}
-          {[5, 4, 3, 2, 1].some((x) => coTrongTp((k: any) => k.sao === x)) && <div className="fsec"><h4>Hạng sao</h4>{[5, 4, 3, 2, 1].filter((x) => coTrongTp((k: any) => k.sao === x)).map((x) =>
-            ck(L.sao.includes(x), (v) => setLoc({ ...L, sao: v ? [...L.sao, x] : L.sao.filter((y) => y !== x) }), <span className="ksv-stars">{"★".repeat(x)}</span>, soNeu({ sao: [...L.sao.filter((y) => y !== x), x] }), `s${x}`))}</div>}
-          {Object.keys(ds.loai || {}).some((x) => coTrongTp((k: any) => k.loai === x)) && <div className="fsec"><h4>Loại chỗ ở</h4>{Object.entries(ds.loai || {}).filter(([x]) => coTrongTp((k: any) => k.loai === x)).map(([x, t]: any) =>
-            ck(L.loai.includes(x), (v) => setLoc({ ...L, loai: bat(L.loai, x, v) }), t, soNeu({ loai: bat(L.loai, x, true) }), x))}</div>}
-          {phDs.length > 0 && <div className="fsec"><h4>Phù hợp cho</h4>{phDs.map((t) => ck(L.ph.includes(t), (v) => setLoc({ ...L, ph: bat(L.ph, t, v) }), t, soNeu({ ph: bat(L.ph, t, true) }), `ph${t}`))}</div>}
-          <div className="fsec"><h4>Điểm khách đánh giá</h4>{coDiem ? ([[9, "9+ Xuất sắc"], [8, "8+ Rất tốt"], [7, "7+ Tốt"]] as const).map(([d, t]) =>
+          {tiDs.length > 0 && nhomG("Tiện nghi khách sạn", L.ti.length, tiDs.map((t) => ck(L.ti.includes(t), (v) => setLoc({ ...L, ti: bat(L.ti, t, v) }), t, soNeu({ ti: bat(L.ti, t, true) }), t)))}
+          {/* v1.3 · D5: hạng sao, loại chỗ ở, phù hợp cho — gộp một nhóm dạng nút tròn */}
+          {nhomG("Hạng sao · loại chỗ ở · phù hợp cho", L.sao.length + L.loai.length + L.ph.length, <div className="ksv13-pills">
+            {[5, 4, 3, 2, 1].filter((x) => coTrongTp((k: any) => k.sao === x)).map((x) => { const on = L.sao.includes(x), so = soNeu({ sao: [...L.sao.filter((y) => y !== x), x] });
+              return <button key={`s${x}`} type="button" className={on ? "on" : ""} aria-pressed={on} disabled={!on && so === 0} onClick={() => setLoc({ ...L, sao: on ? L.sao.filter((y) => y !== x) : [...L.sao, x] })}>{x}★ <small>{so}</small></button>; })}
+            {Object.entries(ds.loai || {}).filter(([x]) => coTrongTp((k: any) => k.loai === x)).map(([x, t]: any) => { const on = L.loai.includes(x), so = soNeu({ loai: bat(L.loai, x, true) });
+              return <button key={`l${x}`} type="button" className={on ? "on" : ""} aria-pressed={on} disabled={!on && so === 0} onClick={() => setLoc({ ...L, loai: bat(L.loai, x, !on) })}>{t} <small>{so}</small></button>; })}
+            {phDs.map((t) => { const on = L.ph.includes(t), so = soNeu({ ph: bat(L.ph, t, true) });
+              return <button key={`p${t}`} type="button" className={on ? "on" : ""} aria-pressed={on} disabled={!on && so === 0} onClick={() => setLoc({ ...L, ph: bat(L.ph, t, !on) })}>{t} <small>{so}</small></button>; })}</div>)}
+          {nhomG("Điểm khách đánh giá", L.dk ? 1 : 0, coDiem ? ([[9, "9+ Xuất sắc"], [8, "8+ Rất tốt"], [7, "7+ Tốt"]] as const).map(([d, t]) =>
             ck(L.dk === d, (v) => setLoc({ ...L, dk: v ? d : 0 }), t, soNeu({ dk: d }), `dk${d}`))
-            : <small className="ksv-muted">Chưa đủ đánh giá của khách VTD — chưa lọc theo điểm.</small>}</div>
-          <div className="fsec"><button type="button" className="ksv-btn line wide" onClick={() => { setLoc(LOC0); setGNhap(null); }}>Bỏ tất cả bộ lọc</button></div></div>
+            : <small className="ksv-muted">Khóa — chưa đủ đánh giá thật của khách VTD.</small>)}
+          {!moLoc && <div className="fsec"><button type="button" className="ksv-btn line wide" onClick={() => { setLoc(LOC0); setGNhap(null); }}>Bỏ tất cả bộ lọc</button></div>}</div>
+        {moLoc && <div className="ksv13-mfoot"><button type="button" className="ksv-btn big wide" onClick={() => setMoLoc(false)}>Xem {loc2.length} kết quả</button></div>}
       </aside>
       <main className="ksv-col" style={{ minWidth: 0 }}>
-        <div className="ksv-rhead"><h2 className="ksv-h1" style={{ fontSize: 20 }}>{loc2.length} chỗ ở{q.tinh ? ` tại ${q.tinh}` : ""}</h2>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button type="button" className="ksv-btn line ksv-fbtn" onClick={() => setMoLoc(true)}>Bộ lọc</button>
-            <button type="button" className={`ksv-btn ${banDo ? "" : "line"}`} style={{ display: "inline-flex", flexDirection: "row", gap: 6, alignItems: "center" }} aria-pressed={banDo} onClick={() => { setBanDo(!banDo); setKhung(null); }}><Ico d={P.ghim} s={15} fill /> {banDo ? "Danh sách" : "Xem trên bản đồ"}</button>
-            <select className="ksv-sel" value={sx} onChange={(e) => setSx(e.target.value)} aria-label="Sắp xếp">
-              {[["phu_hop", "Phù hợp nhất"], ["gia_thap", "Giá thấp nhất trước"], ["gia_cao", "Giá cao nhất trước"], ["diem", "Điểm khách cao nhất"], ["uu_dai", "Ưu đãi nhiều nhất"], ["sao", "Hạng sao"], ["gan", "Gần trung tâm nhất"]].map(([k, t]) =>
-                <option key={k} value={k}>Sắp xếp: {t}</option>)}</select></div></div>
-        {the_.length > 0 && <div className="ksv-chips ksv-dang">{the_.map(([t, bo], i) =>
-          <button key={i} type="button" className="ksv-chip on" onClick={() => { setLoc({ ...L, ...bo }); setGNhap(null); }} aria-label={`Bỏ lọc ${t}`}>{t} ✕</button>)}
-          <button type="button" className="ksv-link" onClick={() => { setLoc(LOC0); setGNhap(null); }}>Bỏ tất cả</button></div>}
+        {/* v1.3 · D1: sắp xếp là thanh tab; điện thoại: nút Bộ lọc + bản đồ cạnh tab */}
+        <div className="ksv13-sx" role="tablist" aria-label="Sắp xếp">{SX13.map(([k, t]) =>
+          <button key={k} type="button" role="tab" aria-selected={sx === k} className={sx === k ? "on" : ""} onClick={() => setSx(k)}>{t}</button>)}</div>
+        <div className="ksv13-dau"><b>{loc2.length} khách sạn{q.tinh ? ` tại ${q.tinh}` : ""}</b>
+          {chipDang}
+          {the_.length > 0 && <button type="button" className="ksv-link" onClick={() => { setLoc(LOC0); setGNhap(null); }}>Bỏ tất cả</button>}
+          <span className="ksv13-dnut"><button type="button" className="ksv-btn line ksv-fbtn" onClick={() => setMoLoc(true)}>Bộ lọc{the_.length ? ` · ${the_.length}` : ""}</button>
+            <button type="button" className={`ksv-btn ${banDo ? "" : "line"}`} style={{ display: "inline-flex", flexDirection: "row", gap: 6, alignItems: "center" }} aria-pressed={banDo} onClick={() => { setBanDo(!banDo); setKhung(null); }}><Ico d={P.ghim} s={15} fill /> {banDo ? "Danh sách" : "Bản đồ"}</button></span></div>
         {loiBox}
         {!loc2.length && <div className="ksv-panel" style={{ textAlign: "center" }}><b>{trongTp.length ? "Không có gói nào thỏa đồng thời các điều kiện đã chọn." : "Chưa có khách sạn trống phòng ở đây cho ngày bạn chọn."}</b>
           {trongTp.length > 0 ? <span className="ksv-muted">Thử tăng ngân sách, đổi ngày hoặc bỏ bớt từng điều kiện ở các thẻ phía trên.</span>
@@ -721,40 +748,37 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
             onChon={(id) => { setGhimChon(id); document.getElementById(`ksv-the-${id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }} /></div>}
         {banDo && theoKhung && !dsHien.length && <div className="ksv-panel" style={{ textAlign: "center" }}>Không có khách sạn trong vùng bản đồ đang xem — kéo hoặc thu nhỏ bản đồ.</div>}
         {dsHien.map((k: any) => { const i = (anhI[k.id] || 0) % Math.max(1, k.anh.length), a = k.anh[i], g = k._g;
-          return <article key={k.id} id={`ksv-the-${k.id}`} className={`ksv-card ${ghimChon === k.id ? "ksv-card-on" : ""}`} onMouseEnter={() => banDo && setGhimChon(k.id)}>
-            {g && <div className="ksv-banner"><b>Giá hợp đồng Vietourist</b>{diem?.dang_bat ? " — tích điểm VTD sau kỳ ở" : ""}{k.co_mien_phi_huy ? " · có gói miễn phí hủy" : ""}</div>}
+          return <article key={k.id} id={`ksv-the-${k.id}`} className={`ksv-card ksv13-card ${ghimChon === k.id ? "ksv-card-on" : ""}`} onMouseEnter={() => banDo && setGhimChon(k.id)}>
             <div className="ksv-crow">
               <div className="ksv-ph">{a ? <button type="button" className="ksv-phbtn" onClick={() => moThe(k)} aria-label={`Xem ${k.ten}`}><img src={a.nho} alt={a.mo_ta_thay_the || a.chu_thich || k.ten} loading="lazy" /></button>
                 : <button type="button" className="ksv-phbtn" onClick={() => moThe(k)} aria-label={`Xem ${k.ten}`}><AnhTrong k={k} /></button>}
-                {(k.danh_gia?.diem_tb || 0) >= 9 && <span className="ksv-b navy aw"><Ico d={P.sao} s={12} fill /> Khách chấm 9+</span>}
                 <button type="button" className={`ksv-ico ksv-heart ${thich[k.id] ? "on" : ""}`} aria-label={thich[k.id] ? "Bỏ yêu thích" : "Lưu vào yêu thích"} aria-pressed={!!thich[k.id]} onClick={() => setThich({ ...thich, [k.id]: !thich[k.id] })}><Ico d={P.tim} s={20} /></button>
                 {k.anh.length > 1 && <><button type="button" className="ksv-ico ksv-prv" aria-label="Ảnh trước" onClick={() => setAnhI({ ...anhI, [k.id]: (i - 1 + k.anh.length) % k.anh.length })}><Ico d={P.trai} /></button>
                   <button type="button" className="ksv-ico ksv-nxt" aria-label="Ảnh tiếp" onClick={() => setAnhI({ ...anhI, [k.id]: (i + 1) % k.anh.length })}><Ico d={P.phai} /></button></>}
                 {k.so_anh > 0 && <span className="ksv-ct">{i + 1}/{k.so_anh}</span>}</div>
-              <div className="ksv-info"><h3><button type="button" className="ksv-ten" onClick={() => moThe(k)}>{k.ten}</button></h3>
-                {k.sao > 0 && <span className="ksv-stars" aria-label={`${k.sao} sao`}>{"★".repeat(k.sao)}</span>}
-                <span className="ksv-where"><Ico d={P.ghim} s={14} fill />{[k.khu_vuc, k.tinh_thanh].filter(Boolean).join(", ")}{k.km_trung_tam != null ? ` · ${phay(k.km_trung_tam)} km tới trung tâm` : ""}</span>
-                {k.gan && <span className="ksv-near">{k.gan}</span>}
+              <div className="ksv-info">
+                <span className="ksv13-sao">{k.sao > 0 && <span aria-label={`${k.sao} sao`}>{"★".repeat(k.sao)}</span>}{k.sao > 0 && " · "}{k.loai_ten || "Khách sạn"}</span>
+                <h3><button type="button" className="ksv-ten" onClick={() => moThe(k)}>{k.ten}</button></h3>
+                <span className="ksv13-dc">{[k.khu_vuc, k.tinh_thanh].filter(Boolean).join(", ")}{k.km_trung_tam != null ? ` · ${phay(k.km_trung_tam)} km tới trung tâm` : ""} · <a href={ggMap([k.ten, k.khu_vuc, k.tinh_thanh].filter(Boolean).join(", "))} target="_blank" rel="noopener noreferrer">Xem bản đồ</a></span>
                 {banDo && !coToaDo(k) && <small className="ksv-muted">Chưa có vị trí trên bản đồ</small>}
-                {(k.con_it > 0 || k.dat_24h > 0) && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  {k.con_it > 0 && <span className="ksv-b" style={{ background: "var(--ksv-price)", color: "#fff" }}>Chỉ còn {k.con_it} phòng</span>}
-                  {k.dat_24h > 0 && <span style={{ color: "var(--ksv-price)", fontSize: 12.5, fontWeight: 600 }}>Đã đặt {k.dat_24h} lần trong 24 giờ qua</span>}</div>}
-                {k.tien_ich.length > 0 && <div className="ksv-feat sm">{k.tien_ich.slice(0, 4).map((t: string) => <span key={t}>{t}</span>)}</div>}
-                {k.noi_bat && <span className="ksv-hl"><Ico d={P.sao} s={14} fill /> {k.noi_bat}</span>}
+                {k.tien_ich.length > 0 && <div className="ksv13-tag">{k.tien_ich.slice(0, 4).map((t: string) => <span key={t}>{t}</span>)}</div>}
+                {g && <span className="ksv13-ok">{[g.mien_phi_huy && "Hủy miễn phí", g.bua_sang && "Có bữa sáng", "Xác nhận ngay khi thanh toán"].filter(Boolean).join(" · ")}</span>}
+                {k.con_it > 0 && <span className="ksv13-it">Chỉ còn {k.con_it} phòng{k.dat_24h > 0 ? ` · đã đặt ${k.dat_24h} lần trong 24 giờ qua` : ""}</span>}
                 {g && locGoi(L) && <span className="ksv-khop"><b>Gói khớp bộ lọc: {g.lp_ten} · {g.goi_ten}</b><br />
                   {[g.bua_sang && "✓ Bữa sáng", g.mien_phi_huy && `✓ Hủy miễn phí${g.huy_han ? ` trước ${dmy(g.huy_han)}` : ""}`, g.tra_sau && "✓ Trả sau", `✓ Còn ${g.con} phòng cả ${dem} đêm`].filter(Boolean).join(" · ")}</span>}</div>
               <div className="ksv-side">
-                {k.danh_gia?.diem_tb ? <span className="ksv-score"><span><b>{k.danh_gia.nhan || nhan(k.danh_gia.diem_tb)}</b><small className="ksv-muted">{k.danh_gia.so_bai} đánh giá</small></span><b>{phay(k.danh_gia.diem_tb)}</b></span>
+                {k.danh_gia?.diem_tb ? <span className="ksv13-dg"><b>{phay(k.danh_gia.diem_tb)}</b> {k.danh_gia.nhan || nhan(k.danh_gia.diem_tb)}<small className="ksv-muted"> · {k.danh_gia.so_bai} đánh giá</small></span>
                   : <small className="ksv-muted">{k.danh_gia?.so_bai ? "Mới — chưa đủ đánh giá" : "Chưa có đánh giá"}</small>}
                 {g ? <div className="ksv-pblk">
-                  {g.niem_yet_dem > g.dem_gia && <><span className="ksv-vp">↓ Giá tốt</span><span><span className="ksv-old">{vnd(g.niem_yet_dem)}</span> <span className="ksv-pct">−{Math.round((1 - g.dem_gia / g.niem_yet_dem) * 100)}%</span></span></>}
-                  <span className="ksv-big"><small>₫</small>{vnd(g.dem_gia)}</span><small className="ksv-muted">Mỗi phòng mỗi đêm</small>
-                  <small>Tổng {dem} đêm{q.phong > 1 ? ` · ${q.phong} phòng` : ""}: <b>₫ {vnd(g.tong)}</b></small><small className="ksv-okc">Đã gồm 8% VAT</small>
-                  {g.mien_phi_huy && <span className="ksv-free">+ MIỄN PHÍ HỦY</span>}
+                  {g.niem_yet_dem > g.dem_gia && <span><span className="ksv-old">{vnd(g.niem_yet_dem)}</span> <span className="ksv-pct">−{Math.round((1 - g.dem_gia / g.niem_yet_dem) * 100)}%</span></span>}
+                  <small className="ksv-muted">Mỗi đêm{q.phong > 1 ? " · mỗi phòng" : ""}</small>
+                  <span className="ksv13-gia">{vnd(g.dem_gia)} ₫</span>
+                  <small>Tổng {dem} đêm{q.phong > 1 ? ` · ${q.phong} phòng` : ""} <b>{vnd(g.tong)} ₫</b></small><small className="ksv-okc">Đã gồm 8% VAT</small>
                   {duKien(g.tong) > 0 && <span className="ksv-diem">+ khoảng {vnd(duKien(g.tong))} điểm sau kỳ ở</span>}
                   <button type="button" className="ksv-btn wide" onClick={() => moThe(k)}>Chọn phòng</button></div>
                   : <div className="ksv-pblk"><span className="ksv-hetb">Hết phòng ngày bạn chọn</span><small className="ksv-muted">Đổi ngày để xem phòng trống</small></div>}</div>
             </div></article>; })}
+        {loc2.length > 0 && <p className="ksv13-note">Khách sạn không còn đủ phòng cho ngày và số phòng đã chọn sẽ không hiện. Không thấy khách sạn mong muốn → bỏ bớt bộ lọc hoặc đổi ngày.</p>}
       </main></div></div>;
 }
 
@@ -1362,5 +1386,53 @@ const CSS = `
 #vtd-access .ksv button.ksv-alb-nv{color:#111}
 #vtd-access .ksv button.ksv-chip{color:#3d4556}#vtd-access .ksv button.ksv-chip.on{color:var(--ksv-ink)}
 #vtd-access .ksv input[type=date]{color:inherit;-webkit-text-fill-color:currentColor}
+/* ══ KS-20 · v1.3 (Chủ tịch duyệt bản xem trước 05/11/2026): trang kết quả khách sạn nền sáng, chữ Be Vietnam Pro ══ */
+.ksv13{--ksv-fg:#14263b;--ksv-muted:#4d5b6a;--ksv-line:#dce3ea;--ksv-line2:#edf1f5;--ksv-soft:#e8f0fb;--ksv-accent:#1557b0;--ksv-ink:#1557b0;--ksv-asoft:#e8f0fb;--ksv-ok:#1d7a4a;--ksv-sh:none;
+  font-family:'Be Vietnam Pro',system-ui,sans-serif;background:#f3f5f8;border-radius:12px}
+.ksv13 a,#vtd-access .ksv13 a{color:#1557b0}.ksv13 a:hover,#vtd-access .ksv13 a:hover{color:#0e3f82}
+/* vtd-access (lớp trợ năng của cổng) kẻ khung cho mọi <details>; nhóm lọc v1.3 là dòng phẳng trong một ô */
+.ksv13 details.fsec,#vtd-access .v3-app .ksv13 details.fsec{margin:0;border:0;border-top:1px solid var(--ksv-line);border-radius:0;background:#fff;color:inherit;padding:12px 16px}
+.ksv13-tt{background:#fff;border:1px solid var(--ksv-line);border-radius:12px;padding:14px 18px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
+.ksv13-tt>div{display:flex;flex-direction:column;gap:2px}.ksv13-tt b{font-size:17px}.ksv13-tt small{font-size:13px;color:var(--ksv-muted)}
+.ksv13-kh{font-size:13px;font-weight:700}
+.ksv13-map{background:#fff;border:1px solid var(--ksv-line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.ksv13-mapo{all:unset;cursor:pointer;height:96px;border-radius:8px;background:#d6e2ee;display:flex;gap:6px;align-items:center;justify-content:center;font-size:12.5px;color:#33475b;text-align:center;padding:0 8px}
+.ksv13-mapo:hover{background:#c9d8e8}.ksv13-mapo:focus-visible{outline:2px solid var(--ksv-accent)}
+.ksv13-map a{font-size:13px;font-weight:600}
+.ksv13-fh{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 4px}.ksv13-fh b{font-size:16px}
+.ksv13 details.fsec>summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;min-height:28px}
+.ksv13 details.fsec>summary::-webkit-details-marker{display:none}
+.ksv13 details.fsec>summary::after{content:"▾";color:var(--ksv-muted);font-size:12px}
+.ksv13 details.fsec[open]>summary::after{content:"▴"}
+.ksv13 details.fsec>summary h4{margin:0;flex:1}
+.ksv13 details.fsec.vang,#vtd-access .v3-app .ksv13 details.fsec.vang{background:#fffaf0}
+.ksv13-pills{display:flex;flex-wrap:wrap;gap:6px}
+.ksv13-pills button{border:1px solid var(--ksv-line);background:#fff;border-radius:99px;padding:6px 12px;font-size:13px;min-height:36px;color:var(--ksv-fg)}
+.ksv13-pills button small{color:var(--ksv-muted);font-size:11px}
+.ksv13-pills button.on{border:2px solid #1557b0;background:#e8f0fb;font-weight:700}
+.ksv13-pills button:disabled{opacity:.45;cursor:not-allowed}
+.ksv13-sx{background:#fff;border:1px solid var(--ksv-line);border-radius:10px;display:flex;overflow-x:auto;scrollbar-width:none}
+.ksv13-sx::-webkit-scrollbar{display:none}
+.ksv13-sx button{all:unset;cursor:pointer;flex:1 0 auto;text-align:center;padding:12px 14px;font-size:14px;color:var(--ksv-fg);border-bottom:3px solid transparent;white-space:nowrap}
+.ksv13-sx button.on{font-weight:700;border-bottom-color:#1557b0}
+.ksv13-sx button:focus-visible{outline:2px solid var(--ksv-accent);outline-offset:-2px}
+.ksv13-dau{background:#fff;border:1px solid var(--ksv-line);border-radius:10px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ksv13-dau>b{font-size:15px;margin-right:6px}.ksv13-dau .ksv-chips{display:contents}
+.ksv13-dnut{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.ksv13-card{border:1px solid var(--ksv-line);border-radius:14px;box-shadow:none}
+.ksv13-sao{color:#b7791f;font-size:13px}
+.ksv13-dc{font-size:13px;color:var(--ksv-muted)}.ksv13-dc a{font-weight:600}
+.ksv13-tag{display:flex;flex-wrap:wrap;gap:6px}.ksv13-tag span{border:1px solid var(--ksv-line);border-radius:6px;padding:2px 6px;font-size:12px}
+.ksv13-ok{font-size:13px;color:#1d7a4a;font-weight:600}
+.ksv13-it{font-size:13px;color:#c2410c}
+.ksv13-dg{font-size:13px}.ksv13-dg b{background:#1557b0;color:#fff;padding:2px 6px;border-radius:6px}
+.ksv13-gia{font-size:24px;font-weight:700;color:var(--ksv-fg);line-height:1.15;font-variant-numeric:tabular-nums}
+.ksv13 .ksv-side .ksv-btn{background:#1557b0}
+.ksv13-note{margin:0;font-size:13px;color:var(--ksv-muted);background:#fff;border:1px solid var(--ksv-line);border-radius:10px;padding:12px}
+.ksv13-mhead{position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid var(--ksv-line);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 4px}
+.ksv13-x{width:44px;height:44px;font-size:20px;background:none;border:0;color:var(--ksv-fg);flex:none}.ksv13-mhead b{flex:1;text-align:center;font-size:17px}
+.ksv13-mfoot{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--ksv-line);padding:12px 0}
+@media (max-width:900px){.ksv13-tt{padding:12px}.ksv13-tt .ksv-btn{width:100%}.ksv13-dnut{width:100%}.ksv13-dnut .ksv-btn{flex:1}
+  .ksv13 .ksv-loc.open{background:#fff;z-index:120}html.ksv-loc-mo .kr-top{visibility:hidden}}
 `;
 export const CSS_KSV = CSS;   // AT-2: trang nhà hàng dùng chung ngôn ngữ giao diện
