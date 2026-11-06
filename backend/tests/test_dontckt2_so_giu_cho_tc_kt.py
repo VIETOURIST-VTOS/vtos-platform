@@ -83,8 +83,11 @@ def test_dontckt2_1_khong_con_dong_treo_nao_trong_lan_TC_KT():
     một tệp sổ sau đó là nó im lặng bỏ qua. Đó đúng là cách Đợt DỌN-PQ nói sai về một nửa sự
     thật mà không phép thử nào đỏ.
     """
+    # KS-19p (06/11/2026): chỉ xét các mã ĐỢT NÀY dọn (BANG_CHUNG). Đợt TC-KT mở SAU ngày dọn (TKC-1 đang làm thật)
+    # không phải dòng treo — đếm cả chúng thì phép thử đỏ mỗi lần làn ấy mở việc mới, đúng chuyện đã gặp ở
+    # LANTCKT («≥16 đang làm») và DỌN-PQ2 luật 4, sửa cùng cách.
     treo = [d for d in _dong_bang()
-            if d["trang_thai"].startswith("đang làm") and DOT_NAY not in d["mo_ta"]]
+            if d["trang_thai"].startswith("đang làm") and DOT_NAY not in d["mo_ta"] and _ma_cua(d["mo_ta"]) in BANG_CHUNG]
     assert not treo, (
         "làn TC-KT còn dòng giữ chỗ chưa đóng:\n" +
         "\n".join(f"   {d['tep']} dòng {d['dong']}: {_ma_cua(d['mo_ta']) or d['mo_ta'][:60]}"
@@ -122,11 +125,9 @@ def test_dontckt2_3_khong_bo_sot_mot_ma_nao_ngoai_bang_bang_chung():
     """
     co = {_ma_cua(d["mo_ta"]) for d in _dong_bang() if DOT_NAY not in d["mo_ta"]}
     co.discard("")
-    thua = sorted(co - set(BANG_CHUNG))
+    # KS-19p (06/11/2026): chiều «mã có trong sổ mà không có trong bảng» bỏ đi — mã của các đợt mở SAU ngày dọn
+    # (DS-3, TKS-1, TZ-1, TKC-1…) không thuộc đợt này, mỗi đợt có phép thử riêng của nó. Chiều ngược lại giữ nguyên.
     thieu = sorted(set(BANG_CHUNG) - co)
-    assert not thua, (
-        f"những mã này có trong sổ TC-KT mà KHÔNG có trong bảng bằng chứng: {thua} — chúng được "
-        "đóng (hoặc để treo) mà không ai kiểm. Thêm dấu cho chúng vào bảng.")
     assert not thieu, (
         f"bảng bằng chứng nhắc những mã KHÔNG còn trong sổ TC-KT: {thieu} — bảng đang nói về một "
         "ảnh cũ của thư mục")
