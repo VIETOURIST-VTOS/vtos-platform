@@ -23,6 +23,9 @@ function Companies() {
   const [lo, setLo] = useState<any>({ company_id: "", nguon: "vietrip", tu_ngay: "", den_ngay: "", loai: "", chi_chua_gan: true });
   const [grp, setGrp] = useState<any>(null);
   const [lo2, setLo2] = useState<any>({ company_id: "", tu_ky: "", den_ky: "", nguon: "", nhom: "", khong_co_tour: true, chi_chua_gan: true });
+  const [lh, setLh] = useState<any>({ id: "", address: "", phone: "" });   // KS-20e: địa chỉ + hotline in trên phiếu
+  const chonLh = (id: string) => { const c = cos.find((x) => String(x.id) === id); setLh({ id, address: c?.address || "", phone: c?.phone || "" }); };
+  useEffect(() => { if (!lh.id && cos.length) { const me = cos.find((c) => c.kind === "me") || cos[0]; setLh({ id: String(me.id), address: me.address || "", phone: me.phone || "" }); } }, [cos]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(() => {
     api("/companies").then(setCos).catch(() => {});
@@ -54,6 +57,13 @@ function Companies() {
           <td className="mono">{c.tax_code || <Tag cls="warn">thiếu MST</Tag>}</td><td>{c.kind_label}</td><td className="num">{c.ownership_pct ? c.ownership_pct + "%" : "–"}</td><td>{fmtD(c.effective_from)}</td>
           <td>{c.in_group ? <Tag cls="navy">trong hợp nhất</Tag> : <Tag cls="warn">bên liên quan</Tag>}</td>
           <td>{c.active ? <Tag cls="ok">Đang hoạt động</Tag> : <Tag cls="red">Tạm ngưng</Tag>}</td></tr>)}</tbody></table>
+      {canWrite && <div style={{ marginTop: 12 }}><h3>Địa chỉ &amp; hotline in trên phiếu</h3>
+        <p className="muted">In trên phiếu xác nhận, hóa đơn đặt phòng VTD và chân email gửi khách (KS-20e). Ô trống thì giấy tờ ghi «chưa khai».</p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <label>Pháp nhân<select value={lh.id} onChange={(e) => chonLh(e.target.value)}>{cos.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>
+          <label style={{ flex: "1 1 260px" }}>Địa chỉ<input value={lh.address} maxLength={300} onChange={(e) => setLh({ ...lh, address: e.target.value })} /></label>
+          <label>Hotline<input value={lh.phone} maxLength={40} onChange={(e) => setLh({ ...lh, phone: e.target.value })} /></label>
+          <button className="act" disabled={!lh.id} onClick={() => post(`/companies/${lh.id}/lien-he`, { address: lh.address, phone: lh.phone })}>Lưu</button></div></div>}
       <p className="muted">Trong phạm vi hợp nhất: công ty mẹ, công ty con, chi nhánh – giao dịch giữa các đơn vị này là giao dịch nội bộ, phải loại trừ khi hợp nhất. Công ty liên kết hạch toán theo phương pháp vốn chủ sở hữu; công ty độc lập chỉ thuyết minh bên liên quan.</p></div>
 
     <div className="panel wrap"><h2>Mức độ đã xác định pháp nhân</h2>

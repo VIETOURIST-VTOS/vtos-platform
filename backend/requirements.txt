@@ -12,6 +12,7 @@ openpyxl==3.1.5
 Pillow==11.3.0          # AT-2a: bản hiển thị nhẹ cho album ảnh nhà hàng (giữ bản gốc)
 pypdfium2==4.30.0       # AT-2b: tách trang thực đơn PDF thành ảnh để khách lật
 boto3==1.35.99          # kho đối tượng S3/Cloudflare R2 cho tài liệu hồ sơ Visa
+fpdf2==2.8.1            # KS-20e: phiếu xác nhận + hóa đơn đặt phòng VTD (PDF song ngữ)
 # TZ-1 06/11/2026: BANG MUI GIO DI THEO MA, khong dan nguoi ta cai tay.
 # `zoneinfo` cua Python khong mang theo bang mui gio — no tim bang cua he dieu hanh roi moi tim
 # goi nay. Linux co san nen CI xanh; Windows khong co nen may Chu tich do, CUNG MOT COMMIT.
