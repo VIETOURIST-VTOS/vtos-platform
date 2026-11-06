@@ -1555,8 +1555,11 @@ def _goi_ban(phong: list[dict], so_phong: int = 1, dem: int = 1, hom_nay: date |
     hn = hom_nay or date.today()
     sp, dem = max(1, so_phong), max(1, dem)
     ra = []
+    # KS-20d (Chủ tịch 06/11/2026 «Cộng các loại phòng»): nhiều phòng thì ghép được nhiều loại phòng (bản v1.3 D2:
+    # Deluxe + Family + Superior) — mỗi loại chỉ cần còn ≥ 1 phòng; đủ tổng số phòng do tim() / du_phong() xét.
+    can = sp if sp == 1 else 1
     for p in phong:
-        if not p["vua"] or p.get("con", 0) < sp:
+        if not p["vua"] or p.get("con", 0) < can:
             continue
         tn = list(p.get("tien_nghi") or [])
         for g in p["goi"]:
@@ -1574,6 +1577,14 @@ def _goi_ban(phong: list[dict], so_phong: int = 1, dem: int = 1, hom_nay: date |
                        "con": p.get("con", 0)})
     ra.sort(key=lambda o: o["dem_gia"])
     return ra
+
+
+def du_phong(goi_ban: list[dict], so_phong: int) -> bool:
+    """KS-20d: tổng số phòng còn của các loại phòng có ít nhất một offer đủ cho số phòng khách cần."""
+    con: dict[int, int] = {}
+    for o in goi_ban:
+        con[o["lp"]] = max(con.get(o["lp"], 0), int(o.get("con") or 0))
+    return sum(con.values()) >= max(1, so_phong)
 
 
 def _the_cong(k: KhachSanVtd, anh: list[AnhKhachSanVtd], phong: list[dict], dg: dict | None = None, dat: int = 0,
@@ -1626,7 +1637,7 @@ def tim(db: Session, tinh: str, vao, ra, nguoi_lon: int = 2, tre_em: int = 0, so
             "mo_thanh_toan": mo_thanh_toan(db, k, chung)} for k in ks]
     # KS-19 (Chủ tịch 05/11/2026: «bỏ luôn» luồng gửi yêu cầu): chỉ hiện khách sạn còn đủ phòng đặt được cho ngày,
     # số khách và số phòng đã chọn — không còn thẻ «gửi yêu cầu / báo giá riêng».
-    the = [o for o in the if o["gia_tu"] is not None and o["goi_ban"]]   # KS-19b: còn ≥ số phòng cần ở mọi đêm
+    the = [o for o in the if o["gia_tu"] is not None and o["goi_ban"] and du_phong(o["goi_ban"], sp)]   # KS-19b / KS-20d
     dem_tp = {}
     for o in the:
         dem_tp[o["tinh_thanh"]] = dem_tp.get(o["tinh_thanh"], 0) + 1
