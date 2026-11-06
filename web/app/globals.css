@@ -35,35 +35,20 @@ a{color:var(--navy);font-weight:600}
    Chỗ chật nhất là khối logo, và nó vẫn dư: 13px ở cỡ 14, 17px ở cỡ 16, 32px ở cỡ 20.
    Đổi `min-height` thành `height` là xoá đúng cái tính chất ấy — phép thử test_tc69 canh nó. */
 .top{background:var(--vtos-nav-bg);color:#fff;padding:6px 16px;min-height:var(--top-h);display:flex;align-items:center;gap:12px;flex-wrap:nowrap;position:sticky;top:0;z-index:5;border-bottom:1px solid rgba(255,255,255,.16)}
-/* Dấu hiệu nhận biết: logo nền trong suốt xếp TRÊN, tên hệ thống xếp DƯỚI (cột dọc). Logo cao cố
-   định 24px và để ảnh tự tính bề ngang theo tỉ lệ – khoá cả hai chiều thì ảnh bẹp. Dòng chữ dưới
-   giãn chữ .14em cho bằng bề ngang logo, và không bao giờ vỡ dòng. */
-/* KHỐI LOGO có nền riêng (phương án A anh Tuấn chọn 12/9, theo ảnh anh gửi): dải chuyển sắc chéo
-   cộng một vệt sáng, để dấu V và dòng chữ nổi khỏi nền navy đặc của thanh ngang.
-
-   BA MÀU CỦA DẢI ĐỀU LẤY TỪ BỘ NHẬN DIỆN – navy đậm → navy → sky. Ảnh gốc có một sắc xanh sáng hơn
-   (#1E6BB8) không nằm trong bộ; lấy --vtos-sky thay vào, vừa đúng hướng chuyển sắc vừa không đẻ ra
-   màu thứ tư (quy tắc 3).
-
-   CHIỀU CAO: dấu V 24px + hở 4 + dòng chữ 11 + đệm 6 = 45px, nằm gọn trong 48px lòng của thanh
-   ngang 72px. Đổi bất kỳ số nào trong bốn số ấy thì phải đo lại cả thanh – đúng lỗi đã mắc một lần
-   khi ô đơn vị hai dòng đẩy thanh ngang lên 120px. */
-.top .brand{display:inline-flex;flex-direction:column;align-items:center;gap:3px;line-height:1;
-  position:relative;overflow:hidden;flex:0 0 auto;padding:6px 30px;border-radius:var(--vtos-radius-md);
-  background:linear-gradient(112deg,var(--vtos-navy-dark) 0%,var(--vtos-nav-bg) 48%,var(--vtos-sky) 100%);
-  /* NỔI LÊN KHỎI THANH NGANG (anh Tuấn chốt 12/9). Ba lớp, mỗi lớp một việc: viền sáng mảnh tách
-     khối khỏi nền navy; vệt sáng trong lòng viền trên làm mép trên bắt sáng; bóng đổ xuống dưới
-     cho khối có bề dày. Không dùng màu ngoài bộ nhận diện – bóng lấy chính navy-dark pha loãng. */
-  border:1px solid rgba(255,255,255,.20);
-  box-shadow:0 2px 4px rgba(11,37,69,.40),0 11px 24px rgba(11,37,69,.58),
-             inset 0 1px 0 rgba(255,255,255,.34)}
-/* Vệt sáng chéo. aria-hidden theo nghĩa của nó: đây là hình, không mang chữ nào. */
-.top .brand::after{content:"";position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(74deg,transparent 44%,rgba(255,255,255,.28) 50%,transparent 57%)}
-.top .brand>*{position:relative;z-index:1}
-.top .brand .brand-logo{height:28px;width:auto;display:block}
-.top .brand small{font-weight:300;font-size:calc(10/14*1rem);letter-spacing:.11em;opacity:.72;white-space:nowrap;
-  font-family:var(--vtos-font-text)}
+/* ══ LOGO v2 · 07/11/2026 ══ Anh Tuấn duyệt bản xem thử «Logo v2 trên VTOS và VTD»: "chỉ lấy logo
+   Vietourist và thêm nhận diện màu xanh navy nhiều hơn". Nên:
+   · bỏ dấu VTOS và khối chuyển sắc nổi (phương án A 12/9) — logo Vietourist Holdings bản nền tối
+     nằm THẲNG trên thanh navy #14538D, không khung, không bóng;
+   · bên phải logo là chữ nhỏ «HỆ THỐNG ĐIỀU HÀNH», ngăn bằng một vạch mảnh — để nhân viên biết đang
+     ở VTOS chứ không phải cổng khách;
+   · logo cao 40px (quy tắc 6: ≥ 22px). Thanh 64 − đệm 6×2 = 52px lòng, logo 40 còn dư 12px.
+   Màn hẹp (≤ 640px) giấu dòng chữ phụ để logo không đẩy các nút ra khỏi thanh. */
+.top .brand{display:inline-flex;flex-direction:row;align-items:center;gap:12px;line-height:1;flex:0 0 auto;
+  padding:0 4px 0 0}
+.top .brand .brand-logo{height:40px;width:auto;display:block}
+.top .brand small{font-weight:500;font-size:calc(10/14*1rem);letter-spacing:.14em;opacity:.78;white-space:nowrap;
+  border-left:1px solid rgba(255,255,255,.35);padding-left:12px;font-family:var(--vtos-font-text)}
+@media (max-width:640px){.top .brand small{display:none}.top .brand .brand-logo{height:32px}}
 .top .right{margin-left:auto;font-size:calc(13/14*1rem)}.top .right b{color:#fff}.top .right a{color:#fff;margin-left:10px}
 nav.tabs{display:flex;gap:2px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:var(--top-h);z-index:4}
 nav.tabs a{border-bottom:3px solid transparent;padding:10px 12px;font-size:calc(13/14*1rem);color:var(--ink2);text-decoration:none;white-space:nowrap;font-weight:500}

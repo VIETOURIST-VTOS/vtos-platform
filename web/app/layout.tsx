@@ -27,7 +27,9 @@ export const metadata: Metadata = {
 // ĐÃ TRẢ NỢ 14/9/2026: manifest.json (background_color + theme_color) và cả 16 ảnh ở /public/splash
 // đã đổi sang #10273E. Trước đó ba nơi mang ba màu khác nhau nên app cài trên điện thoại loé một
 // nhịp navy sáng rồi mới vào nền tối. Ba nơi này phải đổi CÙNG NHAU, đổi một nơi là lại loé.
-export const viewport: Viewport = { themeColor: "#10273E", width: "device-width", initialScale: 1 };
+// LOGO v2 · 07/11/2026: nền thanh về navy chính thức #14538D — ba nơi (đây, manifest, 16 ảnh chờ)
+// đổi cùng lúc.
+export const viewport: Viewport = { themeColor: "#14538D", width: "device-width", initialScale: 1 };
 
 /* MÀN HÌNH CHỜ CHO iPHONE/iPAD.
  * Android tự dựng màn hình chờ từ manifest (icon + background_color), không cần khai gì.

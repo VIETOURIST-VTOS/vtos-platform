@@ -188,7 +188,7 @@ def test_khong_con_ten_mau_cua_trinh_duyet():
 # app lỗi. Nên phép thử này canh CẢ BA CÙNG MỘT MÃ, và sẽ gãy nếu ai đó chỉ đổi một nơi.
 # ═════════════════════════════════════════════════════════════════════════════════════════════
 
-NEN_MO_APP = "#10273E"   # --vtos-nav-bg
+NEN_MO_APP = "#14538D"   # --vtos-nav-bg (logo v2 · 07/11/2026; trước là #10273E)
 
 
 def test_ba_noi_khai_mau_mo_app_khop_nhau():
@@ -207,7 +207,7 @@ def test_ba_noi_khai_mau_mo_app_khop_nhau():
 
 
 def test_anh_cho_da_doi_sang_nen_toi():
-    """Đủ 16 ảnh và điểm ảnh góc của mỗi ảnh phải đúng nền tối, không còn navy sáng #14538D."""
+    """Đủ 16 ảnh và điểm ảnh góc của mỗi ảnh phải đúng nền thanh ngang (navy #14538D từ logo v2)."""
     thu_muc = GOC / "web/public/splash"
     anh = sorted(thu_muc.glob("splash-*.png"))
     assert len(anh) == 16, f"Phải đủ 16 ảnh chờ, đang có {len(anh)}."
@@ -215,7 +215,7 @@ def test_anh_cho_da_doi_sang_nen_toi():
         from PIL import Image
     except ImportError:
         return  # máy chạy kiểm không có Pillow thì bỏ qua phần đo điểm ảnh
-    mong_doi = (0x10, 0x27, 0x3E)
+    mong_doi = (0x14, 0x53, 0x8D)
     lech = {}
     for p in anh:
         goc = Image.open(p).convert("RGB").getpixel((2, 2))

@@ -165,7 +165,7 @@ export default function CoDong({ toi, thoat }: { toi: any; thoat: () => void }) 
   return (<section className="v3-app" data-portal="co-dong">
     <header className="v3-topbar">
       <button type="button" className="v3-brand cursor-interaction" onClick={() => di("home")}>
-        <span className="vh-logo"><img src="/cong/logo.png" alt="Vietourist Holdings" /></span><span>VTD<small>VIETOURIST HOLDINGS</small></span></button>
+        {/* eslint-disable-next-line @next/next/no-img-element */}<img className="logo-v2" src="/thuong-hieu/v2/khoachu-holdings-nen-trong.svg" alt="Vietourist Holdings" width={1107} height={269} /></button>
       <nav aria-label="Cổng"><button type="button" aria-pressed="true"><I n="landmark" /><span>Cổ đông</span></button></nav>
       <button type="button" className="v3-home-return cursor-interaction" aria-label="Đăng xuất" title="Đăng xuất" onClick={thoat}><I n="log-out" /></button>
     </header>

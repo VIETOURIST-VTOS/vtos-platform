@@ -37,14 +37,18 @@
   --vtos-navy-dark:    #0B1B2B;  /* nền rất tối, đầu dải chuyển sắc của khối logo */
   --vtos-sky:          #1E63C8;  /* NỀN nút chính và thẻ nhãn đặc */
   --vtos-navy-light:   #9BCAFF;  /* chữ rê chuột, chữ nhạt trên nền tối */
-  --vtos-nav-bg:       #10273E;  /* NỀN thanh ngang và thanh dọc */
-  --vtos-nav-bg-2:     #0C1E30;  /* nền lún của mục trên thanh điều hướng */
+  /* LOGO v2 · 07/11/2026 — anh Tuấn: "thêm nhận diện màu xanh navy nhiều hơn". Nền thanh ngang và
+     thanh dọc trở về đúng navy chính thức #14538D của bộ v2 (trước: #10273E của bản vẽ V1.4).
+     Chữ trắng trên #14538D đạt 8,0 — trên ngưỡng AA. Ba nơi khai màu mở app (manifest, layout,
+     16 ảnh chờ) đổi CÙNG lúc. */
+  --vtos-nav-bg:       #14538D;  /* NỀN thanh ngang và thanh dọc */
+  --vtos-nav-bg-2:     #0E4072;  /* nền lún của mục trên thanh điều hướng */
   /* Dải màu của MỤC trên thanh điều hướng — lấy đúng bản vẽ V1.4. Bản sáng phủ trắng 5% lên nền
      thanh, ra #1C3248; bản vẽ tô đặc và sáng gấp 1,98 lần, đó chính là chỗ làm cả trang trông
      tối hơn hay sáng hơn. */
-  --vtos-muc-nav:      #24476B;  /* đầu dải, mục thường */
-  --vtos-muc-nav-2:    #1A3858;  /* cuối dải */
-  --vtos-muc-nav-3:    #2A5179;  /* rê chuột */
+  --vtos-muc-nav:      #1C5F9C;  /* đầu dải, mục thường */
+  --vtos-muc-nav-2:    #175591;  /* cuối dải */
+  --vtos-muc-nav-3:    #2369AA;  /* rê chuột */
 
   /* Trạng thái */
   --vtos-success:      #53C49A;  /* đã duyệt, thành công */
@@ -82,7 +86,7 @@
   --vtos-text:         #F4F9FD;  /* 13,46 trên nền thẻ (cũ #E8F1F8 · 12,48) */
   --vtos-heading:      #FFFFFF;  /* 14,27 — tiêu đề phải sáng hơn thân bài (cũ #DCE9F4 · 11,55) */
   --vtos-text-mute:    #C3D5E4;  /*  9,48 (cũ #9BB2C6 · 6,51) */
-  --vtos-text-faint:   #A7BDD0;  /*  7,36 (cũ #7B93A8 · 4,47 — dưới AA trên nền thông tin) */
+  --vtos-text-faint:   #B8CBDB;  /*  8,56 · logo v2 07/11: thanh sáng lên #14538D nên nấc này sáng theo (#A7BDD0 trên thanh mới chỉ 4,09) — nay 4,75 trên thanh */
   --vtos-text-on-navy: #FFFFFF;
 
   /* Bo góc */

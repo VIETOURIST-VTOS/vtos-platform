@@ -766,21 +766,18 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={{ user, toast, datChuaLuu }}>
       <div className="top">
         <button type="button" className="burger" onClick={() => setSide((s) => !s)} aria-label="Menu">☰</button>
-        {/* Dấu hiệu nhận biết: logo VIETOURIST nền TRONG SUỐT (tệp gốc anh Tuấn gửi 12/9/2026), dưới
-            là dòng VIETOURIST OPERATING SYSTEM. Không dùng ảnh nền trắng – nền trắng đặt lên thanh
-            xanh đậm sẽ thành một mảng trắng hình chữ nhật quanh chữ.
-            alt để RỖNG và tên hệ thống viết bằng chữ thật bên dưới: nếu alt cũng là tên ấy thì máy
-            đọc màn hình đọc tên hai lần. width/height khai đúng tỉ lệ tệp (720×389) để trang không
-            bị giật một nhịp khi ảnh tải xong. */}
-        <Link href="/" className="brand" aria-label="VIETOURIST Operating System – về bảng điều hành">
-          {/* Dấu VTOS của bộ nhận diện v1.0 (12/9/2026). Bản NỀN TỐI vì thanh ngang là navy đặc
-              #14538D – bản chính dùng cho nền sáng. Dạng SVG nên không vỡ ở mọi cỡ màn hình.
-              Quy tắc 6: logo trong giao diện không nhỏ hơn 22px; ở đây cao 30px.
-              Logo Vietourist (web/public/vietourist.png) GIỮ NGUYÊN trong kho, không xoá – đó là
-              nhận diện công ty, khác với dấu của phần mềm; trang đăng nhập còn dùng. */}
+        {/* Dấu hiệu nhận biết: logo Vietourist Holdings v2, nền TRONG SUỐT (không đặt ảnh nền trắng lên
+            thanh navy). alt RỖNG vì liên kết đã mang aria-label – đọc tên hai lần là thừa.
+            width/height khai đúng tỉ lệ tệp (1107×269) để trang không giật khi ảnh tải xong. */}
+        <Link href="/" className="brand" aria-label="Vietourist Holdings – Hệ thống điều hành, về bảng điều hành">
+          {/* LOGO v2 (anh Tuấn duyệt 07/11/2026, bản xem thử «Logo v2 trên VTOS và VTD»): chỉ dùng
+              logo Vietourist Holdings, bỏ dấu VTOS. Bản nền tối của bộ v2 (#5A9BD4 · #FF6F96 ·
+              #5FAE66 + chữ trắng), đã bỏ ô nền #0B2545 để nằm thẳng trên thanh navy #14538D.
+              Bên cạnh là chữ nhỏ «Hệ thống điều hành» để nhân viên biết đang ở VTOS.
+              Dấu VTOS v1.0 (thuong-hieu/vtos-logo-*.svg) GIỮ trong kho để tra cứu, không xoá. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/thuong-hieu/vtos-logo-nen-toi.svg" alt="" width={708} height={434} className="brand-logo" />
-          <small>VIETOURIST OPERATING SYSTEM</small>
+          <img src="/thuong-hieu/v2/khoachu-holdings-nen-trong.svg" alt="" width={1107} height={269} className="brand-logo" />
+          <small>HỆ THỐNG ĐIỀU HÀNH</small>
         </Link>
         <span className="bar">
           <ChonDonVi chuaLuu={() => chuaLuu.current} toast={toast} />
