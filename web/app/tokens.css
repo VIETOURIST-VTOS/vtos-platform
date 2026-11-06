@@ -163,3 +163,23 @@
   --vtos-text-faint:   #56697C;  /*  4,88 (bản ghi v1.0 #94A5B4 chỉ 2,43 — dưới AA) */
   --vtos-text-on-navy: #FFFFFF;
 }
+
+/* ══ KS-NUT · MÀU NÚT DO NGƯỜI DÙNG CHỌN · 07/11/2026 ══════════════════════════════════════════
+ * Anh Tuấn duyệt cả hai phương án của bản xem thử «Navy bên trong VTOS» và cho người dùng tự bấm
+ * trong bảng «Giao diện» (cột users.gd_mau_nut). Thẻ <html> mang data-mau-nut="navy" | "sang".
+ *   · "navy" (phương án A, MẶC ĐỊNH) — nút chính, chip và nhãn đang chọn tô navy chính thức
+ *     #14538D. Navy trên nền thẻ #122C45 chỉ đạt 1,8 nên kèm viền #5A9BD4 (bộ nền tối v2) để nút
+ *     không chìm; chữ trắng trên #14538D đạt 7,92.
+ *   · "sang" (phương án B) — giữ #1E63C8 của bản vẽ V1.4 (chữ trắng 5,72).
+ * Chỉ áp ở nền tối: bản sáng vốn đã dùng navy #14538D. Cả hai phương án: gạch dưới tab đang chọn
+ * là --vtos-tab-on (#5A9BD4) thay vàng — vàng để dành cho «cần chú ý» và vòng sáng phím Tab.
+ */
+:root {
+  --vtos-nut-vien: var(--vtos-navy); --vtos-tab-on: #5A9BD4;
+  --vtos-mau-nut-a: #14538D; --vtos-mau-nut-a-vien: #5A9BD4; --vtos-mau-nut-b: #1E63C8;  /* ô mẫu trong bảng Giao diện */
+}
+:root[data-nen="sang"] { --vtos-tab-on: #14538D; }
+:root[data-mau-nut="navy"]:not([data-nen="sang"]) {
+  --vtos-sky:          #14538D;
+  --vtos-nut-vien:     #5A9BD4;
+}

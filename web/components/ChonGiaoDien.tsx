@@ -33,10 +33,10 @@ import { api, type User } from "@/lib/api";
 const KHOA = "vtos_giao_dien";
 /** Lối lui khi máy chủ chưa gửi `giao_dien_mac_dinh` (máy chủ bản cũ). Hai con số này cũng nằm ở
  *  models/core.py; máy chủ mới thì màn hình dùng số của máy chủ, không dùng hai số này. */
-const MAC_DINH = { nen: "toi", co_chu: 16 };
+const MAC_DINH = { nen: "toi", co_chu: 16, mau_nut: "navy" };
 const CO_MIN = 14, CO_MAX = 20;
 
-type Chon = { nen: string | null; co_chu: number | null };
+type Chon = { nen: string | null; co_chu: number | null; mau_nut?: string | null };
 
 /** Nền THẬT SỰ vẽ ra: "may" phải hỏi cài đặt máy, hai cái kia là chính nó. */
 function nenThat(nen: string): "toi" | "sang" {
@@ -47,10 +47,12 @@ function nenThat(nen: string): "toi" | "sang" {
 
 /** Đặt vào thẻ <html>. Tách riêng vì kịch bản trong layout.tsx làm đúng việc này, và hai nơi phải
  *  làm giống hệt nhau — lệch một chữ là trang loé màu lúc React tiếp quản. */
-export function apDung(nen: string, co: number) {
+export function apDung(nen: string, co: number, mau = "navy") {
   const g = document.documentElement;
   g.setAttribute("data-nen", nenThat(nen));
   g.style.setProperty("--vtos-co-chu", co + "px");
+  /* KS-NUT · 07/11/2026: màu nút do người dùng chọn — "navy" (phương án A) hoặc "sang" (B). */
+  g.setAttribute("data-mau-nut", mau === "sang" ? "sang" : "navy");
 }
 
 export default function ChonGiaoDien({ user }: { user: User | null }) {
@@ -58,9 +60,10 @@ export default function ChonGiaoDien({ user }: { user: User | null }) {
   const [gan, setGan] = useState(false);          // đã gắn vào trang chưa (createPortal cần document)
   const [nen, setNen] = useState(MAC_DINH.nen);
   const [co, setCo] = useState(MAC_DINH.co_chu);
+  const [mau, setMau] = useState(MAC_DINH.mau_nut);
   const [trangThai, setTrangThai] = useState<{ chu: string; loi?: boolean } | null>(null);
 
-  const md = user?.giao_dien_mac_dinh || MAC_DINH;
+  const md = { ...MAC_DINH, ...(user?.giao_dien_mac_dinh || {}) };
 
   useEffect(() => { setGan(true); }, []);
 
@@ -71,10 +74,11 @@ export default function ChonGiaoDien({ user }: { user: User | null }) {
     const g: Chon | undefined = user?.giao_dien;
     const n = g?.nen ?? md.nen;
     const c = g?.co_chu ?? md.co_chu;
-    setNen(n); setCo(c);
-    apDung(n, c);
-    try { localStorage.setItem(KHOA, JSON.stringify({ nen: n, co: c })); } catch { /* máy chặn thì thôi */ }
-  }, [user?.giao_dien, md.nen, md.co_chu]);
+    const m = g?.mau_nut ?? md.mau_nut;
+    setNen(n); setCo(c); setMau(m);
+    apDung(n, c, m);
+    try { localStorage.setItem(KHOA, JSON.stringify({ nen: n, co: c, mau: m })); } catch { /* máy chặn thì thôi */ }
+  }, [user?.giao_dien, md.nen, md.co_chu, md.mau_nut]);
 
   /* Người để "Theo máy" mà đổi cài đặt máy giữa chừng thì trang phải đổi theo ngay, không đợi tải
      lại. Chỉ nghe khi đang ở "may" — hai chế độ kia thì cài đặt máy không liên quan. */
@@ -82,36 +86,37 @@ export default function ChonGiaoDien({ user }: { user: User | null }) {
     if (nen !== "may") return;
     let mq: MediaQueryList;
     try { mq = window.matchMedia("(prefers-color-scheme: light)"); } catch { return; }
-    const nghe = () => apDung("may", co);
+    const nghe = () => apDung("may", co, mau);
     mq.addEventListener?.("change", nghe);
     return () => mq.removeEventListener?.("change", nghe);
-  }, [nen, co]);
+  }, [nen, co, mau]);
 
-  const luu = useCallback(async (n: string, c: number) => {
-    apDung(n, c);                                                     // 1. vẽ ngay
-    try { localStorage.setItem(KHOA, JSON.stringify({ nen: n, co: c })); } catch { }   // 2. bản chép
+  const luu = useCallback(async (n: string, c: number, m: string) => {
+    apDung(n, c, m);                                                  // 1. vẽ ngay
+    try { localStorage.setItem(KHOA, JSON.stringify({ nen: n, co: c, mau: m })); } catch { }   // 2. bản chép
     setTrangThai({ chu: "Đang lưu…" });
     try {
-      await api("/auth/giao-dien", { method: "PUT", json: { nen: n, co_chu: c } });   // 3. bản cất
+      await api("/auth/giao-dien", { method: "PUT", json: { nen: n, co_chu: c, mau_nut: m } });   // 3. bản cất
       setTrangThai({ chu: "Đã lưu vào tài khoản của anh/chị." });
     } catch {
       setTrangThai({ chu: "CHƯA lưu được về máy chủ — màn hình đã đổi nhưng lần đăng nhập sau sẽ trở lại như cũ.", loi: true });
     }
   }, []);
 
-  const doiNen = (n: string) => { setNen(n); luu(n, co); };
+  const doiNen = (n: string) => { setNen(n); luu(n, co, mau); };
+  const doiMau = (m: string) => { setMau(m); luu(nen, co, m); };
   const doiCo = (c: number) => {
     const x = Math.max(CO_MIN, Math.min(CO_MAX, c));
-    setCo(x); apDung(nen, x);
-    try { localStorage.setItem(KHOA, JSON.stringify({ nen, co: x })); } catch { }
+    setCo(x); apDung(nen, x, mau);
+    try { localStorage.setItem(KHOA, JSON.stringify({ nen, co: x, mau })); } catch { }
   };
   /* Thanh trượt ghi về máy chủ khi NHẢ TAY, không phải mỗi lần nhích một nấc: kéo từ 14 sang 20 là
      sáu nấc, tức sáu lần gọi máy chủ cho một lần đổi ý. Màn hình vẫn đổi theo từng nấc (doiCo ở
      trên), chỉ có cửa ghi là đợi. */
-  const nhaTay = () => luu(nen, co);
+  const nhaTay = () => luu(nen, co, mau);
 
   const traVe = async () => {
-    setNen(md.nen); setCo(md.co_chu); apDung(md.nen, md.co_chu);
+    setNen(md.nen); setCo(md.co_chu); setMau(md.mau_nut); apDung(md.nen, md.co_chu, md.mau_nut);
     try { localStorage.removeItem(KHOA); } catch { }
     setTrangThai({ chu: "Đang lưu…" });
     try {
@@ -139,6 +144,9 @@ export default function ChonGiaoDien({ user }: { user: User | null }) {
   }, [mo]);
 
   const NEN: [string, string][] = [["toi", "Navy tối"], ["sang", "Trắng sáng"], ["may", "Theo máy"]];
+  /* KS-NUT · anh Tuấn 07/11/2026: "chọn cả A và B cho người dùng tự bấm". Chỉ có tác dụng ở nền
+     tối — bản sáng vốn đã dùng navy #14538D cho nút. */
+  const MAU: [string, string][] = [["navy", "Navy đậm"], ["sang", "Xanh sáng"]];
 
   /* BẢNG GẮN THẲNG VÀO <body>, KHÔNG NẰM TRONG `.top` — và đây là lỗi đã mắc thật một lần khi
      dựng bản xem thử, ghi lại kẻo vòng sau gom nó vào cho "gọn": để bảng bên trong thanh ngang
@@ -158,9 +166,20 @@ export default function ChonGiaoDien({ user }: { user: User | null }) {
       </div>
 
       <div>
+        <span className="gd-nhan">Màu nút</span>
+        <div className="gd-nen gd-mau">
+          {MAU.map(([ma, ten]) => (
+            <button key={ma} type="button" aria-pressed={mau === ma} onClick={() => doiMau(ma)}>
+              <i className={"gd-mau-o gd-mau-" + ma} aria-hidden="true" />{ten}</button>
+          ))}
+        </div>
+        {nenThat(nen) === "sang" && <small className="gd-goi-y">Nền trắng sáng luôn dùng nút navy.</small>}
+      </div>
+
+      <div>
         <span className="gd-nhan">Cỡ chữ</span>
         <div className="gd-co">
-          <button type="button" aria-label="Giảm cỡ chữ" onClick={() => luu(nen, Math.max(CO_MIN, co - 1))}>A−</button>
+          <button type="button" aria-label="Giảm cỡ chữ" onClick={() => luu(nen, Math.max(CO_MIN, co - 1), mau)}>A−</button>
           <span className="gd-truot-boc">
             <input type="range" min={CO_MIN} max={CO_MAX} step={1} value={co}
               aria-label="Cỡ chữ thân bài" aria-valuetext={`${co} điểm ảnh`}
@@ -168,7 +187,7 @@ export default function ChonGiaoDien({ user }: { user: User | null }) {
               onMouseUp={nhaTay} onTouchEnd={nhaTay} onKeyUp={nhaTay} onBlur={nhaTay} />
             <span className="gd-vach"><span>14</span><span>16</span><span>18</span><span>20</span></span>
           </span>
-          <button type="button" aria-label="Tăng cỡ chữ" onClick={() => luu(nen, Math.min(CO_MAX, co + 1))}>A+</button>
+          <button type="button" aria-label="Tăng cỡ chữ" onClick={() => luu(nen, Math.min(CO_MAX, co + 1), mau)}>A+</button>
           <b>{co}&nbsp;px</b>
         </div>
       </div>
@@ -179,7 +198,7 @@ export default function ChonGiaoDien({ user }: { user: User | null }) {
         <small>Chữ phụ trông như thế này.</small></p>
 
       <button type="button" className="gd-tra" onClick={traVe}>
-        Trả về mặc định ({md.nen === "sang" ? "Trắng sáng" : md.nen === "may" ? "Theo máy" : "Navy tối"} · {md.co_chu} px)
+        Trả về mặc định ({md.nen === "sang" ? "Trắng sáng" : md.nen === "may" ? "Theo máy" : "Navy tối"} · {md.co_chu} px · nút {md.mau_nut === "sang" ? "xanh sáng" : "navy"})
       </button>
 
       {trangThai && (

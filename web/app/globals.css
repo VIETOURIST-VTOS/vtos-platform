@@ -52,7 +52,7 @@ a{color:var(--navy);font-weight:600}
 .top .right{margin-left:auto;font-size:calc(13/14*1rem)}.top .right b{color:#fff}.top .right a{color:#fff;margin-left:10px}
 nav.tabs{display:flex;gap:2px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:var(--top-h);z-index:4}
 nav.tabs a{border-bottom:3px solid transparent;padding:10px 12px;font-size:calc(13/14*1rem);color:var(--ink2);text-decoration:none;white-space:nowrap;font-weight:500}
-nav.tabs a.on{color:var(--navy);border-color:var(--orange);font-weight:600}
+nav.tabs a.on{color:var(--navy);border-color:var(--vtos-tab-on);font-weight:600}
 main{max-width:1180px;margin:0 auto;padding:16px}
 h1{font-size:calc(19/14*1rem);margin:4px 0 12px;color:var(--navy);font-family:var(--vtos-font-display);letter-spacing:-.01em}h2{font-size:calc(14.5/14*1rem);margin:0 0 10px;color:var(--vtos-heading);font-family:var(--vtos-font-display)}h3{font-size:calc(12.5/14*1rem);color:var(--ink2);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.06em}
 /* TC-62 · KHUNG NỔI HƠN HÌNH NỀN (anh Tuấn 18/9/2026: "các khung phân hệ nổi hơn so với hình nền").
@@ -79,7 +79,7 @@ td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}.num{t
 .toast.err{background:var(--redbg);color:var(--red);border-color:var(--red)}
 label{display:block;font-size:calc(12/14*1rem);color:var(--ink2);margin-top:8px}
 input,select,textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:calc(13.5/14*1rem);background:var(--panel);color:var(--ink)}textarea{min-height:72px}
-button.act{background:var(--navy2);color:#fff;border:1px solid var(--vtos-navy);border-radius:6px;padding:7px 13px;font:inherit;font-size:calc(13/14*1rem);cursor:pointer;margin:6px 6px 0 0}
+button.act{background:var(--navy2);color:#fff;border:1px solid var(--vtos-nut-vien);border-radius:6px;padding:7px 13px;font:inherit;font-size:calc(13/14*1rem);cursor:pointer;margin:6px 6px 0 0}
 /* CHỮ TỐI TRÊN NÚT MÀU TRẠNG THÁI (sửa 13/9/2026 khi chuyển nền tối). Ở bản sáng, ba màu trạng
    thái là màu ĐẬM nên chữ trắng đọc được. Bản tối lật ngược: xanh lá #53C49A, vàng #F4C36A và đỏ
    #FF6B90 đều SÁNG, chữ trắng trên chúng chỉ đạt 1,6–2,7 lần – nhìn qua tưởng ổn vì nút vẫn nổi
@@ -1604,3 +1604,13 @@ html{font-size:var(--vtos-co-chu,16px)}
    là vừa sửa một chỗ chữ khó đọc vừa đẻ ra một chỗ khác. Nền `--panel2` đổi theo cả hai nền nên
    nó đúng ở cả hai, và chữ giữ nguyên `--ink` đã đo là đọc được. */
 .top .right .menu-toi a.on{background:var(--panel2);color:var(--ink)}
+
+/* ══ KS-NUT · 07/11/2026 · phương án A (data-mau-nut="navy", nền tối): chip / nhãn / nút chọn đang
+   tô --vtos-sky (nay #14538D) phải có viền #5A9BD4, không thì chìm vào nền thẻ #122C45 (1,8). ══ */
+:root[data-mau-nut="navy"]:not([data-nen="sang"]) :is(.cay-chip.on,.gd-nen button[aria-pressed="true"],.v14-ky-nut.chon){border-color:var(--vtos-nut-vien)}
+:root[data-mau-nut="navy"]:not([data-nen="sang"]) .tag.navy{box-shadow:inset 0 0 0 1px var(--vtos-nut-vien)}
+.gd-mau button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.gd-mau-o{display:inline-block;width:12px;height:12px;border-radius:3px;flex:0 0 auto}
+.gd-mau-navy{background:var(--vtos-mau-nut-a);box-shadow:inset 0 0 0 1px var(--vtos-mau-nut-a-vien)}
+.gd-mau-sang{background:var(--vtos-mau-nut-b)}
+.gd-goi-y{display:block;margin-top:4px;font-size:calc(11/14*1rem);color:var(--vtos-text-mute)}
