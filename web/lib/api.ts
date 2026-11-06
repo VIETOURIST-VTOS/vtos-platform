@@ -9,8 +9,8 @@ export type User = { id: number; username: string; full_name: string; role: stri
   /* TC-67 · giao diện của chính người này. `null` ở một trường nghĩa là CHƯA CHỌN, khác hẳn với
      "đã chọn đúng giá trị mặc định" – xem models/core.py. `giao_dien_mac_dinh` do máy chủ gửi
      xuống để màn hình không chép cứng hai con số ấy vào mã. */
-  giao_dien?: { nen: string | null; co_chu: number | null };
-  giao_dien_mac_dinh?: { nen: string; co_chu: number } };
+  giao_dien?: { nen: string | null; co_chu: number | null; mau_nut?: string | null };
+  giao_dien_mac_dinh?: { nen: string; co_chu: number; mau_nut?: string } };
 
 export function getToken() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } }
 export function getUser(): User | null { try { const s = localStorage.getItem(USER_KEY); return s ? JSON.parse(s) : null; } catch { return null; } }

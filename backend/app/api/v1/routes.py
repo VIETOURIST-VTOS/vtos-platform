@@ -21,7 +21,8 @@ from app.core.security import verify_password, create_token, hash_password
 from app.models.core import (User, Tour, ServiceRequest, Booking, Param, Alert, AuditLog, ROLES,
                              TOUR_TYPES, TOUR_STATUS, TOUR_TRON_GOI,
                              GIAO_DIEN_NEN, GIAO_DIEN_CO_MIN, GIAO_DIEN_CO_MAX,
-                             GIAO_DIEN_MAC_DINH_NEN, GIAO_DIEN_MAC_DINH_CO)
+                             GIAO_DIEN_MAC_DINH_NEN, GIAO_DIEN_MAC_DINH_CO,
+                             GIAO_DIEN_MAU_NUT, GIAO_DIEN_MAC_DINH_MAU_NUT)
 from app.services import rules as R
 from app.services import mat_khau_yeu as MKY
 from app.services import tours as T
@@ -70,8 +71,9 @@ def me(u: User = Depends(loc_theo_nguoi_dung("hồ sơ của chính người đ�
             # chọn, và màn hình phải phân biệt được "chưa chọn" với "đã chọn nền tối" – xem lý do
             # dài ở models/core.py. Mặc định gửi kèm riêng một trường để màn hình không phải
             # chép cứng hai con số ấy vào mã JavaScript; đổi mặc định thì đổi một chỗ ở máy chủ.
-            "giao_dien": {"nen": u.gd_nen or None, "co_chu": u.gd_co_chu},
-            "giao_dien_mac_dinh": {"nen": GIAO_DIEN_MAC_DINH_NEN, "co_chu": GIAO_DIEN_MAC_DINH_CO}}
+            "giao_dien": {"nen": u.gd_nen or None, "co_chu": u.gd_co_chu, "mau_nut": u.gd_mau_nut or None},
+            "giao_dien_mac_dinh": {"nen": GIAO_DIEN_MAC_DINH_NEN, "co_chu": GIAO_DIEN_MAC_DINH_CO,
+                                   "mau_nut": GIAO_DIEN_MAC_DINH_MAU_NUT}}
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
@@ -98,6 +100,7 @@ def me(u: User = Depends(loc_theo_nguoi_dung("hồ sơ của chính người đ�
 class GiaoDienVao(BaseModel):
     nen: str | None = None
     co_chu: int | None = None
+    mau_nut: str | None = None   # KS-NUT · "navy" | "sang"
 
 
 @router.put("/auth/giao-dien", tags=["auth"])
@@ -110,10 +113,14 @@ def dat_giao_dien(data: GiaoDienVao, u: User = Depends(current_user), db: Sessio
         if not (GIAO_DIEN_CO_MIN <= data.co_chu <= GIAO_DIEN_CO_MAX):
             raise HTTPException(422, f"Cỡ chữ phải từ {GIAO_DIEN_CO_MIN} đến {GIAO_DIEN_CO_MAX} px")
         u.gd_co_chu = data.co_chu
+    if data.mau_nut is not None:
+        if data.mau_nut not in GIAO_DIEN_MAU_NUT:
+            raise HTTPException(422, f"Màu nút không hợp lệ – chỉ nhận: {', '.join(GIAO_DIEN_MAU_NUT)}")
+        u.gd_mau_nut = data.mau_nut
     db.commit()
     # Trả lại ĐÚNG thứ vừa cất, đọc từ chính bản ghi chứ không dội lại thứ màn hình gửi lên: màn
     # hình cần biết máy chủ đã nhận cái gì, không phải biết nó đã gửi cái gì.
-    return {"nen": u.gd_nen or None, "co_chu": u.gd_co_chu}
+    return {"nen": u.gd_nen or None, "co_chu": u.gd_co_chu, "mau_nut": u.gd_mau_nut or None}
 
 
 @router.delete("/auth/giao-dien", tags=["auth"])
@@ -125,9 +132,9 @@ def xoa_giao_dien(u: User = Depends(current_user), db: Session = Depends(get_db)
     nay, và chính họ cũng không biết. Nút trên màn hình viết là "Trả về mặc định", nên nó phải
     làm đúng nghĩa ấy.
     """
-    u.gd_nen, u.gd_co_chu = "", None
+    u.gd_nen, u.gd_co_chu, u.gd_mau_nut = "", None, ""
     db.commit()
-    return {"nen": None, "co_chu": None}
+    return {"nen": None, "co_chu": None, "mau_nut": None}
 
 
 @router.post("/auth/password", tags=["auth"])
