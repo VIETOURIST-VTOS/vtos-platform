@@ -269,6 +269,7 @@ function KetSo() {
       <MucDoChan />
       <TachNhiem />
       <TienCapCha />
+      <DoiChieuLaiLo />
 
       <style jsx>{`
         .wrap { padding: 16px; max-width: 1000px; }
@@ -784,6 +785,160 @@ function TienCapCha() {
       ) : null}
     </>
   );
+}
+
+/** Đợt R5b-2 — THẺ ĐỌC: đối chiếu lãi lỗ tour, SỔ ↔ BẢNG TÍNH — trên màn KẾT SỔ.
+ *
+ *  VÌ SAO Ở `/ket-so` CHỨ KHÔNG Ở `/accounting`: màn Kế toán KHÔNG khai nhóm
+ *  `/api/v1/accounting` trong `MAN_HINH_API`, nên đặt thẻ ở đó buộc phải thêm một dòng vào
+ *  bảng quyền — và dòng ấy cộng vào `pham_vi_day_du`, tức bảng ký sẽ nói `tp_dh` (Trưởng
+ *  phòng Điều hành) với tới được cửa này, đúng thứ Đợt R5b-1 cố ý không mở. `/ket-so` đã
+ *  khai sẵn cả nhóm ấy và chỉ Kế toán + CNTT thấy, nên đặt ở đây KHÔNG đụng bảng quyền
+ *  một dòng nào. Chủ tịch chốt 06/11/2026 sau khi hàng rào `test_p2` bắt được chỗ này.
+ *
+ *  Cửa `/accounting/doi-chieu-lai-lo` vào main hôm nay (Đợt R5b-1, viết 02/11). Nhưng một con số
+ *  không có chỗ để đọc là việc CÒN THIẾU, không phải việc đã xong — ranh giới 09/9/2026. Thẻ này
+ *  là chỗ đọc ấy.
+ *
+ *  KHÔNG CÓ NÚT NÀO SỬA BÊN NÀO. Đối chiếu là để NÓI RA chênh lệch, không để sửa cho khớp. Sửa
+ *  bên bảng tính là đổi số qua một cửa không có bộ kiểm; sửa bên sổ còn là ghi sổ không qua
+ *  chứng từ.
+ *
+ *  BA ĐIỀU GIAO DIỆN PHẢI GIỮ, và cả ba là quy tắc chứ không phải trang trí:
+ *
+ *    - DÒNG CỘNG CHỈ GỘP NHỮNG DÒNG SO ĐƯỢC CẢ HAI BÊN. Máy chủ đã cộng đúng như vậy trong
+ *      `cong`; màn hình KHÔNG được tự cộng lại từ `dong`, vì `dong` bị cắt ở `gioi_han`.
+ *    - DÒNG THIẾU MỘT BÊN HIỆN LÀ «chưa so được», không phải «lệch bằng cả bên kia». Một tour
+ *      chưa ghi sổ mà báo lệch 900 triệu là nói SỔ SAI, trong khi sự thật là sổ chưa có gì.
+ *    - HAI CƠ SỞ NGÀY KHÁC NHAU thì NÓI RA. Sổ lọc theo ngày hạch toán, bảng tính lấy chuyến
+ *      theo ngày khởi hành. Lệch do chuyến tháng 12 mà hóa đơn về tháng 1 là lệch THẬT và là
+ *      một việc phải xử — gộp hai cơ sở ngày lại là xoá mất chính câu hỏi ấy.
+ */
+function DoiChieuLaiLo() {
+  const { toast } = useShell();
+  const [d, setD] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  // THÁNG TRƯỚC, không phải từ đầu năm: đối chiếu là việc CỦA MỘT KỲ — xong một kỳ rồi mới sang
+  // kỳ sau. (Thẻ «tài khoản cha» thì ngược lại, để từ đầu năm, vì đó là câu hỏi lũy kế.)
+  const thangTruoc = () => {
+    const n = new Date();
+    const d1 = new Date(n.getFullYear(), n.getMonth() - 1, 1);
+    const d2 = new Date(n.getFullYear(), n.getMonth(), 0);
+    const s = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    return [s(d1), s(d2)];
+  };
+  const [tu, setTu] = useState(thangTruoc()[0]);
+  const [den, setDen] = useState(thangTruoc()[1]);
+
+  const load = useCallback(async () => {
+    setBusy(true);
+    try {
+      setD(await api<any>(`/accounting/doi-chieu-lai-lo?tu=${tu}&den=${den}`));
+    } catch (e: any) {
+      toast(errMsg(e), true);
+    } finally {
+      setBusy(false);
+    }
+  }, [tu, den, toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // `fmtD` KHONG duoc nhap o man Ket so — khong them import chi de dinh dang mot cot.
+  const fmtNgay = (v: any) => (typeof v === "string" && v.length >= 10
+    ? `${v.slice(8, 10)}-${v.slice(5, 7)}-${v.slice(0, 4)}` : String(v ?? ""));
+  const oSo = (v: any) => (v === null || v === undefined ? "—" : vnd(v));
+  const c = d?.cong;
+
+  return (<>
+    <h2 style={{ marginTop: 28 }}>Đối chiếu lãi lỗ tour — SỔ ↔ BẢNG TÍNH</h2>
+
+    <div className="row">
+      <label>Từ ngày <input type="date" value={tu} onChange={(e) => setTu(e.target.value)} /></label>
+      <label>đến <input type="date" value={den} onChange={(e) => setDen(e.target.value)} /></label>
+      <button className="ghost" onClick={load} disabled={busy}>Xem lại</button>
+      <Tag cls="warn">CHỈ ĐỌC — không sửa bên nào</Tag>
+      {d ? (d.khop ? <Tag cls="ok">Khớp</Tag> : <Tag cls="red">Có chênh lệch</Tag>) : null}
+    </div>
+
+    {d && <>
+      <div className="card">
+        <div className="row">
+          <span className="chip"><b>{d.tong_dong}</b> mã tour</span>
+          <span className="chip"><b>{c?.so_dong_so_duoc ?? 0}</b> so được cả hai bên</span>
+          <span className="chip"><b>{c?.so_dong_chua_so_duoc ?? 0}</b> chưa so được</span>
+          <span className="chip">lệch lợi nhuận <b>{oSo(c?.lech_loi_nhuan)}</b></span>
+        </div>
+        <p className="muted">{d.ghi_chu}</p>
+
+        {/* Hai cơ sở ngày — nói ra, không gộp. */}
+        <p className="muted small">
+          {d.co_so_ngay?.so} · {d.co_so_ngay?.bang_tinh}
+        </p>
+
+        {/* Ba rổ cảnh báo đến THẲNG từ máy chủ — màn hình không tự nghĩ ra rổ nào. */}
+        {(d.canh_bao || []).map((cb: any, i: number) => (
+          <div key={i} className={cb.muc === "do" ? "red" : "warn"} style={{ padding: "8px 10px", borderRadius: 8, margin: "8px 0" }}>
+            <b>{cb.so_dong} dòng — {cb.ten}</b>
+            <div className="small">{cb.chi_tiet}</div>
+            {(cb.ma || []).length ? <div className="small">Mã: {(cb.ma || []).join(", ")}</div> : null}
+          </div>
+        ))}
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th rowSpan={2}>Mã tour</th><th rowSpan={2}>Tên chuyến</th><th rowSpan={2}>Khởi hành</th>
+            <th colSpan={3} style={{ textAlign: "center" }}>SỔ</th>
+            <th colSpan={3} style={{ textAlign: "center" }}>BẢNG TÍNH</th>
+            <th rowSpan={2} className="num">Lệch lợi nhuận</th>
+          </tr>
+          <tr>
+            <th className="num">Doanh thu</th><th className="num">Chi phí</th><th className="num">Lợi nhuận</th>
+            <th className="num">Doanh thu</th><th className="num">Giá vốn</th><th className="num">Lợi nhuận</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(d.dong || []).length ? (d.dong as any[]).map((r, i) => (
+            <tr key={r.ma || i}>
+              <td>{r.ma}</td>
+              <td className="muted">{r.ten_tour || "—"}</td>
+              <td>{r.ngay_khoi_hanh ? fmtNgay(r.ngay_khoi_hanh) : "—"}</td>
+              <td className="num">{oSo(r.so_doanh_thu)}</td>
+              <td className="num">{oSo(r.so_chi_phi)}</td>
+              <td className="num">{oSo(r.so_loi_nhuan)}</td>
+              <td className="num">{oSo(r.bt_doanh_thu)}</td>
+              <td className="num">{oSo(r.bt_gia_von)}</td>
+              <td className="num">{oSo(r.bt_loi_nhuan)}</td>
+              {/* Thiếu một bên thì KHÔNG in một con số lệch — in trạng thái thứ ba. */}
+              <td className="num">
+                {r.chua_so_duoc ? <Tag>chưa so được</Tag>
+                  : r.khop ? <Tag cls="ok">khớp</Tag>
+                    : <b>{oSo(r.lech_loi_nhuan)}</b>}
+              </td>
+            </tr>
+          )) : <tr><td colSpan={10} className="muted">Không có mã tour nào trong khoảng ngày này.</td></tr>}
+
+          {/* DÒNG CỘNG LẤY THẲNG TỪ `cong` CỦA MÁY CHỦ, không tự cộng lại từ `dong`: `dong` bị
+              cắt ở `gioi_han`, nên cộng ở đây là cộng một phần rồi gọi đó là tổng. */}
+          {c && <tr>
+            <td colSpan={3}><b>Cộng</b> <span className="muted small">({c.so_dong_so_duoc} dòng so được)</span></td>
+            <td className="num"><b>{oSo(c.so_doanh_thu)}</b></td>
+            <td className="num"><b>{oSo(c.so_chi_phi)}</b></td>
+            <td className="num"><b>{oSo(c.so_loi_nhuan)}</b></td>
+            <td className="num"><b>{oSo(c.bt_doanh_thu)}</b></td>
+            <td className="num"><b>{oSo(c.bt_gia_von)}</b></td>
+            <td className="num"><b>{oSo(c.bt_loi_nhuan)}</b></td>
+            <td className="num"><b>{oSo(c.lech_loi_nhuan)}</b></td>
+          </tr>}
+        </tbody>
+      </table>
+
+      {d.cat_bot
+        ? <p className="muted">Hiện {d.hien_dong} trong {d.tong_dong} mã — bảng này ĐÃ CẮT BỚT, nên đừng cộng nhẩm ở đây; <b>dòng Cộng mới là tổng</b>, và nó chỉ gộp những dòng so được cả hai bên.</p>
+        : <p className="muted">Hiện đủ {d.tong_dong} mã. Dòng Cộng chỉ gộp {c?.so_dong_so_duoc ?? 0} dòng so được cả hai bên — hai rổ thiếu ở trên KHÔNG vào tổng.</p>}
+    </>}
+  </>);
 }
 
 export default function Page() {

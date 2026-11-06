@@ -90,6 +90,11 @@ HANG_RAO = (
     # Bon luat nay do BANG CUA THAT qua TestClient, khong doc ma nguon: mot luat doc ma nguon chi
     # chung minh duoc rang chu ay co trong tep, khong chung minh duoc cua tra ve gi.
     "tests/test_tkc1_but_toan_ghi_vao_tai_khoan_cha.py",
+    # ── THE DOI CHIEU LAI LO TOUR, them ngay 06/11/2026 (Dot R5b-2) ──────────────────────────
+    # Bon luat do BANG CUA THAT qua TestClient. Hai luat noi ve man hinh thi cat rieng THAN THE
+    # de do — khong do ca tep, vi ca tep `accounting/page.tsx` co nut ghi that o cho khac, va
+    # do ca tep la do nham nguoi.
+    "tests/test_r5b2_the_doi_chieu_lai_lo.py",
 )
 
 
