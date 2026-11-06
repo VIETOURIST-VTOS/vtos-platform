@@ -311,7 +311,127 @@ function BctcPanel({ toast, period, isKT, isKy }: { toast: (m: string, e?: boole
       <h2>Báo cáo kết quả hoạt động kinh doanh – từ {fmtD(rep.since)} đến {fmtD(rep.upto)}</h2>
       <div className="panel wrap"><table><thead><tr><th>Chỉ tiêu</th><th>Mã</th><th>TM</th><th>Kỳ này</th><th>Cùng kỳ năm trước</th></tr></thead><tbody>{rep.kqkd.map(row)}</tbody></table></div>
       <p className="muted">Lãi/lỗ chưa kết chuyển tính vào 420: {vnd(rep.unposted_pl)}. Lưu chuyển tiền tệ gián tiếp và thuyết minh B09 làm ở bước tiếp theo.</p>
+      {/* DOT V341-1 — thuyet minh cho chi tieu 321 va 339 ngay tren. Dat TRONG khoi `{rep && …}`
+          nen the TU AN voi vai khong doc duoc BCTC, thay vi hien ra roi nhan 403. */}
+      <Vay341 toast={toast} since={since} upto={upto} bctc={rep} />
     </>}
+  </>;
+}
+
+// ── ĐỢT V341-1 06/11/2026 — THẺ ĐỌC «CHI TIẾT VAY VÀ NỢ THUÊ TÀI CHÍNH THEO NGÂN HÀNG, TK 341»
+//
+// VÌ SAO CÓ ĐỢT NÀY. Cửa `GET /reports/vay-341` và bản `.xlsx` của nó đã nằm trên main từ trước
+// (`api/v1/accounting.py`, dựng từ `services/bctc.py::loan_bank_detail_341`), và `test_misa.py`
+// gọi nó nên nó chạy đúng. Nhưng quét toàn bộ `web/**/*.tsx` ngày 06/11/2026: chuỗi `vay-341`
+// xuất hiện ĐÚNG 0 LẦN — không màn hình nào gọi. Theo ranh giới công việc 09/9/2026, một con số
+// không có chỗ để đọc là việc CÒN THIẾU, không phải việc đã xong. Đúng hình Đợt R5b-1 và TKC-1
+// cùng ngày. ĐỢT NÀY KHÔNG ĐỔI MỘT CON SỐ NÀO, chỉ mở chỗ để đọc con số đã có.
+//
+// VÌ SAO ĐẶT TRONG `BctcPanel` CHỨ KHÔNG DỰNG MÀN HÌNH MỚI — đây là chỗ giữ cho đợt không phải
+// ký nới quyền. Bảng này là THUYẾT MINH cho chỉ tiêu 321 và 339 của Bảng cân đối, nên nó thuộc
+// về tab BCTC. Và màn `/accounting` đã khai sẵn nhóm `/api/v1/reports` trong `MAN_HINH_API`,
+// chính nhóm mà tab này đang gọi. Đặt ở màn khác thì buộc phải thêm một dòng vào bảng quyền, mà
+// một dòng thêm vào đó cộng phạm vi cho MỌI vai đang có màn ấy (bài học Đợt R5b-2, 06/11/2026).
+//
+// VÀ NÓ TỰ ẨN VỚI VAI KHÔNG GỌI ĐƯỢC. Thẻ nằm TRONG khối `{rep && …}`, mà `rep` là kết quả của
+// `/reports/bctc` — cùng bộ vai `READ` với cửa vay. Vai nào không đọc được vay thì cũng không
+// đọc được BCTC, nên không ai thấy một cái thẻ chỉ để nhận 403. Không phải chuyện giả định:
+// `tp_dh` vào được màn `/accounting` nhưng KHÔNG nằm trong `READ` của `api/v1/accounting.py`.
+//
+// BA LUẬT HIỂN THỊ — cả ba là quy tắc, không phải trang trí:
+//
+//   (1) DÒNG CỘNG LẤY THẲNG TỪ `total` CỦA MÁY CHỦ. Màn hình không tự cộng lại từ `rows`. Cùng
+//       lý do với thẻ Đợt R5b-2: cộng ở màn hình là cộng cái mình đang thấy rồi gọi nó là tổng.
+//
+//   (2) BỐN CỘT ĐỨNG RIÊNG. Trả nợ trong kỳ (Nợ) và vay thêm trong kỳ (Có) KHÔNG gộp thành một
+//       số «biến động»: trả 4,5 tỷ và vay thêm 3 tỷ gộp lại thành «−1,5 tỷ» là xoá mất đúng câu
+//       người đọc cầm bảng này để hỏi. Máy chủ đã trả riêng hai cột — giữ nguyên hai cột.
+//
+//   (3) ĐỐI CHIẾU VỚI BẢNG CÂN ĐỐI DÙNG ĐÚNG CHỈ TIÊU 321 + 339, và đây là chỗ đo được chứ
+//       không phải chọn bừa: trong `data/bctc_tt99_mau.json`, 321 = «Vay và nợ thuê tài chính
+//       ngắn hạn» và 339 = «Vay và nợ thuê tài chính dài hạn», còn 320 = «Phải trả ngắn hạn
+//       khác» và 338 = «Phải trả dài hạn khác» — hai thứ khác hẳn. `bctc.py` cũng tính vay bằng
+//       `d("321", "339")` ở hai chỗ (dòng 302 và 326).
+//
+//       CẢNH BÁO ĐO ĐƯỢC, CỐ Ý KHÔNG SỬA TRONG ĐỢT NÀY: hằng số `LOAN_KIND_BS` ở `bctc.py:352`
+//       ghi `{"34111": "320", "34112": "339", "34113": "321"}` — tức gán vay ngắn hạn vào chỉ
+//       tiêu «Phải trả ngắn hạn khác». Nó MÂU THUẪN với `bs_credit` của chính danh mục tài khoản
+//       (34111 → 321). Hôm nay nó vô hại vì KHÔNG CHỖ NÀO GỌI NÓ (đếm được: 1 lần xuất hiện
+//       trong toàn kho, là chính dòng khai). Thẻ này cố ý KHÔNG dùng nó. Sửa hay xoá nó là động
+//       vào `bctc.py` — tệp tính số của BCTC — nên để thành một việc riêng có người ký.
+function Vay341({ toast, since, upto, bctc }: { toast: (m: string, e?: boolean) => void; since: string; upto: string; bctc: any }) {
+  const [d, setD] = useState<any>(null);
+  const [mo, setMo] = useState(false);
+  useEffect(() => {
+    if (!mo) return;
+    api(`/reports/vay-341?upto=${upto}&since=${since}`).then(setD).catch((x) => { setD(null); toast(errMsg(x), true); });
+  }, [mo, since, upto]); // eslint-disable-line
+
+  // Chỉ tiêu vay trên Bảng cân đối. Lấy từ `bctc.thtc` đang hiện ngay phía trên, nên hai con số
+  // chắc chắn cùng một kỳ và cùng một lần tính — không gọi lại cửa BCTC lần thứ hai.
+  const ct = (ma: string) => (bctc?.thtc || []).find((r: any) => r.code === ma)?.now ?? null;
+  const bs321 = ct("321");
+  const bs339 = ct("339");
+  const coBS = bs321 !== null && bs339 !== null;
+  const tongBS = coBS ? (bs321 || 0) + (bs339 || 0) : null;
+  const lech = d && tongBS !== null ? (d.total?.close || 0) - tongBS : null;
+
+  if (!mo) return <p><button className="act grey" onClick={() => setMo(true)}>Chi tiết vay 341 theo ngân hàng</button>
+    <span className="muted"> — thuyết minh cho chỉ tiêu 321 và 339 ở bảng trên.</span></p>;
+
+  return <>
+    <h2>Chi tiết vay và nợ thuê tài chính theo ngân hàng – TK 341</h2>
+    <p className="muted">Từ {fmtD(since)} đến {fmtD(upto)}. Bảng CHỈ ĐỌC — số dựng từ sổ đã ghi, không sửa được ở đây.
+      {" "}<button className="act grey" style={{ margin: 0 }} onClick={() => dl(`/reports/vay-341.xlsx?upto=${upto}&since=${since}`, `CHI_TIET_VAY_341_${upto}.xlsx`)}>Xuất Excel</button></p>
+    {!d ? <p className="muted">Đang lấy số…</p> : (d.rows || []).length === 0
+      ? <p className="muted">Không có dòng sổ vay nào trong khoảng ngày này.</p>
+      : <>
+        <div className="panel wrap"><table>
+          <thead><tr><th>Ngân hàng / đối tượng</th><th>Tiểu khoản</th>
+            <th style={{ textAlign: "right" }}>Dư đầu kỳ (Có)</th>
+            <th style={{ textAlign: "right" }}>Trả nợ trong kỳ (Nợ)</th>
+            <th style={{ textAlign: "right" }}>Vay thêm trong kỳ (Có)</th>
+            <th style={{ textAlign: "right" }}>Dư cuối kỳ (Có)</th></tr></thead>
+          <tbody>
+            {/* Không bọc `Fragment`: tệp này không nhập `Fragment`, và thêm một dòng nhập chỉ để
+                nhóm mấy cái `<tr>` là đụng dòng `import` chung của cả màn. Gộp thẳng thành MỘT
+                mảng `<tr>` phẳng — bảng vẫn đúng, và đợt chạm ít tệp hơn. */}
+            {Object.keys(d.by_kind || {}).sort().flatMap((acc: string) => [
+              <tr key={"n" + acc} style={{ fontWeight: 700 }}><td colSpan={6}>{acc} · {d.by_kind[acc].name}</td></tr>,
+              ...(d.rows || []).filter((r: any) => r.account === acc).map((r: any, i: number) =>
+                <tr key={acc + "-" + i}>
+                  <td>{r.partner_code ? "" : <Tag cls="warn">chưa phân loại</Tag>} {r.bank}</td>
+                  <td className="mono">{r.account}</td>
+                  <td style={{ textAlign: "right" }}>{vnd(r.open)}</td>
+                  <td style={{ textAlign: "right" }}>{vnd(r.debit_in_period)}</td>
+                  <td style={{ textAlign: "right" }}>{vnd(r.credit_in_period)}</td>
+                  <td style={{ textAlign: "right" }}>{vnd(r.close)}</td>
+                </tr>),
+            ])}
+            {/* DÒNG CỘNG LẤY THẲNG TỪ `total` CỦA MÁY CHỦ — xem luật (1) ở đầu khối. */}
+            <tr style={{ fontWeight: 700 }}>
+              <td colSpan={2}>CỘNG</td>
+              <td style={{ textAlign: "right" }}>{vnd(d.total.open)}</td>
+              <td style={{ textAlign: "right" }}>{vnd(d.total.debit_in_period)}</td>
+              <td style={{ textAlign: "right" }}>{vnd(d.total.credit_in_period)}</td>
+              <td style={{ textAlign: "right" }}>{vnd(d.total.close)}</td>
+            </tr>
+          </tbody>
+        </table></div>
+        {!coBS ? <p className="muted">Bảng cân đối chưa lập xong nên chưa đối chiếu được chỉ tiêu 321 và 339.</p>
+          : Math.abs(lech as number) < 1
+            ? <p><Tag cls="ok">Khớp Bảng cân đối: 321 + 339 = {vnd(tongBS as number)}</Tag></p>
+            : <div className="panel" style={{ padding: 10 }}>
+              <p style={{ margin: 0 }}><Tag cls="red">LỆCH với Bảng cân đối {vnd(Math.abs(lech as number))}</Tag></p>
+              <p className="muted" style={{ margin: "6px 0 0" }}>
+                Dòng CỘNG là {vnd(d.total.close)}, còn chỉ tiêu 321 + 339 là {vnd(tongBS as number)}.
+                Hai bên đọc cùng một bộ sổ nhưng gom khác nhau: bảng này gom theo ĐỐI TƯỢNG
+                (<span className="mono">partner_code</span>), Bảng cân đối gom theo TÀI KHOẢN. Chênh
+                nghĩa là có dòng sổ vay không mang mã đối tượng — bảng này xếp chúng vào «Đối tượng
+                nội bộ chưa phân loại ngân hàng», và đó là chỗ cần sửa ở dữ liệu gốc, không phải ở đây.
+              </p>
+            </div>}
+      </>}
   </>;
 }
 

@@ -99,6 +99,10 @@ HANG_RAO = (
     # Luat 3 do cho nang nhat: ma tour la `project_code` tren tung dong so, nen doi ma sau khi
     # so da ghi la cat doi so cua mot chuyen. No TU DUNG CANH roi doi cua tu choi.
     "tests/test_td1_sales_admin_ma_tour_doan.py",
+    # ── CHI TIET VAY 341 THEO NGAN HANG, them ngay 06/11/2026 (Dot V341-1) ──────────────────
+    # Luat 2 canh cho nang nhat: dot nay KHONG duoc noi bang quyen. Luat 4 canh the doi chieu
+    # dung chi tieu 321+339, khong phai 320/338 — canh san cai bay `LOAN_KIND_BS` tren main.
+    "tests/test_v341_the_chi_tiet_vay_341.py",
 )
 
 
