@@ -38,6 +38,10 @@ from app.main import app
 
 client = TestClient(app)
 TOK = {}
+# KS-V341 · 07/11/2026: vay thêm của SỔ TRƯỚC KHI DỰNG CẢNH. Trên CI, hàng rào gộp chạy nhiều tệp
+# phép thử trong MỘT tiến trình nên CSDL dùng chung — tệp khác đã ghi khoản vay khác (đo được: 12 tỷ)
+# vào cùng kỳ. Luật đo PHẦN TĂNG do chính cảnh này ghi, không đo con số tuyệt đối của cả sổ.
+CO_TRUOC = {"credit_in_period": 0.0}
 
 GOC = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MAN = os.path.join(GOC, "web", "app", "accounting", "page.tsx")
@@ -74,6 +78,9 @@ def _dung_canh():
     chứ không giả vờ rằng cửa cho phép.
     """
     h = login("ketoan")
+    r0 = client.get("/api/v1/reports/vay-341", headers=h, params={"since": TU, "upto": DEN})
+    assert r0.status_code == 200, r0.text[:300]
+    CO_TRUOC["credit_in_period"] = r0.json()["total"]["credit_in_period"]
     ma_bt = []
     for mo_ta, tien in (("V341-1 dựng cảnh — vay có mã ngân hàng", 5_000_000),
                         ("V341-1 dựng cảnh — vay rồi gỡ mã đối tượng", 2_000_000)):
@@ -132,8 +139,9 @@ def test_v341_1_cua_tra_du_moi_o_the_doc_va_cong_dung_bang_tong_cac_dong():
             "`total." + o + "` không bằng tổng các dòng")
 
     # Cảnh đã dựng: 7 triệu vay thêm, trong đó 2 triệu không mang mã đối tượng.
-    assert abs(d["total"]["credit_in_period"] - 7_000_000) < 1, (
-        "vay thêm trong kỳ phải là 7.000.000 (cảnh dựng), nhận " + str(d["total"]["credit_in_period"]))
+    tang = d["total"]["credit_in_period"] - CO_TRUOC["credit_in_period"]
+    assert abs(tang - 7_000_000) < 1, (
+        "cảnh dựng phải làm vay thêm trong kỳ TĂNG đúng 7.000.000, tăng " + str(tang))
     assert any(not x["partner_code"] for x in d["rows"]), (
         "dòng vay KHÔNG mang mã đối tượng phải hiện ra thành một dòng riêng — gộp nó vào một ngân "
         "hàng nào đó là giấu mất chỗ dữ liệu chưa sạch")
