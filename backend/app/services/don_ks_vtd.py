@@ -485,6 +485,19 @@ def so_hoan_neu_huy(d: DonKsVtd, tra: int, hom_nay: date) -> int:
     return min(tra, max(0, n - int(d.giam_voucher or 0)))
 
 
+def hoan_tung_dong(d: DonKsVtd, hom_nay: date) -> list[dict]:
+    """KS-20c (bản v1.3 M4): hủy thì từng gói / phòng hoàn bao nhiêu — cùng luật so_hoan_neu_huy, chưa trừ voucher.
+    Số hoàn cuối cùng vẫn là so_hoan_neu_huy (đã trừ voucher, không quá số đã trả)."""
+    ra = []
+    for x in d.dong or []:
+        tien = int(x.get("tien") or 0) + int(x.get("thue") or 0)
+        mp = bool(x.get("huy_han")) and hom_nay < date.fromisoformat(str(x["huy_han"])[:10])
+        ra.append({"loai_phong": x.get("loai_phong", ""), "goi": x.get("goi", ""), "so": int(x.get("so") or 1),
+                   "phong": sorted(kh["phong"] for kh in x.get("khach", [])), "tien": tien, "mien_phi": mp,
+                   "huy_han": x.get("huy_han"), "huy_gio_chot": x.get("huy_gio_chot") or "", "hoan": tien if mp else 0})
+    return ra
+
+
 def _huy(db: Session, d: DonKsVtd, boi: str, ly_do: str, now: datetime, toan_bo: bool = False) -> DonKsVtd:
     tra = da_tra(db, d)
     d.so_hoan = tra if toan_bo else so_hoan_neu_huy(d, tra, now.date())
@@ -535,6 +548,7 @@ def ra_khach(db: Session, d: DonKsVtd, now: datetime | None = None) -> dict:
             "ly_do_huy": d.ly_do_huy, "so_hoan": int(d.so_hoan), "hoan_tt": d.hoan_tt, "hoan_tt_ten": HOAN_TT_KS.get(d.hoan_tt, ""),
             "da_hoan_tien": int(d.da_hoan_tien or 0), "co_the_tra": d.trang_thai == "cho_tra" and tra < int(d.tong or 0),
             "co_the_huy": huy_duoc, "hoan_neu_huy": so_hoan_neu_huy(d, tra, now.date()) if huy_duoc else 0,
+            "hoan_dong": hoan_tung_dong(d, now.date()) if huy_duoc and tra > 0 else [],   # KS-20c
             "danh_gia": _dg(db, d, now),
             "the_bat": SP.cong_the_bat(), "tao_luc": d.tao_luc.isoformat(timespec="minutes") if d.tao_luc else None}
 
