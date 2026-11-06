@@ -49,6 +49,7 @@ class ThietKeIn(BaseModel):
 
 class GuiIn(BaseModel):
     thiet_ke: dict
+    ho_ten: str = ""            # KS-19m: bắt buộc khi hồ sơ khách chưa có tên
     dien_thoai: str = ""
     dong_y: bool = False
     ma: str = ""

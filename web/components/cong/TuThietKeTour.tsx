@@ -48,7 +48,7 @@ export default function TuThietKeTour({ toi }: { toi?: any }) {
   const [mo, setMo] = useState<"" | "khach" | "phong">("");
   const [nguon, setNguon] = useState<Record<string, any>>({});
   const [kq, setKq] = useState<any>(null); const [loiTinh, setLoiTinh] = useState("");
-  const [gui, setGui] = useState({ dien_thoai: toi?.dien_thoai || "", ghi_chu: "", dong_y: false });
+  const [gui, setGui] = useState({ ho_ten: toi?.ho_ten || "", dien_thoai: toi?.dien_thoai || "", ghi_chu: "", dong_y: false });
   const [daGui, setDaGui] = useState<any>(null); const [loi, setLoi] = useState(""); const [busy, setBusy] = useState(false);
   const [them, setThem] = useState<Record<number, string>>({});
   // TK-2: thiết kế đã gửi + báo giá chính thức (đã duyệt, hiệu lực 24 giờ) — khách đồng ý ngay tại đây
@@ -137,7 +137,7 @@ export default function TuThietKeTour({ toi }: { toi?: any }) {
   const guiDi = async () => {
     setBusy(true); setLoi("");
     try {
-      const r = await goiCong("/khach/tour-doan/gui", { thiet_ke: thietKe(), dien_thoai: gui.dien_thoai, dong_y: gui.dong_y, ma: daGui?.ma || "" });
+      const r = await goiCong("/khach/tour-doan/gui", { thiet_ke: thietKe(), ho_ten: gui.ho_ten, dien_thoai: gui.dien_thoai, dong_y: gui.dong_y, ma: daGui?.ma || "" });
       setDaGui(r); setKq(r.du_toan); taiCuaToi();
       try { window.scrollTo(0, 0); } catch { /* bỏ qua */ }
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
@@ -332,7 +332,9 @@ export default function TuThietKeTour({ toi }: { toi?: any }) {
         <div className="ksv-f2"><div><b>Bao gồm</b><ul className="tk-ul">{kq.bao_gom.map((x: string) => <li key={x}>{x}</li>)}</ul></div>
           <div><b>Không bao gồm</b><ul className="tk-ul">{kq.khong_bao_gom.map((x: string) => <li key={x}>{x}</li>)}</ul></div></div>
       </>}
-      <div className="ksv-f2">
+      <div className="ksv-f2 tk-f3">
+        <label className="ksv-fld">Họ tên / Tên công ty<input value={gui.ho_ten} maxLength={160} required autoComplete="name" placeholder="Bắt buộc — ghi lên báo giá và hợp đồng"
+          onChange={(e) => setGui({ ...gui, ho_ten: e.target.value })} /></label>
         <label className="ksv-fld">Số điện thoại<input inputMode="tel" value={gui.dien_thoai} placeholder="09xx xxx xxx" onChange={(e) => setGui({ ...gui, dien_thoai: e.target.value })} /></label>
         <label className="ksv-fld">Ghi chú cho Sales<input value={gui.ghi_chu} maxLength={1000} placeholder="Gala, hóa đơn công ty, ăn chay…" onChange={(e) => setGui({ ...gui, ghi_chu: e.target.value })} /></label></div>
       {!daGui && <label className="ksv-chk"><input type="checkbox" checked={gui.dong_y} onChange={(e) => setGui({ ...gui, dong_y: e.target.checked })} />
@@ -354,6 +356,7 @@ const CSS = `
 @media (max-width:560px){.tk-nh{flex-basis:100%}}
 .tk-in{border:1px solid var(--ksv-line);border-radius:8px;padding:8px 10px;font:inherit;min-height:40px;background:#fff;color:var(--ksv-fg)}
 .tk-dd{all:unset;cursor:pointer;border:1px solid var(--ksv-line);border-radius:8px;padding:8px 10px;min-height:24px;background:#fff;font-weight:600}
+.tk-f3{grid-template-columns:repeat(3,minmax(0,1fr))}@media (max-width:900px){.tk-f3{grid-template-columns:1fr}}
 .tk-tuoi{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;font-size:12px}
 .tk-diem,.tk-ngay{border:1px solid var(--ksv-line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .tk-dem{display:inline-flex;align-items:center;gap:8px}
