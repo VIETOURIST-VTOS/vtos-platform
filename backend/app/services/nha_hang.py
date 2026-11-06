@@ -43,7 +43,15 @@ THANH_PHO = {
     "TP. Hồ Chí Minh": ("nam", ("ho chi minh city", "ho chi minh", "saigon", "sai gon", "hcmc", "tp hcm", "hcm")),
     "Vũng Tàu": ("nam", ("vung tau", "ba ria vung tau")), "Phan Thiết – Mũi Né": ("nam", ("phan thiet", "mui ne", "binh thuan")),
     "Cần Thơ": ("nam", ("cantho", "mekong delta", "mekong", "mien tay", "dong bang song cuu long")), "Châu Đốc": ("nam", ("chau doc", "an giang")), "Phú Quốc": ("nam", ("phu quoc island", "phuquoc")),
-    "Bến Tre": ("nam", ()), "Trà Vinh": ("nam", ("travinh",)), "Cà Mau": ("nam", ()), "Côn Đảo": ("nam", ("con dao", "con son"))}
+    "Bến Tre": ("nam", ()), "Trà Vinh": ("nam", ("travinh",)), "Cà Mau": ("nam", ()), "Côn Đảo": ("nam", ("con dao", "con son")),
+    # KS-19n (Chủ tịch chọn «thêm theo thành phố» 06/11/2026): 15 điểm cho khách sạn 4–5★ đợt 34 tỉnh, thành còn thiếu
+    # điểm đến. Vẫn theo thành phố lớn như lề 28/10; tên tỉnh cũ / không dấu để khớp tệp nguồn.
+    "Bắc Ninh": ("bac", ("bac ninh",)), "Thái Nguyên": ("bac", ("thai nguyen",)), "Lạng Sơn": ("bac", ("lang son",)),
+    "Hưng Yên": ("bac", ("hung yen", "yen my")), "Thái Bình": ("bac", ("thai binh",)),
+    "Tam Đảo": ("bac", ("tam dao", "vinh phuc")), "Việt Trì": ("bac", ("viet tri", "phu tho")),
+    "Sơn La": ("bac", ("son la",)), "Lai Châu": ("bac", ("lai chau",)), "Điện Biên Phủ": ("bac", ("dien bien phu", "dien bien")),
+    "Hà Tĩnh": ("trung", ("ha tinh", "ky anh", "vung ang")), "Lý Sơn": ("trung", ("ly son",)),
+    "Tây Ninh": ("nam", ("tay ninh",)), "Biên Hòa": ("nam", ("bien hoa", "dong nai")), "Mỹ Tho": ("nam", ("my tho", "tien giang"))}
 MIEN = {"bac": "Miền Bắc", "trung": "Miền Trung", "tay_nguyen": "Tây Nguyên", "nam": "Miền Nam"}
 
 TRUONG_NH = ("ten", "tinh_thanh", "khu_vuc", "am_thuc", "gio_phuc_vu", "tien_ich", "mo_ta")
