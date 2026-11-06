@@ -19,7 +19,9 @@ type BG = { id: number; ma: string; mang: string; khach_ten: string; khach_dien_
             so_khach: number; ngay_khoi_hanh: string | null; trang_thai: string; trang_thai_ten: string;
             khach_email: string; bang_gia_id: number | null;
             duoi_bien: boolean; giai_trinh: string; bien_luc_gui: number | null; phien_ban: number;
-            dong: Dong[]; ban_da_gui: any[]; cong_bien: any };
+            dong: Dong[]; ban_da_gui: any[]; cong_bien: any;
+            // KS-19k: báo giá đoàn lập từ thiết kế — chung bảng, chỉ xem ở đây; tiền lấy từ phần riêng (không giá vốn)
+            nguon?: string; thiet_ke?: { ma: string; tong_ban: number | null } };
 
 type BangGia = { id: number; ma: string; ten: string; mang: string; hieu_luc_tu: string;
                  hieu_luc_den: string | null; con_hieu_luc: boolean;
@@ -29,7 +31,7 @@ type BangGia = { id: number; ma: string; ten: string; mang: string; hieu_luc_tu:
 const RONG: Dong = { hang_khach: "nguoi_lon", mo_ta: "", so_luong: 1, don_gia: 0,
                      gia_von_don_vi: null, chiet_khau: 0 };
 
-const vnd = (n: number) => (n || 0).toLocaleString("vi-VN") + " đ";
+const vnd = (n: number | null | undefined) => (n || 0).toLocaleString("vi-VN") + " đ";
 const pct = (n: number | null) => (n === null || n === undefined ? "–" : (n * 100).toFixed(1) + "%");
 
 function BaoGia() {
@@ -336,6 +338,7 @@ function BaoGia() {
             <tbody>
               {ds.map((b) => {
                 const c = b.cong_bien;
+                const tuTK = b.nguon === "thiet_ke";
                 return (
                   <>
                     <tr key={b.id}>
@@ -343,23 +346,25 @@ function BaoGia() {
                       <td><b>{b.khach_ten}</b><div className="muted small">{b.khach_dien_thoai}</div></td>
                       <td>{b.so_khach}</td>
                       <td>{b.ngay_khoi_hanh || "–"}</td>
-                      <td style={{ textAlign: "right" }}>{vnd(c.tong_ban)}</td>
+                      <td style={{ textAlign: "right" }}>{vnd(tuTK ? b.thiet_ke?.tong_ban : c.tong_ban)}</td>
                       <td>
-                        {!c.du_co_so ? <Tag cls="warn">chưa đủ cơ sở</Tag>
+                        {tuTK ? (b.bien_luc_gui != null ? <Tag cls={b.duoi_bien ? "red" : "ok"}>{pct(b.bien_luc_gui)}</Tag> : "–")
+                          : !c.du_co_so ? <Tag cls="warn">chưa đủ cơ sở</Tag>
                           : c.dat ? <Tag cls="ok">{pct(c.bien)}</Tag>
                           : <Tag cls="red">{pct(c.bien)}</Tag>}
                         {b.duoi_bien ? <div className="muted small">đã gửi dưới biên</div> : null}
                       </td>
                       <td>{b.trang_thai_ten}</td>
                       <td className="nut">
-                        {soan && b.trang_thai === "nhap" &&
+                        {tuTK && <span className="muted small">Từ thiết kế {b.thiet_ke?.ma} · xử lý ở Tour đoàn</span>}
+                        {soan && !tuTK && b.trang_thai === "nhap" &&
                           <button className="ghost" disabled={dang} onClick={() => moSua(b)}>Sửa</button>}
-                        {soan && ["nhap", "da_gui"].includes(b.trang_thai) &&
+                        {soan && !tuTK && ["nhap", "da_gui"].includes(b.trang_thai) &&
                           <button className="ghost" disabled={dang} onClick={() => gui(b)}>Gửi khách</button>}
-                        {soan && b.trang_thai === "da_gui" &&
+                        {soan && !tuTK && b.trang_thai === "da_gui" &&
                           <button className="ghost" disabled={dang}
                                   onClick={() => hanh(b, "khach-chot", "Khách đã chốt")}>Khách chốt</button>}
-                        {soan && b.trang_thai === "khach_chot" &&
+                        {soan && !tuTK && b.trang_thai === "khach_chot" &&
                           <button className="ghost" disabled={dang}
                                   onClick={() => lapHopDong(b)}>Lập hợp đồng</button>}
                       </td>

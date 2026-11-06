@@ -37,6 +37,15 @@ class CongBaoGia(HTTPException):
         super().__init__(422, {"gate": ma, "message": thong_diep, **them})
 
 
+def chi_xem_neu_tu_thiet_ke(bg: BaoGia) -> None:
+    """KS-19k (Chủ tịch chọn 06/11/2026 «hiện, chỉ xem»): báo giá đoàn lập từ thiết kế nằm chung bảng để báo cáo đọc
+    một chỗ, nhưng luồng của nó (Điều hành lập → TP ĐH / Chủ tịch duyệt → khách đồng ý → hợp đồng nháp) đi ở màn Tour
+    đoàn. Cho sửa / gửi / chốt ở đây thì một báo giá có hai luồng ghi, và hai luồng sẽ lệch nhau."""
+    if getattr(bg, "nguon", "ban_hang") == "thiet_ke":
+        raise CongBaoGia("NGUON_THIET_KE", f"Báo giá {bg.ma} lập từ thiết kế tour đoàn — ở đây chỉ xem. "
+                                           "Sửa, duyệt và khách đồng ý đi theo màn Tour đoàn.")
+
+
 # ────────────────────────────── BẢNG GIÁ ──────────────────────────────
 def bang_gia_hieu_luc(db: Session, product_id: int, ngay: date | None = None) -> BangGia | None:
     """Bảng giá đang hiệu lực cho một sản phẩm vào một ngày.
@@ -113,6 +122,7 @@ def gui_khach(db: Session, bg: BaoGia, boi: str, giai_trinh: str = "") -> BaoGia
     Trường hợp thứ ba cố ý không nhẹ hơn trường hợp thứ hai. Bán mà không biết lãi lỗ ít nhất cũng
     đáng lo bằng bán mà biết là mỏng.
     """
+    chi_xem_neu_tu_thiet_ke(bg)
     if bg.trang_thai not in ("nhap", "cho_duyet_bien", "da_gui"):
         raise CongBaoGia("TRANG_THAI", f"Báo giá đang ở trạng thái '{bg.trang_thai}', không gửi được")
     kq = xem_bien(db, bg)
@@ -149,6 +159,7 @@ def gui_khach(db: Session, bg: BaoGia, boi: str, giai_trinh: str = "") -> BaoGia
 
 
 def khach_chot(db: Session, bg: BaoGia, boi: str) -> None:
+    chi_xem_neu_tu_thiet_ke(bg)
     if bg.trang_thai != "da_gui":
         raise CongBaoGia("TRANG_THAI", "Chỉ báo giá ĐÃ GỬI mới chốt được – khách không chốt được cái "
                                        "chưa nhìn thấy")
@@ -164,6 +175,7 @@ def lap_hop_dong(db: Session, bg: BaoGia, boi: str, **data) -> HopDongKhach:
     Lấy từ bảng bao_gia đang soạn thì hợp đồng mang con số hôm nay, còn khách chốt con số hôm ấy –
     và chênh lệch đó chỉ lộ ra lúc đối chiếu doanh thu, thường là vài tháng sau.
     """
+    chi_xem_neu_tu_thiet_ke(bg)
     if bg.trang_thai != "khach_chot":
         raise CongBaoGia("TRANG_THAI",
                          "Chỉ lập hợp đồng từ báo giá KHÁCH ĐÃ CHỐT. Trạng thái hiện tại: "

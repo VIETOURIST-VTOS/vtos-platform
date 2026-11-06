@@ -239,7 +239,8 @@ CUA_TAY = (
     # TK-1e (04/11/2026): Điều hành nhập lịch ngày lễ Tết ở màn /tour-doan › Ngày lễ Tết (thù lao HDV ×2).
     "ngay_le_tet",
     # TK-2 (04/11/2026): Điều hành lập / sửa báo giá đoàn, TP ĐH / Chủ tịch / TGĐ duyệt ở /tour-doan; khách đồng ý trên cổng.
-    "bao_gia_doan",
+    # KS-19k (06/11/2026): đầu báo giá về bảng chung bao_gia; phần riêng ở bao_gia_thiet_ke — cùng cửa nhập ấy.
+    "bao_gia_thiet_ke",
     # CSKH tự động 25/9/2026. Hai bảng này có cửa nhập THẬT, và cửa ấy khác mọi cửa còn lại của
     # kho: người nhập là KHÁCH HÀNG, qua trang công khai /y-kien/<mã> (API /api/v1/khao-sat).
     # Cửa thứ hai cho khách không dùng Zalo: nhân viên ghi hộ ở màn hình /danh-gia, và bản ghi

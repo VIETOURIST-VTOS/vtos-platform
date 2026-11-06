@@ -14,7 +14,7 @@ chỉ chuyển sang OTA) → dòng «Sales báo giá», không cộng vào tạm
 from datetime import date, datetime
 
 from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 from app.models.kieu_tien import TIEN
@@ -104,14 +104,22 @@ class NgayLeTet(Base):
 # thật của NCC, điền dòng thiếu giá. Biên ≥ 10% → TP Điều hành duyệt (khác người lập); < 10% → Chủ tịch / TGĐ, có lý
 # do. Duyệt xong khóa (hash), hiện cho khách 24 giờ. Giá trẻ em = 75% người lớn (tour đi xe) / 80% (có chặng bay).
 # Khách đồng ý → máy tạo hợp đồng khách NHÁP (hop_dong_khach) cho Sale Admin hoàn thiện. Đặt cọc là giai đoạn 3.
-TRANG_THAI_BG = {"nhap": "Nháp", "cho_duyet": "Chờ duyệt", "tra_lai": "Trả lại", "da_duyet": "Đã gửi khách",
-                 "khach_dong_y": "Khách đồng ý", "het_han": "Hết hạn", "thay_the": "Bị thay (khách sửa thiết kế)"}
+# KS-19k (Chủ tịch chọn 06/11/2026): trạng thái QUY VỀ TÊN CHUNG của bảng báo giá — «đã gửi khách» = da_gui,
+# «khách đồng ý» = khach_chot (trước là da_duyet / khach_dong_y). Ba trạng thái riêng của luồng duyệt đoàn giữ nguyên.
+TRANG_THAI_BG = {"nhap": "Nháp", "cho_duyet": "Chờ duyệt", "tra_lai": "Trả lại", "da_gui": "Đã gửi khách",
+                 "khach_chot": "Khách đồng ý", "het_han": "Hết hạn", "thay_the": "Bị thay (khách sửa thiết kế)"}
 
 
 class BaoGiaDoan(Base):
-    __tablename__ = "bao_gia_doan"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    ma: Mapped[str] = mapped_column(String(24), unique=True, index=True)               # BGD-000001
+    """Phần RIÊNG của một báo giá đoàn lập từ thiết kế (KS-19k, Chủ tịch chọn 06/11/2026 «đầu chung + bảng phụ»).
+
+    ĐẦU báo giá — mã, mảng, khách, trạng thái, người lập, người duyệt — nằm ở bảng CHUNG `bao_gia` (mang=kd_doan,
+    nguon=thiet_ke), để V6 giữ được «một bảng cho cả lẻ và đoàn»: báo cáo phòng, bàn giao việc, phạm vi pháp nhân đều
+    đọc một chỗ. Bảng này chỉ giữ thứ báo giá lẻ không có: dòng tạm tính kèm giá vốn, hệ số trẻ em, số NL/TE/EB, giá
+    từng hạng khách, hạn 24 giờ, mã băm. Khóa chính = id của dòng đầu (quan hệ 1-1).
+    """
+    __tablename__ = "bao_gia_thiet_ke"
+    id: Mapped[int] = mapped_column(ForeignKey("bao_gia.id"), primary_key=True)
     thiet_ke_id: Mapped[int] = mapped_column(ForeignKey("thiet_ke_doan.id"), index=True)
     thiet_ke_ma: Mapped[str] = mapped_column(String(20), index=True)
     tai_khoan_id: Mapped[int] = mapped_column(ForeignKey("tai_khoan_ngoai.id"), index=True)
@@ -128,16 +136,49 @@ class BaoGiaDoan(Base):
     bao_gom: Mapped[list] = mapped_column(JSON, default=list)
     khong_bao_gom: Mapped[list] = mapped_column(JSON, default=list)
     ghi_chu: Mapped[str] = mapped_column(Text, default="")
-    trang_thai: Mapped[str] = mapped_column(String(14), default="nhap", index=True)
     cap_duyet: Mapped[str] = mapped_column(String(10), default="")        # tp_dh | ct_tgd
     ly_do_bien: Mapped[str] = mapped_column(String(300), default="")
-    tao_boi: Mapped[str] = mapped_column(String(50), default="")
-    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     gui_duyet_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    duyet_boi: Mapped[str] = mapped_column(String(50), default="")
-    duyet_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     ly_do_tra: Mapped[str] = mapped_column(String(300), default="")
     han_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     ma_bam: Mapped[str] = mapped_column(String(64), default="")
     khach_dong_y_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     hop_dong_id: Mapped[int | None] = mapped_column(ForeignKey("hop_dong_khach.id"), nullable=True)
+    dau: Mapped["BaoGia"] = relationship("BaoGia", lazy="joined")  # noqa: F821
+
+    # Đọc / ghi các trường ĐẦU qua dòng ở bảng chung — một nơi giữ, không chép hai chỗ.
+    @property
+    def ma(self) -> str:
+        return self.dau.ma
+
+    @property
+    def trang_thai(self) -> str:
+        return self.dau.trang_thai
+
+    @trang_thai.setter
+    def trang_thai(self, v: str) -> None:
+        self.dau.trang_thai = v
+
+    @property
+    def tao_boi(self) -> str:
+        return self.dau.tao_boi
+
+    @property
+    def tao_luc(self) -> datetime:
+        return self.dau.tao_luc
+
+    @property
+    def duyet_boi(self) -> str:
+        return self.dau.duyet_boi
+
+    @duyet_boi.setter
+    def duyet_boi(self, v: str) -> None:
+        self.dau.duyet_boi = v
+
+    @property
+    def duyet_luc(self) -> datetime | None:
+        return self.dau.duyet_luc
+
+    @duyet_luc.setter
+    def duyet_luc(self, v: datetime | None) -> None:
+        self.dau.duyet_luc = v
