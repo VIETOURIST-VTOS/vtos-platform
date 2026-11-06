@@ -22,7 +22,7 @@ if os.path.exists("test_q2a.db"):
 
 import ast  # noqa: E402
 import pathlib  # noqa: E402
-from datetime import date  # noqa: E402
+from datetime import date, timedelta  # noqa: E402
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -74,7 +74,9 @@ def _dung_canh():
                         pax=1, sales_id=op.id, created_by=op.id, request_id=0, source="thu")
             db.add(b); db.commit()
             care = CareTicket(booking_id=b.id, tour_id=t.id, customer_name="KhachQ2ARieng",
-                              customer_phone="0900000777", han_lien_he=date(2026, 11, 5))
+                              customer_phone="0900000777",
+                              # KS-19o: hạn tính từ hôm nay — ngày cố định 05/11 thành «quá hạn» từ 06/11 và test_a4 mất phép lọc để đo
+                              han_lien_he=date.today() + timedelta(days=30))
             db.add(care); db.commit()
             for diem in (5, 1):
                 db.add(DanhGiaSauTour(care_id=care.id, booking_id=b.id, tour_id=t.id,

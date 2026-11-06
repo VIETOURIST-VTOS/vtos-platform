@@ -74,17 +74,34 @@ def _bang_khai_trong_tep_mo_hinh() -> dict[str, str]:
     return ra
 
 
+def _phan_nang_cap(src: str) -> str:
+    """Chỉ thân hàm upgrade(): bảng do downgrade() dựng lại (để lùi bản) không phải bảng đang có trên cơ sở dữ liệu."""
+    import ast
+    try:
+        cay = ast.parse(src)
+    except SyntaxError:
+        return src
+    for n in cay.body:
+        if isinstance(n, ast.FunctionDef) and n.name == "upgrade":
+            return ast.get_source_segment(src, n) or src
+    return src
+
+
 def _bang_do_migration_tao() -> set[str]:
-    ra = set()
+    # KS-19k (06/11/2026): bảng một bản nâng cấp SAU đã bỏ (op.drop_table trong upgrade) thì không còn trên cơ sở
+    # dữ liệu — trừ ra. Ví dụ bao_gia_doan: TK-2 tạo, KS-19k gộp vào bao_gia rồi bỏ; downgrade của KS-19k dựng lại.
+    ra, bo = set(), set()
     for f in sorted(os.listdir(THU_MUC_VERSIONS)):
         if not f.endswith(".py") or f.startswith("__"):
             continue
-        src = open(os.path.join(THU_MUC_VERSIONS, f), encoding="utf-8").read()
+        src = _phan_nang_cap(open(os.path.join(THU_MUC_VERSIONS, f), encoding="utf-8").read())
         for m in re.finditer(r'op\.create_table\(\s*["\']([^"\']+)["\']', src):
             ra.add(m.group(1))
         for m in re.finditer(r'CREATE TABLE (?:IF NOT EXISTS )?["\']?(\w+)', src, re.I):
             ra.add(m.group(1))
-    return ra - {"alembic_version"}
+        for m in re.finditer(r'op\.drop_table\(\s*["\']([^"\']+)["\']', src):
+            bo.add(m.group(1))
+    return ra - bo - {"alembic_version"}
 
 
 # ------------------------------------------------------------------ C1
