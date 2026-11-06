@@ -836,22 +836,35 @@ def dh_xac_nhan(db: Session, u: User, did: int, ma_ks: str, now: datetime | None
     return d
 
 
+def thu_xac_nhan(d: DonKsVtd, ks_ten: str = ""):
+    """KS-20e (Chủ tịch duyệt bản xem thử 07/11/2026, theo mẫu Agoda): email song ngữ + đính kèm phiếu xác nhận và
+    hóa đơn đặt phòng (PDF). Không có phiên CSDL (phép thử cũ) thì chỉ gửi chữ."""
+    from email.message import EmailMessage
+    from sqlalchemy.orm import object_session
+    from app.services import phieu_ks_vtd as PK
+    db = object_session(d)
+    m = EmailMessage()
+    if db is None:
+        m["Subject"] = f"Xác nhận đặt phòng với Vietourist – Mã đặt phòng: {d.ma}"
+        m.set_content(f"Đơn đặt phòng {d.ma} tại {ks_ten} đã được xác nhận.")
+        return m
+    tieu_de, chu, html = PK.email_html(db, d)
+    m["Subject"] = tieu_de
+    m.set_content(chu)
+    m.add_alternative(html, subtype="html")
+    for ten, b in PK.dinh_kem(db, d):
+        m.add_attachment(b, maintype="application", subtype="pdf", filename=ten)
+    return m
+
+
 def _gui_xac_nhan_email(d: DonKsVtd, ks_ten: str) -> bool:
     """KS-16s: email «Đặt phòng đã được xác nhận» khi Điều hành chốt — chỉ khi đơn có email và đã cấu hình SMTP."""
     from app.core.config import settings
     if not (d.email and settings.SMTP_HOST and settings.SMTP_FROM):
         return False
     import smtplib
-    from email.message import EmailMessage
-    m = EmailMessage()
-    m["Subject"] = f"Đặt phòng {d.ma} đã được xác nhận — {ks_ten}"
+    m = thu_xac_nhan(d, ks_ten)
     m["From"], m["To"] = settings.SMTP_FROM, d.email
-    m.set_content(f"Chào {d.ho_ten},\n\nĐặt phòng của bạn tại {ks_ten} đã được xác nhận.\n"
-                  f"Mã đơn Vietourist: {d.ma}\n" + (f"Mã xác nhận của khách sạn: {d.ma_xac_nhan_ks}\n" if d.ma_xac_nhan_ks else "")
-                  + f"Đã thanh toán: {int(d.tong or 0):,} đ (đã gồm {S.VAT_PT}% VAT)\n".replace(",", ".")
-                  + f"Nhận phòng {d.vao:%d/%m/%Y} · trả phòng {d.ra:%d/%m/%Y} · {d.so_phong} phòng"
-                  + (f"\nGiờ đến dự kiến: {d.gio_den}" if d.gio_den else "")
-                  + "\nXem đơn ở «Đơn của tôi» trên cổng Vietourist.\n\n" + settings.COMPANY_NAME)
     cls = smtplib.SMTP_SSL if settings.SMTP_SSL else smtplib.SMTP
     with cls(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as sv:
         if not settings.SMTP_SSL:

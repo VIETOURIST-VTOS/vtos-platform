@@ -53,7 +53,7 @@ def test_ks20c_1_hoan_tung_phong(db, hai):
 def test_ks20c_2_giao_dien():
     c = (Path(__file__).resolve().parents[2] / "web" / "components" / "cong" / "KhachSanVtd.tsx").read_text(encoding="utf-8")
     for t in ('["Chọn phòng", "Thông tin", "Thanh toán", "Xác nhận"]', "Thanh toán thành công = phòng được xác nhận ngay.",
-              "Tích điểm VTD", "Xem trong Đơn của tôi", "/cong?tab=bookings", "In / lưu phiếu xác nhận (PDF)", "Chỉ đường Google Maps",
+              "Tích điểm VTD", "Xem trong Đơn của tôi", "/cong?tab=bookings", "Tải phiếu xác nhận (PDF)", "Chỉ đường Google Maps",
               '"Sắp tới"', '"Đã qua"', '"Đã hủy"', "Hoàn về tài khoản đã trả", "Lý do (không bắt buộc)", "Xác nhận hủy", "Giữ đơn",
               "hoan_dong", "Khách hủy · ${lyDo}", "ksv13-sheet", "Đặt giữ, trả trước"):
         assert t in c, t

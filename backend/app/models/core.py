@@ -28,6 +28,9 @@ class Company(Base):
     code: Mapped[str] = mapped_column(String(30), unique=True)
     name: Mapped[str] = mapped_column(String(200))
     tax_code: Mapped[str] = mapped_column(String(20), default="")
+    # KS-20e (07/11/2026): in trên phiếu xác nhận / hóa đơn đặt phòng và chân email — Kế toán sửa ở màn «Pháp nhân».
+    address: Mapped[str] = mapped_column(String(300), default="")
+    phone: Mapped[str] = mapped_column(String(40), default="")
     kind: Mapped[str] = mapped_column(String(12), default="con")           # me / con / lien_ket / chi_nhanh
     ownership_pct: Mapped[float] = mapped_column(Float, default=0)         # tỷ lệ sở hữu của công ty mẹ
     parent_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)

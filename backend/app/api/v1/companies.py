@@ -25,6 +25,7 @@ WRITE = ("cntt", "ketoan", "tgd", "chutich")
 
 def out(c: Company) -> dict:
     return {"id": c.id, "code": c.code, "name": c.name, "tax_code": c.tax_code, "kind": c.kind,
+            "address": c.address or "", "phone": c.phone or "",                       # KS-20e
             "kind_label": COMPANY_KINDS.get(c.kind, c.kind), "ownership_pct": c.ownership_pct,
             "parent_id": c.parent_id, "effective_from": c.effective_from, "active": c.active,
             "in_group": c.in_group(), "related_party": c.related_party(), "note": c.note}
@@ -268,3 +269,24 @@ def phu_kin_phap_nhan(u: User = Depends(require_roles(*WRITE, "hcns", "bks")),
     """
     from app.services import pham_vi_phap_nhan as PV
     return PV.do_phu_kin(db)
+
+
+class LienHeIn(BaseModel):
+    address: str = ""
+    phone: str = ""
+
+
+@router.post("/companies/{cid}/lien-he")
+def sua_lien_he(cid: int, data: LienHeIn, u: User = Depends(require_roles(*WRITE)), db: Session = Depends(get_db)):
+    """KS-20e: địa chỉ + hotline in trên phiếu xác nhận / hóa đơn đặt phòng VTD và chân email."""
+    c = db.get(Company, cid)
+    if c is None:
+        raise HTTPException(404, "Không có pháp nhân này")
+    dc, sdt = " ".join(data.address.split())[:300], " ".join(data.phone.split())[:40]
+    if sdt and sum(ch.isdigit() for ch in sdt) < 8:
+        raise HTTPException(422, "Số điện thoại chưa đúng")
+    truoc = out(c)
+    c.address, c.phone = dc, sdt
+    R.audit(db, u.username, u.role, "sua_lien_he_phap_nhan", f"company:{c.code}", before=truoc, after=out(c))
+    db.commit()
+    return out(c)

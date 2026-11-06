@@ -102,6 +102,21 @@ def mot(ma: str, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Dep
     return _goi(S.mot_cua, db, tk, ma)
 
 
+@router_cong.get("/{ma}/pdf/{loai}")
+def tai_pdf(ma: str, loai: str, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
+    """KS-20e: phiếu xác nhận (loai=phieu) / hóa đơn đặt phòng (loai=hoa_don) của đơn mình — PDF song ngữ."""
+    from fastapi.responses import Response
+    from app.services import phieu_ks_vtd as PK
+    _khach(tk)
+    d = _goi(S._cua, db, tk, ma)
+    try:
+        b = PK.pdf_phieu(db, d) if loai == "phieu" else PK.pdf_hoa_don(db, d) if loai == "hoa_don" else PK.kiem(d, loai)
+    except PK.LoiPhieu as ex:
+        raise HTTPException(ex.status, str(ex))
+    ten = f"{'Phieu-xac-nhan' if loai == 'phieu' else 'Hoa-don'}-{d.ma}.pdf"
+    return Response(content=b, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{ten}"'})
+
+
 @router_cong.get("/{ma}/qr")
 def qr(ma: str, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
     _khach(tk)

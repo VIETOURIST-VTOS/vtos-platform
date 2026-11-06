@@ -19,7 +19,7 @@ import dynamic from "next/dynamic";
 import { giaGon } from "./BanDoKs";
 const BanDoKs = dynamic(() => import("./BanDoKs"), { ssr: false, loading: () => <div className="ksv-bando" style={{ height: 320 }} /> });   // KS-16s
 import QRCode from "qrcode";
-import { diCongThe, duongRieng, goiCong, moNgoai, xemCong } from "@/lib/cong";
+import { diCongThe, duongRieng, goiCong, moNgoai, phienCong, xemCong } from "@/lib/cong";
 import { DanhGiaKsCong, MUC_KS, OD, TomTatDg, VietDanhGiaKs, nhanDiem } from "./DanhGiaKs";
 
 type Q = { tinh: string; vao: string; ra: string; nl: number; te: number; phong: number; tuoi?: number[]; chia: Phong[] };
@@ -1039,7 +1039,8 @@ function DonKs({ d, bao, loi: loi0, onDoi, onTra, onLai, huyNgay = false }: { d:
           <span>Khách chính<br /><b style={{ fontSize: 16 }}>{d.ho_ten}</b></span><span>Trạng thái<br /><b className="ksv-okc" style={{ fontSize: 16 }}>Đã xác nhận · Đã thanh toán đủ</b></span></div>
         <span className="ksv-muted">{d.khach_san?.ten}{d.khach_san?.dia_chi ? ` · ${d.khach_san.dia_chi}` : ""} · nhận phòng từ {d.khach_san?.gio_nhan}, trả trước {d.khach_san?.gio_tra}.
           Xuất trình phiếu hoặc mã khi nhận phòng; không phải trả thêm tại khách sạn, trừ dịch vụ bạn tự dùng.</span>
-        <div><button type="button" className="ksv-btn" onClick={() => window.print()}>In / lưu PDF</button></div></section>}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}><button type="button" className="ksv-btn" onClick={() => taiPdf(d.ma, "phieu")}>Tải phiếu xác nhận (PDF)</button>
+          <button type="button" className="ksv-btn line" onClick={() => window.print()}>In trang này</button></div></section>}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {d.co_the_tra && !giu && <button type="button" className="ksv-btn" onClick={onTra}>Thanh toán ₫ {vnd(d.con_phai_tra)}</button>}
         {d.co_the_huy && <button type="button" className="ksv-btn line" style={{ color: "var(--ksv-price)", borderColor: "var(--ksv-price)" }} onClick={() => setHoi(true)}>Hủy phòng</button>}
@@ -1056,6 +1057,18 @@ function DonKs({ d, bao, loi: loi0, onDoi, onTra, onLai, huyNgay = false }: { d:
     <TomTatDon d={d} /></div></>;
 }
 
+/** KS-20e: tải phiếu xác nhận / hóa đơn đặt phòng (PDF song ngữ) của đơn mình — cùng phiên đăng nhập cổng. */
+async function taiPdf(ma: string, loai: "phieu" | "hoa_don") {
+  try {
+    const p = phienCong();
+    const r = await fetch(`/api/v1/cong/ks-vtd/don/${encodeURIComponent(ma)}/pdf/${loai}`, { headers: p ? { Authorization: `Bearer ${p}` } : {} });
+    if (!r.ok) { let m = `Lỗi ${r.status}`; try { m = (await r.json())?.detail || m; } catch { /* bỏ qua */ } alert(m); return; }
+    const u = URL.createObjectURL(await r.blob());
+    const a = document.createElement("a"); a.href = u; a.download = `${loai === "phieu" ? "Phieu-xac-nhan" : "Hoa-don"}-${ma}.pdf`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000);
+  } catch { alert("Chưa tải được PDF — thử lại sau"); }
+}
+
 /** KS-20c (bản v1.3 D4 / M3): đặt phòng đã xác nhận — số đã nhận, nút tiếp theo, ngày giờ, hạn hủy miễn phí từng phòng. */
 function XacNhanV13({ d }: { d: any }) {
   const k = d.khach_san || {};
@@ -1066,7 +1079,8 @@ function XacNhanV13({ d }: { d: any }) {
     <p style={{ margin: 0, fontSize: 15 }}>Đã nhận <b>₫ {vnd(d.da_tra)}</b>. {k.ten} giữ {d.so_phong} phòng cho bạn từ {dmy(d.vao)}.{d.email ? " Mã đặt phòng đã gửi qua email." : ""}</p>
     <div className="ksv13-nut">
       <a className="ksv-btn" href="/cong?tab=bookings">Xem trong Đơn của tôi</a>
-      <button type="button" className="ksv-btn line" onClick={() => window.print()}>In / lưu phiếu xác nhận (PDF)</button>
+      <button type="button" className="ksv-btn line" onClick={() => taiPdf(d.ma, "phieu")}>Tải phiếu xác nhận (PDF)</button>
+      <button type="button" className="ksv-btn line" onClick={() => taiPdf(d.ma, "hoa_don")}>Tải hóa đơn (PDF)</button>
       <a className="ksv-btn line" href={ggDuong(k)} target="_blank" rel="noopener noreferrer">Chỉ đường Google Maps ↗</a></div>
     <div className="ksv13-xgrid">
       <div><small className="ksv-muted">Nhận phòng</small><b>{thuNgan(d.vao)}, {dmy(d.vao)}{k.gio_nhan ? ` từ ${k.gio_nhan}` : ""}</b></div>
