@@ -61,8 +61,36 @@ def _cot_phu():
 def upgrade() -> None:
     op.add_column("bao_gia", sa.Column("nguon", sa.String(20), nullable=False, server_default="ban_hang"))
     op.create_index("ix_bao_gia_nguon", "bao_gia", ["nguon"])
-    op.create_table("bao_gia_thiet_ke",
-                    sa.Column("id", sa.Integer(), sa.ForeignKey("bao_gia.id"), primary_key=True), *_cot_phu())
+    # Cột viết thẳng (không qua _cot_phu) để bộ đọc cột tiền của V9 (đọc cây cú pháp) thấy đủ cột tiền của bảng mới.
+    # Cùng cột, cùng kiểu với _cot_phu() — chỉ đổi cách viết, bản nâng cấp đã chạy không đổi hành vi.
+    op.create_table(
+        "bao_gia_thiet_ke",
+        sa.Column("id", sa.Integer(), sa.ForeignKey("bao_gia.id"), primary_key=True),
+        sa.Column("thiet_ke_id", sa.Integer(), sa.ForeignKey("thiet_ke_doan.id"), nullable=False),
+        sa.Column("thiet_ke_ma", sa.String(20), nullable=False),
+        sa.Column("tai_khoan_id", sa.Integer(), sa.ForeignKey("tai_khoan_ngoai.id"), nullable=False),
+        sa.Column("dong", sa.JSON(), nullable=False),
+        sa.Column("bien_pt", TIEN, nullable=False, server_default="10"),
+        sa.Column("he_so_te", TIEN, nullable=False, server_default="0.75"),
+        sa.Column("so_nl", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("so_te", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("so_eb", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("tong_von", TIEN, nullable=True),
+        sa.Column("tong_ban", TIEN, nullable=True),
+        sa.Column("gia_nl", TIEN, nullable=True),
+        sa.Column("gia_te", TIEN, nullable=True),
+        sa.Column("bao_gom", sa.JSON(), nullable=False),
+        sa.Column("khong_bao_gom", sa.JSON(), nullable=False),
+        sa.Column("ghi_chu", sa.Text(), nullable=False, server_default=""),
+        sa.Column("cap_duyet", sa.String(10), nullable=False, server_default=""),
+        sa.Column("ly_do_bien", sa.String(300), nullable=False, server_default=""),
+        sa.Column("gui_duyet_luc", sa.DateTime(), nullable=True),
+        sa.Column("ly_do_tra", sa.String(300), nullable=False, server_default=""),
+        sa.Column("han_luc", sa.DateTime(), nullable=True),
+        sa.Column("ma_bam", sa.String(64), nullable=False, server_default=""),
+        sa.Column("khach_dong_y_luc", sa.DateTime(), nullable=True),
+        sa.Column("hop_dong_id", sa.Integer(), sa.ForeignKey("hop_dong_khach.id"), nullable=True),
+    )
     for c in ("thiet_ke_id", "thiet_ke_ma", "tai_khoan_id"):
         op.create_index(f"ix_bao_gia_thiet_ke_{c}", "bao_gia_thiet_ke", [c])
 

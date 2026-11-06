@@ -235,7 +235,10 @@ def tu_khop(db: Session, txn, now: datetime | None = None) -> bool:
         return False
     b = db.get(Booking, l.booking_id)
     so = float(txn.amount or 0)
-    tt = trang_thai(l, now.date())
+    # KS-19o (06/11/2026): «hết hạn» xét theo NGÀY TIỀN VỀ (ngày giao dịch ngân hàng), không theo lúc robot chạy —
+    # khách chuyển trong hạn mà robot / SePay đồng bộ trễ một ngày thì vẫn là trả đúng hạn.
+    luc_ve = getattr(txn, "transaction_date", None) or now
+    tt = trang_thai(l, (luc_ve.date() if hasattr(luc_ve, "date") else luc_ve))
     if b is None or b.cancelled or tt != "mo" or abs(so - float(l.so_tien or 0)) >= 1:
         ly_do = (f"link {l.ma} đang «{tt}»" if tt != "mo" else
                  f"số {_vnd(so)} ≠ {_vnd(l.so_tien)} của link {l.ma}") if b is not None else f"link {l.ma} mất booking"
