@@ -103,6 +103,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Lệch một chữ giữa hai nơi là trang loé màu đúng lúc React tiếp quản. */}
         <script dangerouslySetInnerHTML={{ __html:
           "try{document.documentElement.setAttribute('data-mau-nut','navy');"
+          + "document.documentElement.setAttribute('data-nen','sang');"
           + "var g=JSON.parse(localStorage.getItem('vtos_giao_dien')||'null');if(g){"
           + "if(g.mau==='sang')document.documentElement.setAttribute('data-mau-nut','sang');"
           + "var n=g.nen==='may'?(matchMedia('(prefers-color-scheme: light)').matches?'sang':'toi')"

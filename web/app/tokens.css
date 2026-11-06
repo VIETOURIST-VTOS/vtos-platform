@@ -52,11 +52,11 @@
 
   /* Trạng thái */
   --vtos-success:      #53C49A;  /* đã duyệt, thành công */
-  --vtos-danger:       #FF6B90;  /* từ chối, cảnh báo */
+  --vtos-danger:       #6FA8F0;  /* từ chối, cảnh báo — KS-NAVY 07/11: đỏ → navy sáng (cũ #FF6B90) */
   --vtos-warning:      #F4C36A;  /* cần chú ý */
   --vtos-info:         #6FA8F0;  /* chờ xử lý */
   --vtos-success-bg:   #14392F;
-  --vtos-danger-bg:    #3B1B27;
+  --vtos-danger-bg:    #183550;  /* KS-NAVY · cũ #3B1B27 */
   --vtos-warning-bg:   #35290F;
   --vtos-info-bg:      #183550;
 
@@ -138,15 +138,15 @@
 :root[data-nen="sang"] {
   --vtos-navy:         #14538D;  /* 7,92 — chữ, số nổi bật, liên kết, và MÀU TÔ cột biểu đồ */
   --vtos-navy-dark:    #071A33;
-  --vtos-sky:          #14538D;  /* 7,92 với chữ trắng — nền nút chính và thẻ nhãn đặc */
+  --vtos-sky:          #1E63C8;  /* 5,72 với chữ trắng — KS-NAVY 07/11: nút chính navy sáng (cũ #14538D) */
   --vtos-navy-light:   #0F4C84;  /* 8,18 */
 
   --vtos-success:      #1E7A4E;  /* 5,32 */
-  --vtos-danger:       #A8145C;  /* 6,79 */
+  --vtos-danger:       #1E63C8;  /* 5,72 — KS-NAVY 07/11: đỏ → navy sáng (cũ #A8145C) */
   --vtos-warning:      #8A5A00;  /* 5,93 */
   --vtos-info:         #14538D;  /* 7,92 */
   --vtos-success-bg:   #E6F4EC;
-  --vtos-danger-bg:    #FBE9F0;
+  --vtos-danger-bg:    #E8F0FB;  /* KS-NAVY · cũ #FBE9F0 */
   --vtos-warning-bg:   #FBF1DC;
   --vtos-info-bg:      #E7EFF7;
 
@@ -178,7 +178,7 @@
   --vtos-nut-vien: var(--vtos-navy); --vtos-tab-on: #5A9BD4;
   --vtos-mau-nut-a: #14538D; --vtos-mau-nut-a-vien: #5A9BD4; --vtos-mau-nut-b: #1E63C8;  /* ô mẫu trong bảng Giao diện */
 }
-:root[data-nen="sang"] { --vtos-tab-on: #14538D; }
+:root[data-nen="sang"] { --vtos-tab-on: #14538D; --vtos-nut-vien: #14538D; }
 :root[data-mau-nut="navy"]:not([data-nen="sang"]) {
   --vtos-sky:          #14538D;
   --vtos-nut-vien:     #5A9BD4;

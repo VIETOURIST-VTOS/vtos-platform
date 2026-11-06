@@ -312,8 +312,8 @@ export default function Login() {
   const goc = man === "cong" ? KHUNG_HO_TRO : THANH_TREN;   // trang mở đầu v3.4 không có thanh trên riêng
   const thanh = hoTro ? goc.replace(' hidden=""', "") : goc;
   return (<>
-    <link rel="stylesheet" href="/cong/vtd.css?v=40" />
-    <div style={{ background: "#081826", minHeight: "100vh" }}>
+    <link rel="stylesheet" href="/cong/vtd.css?v=41" />
+    <div style={{ background: "#F4F7FA", minHeight: "100vh" }}>
       <div id="vtd-access" data-mode="inline" data-page={man === "cong" ? "home" : "login"} data-role={vai?.role || "khach-hang"} data-preview="off" data-vtos-screen="off" data-vtos-menu="closed">
         <div id="vtd-screen" onClick={bam}>
           <div style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: thanh }} />

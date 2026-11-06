@@ -219,7 +219,9 @@ class User(Base):
 # nguồn. Đổi dải cỡ chữ thì đổi ở đây, không đi sửa ba nơi.
 GIAO_DIEN_NEN = ("toi", "sang", "may")   # navy tối · trắng sáng · theo cài đặt máy
 GIAO_DIEN_CO_MIN, GIAO_DIEN_CO_MAX = 14, 20
-GIAO_DIEN_MAC_DINH_NEN, GIAO_DIEN_MAC_DINH_CO = "toi", 16
+# KS-NAVY 07/11/2026: Chủ tịch chốt một giao diện navy sáng cho mọi cổng — mặc định đổi sang "sang".
+# Người đã TỰ CHỌN "toi" vẫn giữ (cột gd_nen của họ có giá trị); chỉ người chưa chọn đi theo mặc định mới.
+GIAO_DIEN_MAC_DINH_NEN, GIAO_DIEN_MAC_DINH_CO = "sang", 16
 GIAO_DIEN_MAU_NUT = ("navy", "sang")     # KS-NUT · navy đậm (A) · xanh sáng (B)
 GIAO_DIEN_MAC_DINH_MAU_NUT = "navy"
 

@@ -102,8 +102,9 @@ def test_mac_dinh_la_navy_16px():
     đổi một chỗ sót một chỗ, và hai chỗ ấy lệch nhau thì không ai báo.
     """
     core = _doc(os.path.join(ROOT, "backend", "app", "models", "core.py"))
-    assert re.search(r'GIAO_DIEN_MAC_DINH_NEN\s*,\s*GIAO_DIEN_MAC_DINH_CO\s*=\s*"toi"\s*,\s*16', core), \
-        "mặc định phải là nền tối + 16px, khai ở models/core.py"
+    # KS-NAVY 07/11/2026: Chủ tịch chốt một giao diện navy sáng — mặc định nền đổi "toi" → "sang".
+    assert re.search(r'GIAO_DIEN_MAC_DINH_NEN\s*,\s*GIAO_DIEN_MAC_DINH_CO\s*=\s*"sang"\s*,\s*16', core), \
+        "mặc định phải là nền trắng sáng + 16px, khai ở models/core.py"
     assert re.search(r'GIAO_DIEN_CO_MIN\s*,\s*GIAO_DIEN_CO_MAX\s*=\s*14\s*,\s*20', core), \
         "dải cỡ chữ phải là 14–20px đúng yêu cầu 18/9"
 

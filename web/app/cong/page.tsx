@@ -49,8 +49,8 @@ export default function Cong() {
   const role = toi?.loai === "doi_tac" ? "doi-tac" : toi?.loai === "co_dong" ? "co-dong" : "khach-hang";
   const canHoSo = toi && toi.loai !== "khach_hang" && ["ho_so", "bo_sung"].includes(toi.trang_thai);
   return (<>
-    <link rel="stylesheet" href="/cong/vtd.css?v=40" />
-    <div style={{ background: "#081826", minHeight: "100vh" }}>
+    <link rel="stylesheet" href="/cong/vtd.css?v=41" />
+    <div style={{ background: "#F4F7FA", minHeight: "100vh" }}>
       <div id="vtd-access" data-mode="inline" data-page="login" data-role={role} data-preview="off" data-vtos-screen="off" data-vtos-menu="closed">
         <div id="vtd-screen">
           {toi?.loai === "khach_hang" && toi.trang_thai !== "khoa" ? <KhachHang toi={toi} thoat={thoat} />
@@ -58,7 +58,7 @@ export default function Cong() {
             : toi?.loai === "doi_tac" && toi.trang_thai === "hoat_dong" ? <DoiTac toi={toi} thoat={thoat} />
             : toi?.loai === "co_dong" && toi.trang_thai === "hoat_dong" ? <CoDong toi={toi} thoat={thoat} /> : <>
           <div style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: THANH_TREN }} />
-          {!toi ? <p style={{ color: "#a9b9ce", padding: 24 }}>Đang tải…</p> : <div data-role={role}><div className="v4-auth">
+          {!toi ? <p style={{ color: "#4A6076", padding: 24 }}>Đang tải…</p> : <div data-role={role}><div className="v4-auth">
             <nav className="vtd-breadcrumb"><span>{toi.loai_ten}</span><span>·</span><span>{toi.dien_thoai || toi.email}</span>
               <button type="button" className="v3-button v3-secondary cursor-interaction" style={{ marginLeft: "auto" }} onClick={thoat}>Đăng xuất</button></nav>
             <main className="vtd-login" style={{ gridTemplateColumns: "1fr" }}>
