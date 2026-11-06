@@ -396,6 +396,22 @@ def chuyen_dieu_hanh_tour(tid: int, data: S.ActionNote | None = None,
                           db: Session = Depends(get_db)):
     return {"message": T.chuyen_dieu_hanh(db, u, _tour(db, tid), (data.note if data else ""))}
 
+class DoiMaTourIn(BaseModel):
+    ma: str
+
+
+# ĐỢT TD-1 06/11/2026 — Sale Admin đặt lại mã tour đoàn ở cổng chuyển.
+#
+# Cùng bộ vai với `chuyen-dieu-hanh` ngay trên: đây là cùng một cổng, cùng một người. KHÔNG mở
+# cho Kinh doanh Đoàn — mở thì mã lại do người mở đặt, và cả đợt này mất nghĩa.
+@router.post("/tours/{tid}/doi-ma", tags=["tours"])
+def doi_ma_tour(tid: int, data: DoiMaTourIn,
+                u: User = Depends(require_roles("sales_admin", "chutich",
+                                                mo_ta="đặt lại mã tour đoàn ở cổng chuyển")),
+                db: Session = Depends(get_db)):
+    return {"message": T.doi_ma(db, u, _tour(db, tid), data.ma)}
+
+
 
 @router.post("/tours/{tid}/tra-lai-kinh-doanh", tags=["tours"])
 def tra_lai_kinh_doanh_tour(tid: int, data: S.ActionNote | None = None,

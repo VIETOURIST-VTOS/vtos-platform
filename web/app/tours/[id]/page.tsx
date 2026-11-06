@@ -46,6 +46,9 @@ function TourDetail() {
   const sp = useSearchParams();
   const [tab, setTab] = useState(sp.get("tab") || "info");
   const [note, setNote] = useState("");
+  // DOT TD-1 — o dat lai ma tour. Khai o DAY, truoc `if (!t) return`: hook khong duoc goi sau
+  // mot duong return som, nen khai canh `run()` o duoi se vo pham vi hook cua React.
+  const [maMoi, setMaMoi] = useState("");
   const [nguoiNhan, setNguoiNhan] = useState<any[]>([]);
   /** Sự cố của CHÍNH chuyến này. `null` = chưa hỏi máy chủ, `[]` = đã hỏi và chuyến này sạch — gộp
    *  hai cái là nói "không có sự cố nào" trong khi chưa ai hỏi. Lỗi quyền giữ nguyên để IN RA: màn
@@ -72,6 +75,14 @@ function TourDetail() {
   const tabs = TABS.filter(([k]) => k === "budget" ? xemDuToan : !["cost", "lop3"].includes(k) || xemGiaVon);
   const can = (a: string) => act.includes(a);
   const run = async (path: string, json?: any) => { try { const r = await api(`/tours/${t.id}/${path}`, { method: "POST", json: { note, ...(json || {}) } }); toast(r.message); setNote(""); load(); } catch (e) { toast(errMsg(e), true); } };
+  // DOT TD-1 — KHONG dung `run()`: `run` gui kem `note` va xoa o ghi chu sau moi lan bam, con
+  // doi ma la viec khac va khong duoc nuot mat ghi chu nguoi dung dang soan de chuyen.
+  const doiMa = async () => {
+    try {
+      const r = await api(`/tours/${t.id}/doi-ma`, { method: "POST", json: { ma: maMoi } });
+      toast(r.message); setMaMoi(""); load();
+    } catch (e) { toast(errMsg(e), true); }
+  };
   const saveEdit = async (e: React.FormEvent) => {
     e.preventDefault(); const d: any = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
     ["price_per_pax", "fixed_cost", "var_cost_per_pax", "hoa_hong_khach_tien"].forEach((k) => (d[k] = soTien(d[k])));
@@ -165,6 +176,19 @@ function TourDetail() {
           {can("chuyen_dieu_hanh") && <>
             <NoteBox />
             <button className="act teal" onClick={() => run("chuyen-dieu-hanh")}>Chuyển Phòng Điều hành</button>
+          {/* ĐỢT TD-1 06/11/2026 — Sale Admin đặt lại mã tour trước khi chuyển.
+              Mã tour là `project_code` của từng dòng sổ, nên máy chủ CHẶN đổi khi sổ đã dùng mã
+              ấy — giao diện không giấu nút, nó để người bấm đọc được lý do từ máy chủ. */}
+            <div className="row" style={{ gap: 8, alignItems: "center", margin: "8px 0" }}>
+              <label>Mã tour</label>
+              <input value={maMoi} onChange={(e) => setMaMoi(e.target.value.toUpperCase())}
+                     placeholder={t.code} style={{ width: 200, fontFamily: "ui-monospace, Menlo, Consolas, monospace" }} />
+              <button className="act grey" disabled={!maMoi || maMoi === t.code}
+                      onClick={doiMa}>Đặt lại mã</button>
+            </div>
+            <p className="muted">Khuôn: viết tắt điểm đến + ngày khởi hành DDMMYY (ví dụ <b>PQ111026</b>).
+              Đổi mã chỉ được khi sổ chưa có dòng nào mang mã cũ — mã tour là mã công trình trên
+              từng dòng sổ, đổi sau khi sổ đã ghi là cắt đôi sổ của chuyến.</p>
             <button className="act grey" onClick={() => run("tra-lai-kinh-doanh")}>Trả lại Kinh doanh (ghi rõ lý do)</button>
             <p className="muted">Trả lại phải ghi lý do tối thiểu 20 ký tự vào ô trên — trả lại mà không nói thiếu gì
               thì người nhận lại hồ sơ phải đoán.</p>
