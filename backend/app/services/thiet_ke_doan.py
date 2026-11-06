@@ -371,7 +371,8 @@ def gia_xe_bang(db: Session, tk: dict, so_ngay: int, ngoi: int, ngay: date) -> d
     if tl:
         r = sorted(tl, key=lambda x: (abs(int(x.days) - so_ngay), -(x.effective_from or date.min).toordinal(), -x.id))[0]
         ngay_gia = float(r.internal_price) / int(r.days)  # k2-doc-an-toan: tl lấy từ tuyen — internal_price > 0
-        return {"ten": f"Xe {XE_BANG_CHO} chỗ · theo tuyến {r.route} {int(r.days)} ngày, quy theo ngày (bảng giá xe)",
+        tuyen_ten = r.route if f"{int(r.days)} ngày" in (r.route or "") else f"{r.route} {int(r.days)} ngày"   # KS-19m: tên tuyến đã có số ngày thì không ghi lặp
+        return {"ten": f"Xe {XE_BANG_CHO} chỗ · theo tuyến {tuyen_ten}, quy theo ngày (bảng giá xe)",
                 "loai": f"xe {XE_BANG_CHO} chỗ", "chi_tiet": f"{so} xe × {so_ngay} ngày",
                 "von": ngay_gia * so_ngay * so, "nguon": f"vehicle_rates:{r.id}:quy_ngay"}
     return None
@@ -761,6 +762,13 @@ def gui(db: Session, tk_: TaiKhoanNgoai, d: dict, now: datetime | None = None) -
     dt = du_toan(db, tk)
     tom = _tom_tat(tk, dt)
     ma = str(d.get("ma") or "").strip()
+    # KS-19m (Chủ tịch duyệt 06/11/2026): họ tên / tên công ty bắt buộc khi hồ sơ khách chưa có tên — báo giá, hợp đồng
+    # nháp và lead ghi tên này thay cho «Khách cổng #…». Hồ sơ đã có tên thì giữ nguyên tên hồ sơ.
+    ho_ten = _sach(d.get("ho_ten"), 160)
+    if not (tk_.ho_ten or "").strip():
+        if not ho_ten:
+            raise LoiThietKe("Nhập họ tên hoặc tên công ty để Sales ghi lên báo giá")
+        tk_.ho_ten = ho_ten
     cu = None
     if ma:
         cu = db.execute(select(ThietKeDoan).where(ThietKeDoan.ma == ma).order_by(ThietKeDoan.phien_ban.desc())).scalars().first()
