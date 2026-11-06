@@ -442,8 +442,8 @@ export default function NhaHangAgoda({ ten = "", lienHe = "", coSdt = false, sdt
 }
 
 const CSS = `
-.nhv{--ksv-accent:#2a5bd7;--ksv-ink:#2459cf}
-.nhv-hero{background:linear-gradient(135deg,#7a2e1b,#c8613f);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px;color:#fff}
+.nhv{--ksv-accent:#14538D;--ksv-ink:#14538D}
+.nhv-hero{background:linear-gradient(135deg,#0B2545,#1E63C8);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px;color:#fff}
 .nhv-hero.gon{padding:10px;background:#1f2a5a}
 .nhv-ht{font-size:22px;font-weight:800;text-wrap:balance}.nhv-hs{font-size:13px;opacity:.9;margin-top:-6px}
 .nhv-sbar{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,.7fr) minmax(0,1.1fr) auto;gap:8px}
@@ -470,10 +470,10 @@ const CSS = `
 .nhv-f{display:grid;grid-template-columns:220px minmax(0,1fr);gap:12px;align-items:end}
 .nhv-slots{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px}
 .nhv-slot{border:1px solid var(--ksv-line);background:#fff;border-radius:8px;padding:8px 12px;font-weight:700;font-size:14px;color:var(--ksv-fg);font-variant-numeric:tabular-nums}
-.nhv-slot.on{background:#b4452c;border-color:#b4452c;color:#fff}
+.nhv-slot.on{background:#1E63C8;border-color:#1E63C8;color:#fff}
 .nhv-menu{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
 .nhv-mn{all:unset;box-sizing:border-box;cursor:pointer;border:1px solid var(--ksv-line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:5px;background:#fff}
-.nhv-mn.on{border-color:#b4452c;box-shadow:0 0 0 2px #b4452c}.nhv-mn:focus-visible{outline:2px solid var(--ksv-accent)}
+.nhv-mn.on{border-color:#1E63C8;box-shadow:0 0 0 2px #1E63C8}.nhv-mn:focus-visible{outline:2px solid var(--ksv-accent)}
 .nhv-mn .nhv-tag{align-self:flex-start}
 .nhv-chua{display:flex;flex-direction:column;gap:4px;background:var(--ksv-soft);border-radius:10px;padding:14px}
 .nhv-tdnh summary{cursor:pointer;font-weight:600}.nhv-tdnh-tr{display:flex;gap:8px;overflow-x:auto;padding:8px 0}.nhv-tdnh-tr img{height:160px;border-radius:6px;border:1px solid var(--ksv-line)}
