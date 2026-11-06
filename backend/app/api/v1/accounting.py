@@ -841,3 +841,48 @@ def tien_ghi_cap_cha(tu: date | None = None, den: date | None = None, gioi_han: 
                     "luật. Cửa này CHỈ ĐỌC: không sửa, không đảo. Chủ tịch chốt 02/11/2026 để "
                     "nguyên bút toán cũ, Kế toán trưởng quyết từng khoản."),
     }
+
+
+# ── ĐỢT R5b-1 02/11/2026 — CỬA ĐỐI CHIẾU LÃI LỖ TOUR: SỔ ↔ BẢNG TÍNH ────────────────────────
+#
+# Chủ tịch chốt 01/11/2026: *"số từ SỔ là số thật, bảng tính để cạnh để so, có cột lệch"*, và
+# *"ghép theo mã tour, và nói ra bên nào thiếu"*. Và chốt thêm: ĐỢT NÀY KHÔNG ĐỔI CHUẨN 09/9 —
+# bảng Lãi lỗ tour của Điều hành giữ nguyên quyết toán chi tiết; đây là một thẻ ĐỐI CHIẾU.
+#
+# ĐƯỜNG PHẢI NẰM DƯỚI `/accounting/` — sửa 06/11/2026, và đây là chỗ bản đầu sai.
+#
+# Bản 02/11 khai đường ở gốc, tức `/api/v1/` + tên cửa. Bộ định tuyến mang tiền tố `/api/v1`, nên
+# đường thật thành MỘT NHÓM API RIÊNG mà không màn hình nào khai trong `MAN_HINH_API` — và lúc ấy
+# KHÔNG VAI NÀO CHẠM ĐƯỢC CỬA. Đúng cái bẫy Đợt DỌN-R4c3 đã gỡ cho `tien-ghi-cap-cha` hôm 04/11.
+#
+# Lời chú cũ ở ngay chỗ này còn viết «không mở bộ định tuyến mới» — viết mà không đo, nên nó trấn
+# an người đọc trong khi cửa đã khoá. Phép tự kiểm cũng hỏng theo: nó tìm chữ `APIRouter(` trong
+# khối, mà nhóm API đâu có sinh ra từ `APIRouter(` — nó sinh ra từ ĐOẠN ĐẦU CỦA ĐƯỜNG. Một phép
+# đo nhắm vào thứ dễ đo thay vì thứ nó nhận là đang đo thì xanh mà không bảo được gì.
+#
+# Nay cửa nằm dưới nhóm `/api/v1/accounting`, nhóm mà `/ket-so` ĐÃ khai sẵn. Không thêm một dòng
+# nào vào `MAN_HINH_API` hay bảng ký quyền.
+#
+# BỘ VAI: `READ` của phân hệ kế toán, KHÔNG phải `lai_lo_tour.XEM`. Hai bộ ấy khác nhau có chủ ý
+# — `lai_lo_tour.XEM` có Điều hành (`tp_dh`, `nv_dh`) vì lãi lỗ chuyến là số của họ; còn bảng
+# ĐỐI CHIẾU VỚI SỔ là việc của Kế toán. Mở nó cho Điều hành là bày sổ kế toán ra một màn hình
+# Điều hành, và đó là một quyền chưa ai ký. Chặn nằm ở đây, không ở menu.
+#
+# CHỈ ĐỌC. Không một đường ghi nào: đối chiếu là để NÓI RA chênh lệch, không để sửa cho khớp.
+# Sửa bên nào cũng là đổi số liệu qua một cửa không có bộ kiểm — và sửa bên SỔ thì còn là ghi sổ
+# không qua chứng từ.
+
+
+@router.get("/accounting/doi-chieu-lai-lo")
+def doi_chieu_lai_lo(tu: date, den: date, gioi_han: int = 500,
+                     u: User = Depends(require_roles(*READ, mo_ta="đối chiếu lãi lỗ tour")),
+                     db: Session = Depends(get_db)):
+    """Bảng đối chiếu lãi lỗ tour: SỔ ↔ BẢNG TÍNH, ghép theo mã tour, có cột lệch.
+
+    Lệch chỉ tính khi CÓ CẢ HAI BÊN; thiếu một bên là "chưa so được", một trạng thái thứ ba
+    khác hẳn "khớp" và "lệch".
+    """
+    from app.services import doi_chieu_lai_lo as DCL
+    if den < tu:
+        raise HTTPException(422, "Ngày đến phải sau ngày từ")
+    return DCL.doi_chieu(db, tu, den, gioi_han)
