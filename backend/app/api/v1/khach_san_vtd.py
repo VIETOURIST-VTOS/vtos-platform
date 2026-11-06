@@ -388,6 +388,12 @@ class ChonIn(BaseModel):
     so: int
 
 
+class ChiaIn(BaseModel):
+    nl: int = 1
+    te: int = 0
+    tuoi: list[int] = []
+
+
 class TinhIn(BaseModel):
     vao: str
     ra: str
@@ -395,6 +401,8 @@ class TinhIn(BaseModel):
     nguoi_lon: int = 1          # KS-16j: máy tính phụ thu trẻ em / giường phụ
     tre_em: int = 0
     tuoi_tre_em: list[int] = []
+    chia: list[ChiaIn] = []     # KS-20b: khách khai từng phòng (tối đa 9)
+    xep: list[int] = []         # KS-20b: nhóm khách của từng phòng đã chọn (máy gợi ý, khách đổi)
 
 
 @router_cong.get("/{kid:int}/danh-gia")
@@ -412,7 +420,7 @@ def danh_gia_cong(kid: int, trang: int = 1, xep: str = "moi", tk: TaiKhoanNgoai 
 def tinh(kid: int, data: TinhIn, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
     _khach(tk)
     return _goi(S.tinh_lua_chon, db, kid, data.vao, data.ra, [c.model_dump() for c in data.chon], None,
-                data.nguoi_lon, data.tre_em, data.tuoi_tre_em)
+                data.nguoi_lon, data.tre_em, data.tuoi_tre_em, [c.model_dump() for c in data.chia], data.xep)
 
 
 class YeuCauIn(BaseModel):
@@ -428,6 +436,8 @@ class YeuCauIn(BaseModel):
     lien_he: str = ""
     yeu_cau_them: str = ""
     gio_den: str = ""               # KS-16s
+    chia: list[ChiaIn] = []         # KS-20b
+    xep: list[int] = []
 
 
 @router_cong.post("/{kid:int}/yeu-cau")
