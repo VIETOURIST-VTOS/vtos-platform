@@ -1203,17 +1203,17 @@ const CSS = `
 .ksv-ddc{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px;background:#fff;border:1px solid #dde3ee;border-radius:12px;overflow:hidden;padding-bottom:8px}
 .ksv-ddc img,.ksv-ddc .ph{width:100%;height:84px;object-fit:cover;background:#dfe7f3}
 .ksv-ddc b{padding:0 10px;font-size:14px;color:#1a2233}.ksv-ddc small{padding:0 10px;color:#5d6a7d;font-size:12px}
-.ksv-ddc.on,.ksv-ddc:focus-visible{outline:2px solid #2a5bd7}
+.ksv-ddc.on,.ksv-ddc:focus-visible{outline:2px solid #14538D}
 .ksv-bando{width:100%;border-radius:12px;background:#e6eef5;z-index:0}
 .ksv-mapbox{display:flex;flex-direction:column;gap:8px;position:sticky;top:8px;z-index:2;background:#f4f6fa;padding-bottom:6px}
 .ksv-mapbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-.ksv-pin{display:inline-block;transform:translate(-50%,-100%);background:#fff;color:#1a2233;border:2px solid #d92d20;border-radius:99px;padding:3px 8px;font:800 12px/1.2 system-ui,sans-serif;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.25)}
-.ksv-pin.on{background:#d92d20;color:#fff}
-.ksv-card-on{outline:2px solid #2a5bd7;outline-offset:0}
+.ksv-pin{display:inline-block;transform:translate(-50%,-100%);background:#fff;color:#1a2233;border:2px solid #1E63C8;border-radius:99px;padding:3px 8px;font:800 12px/1.2 system-ui,sans-serif;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.ksv-pin.on{background:#1E63C8;color:#fff}
+.ksv-card-on{outline:2px solid #14538D;outline-offset:0}
 .ksv-khoa{background:#c9d1de!important;color:#4a5568!important;border-color:#c9d1de!important;cursor:not-allowed}
 @media (max-width:760px){.ksv-mapbox{position:relative;top:0}}
-.ksv{--ksv-fg:#23252c;--ksv-muted:#5f6472;--ksv-line:#e1e4eb;--ksv-soft:#eef1f7;--ksv-card:#fff;--ksv-band:#1f2a5a;--ksv-accent:#3f66e0;--ksv-ink:#2459cf;
-  --ksv-asoft:#e8eefc;--ksv-price:#d3261b;--ksv-ok:#1c7f46;--ksv-oksoft:#e5f4ea;--ksv-star:#e39a2d;
+.ksv{--ksv-fg:#23252c;--ksv-muted:#5f6472;--ksv-line:#e1e4eb;--ksv-soft:#eef1f7;--ksv-card:#fff;--ksv-band:#1f2a5a;--ksv-accent:#14538D;--ksv-ink:#14538D;
+  --ksv-asoft:#e8eefc;--ksv-price:#1E63C8;--ksv-ok:#1c7f46;--ksv-oksoft:#e5f4ea;--ksv-star:#e39a2d;
   display:flex;flex-direction:column;gap:14px;color:var(--ksv-fg);min-width:0}
 .ksv h2,.ksv h3{text-wrap:balance}
 .ksv button{cursor:pointer;font:inherit}
@@ -1252,7 +1252,7 @@ const CSS = `
 .ksv-ct{position:absolute;left:10px;bottom:10px;background:rgba(20,20,30,.66);color:#fff;font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px}
 .ksv-ct.ksv-tam{font-weight:500}
 .ksv-ico{position:absolute;border:0;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 1px 4px rgba(0,0,0,.2)}
-.ksv-heart{right:10px;top:10px;width:38px;height:38px}.ksv-heart.on svg{fill:#e0335a;stroke:#e0335a}
+.ksv-heart{right:10px;top:10px;width:38px;height:38px}.ksv-heart.on svg{fill:#1E63C8;stroke:#1E63C8}
 .ksv-nxt{right:10px;top:calc(50% - 16px);width:32px;height:32px}.ksv-prv{left:10px;top:calc(50% - 16px);width:32px;height:32px}
 .ksv-trong{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;height:100%;min-height:200px;background:#eef2f5}
 .ksv-trong b{width:52px;height:52px;border-radius:50%;color:#fff;font-size:24px;display:grid;place-items:center}
@@ -1277,7 +1277,7 @@ const CSS = `
 .ksv-btn.wide{width:100%;margin-top:6px}
 .ksv-link{all:unset;cursor:pointer;color:var(--ksv-ink);font-weight:600}
 .ksv-muted{color:var(--ksv-muted)}.ksv-okc{color:var(--ksv-ok)}
-.ksv-loi{background:#fdecea;color:#8a1f1f;border-radius:8px;padding:10px 14px}
+.ksv-loi{background:#E8F0FB;color:#14538D;border-radius:8px;padding:10px 14px}
 .ksv-ok{background:var(--ksv-oksoft);color:var(--ksv-ok);border-radius:10px;padding:10px 14px}
 .ksv-gal{display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:170px 170px;gap:6px;border-radius:12px;overflow:hidden}
 .ksv-gal span{position:relative;background:var(--ksv-soft)}.ksv-gal span:first-child{grid-row:span 2}
@@ -1373,7 +1373,7 @@ const CSS = `
 .ksv-b.navy{background:var(--ksv-navy);color:#fff}.ksv-b.purple{background:var(--ksv-purple);color:#fff}.ksv-b.green{background:var(--ksv-oksoft);color:var(--ksv-ok)}.ksv-b.out{border:1px solid var(--ksv-line);color:#3c4657;font-weight:500}
 .ksv-b.aw{position:absolute;left:8px;top:8px}
 /* tìm */
-.ksv-hero{border-radius:16px;overflow:visible;z-index:3;background:linear-gradient(180deg,#2a7fb6 0%,#3fa7d3 55%,#7fd0e8 100%);padding:36px 16px 0;position:relative}
+.ksv-hero{border-radius:16px;overflow:visible;z-index:3;background:linear-gradient(180deg,#0B2545 0%,#14538D 55%,#5A9BD4 100%);padding:36px 16px 0;position:relative}
 .ksv-hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:70px;border-radius:0 0 16px 16px;background:linear-gradient(180deg,transparent,rgba(241,226,184,.85))}
 .ksv-hero-in{position:relative;z-index:1;max-width:880px;margin:0 auto;display:flex;flex-direction:column;align-items:center}
 .ksv-hero h1{color:#fff;font-size:28px;font-weight:800;text-align:center;margin:0 0 18px;text-shadow:0 2px 10px rgba(0,0,0,.3);text-wrap:balance}
@@ -1431,7 +1431,7 @@ const CSS = `
 .ksv-bars s{display:block;height:5px;border-radius:3px;background:var(--ksv-line);text-decoration:none;position:relative;overflow:hidden}.ksv-bars s i{position:absolute;inset:0 auto 0 0;background:var(--ksv-ink)}
 .ksv-map{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;height:120px;text-decoration:none;color:#23252c;
   background:repeating-linear-gradient(0deg,transparent 0 38px,#fff 38px 41px),repeating-linear-gradient(90deg,#eef2e6 0 70px,#f3d36a 70px 75px);}
-.ksv-map span{color:#e5484d}.ksv-map b{font-size:13px;letter-spacing:.5px;background:#fff;padding:3px 10px;border-radius:99px}
+.ksv-map span{color:#1E63C8}.ksv-map b{font-size:13px;letter-spacing:.5px;background:#fff;padding:3px 10px;border-radius:99px}
 .ksv-chips{display:flex;flex-wrap:wrap;gap:8px}
 /* KS-19e: chặn kiểu ô nhập chung của trang (nền tối, đệm 12px, viền) đè lên thanh kéo — trước đây thành dải đen đè ô số. */
 .ksv-r2{position:relative;height:30px;margin:4px 2px 8px}
@@ -1579,7 +1579,7 @@ const CSS = `
 .ksv13-dc{font-size:13px;color:var(--ksv-muted)}.ksv13-dc a{font-weight:600}
 .ksv13-tag{display:flex;flex-wrap:wrap;gap:6px}.ksv13-tag span{border:1px solid var(--ksv-line);border-radius:6px;padding:2px 6px;font-size:12px}
 .ksv13-ok{font-size:13px;color:#1d7a4a;font-weight:600}
-.ksv13-it{font-size:13px;color:#c2410c}
+.ksv13-it{font-size:13px;color:#1E63C8}
 .ksv13-dg{font-size:13px}.ksv13-dg b{background:#14538D;color:#fff;padding:2px 6px;border-radius:6px}
 .ksv13-gia{font-size:24px;font-weight:700;color:var(--ksv-fg);line-height:1.15;font-variant-numeric:tabular-nums}
 .ksv13 .ksv-side .ksv-btn{background:#14538D}
@@ -1598,13 +1598,13 @@ const CSS = `
 .ksv13-nut{display:flex;flex-wrap:wrap;gap:10px}.ksv13-nut .ksv-btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-height:44px}
 .ksv13-xgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;border-top:1px solid var(--ksv-line);padding-top:12px;font-size:14px}
 .ksv13-xgrid>div{display:flex;flex-direction:column;gap:2px}
-.ksv13-do{color:#c2410c;font-weight:600}
+.ksv13-do{color:#1E63C8;font-weight:600}
 .ksv13-hnut{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .ksv13-keo{display:none}.ksv13-man{display:none}
 .ksv13-the{display:flex;border-bottom:1px solid var(--ksv-line);margin:0 -4px}
 .ksv13-the button{flex:1;background:none;border:0;border-bottom:3px solid transparent;padding:10px 6px;font:inherit;font-size:14px;color:var(--ksv-muted);cursor:pointer;min-height:44px}
 .ksv13-the button.on{color:var(--ksv-fg);font-weight:700;border-bottom-color:var(--ksv-accent,#14538D)}.ksv13-the small{font-weight:400;color:var(--ksv-muted)}
-.ksv13-dnut{display:flex;gap:8px;flex-wrap:wrap}.ksv13-huy{color:#c2410c !important;border-color:#c2410c !important}
+.ksv13-dnut{display:flex;gap:8px;flex-wrap:wrap}.ksv13-huy{color:#1E63C8 !important;border-color:#1E63C8 !important}
 @media (max-width:900px){.ksv13-man{display:block;position:fixed;inset:0;background:rgba(20,38,59,.45);z-index:140}
   .ksv13-sheet{position:fixed;left:0;right:0;bottom:0;margin:0;z-index:141;border-radius:16px 16px 0 0;max-height:88vh;overflow:auto;padding:16px 16px 20px;box-shadow:0 -6px 20px rgba(20,38,59,.15)}
   .ksv13-keo{display:block;width:40px;height:4px;border-radius:2px;background:var(--ksv-line);align-self:center}
