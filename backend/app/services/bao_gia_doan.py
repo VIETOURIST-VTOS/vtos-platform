@@ -1,10 +1,10 @@
 """TK-2 · Báo giá chính thức tour đoàn khách tự thiết kế — giai đoạn 2 (Chủ tịch 04/11/2026, duyệt bản xem thử;
 hạn 24 giờ; trẻ em 75% giá người lớn với tour đi xe, 80% khi có chặng bay; khách đồng ý → hợp đồng nháp).
 
-Vòng đời một báo giá (BaoGiaDoan):
-  nhap ─(Điều hành gửi duyệt)→ cho_duyet ─(duyệt)→ da_duyet (khóa, hiện cho khách 24 giờ) ─(khách đồng ý)→ khach_dong_y
+Vòng đời một báo giá (đầu ở bảng chung bao_gia, phần riêng ở bao_gia_thiet_ke — KS-19k 06/11/2026):
+  nhap ─(Điều hành gửi duyệt)→ cho_duyet ─(duyệt)→ da_gui (khóa, hiện cho khách 24 giờ) ─(khách đồng ý)→ khach_chot
                                          └(trả lại)→ tra_lai ─(sửa, gửi lại)→ cho_duyet
-  da_duyet quá hạn → het_han · khách gửi phiên bản thiết kế mới → mọi báo giá chưa đồng ý của mã ấy → thay_the.
+  da_gui quá hạn → het_han · khách gửi phiên bản thiết kế mới → mọi báo giá chưa đồng ý của mã ấy → thay_the.
 
 TIỀN — máy tính lại mỗi lần lưu, không nhận số tiền nào từ trình duyệt ngoài GIÁ VỐN từng dòng do Điều hành nhập:
   giá bán dòng = vốn ÷ (1 − biên), làm tròn lên nghìn · tổng bán dòng = Σ
@@ -20,9 +20,10 @@ import json
 import math
 from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.models.ban_hang import BaoGia
 from app.models.cong_ngoai import TaiKhoanNgoai
 from app.models.core import User
 from app.models.thiet_ke_doan import TRANG_THAI_BG, BaoGiaDoan, ThietKeDoan
@@ -92,7 +93,7 @@ def _thieu(bg: BaoGiaDoan) -> list[str]:
 
 
 def _het_han_neu_qua(bg: BaoGiaDoan, now: datetime) -> None:
-    if bg.trang_thai == "da_duyet" and bg.han_luc and now > bg.han_luc:
+    if bg.trang_thai == "da_gui" and bg.han_luc and now > bg.han_luc:
         bg.trang_thai = "het_han"
 
 
@@ -132,8 +133,8 @@ def lap(db: Session, u: User, thiet_ke_id: int, now: datetime | None = None) -> 
         raise LoiBaoGia("Không có thiết kế này", 404)
     if tk.trang_thai != "da_gui":
         raise LoiBaoGia("Thiết kế này đã có phiên bản mới hơn — lập báo giá từ phiên bản mới nhất", 409)
-    cu = db.execute(select(BaoGiaDoan).where(BaoGiaDoan.thiet_ke_id == tk.id,
-                                             BaoGiaDoan.trang_thai.in_(["nhap", "tra_lai", "cho_duyet"]))).scalars().first()
+    cu = db.execute(select(BaoGiaDoan).join(BaoGia, BaoGia.id == BaoGiaDoan.id)
+                    .where(BaoGiaDoan.thiet_ke_id == tk.id, BaoGia.trang_thai.in_(["nhap", "tra_lai", "cho_duyet"]))).scalars().first()
     if cu is not None:
         return ra(cu, True)
     d, t = tk.du_toan or {}, tk.thiet_ke or {}
@@ -142,11 +143,23 @@ def lap(db: Session, u: User, thiet_ke_id: int, now: datetime | None = None) -> 
     dong += [{"nhom": x["nhom"], "ten": x["ten"], "chi_tiet": x.get("ly_do", ""), "von": None, "nguon": "thiếu giá"}
              for x in d.get("thieu_gia", [])]
     k = t.get("khach") or {}
-    so = (db.execute(select(BaoGiaDoan.id).order_by(BaoGiaDoan.id.desc())).scalars().first() or 0) + 1
-    bg = BaoGiaDoan(ma=f"BGD-{so:06d}", thiet_ke_id=tk.id, thiet_ke_ma=tk.ma, tai_khoan_id=tk.tai_khoan_id, dong=dong,
-                    bien_pt=T.BIEN_TAM_TINH * 100, he_so_te=he_so_te(t), so_nl=int(k.get("nl") or 0),
-                    so_te=int(k.get("te") or 0), so_eb=int(k.get("eb") or 0), bao_gom=list(d.get("bao_gom", [])),
-                    khong_bao_gom=list(d.get("khong_bao_gom", [])), trang_thai="nhap", tao_boi=u.username, tao_luc=now)
+    so = db.execute(select(func.count()).select_from(BaoGiaDoan)).scalar() or 0
+    while True:                                              # mã BGD-… giữ như trước KS-19k, không trùng
+        so += 1
+        if db.execute(select(BaoGia.id).where(BaoGia.ma == f"BGD-{so:06d}")).first() is None:
+            break
+    kh = db.get(TaiKhoanNgoai, tk.tai_khoan_id)
+    so_nl, so_te, so_eb = int(k.get("nl") or 0), int(k.get("te") or 0), int(k.get("eb") or 0)
+    dau = BaoGia(ma=f"BGD-{so:06d}", mang="kd_doan", nguon="thiet_ke",
+                 khach_ten=(((kh.ho_ten or kh.dien_thoai) if kh else "") or f"Khách cổng #{tk.tai_khoan_id}")[:200],
+                 khach_dien_thoai=(kh.dien_thoai if kh else "")[:30], khach_email=(kh.email if kh else "")[:120],
+                 ngay_khoi_hanh=tk.ngay_di, so_khach=so_nl + so_te + so_eb, trang_thai="nhap", tao_boi=u.username,
+                 tao_luc=now)
+    db.add(dau)
+    db.flush()
+    bg = BaoGiaDoan(id=dau.id, dau=dau, thiet_ke_id=tk.id, thiet_ke_ma=tk.ma, tai_khoan_id=tk.tai_khoan_id, dong=dong,
+                    bien_pt=T.BIEN_TAM_TINH * 100, he_so_te=he_so_te(t), so_nl=so_nl, so_te=so_te, so_eb=so_eb,
+                    bao_gom=list(d.get("bao_gom", [])), khong_bao_gom=list(d.get("khong_bao_gom", [])))
     tinh(bg)
     db.add(bg)
     db.flush()
@@ -221,6 +234,7 @@ def gui_duyet(db: Session, u: User, bid: int, ly_do: str = "", now: datetime | N
             raise LoiBaoGia(f"Biên {b * 100:.1f}% dưới {NGUONG * 100:.0f}% — ghi lý do để Chủ tịch / TGĐ duyệt")
         bg.ly_do_bien = T._sach(ly_do, 300)
     bg.trang_thai, bg.gui_duyet_luc, bg.ly_do_tra = "cho_duyet", now or datetime.now(), ""
+    bg.dau.duoi_bien, bg.dau.giai_trinh = bg.cap_duyet == "ct_tgd", bg.ly_do_bien if bg.cap_duyet == "ct_tgd" else ""
     R.audit(db, u.username, u.role, "bao_gia_doan_gui_duyet", f"bao_gia_doan:{bg.ma}",
             after={"bien_thuc": round(b, 4), "cap_duyet": bg.cap_duyet})
     db.commit()
@@ -247,9 +261,11 @@ def duyet(db: Session, u: User, bid: int, dong_y: bool, ly_do: str = "", now: da
         if not T._sach(ly_do):
             raise LoiBaoGia("Ghi lý do trả lại")
         bg.trang_thai, bg.ly_do_tra = "tra_lai", T._sach(ly_do, 300)
+        bg.dau.ly_do_tu_choi = bg.ly_do_tra
     else:
-        bg.trang_thai, bg.duyet_boi, bg.duyet_luc = "da_duyet", u.username, now
+        bg.trang_thai, bg.duyet_boi, bg.duyet_luc = "da_gui", u.username, now
         bg.han_luc = now + timedelta(hours=HAN_GIO)
+        bg.dau.han_hieu_luc, bg.dau.bien_luc_gui, bg.dau.nguong_luc_gui = bg.han_luc.date(), bien_thuc(bg), NGUONG
         bg.ma_bam = _bam(bg)
         gia = f"{int(bg.tong_ban):,} đ" if bg.tong_ban is not None else "chưa có giá"   # K2: rỗng không thành «0 đ»
         _ghi_lead(db, tk, f"Báo giá {bg.ma} đã gửi khách: {gia}, hiệu lực đến {bg.han_luc:%d/%m %H:%M}".replace(",", "."))
@@ -272,7 +288,7 @@ def _ghi_lead(db: Session, tk: ThietKeDoan, dong: str) -> None:
 
 def theo_thiet_ke(db: Session, u: User, thiet_ke_ma: str, now: datetime | None = None) -> list[dict]:
     T._quyen(u, T.VAI_XEM)
-    ds = db.execute(select(BaoGiaDoan).where(BaoGiaDoan.thiet_ke_ma == thiet_ke_ma).order_by(BaoGiaDoan.id.desc())).scalars().all()
+    ds = db.execute(select(BaoGiaDoan).where(BaoGiaDoan.thiet_ke_ma == thiet_ke_ma).order_by(BaoGiaDoan.id.desc())).scalars().unique().all()
     for bg in ds:
         _het_han_neu_qua(bg, now or datetime.now())
     db.commit()
@@ -282,8 +298,9 @@ def theo_thiet_ke(db: Session, u: User, thiet_ke_ma: str, now: datetime | None =
 def thay_the_khi_sua(db: Session, thiet_ke_ma: str) -> int:
     """Khách gửi phiên bản thiết kế mới → báo giá chưa được khách đồng ý của mã ấy hết hiệu lực."""
     n = 0
-    for bg in db.execute(select(BaoGiaDoan).where(BaoGiaDoan.thiet_ke_ma == thiet_ke_ma,
-                                                  BaoGiaDoan.trang_thai.in_(["nhap", "tra_lai", "cho_duyet", "da_duyet"]))).scalars():
+    for bg in db.execute(select(BaoGiaDoan).join(BaoGia, BaoGia.id == BaoGiaDoan.id)
+                         .where(BaoGiaDoan.thiet_ke_ma == thiet_ke_ma,
+                                BaoGia.trang_thai.in_(["nhap", "tra_lai", "cho_duyet", "da_gui"]))).scalars().unique():
         bg.trang_thai = "thay_the"
         n += 1
     return n
@@ -292,8 +309,9 @@ def thay_the_khi_sua(db: Session, thiet_ke_ma: str) -> int:
 # ══ CỔNG KHÁCH ══════════════════════════════════════════════════════════════════════════════════════
 def cho_khach(db: Session, tk_: TaiKhoanNgoai, thiet_ke_ma: str, now: datetime | None = None) -> dict | None:
     """Báo giá mới nhất khách được thấy của một mã thiết kế (đã duyệt / hết hạn / đã đồng ý)."""
-    bg = db.execute(select(BaoGiaDoan).where(BaoGiaDoan.thiet_ke_ma == thiet_ke_ma, BaoGiaDoan.tai_khoan_id == tk_.id,
-                                             BaoGiaDoan.trang_thai.in_(["da_duyet", "het_han", "khach_dong_y"]))
+    bg = db.execute(select(BaoGiaDoan).join(BaoGia, BaoGia.id == BaoGiaDoan.id)
+                    .where(BaoGiaDoan.thiet_ke_ma == thiet_ke_ma, BaoGiaDoan.tai_khoan_id == tk_.id,
+                           BaoGia.trang_thai.in_(["da_gui", "het_han", "khach_chot"]))
                     .order_by(BaoGiaDoan.id.desc())).scalars().first()
     if bg is None:
         return None
@@ -315,12 +333,12 @@ def khach_dong_y(db: Session, tk_: TaiKhoanNgoai, bid: int, ma_bam: str, dong_y:
     if not dong_y:
         raise LoiBaoGia("Đánh dấu ô đồng ý báo giá")
     _het_han_neu_qua(bg, now)
-    if bg.trang_thai == "khach_dong_y":
+    if bg.trang_thai == "khach_chot":
         return {**ra(bg, False), "message": "Bạn đã đồng ý báo giá này"}
     if bg.trang_thai == "het_han":
         db.commit()
         raise LoiBaoGia("Báo giá đã hết hạn — gửi lại thiết kế hoặc liên hệ Sales để nhận báo giá mới", 410)
-    if bg.trang_thai != "da_duyet":
+    if bg.trang_thai != "da_gui":
         raise LoiBaoGia("Báo giá không còn hiệu lực", 409)
     if not ma_bam or ma_bam != bg.ma_bam or _bam(bg) != bg.ma_bam:
         raise LoiBaoGia("Báo giá đã thay đổi — tải lại trang để xem bản mới", 409)
@@ -330,7 +348,7 @@ def khach_dong_y(db: Session, tk_: TaiKhoanNgoai, bid: int, ma_bam: str, dong_y:
         db.commit()
         raise LoiBaoGia("Bạn đã gửi phiên bản thiết kế mới — báo giá này không còn hiệu lực", 409)
     t = tk.thiet_ke or {}
-    hd = HopDongKhach(so_hop_dong=sinh_ma(db, HopDongKhach, HopDongKhach.so_hop_dong, "HD"),
+    hd = HopDongKhach(bao_gia_id=bg.id, so_hop_dong=sinh_ma(db, HopDongKhach, HopDongKhach.so_hop_dong, "HD"),
                       khach_ten=(tk_.ho_ten or tk_.dien_thoai or f"Khách cổng #{tk_.id}")[:200], gia_tri=float(bg.tong_ban or 0),
                       trang_thai="nhap", tao_boi="cong_khach", tao_luc=now,
                       ghi_chu=(f"Tự tạo khi khách đồng ý báo giá {bg.ma} (tour đoàn khách tự thiết kế {tk.ma} phiên bản "
@@ -339,7 +357,7 @@ def khach_dong_y(db: Session, tk_: TaiKhoanNgoai, bid: int, ma_bam: str, dong_y:
                                "Sale Admin hoàn thiện thông tin khách, số đợt thanh toán rồi ký.").replace(",", "."))
     db.add(hd)
     db.flush()
-    bg.trang_thai, bg.khach_dong_y_luc, bg.hop_dong_id = "khach_dong_y", now, hd.id
+    bg.trang_thai, bg.khach_dong_y_luc, bg.hop_dong_id = "khach_chot", now, hd.id
     _ghi_lead(db, tk, f"Khách ĐỒNG Ý báo giá {bg.ma} — hợp đồng nháp {hd.so_hop_dong}")
     R.audit(db, f"cong:{tk_.id}", "khach", "bao_gia_doan_khach_dong_y", f"bao_gia_doan:{bg.ma}",
             after={"hop_dong": hd.so_hop_dong, "tong_ban": bg.tong_ban, "ma_bam": bg.ma_bam})

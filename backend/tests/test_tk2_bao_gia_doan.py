@@ -86,7 +86,7 @@ def test_tk2_3_cap_duyet_theo_bien(db, nen):
     with pytest.raises(B.LoiBaoGia, match="sửa"):
         B.luu(db, _u(db, "dh"), bg["id"], {"bien_pt": 12})
     bg = B.duyet(db, _u(db, "tp"), bg["id"], True, now=NOW)
-    assert bg["trang_thai"] == "da_duyet" and bg["han_luc"] == (NOW + dt.timedelta(hours=24)).isoformat(timespec="minutes")
+    assert bg["trang_thai"] == "da_gui" and bg["han_luc"] == (NOW + dt.timedelta(hours=24)).isoformat(timespec="minutes")
 
 
 def test_tk2_3b_nguoi_lap_khong_tu_duyet(db, nen):
@@ -97,7 +97,7 @@ def test_tk2_3b_nguoi_lap_khong_tu_duyet(db, nen):
     bg = B.gui_duyet(db, _u(db, "tp"), bg["id"])
     with pytest.raises(B.LoiBaoGia, match="không tự duyệt"):
         B.duyet(db, _u(db, "tp"), bg["id"], True)
-    assert B.duyet(db, _u(db, "tp2"), bg["id"], True)["trang_thai"] == "da_duyet"
+    assert B.duyet(db, _u(db, "tp2"), bg["id"], True)["trang_thai"] == "da_gui"
 
 
 def _da_duyet(db, nen, **them):
@@ -116,14 +116,14 @@ def test_tk2_4_khach_dong_y_tao_hop_dong_nhap(db, nen):
     _bang_gia(db)
     tk = _da_duyet(db, nen)
     mine = S.cua_toi(db, _tk(db), NOW)[0]["bao_gia"]
-    assert mine["trang_thai"] == "da_duyet" and "tong_von" not in mine and all("von" not in x for x in mine["dong"])
+    assert mine["trang_thai"] == "da_gui" and "tong_von" not in mine and all("von" not in x for x in mine["dong"])
     with pytest.raises(B.LoiBaoGia, match="Không tìm thấy"):
         B.khach_dong_y(db, _tk(db, 2), mine["id"], mine["ma_bam"], True, NOW)
     with pytest.raises(B.LoiBaoGia, match="đã thay đổi"):
         B.khach_dong_y(db, _tk(db), mine["id"], "sai", True, NOW)
     r = B.khach_dong_y(db, _tk(db), mine["id"], mine["ma_bam"], True, NOW + dt.timedelta(hours=2))
     hd = db.execute(select(HopDongKhach)).scalars().one()
-    assert r["trang_thai"] == "khach_dong_y" and r["hop_dong"] == hd.so_hop_dong
+    assert r["trang_thai"] == "khach_chot" and r["hop_dong"] == hd.so_hop_dong
     assert hd.trang_thai == "nhap" and hd.gia_tri == mine["tong_ban"] and tk.ma in hd.ghi_chu
     assert B.khach_dong_y(db, _tk(db), mine["id"], mine["ma_bam"], True, NOW)["message"].startswith("Bạn đã đồng ý")
 
@@ -146,7 +146,7 @@ def test_tk2_5_khach_sua_thiet_ke_thi_bao_gia_cu_het_hieu_luc(db, nen):
     _bang_gia(db)
     tk = _da_duyet(db, nen)
     S.gui(db, _tk(db), {"thiet_ke": _thiet_ke(nen, khach={"nl": 25}, phong={"p2": 13}), "ma": tk.ma}, NOW)
-    assert db.execute(select(BaoGiaDoan)).scalars().one().trang_thai == "thay_the"
+    assert db.execute(select(BaoGiaDoan)).scalars().unique().one().trang_thai == "thay_the"
     with pytest.raises(B.LoiBaoGia, match="phiên bản mới"):
         B.lap(db, _u(db, "dh"), tk.id, NOW)
     sa = S.ds_vtos(db, _u(db, "sa"))

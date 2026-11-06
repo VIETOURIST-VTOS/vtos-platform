@@ -175,19 +175,19 @@ export default function TuThietKeTour({ toi }: { toi?: any }) {
         {!b && <span className="ksv-muted">Đang chờ Vietourist lập báo giá chính thức.</span>}
         {b && <>
           <div className="tk-hang"><b>Báo giá chính thức {b.ma}</b>
-            <span className={b.trang_thai === "da_duyet" ? "ksv-diem" : "ksv-muted"}>{b.trang_thai_ten}</span></div>
+            <span className={b.trang_thai === "da_gui" ? "ksv-diem" : "ksv-muted"}>{b.trang_thai_ten}</span></div>
           <div className="wrap" style={{ overflowX: "auto" }}><table className="tk-bang"><tbody>{b.dong.map((r: any, i: number) =>
             <tr key={i}><td>{r.ten}</td><td>{r.chi_tiet}</td></tr>)}</tbody></table></div>
           <div className="ksv-sum"><b>Tổng giá trị</b><b className="ksv-big">₫ {vnd(b.tong_ban)}</b></div>
           <span className="ksv-muted">Người lớn ₫ {vnd(b.gia_nl)} · trẻ em ₫ {vnd(b.gia_te)} ({Math.round(b.he_so_te * 100)}% người lớn){b.so_eb ? ` · ${b.so_eb} em bé không tính` : ""}</span>
           <div className="ksv-f2"><div><b>Bao gồm</b><ul className="tk-ul">{b.bao_gom.map((x: string) => <li key={x}>{x}</li>)}</ul></div>
             <div><b>Không bao gồm</b><ul className="tk-ul">{b.khong_bao_gom.map((x: string) => <li key={x}>{x}</li>)}</ul></div></div>
-          {b.trang_thai === "da_duyet" && <>
+          {b.trang_thai === "da_gui" && <>
             <span className="ksv-hv">Hiệu lực đến {b.han_luc ? `${b.han_luc.slice(11, 16)} · ${ngayVn(b.han_luc.slice(0, 10))}/${b.han_luc.slice(0, 4)}` : ""} — sau giờ này cần xin báo giá mới.</span>
             <label className="ksv-chk"><input type="checkbox" checked={!!dongY[b.id]} onChange={(e) => setDongY({ ...dongY, [b.id]: e.target.checked })} />
               <span style={{ fontSize: 13 }}>Tôi đồng ý báo giá này. Sales Vietourist liên hệ ký hợp đồng; chưa thu tiền ở bước này.</span></label>
             <button type="button" className="ksv-btn" disabled={!dongY[b.id]} onClick={() => dongYBg(b)}>Đồng ý báo giá</button></>}
-          {b.trang_thai === "khach_dong_y" && <span className="ksv-diem">Bạn đã đồng ý báo giá — Sales Vietourist sẽ liên hệ ký hợp đồng.</span>}
+          {b.trang_thai === "khach_chot" && <span className="ksv-diem">Bạn đã đồng ý báo giá — Sales Vietourist sẽ liên hệ ký hợp đồng.</span>}
           {b.trang_thai === "het_han" && <span className="ksv-muted">Báo giá đã hết hạn — sửa và gửi lại thiết kế, hoặc liên hệ Sales để nhận báo giá mới.</span>}
         </>}
       </div>; })}

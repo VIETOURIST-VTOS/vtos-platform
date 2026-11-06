@@ -51,7 +51,15 @@ TRANG_THAI_BAO_GIA = {
     "khach_tu_choi": "Khách từ chối",
     "het_han": "Hết hạn",
     "huy": "Hủy",
+    # KS-19k (06/11/2026): ba trạng thái riêng của báo giá đoàn lập từ thiết kế (luồng duyệt TP ĐH / Chủ tịch).
+    "cho_duyet": "Chờ duyệt",
+    "tra_lai": "Trả lại",
+    "thay_the": "Bị thay (khách sửa thiết kế)",
 }
+
+# KS-19k: báo giá sinh từ đâu. «ban_hang» = Sales soạn ở màn /bao-gia; «thiet_ke» = Điều hành lập từ thiết kế tour đoàn
+# khách gửi (phần riêng ở bảng bao_gia_thiet_ke). Báo giá «thiet_ke» chỉ XEM ở màn Bán hàng — mọi thao tác đi luồng TK-2.
+NGUON_BAO_GIA = ("ban_hang", "thiet_ke")
 
 
 class BangGia(Base):
@@ -106,6 +114,7 @@ class BaoGia(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     ma: Mapped[str] = mapped_column(String(30), unique=True, index=True)
     mang: Mapped[str] = mapped_column(String(20), default="kd_le", index=True)
+    nguon: Mapped[str] = mapped_column(String(20), default="ban_hang", server_default="ban_hang", index=True)
     khach_ten: Mapped[str] = mapped_column(String(200))
     khach_dien_thoai: Mapped[str] = mapped_column(String(30), default="")
     khach_email: Mapped[str] = mapped_column(String(120), default="")

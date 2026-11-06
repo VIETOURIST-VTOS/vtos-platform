@@ -14,7 +14,7 @@ import { Tag, errMsg } from "@/components/ui";
 
 const d = (n?: number | null) => (n || n === 0 ? Math.round(n).toLocaleString("vi-VN") + " đ" : "—");
 const ngay = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "—");
-const MAU_BG: Record<string, string> = { nhap: "grey", cho_duyet: "warn", tra_lai: "red", da_duyet: "navy", khach_dong_y: "ok", het_han: "grey", thay_the: "grey" };
+const MAU_BG: Record<string, string> = { nhap: "grey", cho_duyet: "warn", tra_lai: "red", da_gui: "navy", khach_chot: "ok", het_han: "grey", thay_the: "grey" };
 const MAU: Record<string, string> = { cho_duyet: "warn", hieu_luc: "ok", tu_choi: "red", ngung: "grey" };
 const TRONG = { loai: "xe", ten: "", pham_vi: "ca_hai", khu_vuc: "", gia: "", tu_cho: "", tu_diem: "", den_diem: "", hang_ve: "pho_thong", gia_tre_em: "", gia_em_be: "", tu_ngay: "", den_ngay: "", ghi_chu: "" };
 

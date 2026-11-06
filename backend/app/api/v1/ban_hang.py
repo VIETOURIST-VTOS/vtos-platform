@@ -148,7 +148,20 @@ def _bg_ra(db: Session, bg: BaoGia) -> dict:
                             "tong_von": None if b.tong_von is None else float(b.tong_von),
                             "bien": b.bien, "nguong": b.nguong, "du_co_so": b.du_co_so,
                             "gui_boi": b.gui_boi, "gui_luc": b.gui_luc} for b in ban],
-            "cong_bien": BH.xem_bien(db, bg)}
+            "cong_bien": BH.xem_bien(db, bg), "nguon": bg.nguon, **_tu_thiet_ke(db, bg)}
+
+
+def _tu_thiet_ke(db: Session, bg: BaoGia) -> dict:
+    """KS-19k: báo giá đoàn lập từ thiết kế — kèm mã thiết kế và GIÁ BÁN (không giá vốn) để màn Bán hàng xem được."""
+    if bg.nguon != "thiet_ke":
+        return {}
+    from app.models.thiet_ke_doan import BaoGiaDoan
+    p = db.get(BaoGiaDoan, bg.id)
+    if p is None:
+        return {}
+    return {"thiet_ke": {"ma": p.thiet_ke_ma, "so_nl": p.so_nl, "so_te": p.so_te, "so_eb": p.so_eb,
+                         "gia_nl": p.gia_nl, "gia_te": p.gia_te, "tong_ban": p.tong_ban,
+                         "han_luc": p.han_luc.isoformat(timespec="minutes") if p.han_luc else None}}
 
 
 @router.get("/tour-de-chon")
@@ -227,6 +240,7 @@ def sua_bao_gia(bid: int, data: BaoGiaIn, u: User = Depends(require_roles(*SOAN)
                 db: Session = Depends(get_db)):
     bg = db.get(BaoGia, bid)
     if bg is None: raise HTTPException(404, "Không có báo giá")
+    BH.chi_xem_neu_tu_thiet_ke(bg)
     if bg.trang_thai in ("khach_chot", "huy"):
         raise HTTPException(422, f"Báo giá đang ở '{bg.trang_thai}', không sửa được")
     GML.kiem_phien_ban(bg, data.phien_ban, f"Báo giá {bg.ma}", lambda: _bg_ra(db, bg))
