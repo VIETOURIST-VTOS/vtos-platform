@@ -197,5 +197,5 @@ def test_dontckt_7_so_cua_dot_o_lan_phan_quyen_va_khong_cho_nao_khac():
 
     khac = [t for t in _nguon()
             if os.path.abspath(t) != os.path.abspath(TEP_DOT)
-            and "DON-TCKT" in open(t, encoding="utf-8").read()]
+            and re.search(r"DON-TCKT(?!\w)", open(t, encoding="utf-8").read())]   # KS-19p: không bắt nhầm DON-TCKT2
     assert not khac, f"đợt này còn ghi vào {khac}"
