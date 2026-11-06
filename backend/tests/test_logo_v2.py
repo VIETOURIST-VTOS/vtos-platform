@@ -53,7 +53,7 @@ def test_navy_chinh_thuc_tren_thanh_va_nut():
     assert "--v3-navy:#14538D;--v3-accent:#14538D" in khoi
     assert "#1557b0" not in _doc("components", "cong", "KhachSanVtd.tsx")
     for p in (("app", "cong", "page.tsx"), ("app", "login", "page.tsx"), ("components", "cong", "KhungRieng.tsx")):
-        assert "/cong/vtd.css?v=40" in _doc(*p), p
+        assert "/cong/vtd.css?v=41" in _doc(*p), p   # KS-NAVY nâng v=41
 
 
 def test_mot_bieu_tuong_va_mau_mo_app():

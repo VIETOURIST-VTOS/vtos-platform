@@ -219,7 +219,7 @@ export default function CongNcc({ toi, thoat }: { toi: any; thoat: () => void })
           {d.dg.bai.length ? d.dg.bai.map((b: any) => <div key={b.id} className="v3-panel" style={{ marginTop: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
               <b>{b.ten} · {b.la_doan ? "Đoàn" : "Bàn"} {b.so_khach} người · {ngay(b.ngay_an)}{d.dg.nha_hang.length > 1 ? ` · ${b.nha_hang}` : ""}</b>
-              <span style={{ color: b.diem <= 2 ? "#8a1f1f" : "#b07a10", letterSpacing: 2 }} aria-label={`${b.diem} sao`}>{"★★★★★".slice(0, b.diem)}<span style={{ color: "#c9d3dc" }}>{"★★★★★".slice(b.diem)}</span></span></div>
+              <span style={{ color: b.diem <= 2 ? "#1E63C8" : "#b07a10", letterSpacing: 2 }} aria-label={`${b.diem} sao`}>{"★★★★★".slice(0, b.diem)}<span style={{ color: "#c9d3dc" }}>{"★★★★★".slice(b.diem)}</span></span></div>
             {b.nhan_xet && <p style={{ margin: "6px 0", whiteSpace: "pre-line" }}>{b.nhan_xet}</p>}
             {b.anh.length > 0 && <div style={{ display: "flex", gap: 6 }}>{b.anh.map((a: any) => <img key={a.i} src={a.nho} alt="Ảnh khách" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 6 }} />)}</div>}
             {b.tra_loi_bi_an && <small>Lời trả lời đã bị Vietourist ẩn vì vi phạm quy tắc.</small>}
@@ -237,7 +237,7 @@ export default function CongNcc({ toi, thoat }: { toi: any; thoat: () => void })
           {d.dgks.bai.length ? d.dgks.bai.map((b: any) => <div key={b.id} className="v3-panel" style={{ marginTop: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
               <b>{b.ten} · {b.loai_phong} · ở {b.thang_o}{d.dgks.khach_san.length > 1 ? ` · ${b.khach_san}` : ""}</b>
-              <b style={{ color: b.diem <= 5 ? "#8a1f1f" : "#1f4fae" }}>{b.diem}/10</b></div>
+              <b style={{ color: b.diem <= 5 ? "#1E63C8" : "#14538D" }}>{b.diem}/10</b></div>
             {b.tieu_de && <b style={{ display: "block", marginTop: 6 }}>{b.tieu_de}</b>}
             {b.nhan_xet && <p style={{ margin: "6px 0", whiteSpace: "pre-line" }}>{b.nhan_xet}</p>}
             {b.anh.length > 0 && <div style={{ display: "flex", gap: 6 }}>{b.anh.map((a: any) => <img key={a.i} src={a.nho} alt="Ảnh khách" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 6 }} />)}</div>}

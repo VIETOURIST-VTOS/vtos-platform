@@ -59,7 +59,7 @@ export function NhanPl({ n, boDs }: { n: any; boDs?: boolean }) {
   const s = { fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 6, lineHeight: 1.5 } as const;
   return <div className="at-pl" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
     {c && <span style={{ ...s, background: c[0], color: c[1] }}>{n.bac_ten}</span>}
-    {n.michelin && <span style={{ ...s, background: "#f6e6e6", color: "#8a1f1f" }}>{n.michelin}</span>}
+    {n.michelin && <span style={{ ...s, background: "#E8F0FB", color: "#1E63C8" }}>{n.michelin}</span>}
     {n.dac_san && !boDs && <span style={{ ...s, background: "#fbeee0", color: "#7a4a22" }}>Đặc sản địa phương</span>}</div>;
 }
 
@@ -268,7 +268,7 @@ export default function KhamPhaAmThuc({ onDat, rieng = false, moId }: { onDat: (
 
 const CSS = `
 .at{display:flex;flex-direction:column;gap:16px;--at-ink:var(--v3-ink,#162d47);--at-muted:var(--v3-muted,#566a80);--at-line:var(--v3-line,#e0e7ee);
-  --at-teal:#147866;--at-tint:#e7f4ef;--at-gold:#a8783c;--at-gold-tint:#f6eddf;--at-slot:#e3e8ee;--at-sea:#e3eef7;--at-land:#eef1f4;--at-pin:#e0405f}
+  --at-teal:#147866;--at-tint:#e7f4ef;--at-gold:#a8783c;--at-gold-tint:#f6eddf;--at-slot:#e3e8ee;--at-sea:#e3eef7;--at-land:#eef1f4;--at-pin:#1E63C8}
 .at h1,.at h2,.at h3{text-wrap:balance;margin:0}
 .at-bia{position:relative;min-height:240px;border-radius:14px;overflow:hidden;display:flex;align-items:flex-end;color:#fff;background:linear-gradient(160deg,#0b2c49,#081826)}
 .at-bia img,.at-bia-nen{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}

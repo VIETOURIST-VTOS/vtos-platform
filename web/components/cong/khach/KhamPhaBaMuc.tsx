@@ -5,9 +5,9 @@ import { useEffect, useState } from "react";
 import { duongRieng, type TrangRieng } from "@/lib/cong";
 
 const O: [TrangRieng, string, string, string][] = [
-  ["tours", "Tour du lịch", "Tour trong nước, nước ngoài, tour đoàn theo yêu cầu", "linear-gradient(135deg,#0e7c6b,#3fb59d)"],
-  ["hotel", "Khách sạn", "Khách sạn hợp tác, giá hợp đồng Vietourist, đặt giữ trả sau", "linear-gradient(135deg,#1d3f9a,#4f86e8)"],
-  ["restaurant", "Nhà hàng & ẩm thực", "Hương vị Việt Nam, thực đơn, đặt bàn có ưu đãi", "linear-gradient(135deg,#8f3420,#e0794f)"],
+  ["tours", "Tour du lịch", "Tour trong nước, nước ngoài, tour đoàn theo yêu cầu", "linear-gradient(135deg,#0B2545,#14538D)"],
+  ["hotel", "Khách sạn", "Khách sạn hợp tác, giá hợp đồng Vietourist, đặt giữ trả sau", "linear-gradient(135deg,#14538D,#1E63C8)"],
+  ["restaurant", "Nhà hàng & ẩm thực", "Hương vị Việt Nam, thực đơn, đặt bàn có ưu đãi", "linear-gradient(135deg,#1E63C8,#5A9BD4)"],
 ];
 
 export default function KhamPhaBaMuc() {

@@ -33,7 +33,7 @@ import { api, type User } from "@/lib/api";
 const KHOA = "vtos_giao_dien";
 /** Lối lui khi máy chủ chưa gửi `giao_dien_mac_dinh` (máy chủ bản cũ). Hai con số này cũng nằm ở
  *  models/core.py; máy chủ mới thì màn hình dùng số của máy chủ, không dùng hai số này. */
-const MAC_DINH = { nen: "toi", co_chu: 16, mau_nut: "navy" };
+const MAC_DINH = { nen: "sang", co_chu: 16, mau_nut: "navy" };   // KS-NAVY 07/11: mặc định nền trắng sáng
 const CO_MIN = 14, CO_MAX = 20;
 
 type Chon = { nen: string | null; co_chu: number | null; mau_nut?: string | null };
@@ -173,7 +173,7 @@ export default function ChonGiaoDien({ user }: { user: User | null }) {
               <i className={"gd-mau-o gd-mau-" + ma} aria-hidden="true" />{ten}</button>
           ))}
         </div>
-        {nenThat(nen) === "sang" && <small className="gd-goi-y">Nền trắng sáng luôn dùng nút navy.</small>}
+        {nenThat(nen) === "sang" && <small className="gd-goi-y">Nền trắng sáng luôn dùng nút navy sáng.</small>}
       </div>
 
       <div>
