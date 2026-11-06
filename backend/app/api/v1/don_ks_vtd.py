@@ -38,6 +38,12 @@ class ChonIn(BaseModel):
     so: int
 
 
+class ChiaIn(BaseModel):
+    nl: int = 1
+    te: int = 0
+    tuoi: list[int] = []
+
+
 class DatIn(BaseModel):
     vao: date
     ra: date
@@ -53,6 +59,8 @@ class DatIn(BaseModel):
     ma_voucher: str = ""            # KS-16: voucher VTD Rewards khách tự nhập (tối đa 5% đơn)
     cach_tra: str = "ngay"          # KS-16p: ngay | sau («Đặt giữ, trả sau» — chỉ gói miễn phí hủy)
     gio_den: str = ""               # KS-16s: giờ đến dự kiến
+    chia: list[ChiaIn] = []         # KS-20b: khách khai từng phòng (tối đa 9)
+    xep: list[int] = []             # KS-20b: nhóm khách của từng phòng đã chọn
 
 
 @router_cong.get("")

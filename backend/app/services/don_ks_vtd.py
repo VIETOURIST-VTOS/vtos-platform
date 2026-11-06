@@ -275,7 +275,8 @@ def nhac_han_tra(db: Session, now: datetime | None = None) -> list[str]:
     return ra
 
 
-def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict], nl: int = 1, te: int = 0, tuoi=None) -> list[dict]:
+def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict], nl: int = 1, te: int = 0, tuoi=None,
+              chia: list[dict] | None = None, xep=None) -> list[dict]:
     """Dòng đơn máy tính từ gói đã duyệt. chon = [{goi_id, so}] — không nhận số tiền."""
     gop: dict[int, int] = {}
     for c in chon or []:
@@ -303,7 +304,7 @@ def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict]
     # KS-16j/16k: phụ thu trẻ em / ăn sáng trẻ / giường phụ máy tự cộng vào dòng (chưa thuế phí, cùng tỷ lệ thuế phí)
     try:
         pts = S.phu_thu_dong(k, dong, {x["loai_phong_id"]: x["_lp"] for x in dong}, {x["goi_id"]: x["_g"] for x in dong},
-                             nl, te, tuoi, (ra - vao).days)
+                             nl, te, tuoi, (ra - vao).days, chia, xep)
     except S.LoiKhachSan as ex:
         raise LoiDon(str(ex))
     for x, pt in zip(dong, pts):
@@ -312,6 +313,8 @@ def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict]
             x["phu_thu"] = pt["phu_thu"]
             x["phu_thu_ct"] = pt["phu_thu_ct"]
             x["tien"] += pt["phu_thu"]
+        if pt.get("khach"):
+            x["khach"] = pt["khach"]                        # KS-20b: [{phong, nl, te, tuoi}] — gửi khách sạn đúng ai ở phòng nào
         if pt["cho_xac_nhan"]:
             x["giuong_phu_cho_xac_nhan"] = True     # Điều hành hỏi khách sạn; không xếp được → báo hết phòng, hoàn 100%
         x["thue"] = 0                                   # KS-19: giá đã gồm 8% VAT — không cộng thuế phí
@@ -338,6 +341,13 @@ def han_tra_sau(dong: list[dict], hom_nay: date) -> date | None:
     return han if han > hom_nay else None
 
 
+def chia_phong_txt(dong: list[dict]) -> str:
+    """KS-20b: «Phòng 1 — 2 người lớn · Deluxe · Linh hoạt» mỗi phòng một dòng, theo số phòng khách khai."""
+    ds = sorted(((kh["phong"], f"Phòng {kh['phong']} — {S.ta_nhom(kh)} · {x['loai_phong']} · {x['goi']}")
+                 for x in dong for kh in x.get("khach", [])))
+    return "".join(t + "\n" for _p, t in ds)
+
+
 def dat(db: Session, tk, kid: int, d: dict, now: datetime | None = None) -> DonKsVtd:
     """Khách bấm «Đặt và thanh toán»: máy kiểm phòng trống, giữ phòng 15 phút, tạo đơn «Chờ thanh toán»."""
     now = now or datetime.now()
@@ -361,12 +371,18 @@ def dat(db: Session, tk, kid: int, d: dict, now: datetime | None = None) -> DonK
     if gio_den and gio_den not in GIO_DEN:
         raise LoiDon("Giờ đến dự kiến không hợp lệ")
     nl, te = max(1, int(d.get("nguoi_lon") or 1)), max(0, int(d.get("tre_em") or 0))
+    try:
+        chia = S.doc_chia(d.get("chia"))                               # KS-20b: khách khai từng phòng
+    except S.LoiKhachSan as ex:
+        raise LoiDon(str(ex))
+    if chia:
+        nl, te, tuoi_c = S.tong_chia(chia)
     dang = db.execute(select(func.count(DonKsVtd.id)).where(DonKsVtd.tai_khoan_ngoai_id == tk.id, DonKsVtd.trang_thai == "cho_tra",
                                                             DonKsVtd.giu_den > now)).scalar() or 0
     if dang >= DON_CHO_TRA_TOI_DA:
         raise LoiDon("Bạn đang có đơn chờ thanh toán — trả hoặc hủy đơn đó trước", 409)
-    tuoi = S.doc_tuoi(te, d.get("tuoi_tre_em"))
-    dong = _dong_dat(db, k, vao, ra, d.get("chon") or [], nl, te, tuoi)
+    tuoi = tuoi_c if chia else S.doc_tuoi(te, d.get("tuoi_tre_em"))
+    dong = _dong_dat(db, k, vao, ra, d.get("chon") or [], nl, te, tuoi, chia, d.get("xep"))
     so = sum(x["so"] for x in dong)
     if so > 9:
         raise LoiDon("Tối đa 9 phòng một lần đặt")
@@ -403,7 +419,8 @@ def dat(db: Session, tk, kid: int, d: dict, now: datetime | None = None) -> DonK
             raise LoiDon("Bạn đang giữ một đơn trả sau chưa trả — trả hoặc hủy đơn đó trước, hoặc chọn «Trả ngay»", 409)
         giu_den = datetime.combine(han_tra, datetime.max.time()).replace(microsecond=0)
     don = DonKsVtd(ma=_ma_moi(db, vao), khach_san_id=k.id, tai_khoan_ngoai_id=tk.id, cong=tk.loai, ho_ten=ho_ten,
-                   lien_he=lien_he, email=email, yeu_cau=((f"Tuổi trẻ em: {', '.join(str(t) for t in tuoi)}\n" if tuoi else "")
+                   lien_he=lien_he, email=email, yeu_cau=((chia_phong_txt(dong) if chia else
+                                                            (f"Tuổi trẻ em: {', '.join(str(t) for t in tuoi)}\n" if tuoi else ""))
                                                                    + str(d.get("yeu_cau") or "").strip())[:1500], vao=vao, ra=ra,
                    nguoi_lon=nl, tre_em=te, dong=dong, so_phong=so, tien_phong=tien, thue_phi=thue, tong=tien + thue - giam,
                    trang_thai="cho_tra", giu_den=giu_den, tao_luc=now,
