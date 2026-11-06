@@ -103,6 +103,10 @@ HANG_RAO = (
     # Luat 2 canh cho nang nhat: dot nay KHONG duoc noi bang quyen. Luat 4 canh the doi chieu
     # dung chi tieu 321+339, khong phai 320/338 — canh san cai bay `LOAN_KIND_BS` tren main.
     "tests/test_v341_the_chi_tiet_vay_341.py",
+    # ── BU TRU THUE GTGT CUOI KY, them ngay 07/11/2026 (Dot GTGT-1) ─────────────────────────
+    # Luat 1 canh hai cong thuc KHONG doi xung (dau ra trong ky, dau vao co du dau ky) — chep
+    # nham thanh doi xung la cho sai kinh dien. Luat 2 canh but toan ghi vao TAI KHOAN CON.
+    "tests/test_gtgt1_bu_tru_thue_gtgt.py",
 )
 
 

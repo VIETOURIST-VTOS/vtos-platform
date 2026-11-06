@@ -82,3 +82,22 @@ def tg_ghi(body: KetChuyen, u: User = Depends(require_roles(*GHI)), db: Session 
         raise HTTPException(400, str(ex))
     db.commit()
     return kq
+# ---------- Bù trừ thuế GTGT cuối kỳ (GTGT-1, Chủ tịch chốt 07/11/2026) ----------
+# Đặt ở CUỐI tệp vì cùng một lý do với tách tỷ giá ngay trên: thân yêu cầu dùng lại chính lớp
+# `KetChuyen` (chỉ cần `ky`), và đặt ở đầu tệp thì lớp ấy chưa tồn tại — lỗi nổ lúc nạp module
+# nên cả máy chủ không lên.
+@router.get("/bu-tru-gtgt/xem-truoc")
+def gtgt_xem_truoc(ky: str, u: User = Depends(require_roles(*XEM)), db: Session = Depends(get_db)):
+    return KS.xem_truoc_bu_tru_gtgt(db, ky)
+
+
+@router.post("/bu-tru-gtgt")
+def gtgt_ghi(body: KetChuyen, u: User = Depends(require_roles(*GHI)), db: Session = Depends(get_db)):
+    """Ghi bút toán bù trừ GTGT. Chỉ Kế toán, y như mọi đường ghi khác ở màn hình này."""
+    try:
+        kq = KS.bu_tru_gtgt(db, u, body.ky)
+    except KS.KhongGhiDuoc as ex:
+        raise HTTPException(400, str(ex))
+    db.commit()
+    return kq
+

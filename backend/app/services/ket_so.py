@@ -665,3 +665,172 @@ def tach_ty_gia(db: Session, u: User, ky: str) -> dict:
     return {**xt, "da_ghi": True, "chung_tu": e.code,
             "message": (f"Đã tách chênh lệch tỷ giá kỳ {ky}: lỗ {xt['lo']:,.0f} đ, "
                         f"lãi {xt['lai']:,.0f} đ, trên {len(xt['tach_duoc'])} dòng.")}
+# ====================== BÙ TRỪ THUẾ GTGT CUỐI KỲ (GTGT-1) ======================
+#
+# Chủ tịch chốt 07/11/2026 sau khi đọc tài liệu MISA: bù trừ `Nợ 33311 / Có 1331` theo SỐ NHỎ HƠN
+# giữa thuế đầu ra phải nộp và thuế đầu vào được khấu trừ, theo đúng KỲ KÊ KHAI của công ty.
+#
+# ĐẶT Ở ĐÂY CHỨ KHÔNG THÀNH MỘT BƯỚC CỦA `BUOC_KET_CHUYEN` — cùng lý do với tách tỷ giá ngay
+# trên, nhưng lý do mạnh hơn: bốn bước kia đóng tài khoản KẾT QUẢ KINH DOANH (`TIEN_TO_KQKD` =
+# 5/6/7/8) về 911 hoặc 154. Còn 133 và 3331 là tài khoản BẢNG CÂN ĐỐI — chúng không đóng về đâu
+# cả, chúng bù trừ vào nhau. Nhét chúng vào bảng ấy thì bộ dò «tài khoản không thuộc bước nào»
+# và mọi phép kiểm dựng trên giả định «mọi bước đều là KQKD» sẽ nói những câu vô nghĩa.
+#
+# GHI VÀO TÀI KHOẢN CON, KHÔNG GHI VÀO TÀI KHOẢN CHA (Chủ tịch chốt 07/11/2026). Tài liệu MISA tự
+# mâu thuẫn chỗ này — bút toán mẫu ghi `Nợ 3331 / Có 133`, nhưng chính MISA cấm hạch toán vào tài
+# khoản tổng hợp, mà 133 và 3331 đều có tài khoản con. Trong danh mục của VTOS mỗi bên chỉ có
+# ĐÚNG MỘT con (`133 → 1331`, `3331 → 33311`), nên không có chỗ nào phải chọn.
+TK_GTGT_VAO, TK_GTGT_VAO_CHA = "1331", "133"
+TK_GTGT_RA, TK_GTGT_RA_CHA = "33311", "3331"
+NGUON_BU_TRU_GTGT = "ket_chuyen"
+# Khóa tham số khai ở `rules.GTGT_KY_KE_KHAI_KEY` — MỘT chỗ, không chép sang đây. Hai hằng số
+# mang cùng một chuỗi thì sớm muộn lệch nhau, và lúc ấy cửa đọc một khóa còn màn hình Tham số
+# sửa một khóa khác, không ai thấy.
+
+
+def _cay_tk(db: Session, goc: str) -> list[str]:
+    """Tài khoản gốc VÀ mọi con cháu của nó.
+
+    SỐ PHẢI ĐỌC CẢ CÂY, DÙ BÚT TOÁN CHỈ GHI VÀO LÁ — và đây không phải chuyện cẩn thận thừa. Đo
+    trên main ngày 07/11/2026: đường phát hành hóa đơn và đường bút toán đảo CÓ ghi thẳng vào
+    `3331`, tức vào tài khoản cha. Chỉ đọc `33311` thì phần nằm trên `3331` biến mất khỏi phép
+    tính, và số bù trừ sẽ nhỏ hơn số thật mà không một câu nào nói ra.
+    """
+    cac = {a.code: a for a in db.execute(select(Account)).scalars()}
+    ra, cho = [], [goc]
+    while cho:
+        c = cho.pop()
+        if c in cac and c not in ra:
+            ra.append(c)
+            cho += [x.code for x in cac.values() if x.parent == c]
+    return sorted(ra)
+
+
+def _ps_cay(db: Session, cay: list[str], ky: str, luy_ke: bool) -> dict[str, float]:
+    """Phát sinh Nợ và Có của một cây tài khoản — `luy_ke` thì tính đến hết kỳ, không thì trong kỳ."""
+    q = (select(JournalLine.account_code, func.sum(JournalLine.debit), func.sum(JournalLine.credit))
+         .join(JournalEntry)
+         .where(JournalEntry.status == "da_ghi_so", JournalLine.account_code.in_(cay))
+         .group_by(JournalLine.account_code))
+    q = q.where(JournalEntry.period <= ky) if luy_ke else q.where(JournalEntry.period == ky)
+    no = co = 0.0
+    for _ma, n, c in db.execute(q).all():
+        no += float(n or 0); co += float(c or 0)
+    return {"no": round(no, 0), "co": round(co, 0)}
+
+
+def _du_tren_cha(db: Session, cha: str, ky: str) -> float:
+    """Số dư LŨY KẾ đang nằm trên CHÍNH tài khoản cha (không tính con). Khác 0 là một chỗ hở."""
+    q = (select(func.sum(JournalLine.debit), func.sum(JournalLine.credit))
+         .join(JournalEntry)
+         .where(JournalEntry.status == "da_ghi_so", JournalEntry.period <= ky,
+                JournalLine.account_code == cha))
+    n, c = db.execute(q).one()
+    return round(float(n or 0) - float(c or 0), 0)
+
+
+def xem_truoc_bu_tru_gtgt(db: Session, ky: str) -> dict:
+    """Bản xem trước. Mọi đường GHI ở tệp này đều có một đường XEM TRƯỚC — xem ghi chú đầu tệp.
+
+    HAI CÔNG THỨC LẤY NGUYÊN CỦA MISA, và chúng KHÔNG đối xứng — chép nhầm thành đối xứng là
+    chỗ sai kinh điển:
+
+        thuế đầu ra phải nộp   = PS Có 3331 − PS Nợ 3331  TRONG KỲ
+        thuế đầu vào khấu trừ  = dư Nợ 133 ĐẦU KỲ + PS Nợ 133 − PS Có 133 trong kỳ
+
+    Đầu ra chỉ tính TRONG KỲ vì phần kỳ trước đã khai và đã nộp rồi; đầu vào thì mang theo số dư
+    đầu kỳ vì thuế chưa khấu trừ hết được chuyển sang kỳ sau. Dùng lũy kế cho cả hai là bù trừ
+    lại phần đã bù trừ ở kỳ trước.
+    """
+    from app.services import rules as R
+    ky_kk = (R.get_param_chu(db, R.GTGT_KY_KE_KHAI_KEY) or "").strip().lower()
+
+    cay_ra, cay_vao = _cay_tk(db, TK_GTGT_RA_CHA), _cay_tk(db, TK_GTGT_VAO_CHA)
+    ps_ra = _ps_cay(db, cay_ra, ky, luy_ke=False)
+    ps_vao = _ps_cay(db, cay_vao, ky, luy_ke=False)
+    # Dư Nợ 133 ĐẦU KỲ = lũy kế đến hết kỳ trừ đi phát sinh trong kỳ.
+    lk_vao = _ps_cay(db, cay_vao, ky, luy_ke=True)
+    du_dau_vao = round((lk_vao["no"] - lk_vao["co"]) - (ps_vao["no"] - ps_vao["co"]), 0)
+
+    dau_ra = round(ps_ra["co"] - ps_ra["no"], 0)
+    dau_vao = round(du_dau_vao + ps_vao["no"] - ps_vao["co"], 0)
+    bu = round(min(dau_ra, dau_vao), 0)
+    if bu < 1:
+        bu = 0.0
+
+    ref = f"gtgt:{ky}"
+    da = db.execute(select(JournalEntry).where(JournalEntry.source_type == NGUON_BU_TRU_GTGT,
+                                               JournalEntry.source_ref == ref,
+                                               JournalEntry.status == "da_ghi_so")).scalars().first()
+    cha_ra, cha_vao = _du_tren_cha(db, TK_GTGT_RA_CHA, ky), _du_tren_cha(db, TK_GTGT_VAO_CHA, ky)
+
+    canh = []
+    if not ky_kk:
+        canh.append(f"Chưa đặt kỳ kê khai GTGT của công ty (tham số `{R.GTGT_KY_KE_KHAI_KEY}`: "
+                    "`thang` hoặc `quy`). Chưa đặt thì không bù trừ được — kê khai tháng mà bù "
+                    "theo quý, hay ngược lại, là lệch đúng tờ khai đã nộp.")
+    elif ky_kk == "quy" and int(ky[5:7]) % 3 != 0:
+        canh.append(f"Công ty kê khai theo QUÝ, mà {ky} không phải tháng cuối quý — bù trừ GTGT "
+                    "chỉ làm ở tháng 3, 6, 9, 12. Bù ở tháng giữa quý là cắt đôi một tờ khai.")
+    # CHỖ HỞ PHẢI NÓI RA, không được im: phần số dư nằm trên CHÍNH tài khoản cha.
+    for ten, so, cha, con in (("đầu ra", cha_ra, TK_GTGT_RA_CHA, TK_GTGT_RA),
+                              ("đầu vào", cha_vao, TK_GTGT_VAO_CHA, TK_GTGT_VAO)):
+        if abs(so) >= 1:
+            canh.append(f"Thuế {ten}: {abs(so):,.0f} đ đang nằm trên CHÍNH tài khoản cha {cha}, "
+                        f"không phải trên {con}. Phép tính trên đã cộng cả cây nên số bù trừ "
+                        f"ĐÚNG, nhưng bút toán ghi vào {con} sẽ không dọn phần nằm ở {cha} — "
+                        f"sổ chi tiết hai tài khoản ấy còn lệch tới khi nắn đường ghi về tài "
+                        f"khoản con (việc riêng, Chủ tịch chốt 07/11/2026 làm sau).")
+
+    but_toan = ([{"account": TK_GTGT_RA, "debit": bu, "note": f"bù trừ thuế GTGT kỳ {ky}"},
+                 {"account": TK_GTGT_VAO, "credit": bu}] if bu >= 1 else [])
+    return {
+        "ky": ky, "ky_ke_khai": ky_kk, "da_bat": bool(ky_kk),
+        "dau_ra_phai_nop": dau_ra, "dau_vao_duoc_khau_tru": dau_vao,
+        "du_dau_ky_133": du_dau_vao, "so_bu_tru": bu,
+        "con_phai_nop": round(dau_ra - bu, 0), "con_duoc_khau_tru": round(dau_vao - bu, 0),
+        "tk_no": TK_GTGT_RA, "tk_co": TK_GTGT_VAO,
+        "du_tren_tk_cha": {TK_GTGT_RA_CHA: cha_ra, TK_GTGT_VAO_CHA: cha_vao},
+        "but_toan": but_toan,
+        "da_ghi": da is not None, "chung_tu": da.code if da else "",
+        "canh_bao": canh,
+        "ghi_chu": ("Sau khi bù trừ, dư Có 3331 phải khớp chỉ tiêu [40] và dư Nợ 133 khớp chỉ "
+                    "tiêu [43] trên tờ khai GTGT của kỳ — phép đối chiếu này là của MISA, và nó "
+                    "là việc của người, máy không tự làm được vì máy không đọc tờ khai."),
+    }
+
+
+def bu_tru_gtgt(db: Session, u: User, ky: str) -> dict:
+    """Ghi MỘT bút toán bù trừ cho cả kỳ. Ghi rồi thì bỏ qua, không ghi lần hai."""
+    from app.services import accounting as ACC
+    if ACC.is_locked(db, ky):
+        raise KhongGhiDuoc(f"Kỳ {ky} đã khóa sổ – không ghi được nữa.")
+    xt = xem_truoc_bu_tru_gtgt(db, ky)
+    if not xt["da_bat"]:
+        from app.services import rules as R
+        raise KhongGhiDuoc(
+            f"Chưa đặt kỳ kê khai GTGT của công ty (tham số `{R.GTGT_KY_KE_KHAI_KEY}`: `thang` "
+            "hoặc `quy`). Đặt ở màn hình Tham số rồi chạy lại.")
+    if xt["ky_ke_khai"] == "quy" and int(ky[5:7]) % 3 != 0:
+        raise KhongGhiDuoc(
+            f"Công ty kê khai GTGT theo QUÝ – {ky} không phải tháng cuối quý. Bù trừ ở tháng 3, "
+            "6, 9 hoặc 12.")
+    if xt["da_ghi"]:
+        return {**xt, "message": f"Kỳ {ky} đã bù trừ ở chứng từ {xt['chung_tu']} – bỏ qua."}
+    if not xt["but_toan"]:
+        return {**xt, "message": (f"Kỳ {ky} không có gì để bù trừ: đầu ra "
+                                  f"{xt['dau_ra_phai_nop']:,.0f} đ, đầu vào "
+                                  f"{xt['dau_vao_duoc_khau_tru']:,.0f} đ.")}
+    d = date(int(ky[:4]), int(ky[5:7]), 28)
+    try:
+        e = ACC.post_entry(db, u.username, u.role, d,
+                           f"Bù trừ thuế GTGT đầu vào – đầu ra, kỳ {ky}", list(xt["but_toan"]),
+                           NGUON_BU_TRU_GTGT, f"gtgt:{ky}", nghiep_vu="bu_tru_gtgt")
+    except ValueError as ex:
+        raise KhongGhiDuoc(f"Bù trừ thuế GTGT kỳ {ky}: {ex}")
+    return {**xt, "da_ghi": True, "chung_tu": e.code,
+            "message": (f"Đã bù trừ thuế GTGT kỳ {ky}: {xt['so_bu_tru']:,.0f} đ "
+                        f"(Nợ {TK_GTGT_RA} / Có {TK_GTGT_VAO}). Còn phải nộp "
+                        f"{xt['con_phai_nop']:,.0f} đ, còn được khấu trừ "
+                        f"{xt['con_duoc_khau_tru']:,.0f} đ.")}
+

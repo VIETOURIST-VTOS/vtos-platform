@@ -84,6 +84,9 @@ NGHIEP_VU: dict[str, tuple[str, str]] = {
     "ket_chuyen_cuoi_ky":       ("Kết chuyển cuối kỳ theo bước kết sổ",                "PKT"),
     "ket_chuyen_chot_so":       ("Kết chuyển để chốt sổ theo bản kiểm toán",           "PKT"),
     "tach_ty_gia":              ("Tách chênh lệch tỷ giá ra 635/515",                  "PKT"),
+    # ĐỢT GTGT-1 07/11/2026. PKT y như tách tỷ giá ngay trên: cả hai là bút toán phân loại lại
+    # cuối kỳ do Kế toán lập, không phải một tờ phiếu thu/chi hay một hóa đơn.
+    "bu_tru_gtgt":              ("Bù trừ thuế GTGT đầu vào – đầu ra cuối kỳ",          "PKT"),
     "but_toan_sao_ke":          ("Ghi sổ dòng sao kê ngân hàng đã nhận diện",          "BC"),
     "khau_hao_tscd":            ("Trích khấu hao tài sản cố định",                     "PKT"),
     "phan_bo_tra_truoc":        ("Phân bổ chi phí trả trước / công cụ dụng cụ",        "PKT"),
