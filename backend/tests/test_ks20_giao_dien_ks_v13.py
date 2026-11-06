@@ -12,7 +12,7 @@ def _v():
 
 def test_ks20_1_nen_sang_va_chu_be_vietnam_pro():
     v = _v()
-    assert 'className="ksv ksv13"' in v and "Be Vietnam Pro" in v and "--ksv-accent:#1557b0" in v
+    assert 'className="ksv ksv13"' in v and "Be Vietnam Pro" in v and "--ksv-accent:#14538D" in v
 
 
 def test_ks20_2_thanh_tom_tat_va_sua_tim_kiem():

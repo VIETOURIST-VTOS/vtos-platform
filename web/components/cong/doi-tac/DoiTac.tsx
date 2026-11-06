@@ -125,7 +125,7 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
   const ten = blv?.doi_tac?.ten || toi.ten_don_vi || toi.ho_ten || "Đối tác";
 
   if (cho || toi.loai_doi_tac === "ncc") return (<section className="v3-app" data-portal="doi-tac">
-    <header className="v3-topbar"><span className="v3-brand"><span className="vh-logo"><img src="/cong/logo.png" alt="Vietourist Holdings" /></span><span>VTD<small>VIETOURIST HOLDINGS</small></span></span>
+    <header className="v3-topbar"><span className="v3-brand">{/* eslint-disable-next-line @next/next/no-img-element */}<img className="logo-v2" src="/thuong-hieu/v2/khoachu-holdings-nen-trong.svg" alt="Vietourist Holdings" width={1107} height={269} /></span>
       <button type="button" className="v3-home-return cursor-interaction" aria-label="Đăng xuất" title="Đăng xuất" onClick={thoat}><I n="log-out" /></button></header>
     <main className="v3-main" style={{ maxWidth: 720, margin: "0 auto" }}>
       <div className="v3-page-head"><div><div className="v3-eyebrow">VTD • Cổng đối tác</div><h1>Xin chào, {toi.ten_don_vi || toi.ho_ten || "đối tác"}</h1></div></div>
@@ -138,7 +138,7 @@ export default function DoiTac({ toi, thoat }: { toi: any; thoat: () => void }) 
   return (<section className="v3-app" data-portal="doi-tac">
     <header className="v3-topbar">
       <button type="button" className="v3-brand cursor-interaction" onClick={() => di("home")}>
-        <span className="vh-logo"><img src="/cong/logo.png" alt="Vietourist Holdings" /></span><span>VTD<small>VIETOURIST HOLDINGS</small></span></button>
+        {/* eslint-disable-next-line @next/next/no-img-element */}<img className="logo-v2" src="/thuong-hieu/v2/khoachu-holdings-nen-trong.svg" alt="Vietourist Holdings" width={1107} height={269} /></button>
       <nav aria-label="Cổng"><button type="button" aria-pressed="true"><I n="handshake" /><span>{ctv ? "Cộng tác viên" : "Đại lý"}</span></button></nav>
       <button type="button" className="v3-home-return cursor-interaction" aria-label="Đăng xuất" title="Đăng xuất" onClick={thoat}><I n="log-out" /></button>
     </header>

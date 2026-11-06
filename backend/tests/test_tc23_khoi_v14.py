@@ -258,7 +258,9 @@ def test_muc_menu_dung_dai_mau_dac_cua_ban_ve():
     """
     css = _doc(CSS)
     tok = _doc(GOC / "web" / "app" / "tokens.css")
-    assert "--vtos-muc-nav:      #24476B" in tok, "Thiếu màu dải mục menu của bản vẽ"
+    # Logo v2 (07/11/2026): thanh dọc đổi sang navy #14538D nên dải mục sáng theo (#1C5F9C) — vẫn là
+    # màu ĐẶC, đúng tinh thần của phép thử này.
+    assert "--vtos-muc-nav:      #1C5F9C" in tok, "Thiếu màu dải mục menu"
     i = css.find("aside.side .grp{")
     assert i > 0, "Không thấy luật mục menu"
     than = css[i:i + 500]

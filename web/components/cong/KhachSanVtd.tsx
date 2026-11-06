@@ -1436,12 +1436,12 @@ const CSS = `
 /* KS-19e: chặn kiểu ô nhập chung của trang (nền tối, đệm 12px, viền) đè lên thanh kéo — trước đây thành dải đen đè ô số. */
 .ksv-r2{position:relative;height:30px;margin:4px 2px 8px}
 .ksv-r2::before{content:"";position:absolute;left:0;right:0;top:13px;height:4px;border-radius:2px;background:var(--ksv-line,#dce3ea)}
-.ksv-r2 .ksv-r2f{position:absolute;top:13px;height:4px;border-radius:2px;background:var(--ksv-blue,#1557b0)}
+.ksv-r2 .ksv-r2f{position:absolute;top:13px;height:4px;border-radius:2px;background:var(--ksv-blue,#14538D)}
 .ksv .ksv-r2 input[type=range]{position:absolute;left:0;right:0;top:0;width:100%;height:30px;margin:0;padding:0!important;border:0!important;box-shadow:none!important;border-radius:0!important;background:transparent!important;pointer-events:none;-webkit-appearance:none;appearance:none;outline:none}
 .ksv .ksv-r2 input[type=range]::-webkit-slider-runnable-track{height:30px;background:transparent;border:0}
 .ksv .ksv-r2 input[type=range]::-moz-range-track{height:4px;background:transparent;border:0}
-.ksv .ksv-r2 input[type=range]::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:24px;height:24px;margin-top:3px;border-radius:50%;background:#fff;border:2px solid var(--ksv-blue,#1557b0);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
-.ksv .ksv-r2 input[type=range]::-moz-range-thumb{pointer-events:auto;width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid var(--ksv-blue,#1557b0);cursor:pointer}
+.ksv .ksv-r2 input[type=range]::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:24px;height:24px;margin-top:3px;border-radius:50%;background:#fff;border:2px solid var(--ksv-blue,#14538D);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.ksv .ksv-r2 input[type=range]::-moz-range-thumb{pointer-events:auto;width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid var(--ksv-blue,#14538D);cursor:pointer}
 .ksv .ksv-r2 input[type=range]:focus-visible::-webkit-slider-thumb{outline:3px solid rgba(21,87,176,.35)}
 .ksv-mo{opacity:.45}
 .ksv-dang{align-items:center}
@@ -1542,9 +1542,9 @@ const CSS = `
 #vtd-access .ksv button.ksv-chip{color:#3d4556}#vtd-access .ksv button.ksv-chip.on{color:var(--ksv-ink)}
 #vtd-access .ksv input[type=date]{color:inherit;-webkit-text-fill-color:currentColor}
 /* ══ KS-20 · v1.3 (Chủ tịch duyệt bản xem trước 05/11/2026): trang kết quả khách sạn nền sáng, chữ Be Vietnam Pro ══ */
-.ksv13{--ksv-fg:#14263b;--ksv-muted:#4d5b6a;--ksv-line:#dce3ea;--ksv-line2:#edf1f5;--ksv-soft:#e8f0fb;--ksv-accent:#1557b0;--ksv-ink:#1557b0;--ksv-asoft:#e8f0fb;--ksv-ok:#1d7a4a;--ksv-sh:none;
+.ksv13{--ksv-fg:#14263b;--ksv-muted:#4d5b6a;--ksv-line:#dce3ea;--ksv-line2:#edf1f5;--ksv-soft:#E8F0F8;--ksv-accent:#14538D;--ksv-ink:#14538D;--ksv-asoft:#E8F0F8;--ksv-ok:#1d7a4a;--ksv-sh:none;
   font-family:'Be Vietnam Pro',system-ui,sans-serif;background:#f3f5f8;border-radius:12px}
-.ksv13 a,#vtd-access .ksv13 a{color:#1557b0}.ksv13 a:hover,#vtd-access .ksv13 a:hover{color:#0e3f82}
+.ksv13 a,#vtd-access .ksv13 a{color:#14538D}.ksv13 a:hover,#vtd-access .ksv13 a:hover{color:#0B2545}
 /* vtd-access (lớp trợ năng của cổng) kẻ khung cho mọi <details>; nhóm lọc v1.3 là dòng phẳng trong một ô */
 .ksv13 details.fsec,#vtd-access .v3-app .ksv13 details.fsec{margin:0;border:0;border-top:1px solid var(--ksv-line);border-radius:0;background:#fff;color:inherit;padding:12px 16px}
 .ksv13-tt{background:#fff;border:1px solid var(--ksv-line);border-radius:12px;padding:14px 18px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
@@ -1564,12 +1564,12 @@ const CSS = `
 .ksv13-pills{display:flex;flex-wrap:wrap;gap:6px}
 .ksv13-pills button{border:1px solid var(--ksv-line);background:#fff;border-radius:99px;padding:6px 12px;font-size:13px;min-height:36px;color:var(--ksv-fg)}
 .ksv13-pills button small{color:var(--ksv-muted);font-size:11px}
-.ksv13-pills button.on{border:2px solid #1557b0;background:#e8f0fb;font-weight:700}
+.ksv13-pills button.on{border:2px solid #14538D;background:#E8F0F8;font-weight:700}
 .ksv13-pills button:disabled{opacity:.45;cursor:not-allowed}
 .ksv13-sx{background:#fff;border:1px solid var(--ksv-line);border-radius:10px;display:flex;overflow-x:auto;scrollbar-width:none}
 .ksv13-sx::-webkit-scrollbar{display:none}
 .ksv13-sx button{all:unset;cursor:pointer;flex:1 0 auto;text-align:center;padding:12px 14px;font-size:14px;color:var(--ksv-fg);border-bottom:3px solid transparent;white-space:nowrap}
-.ksv13-sx button.on{font-weight:700;border-bottom-color:#1557b0}
+.ksv13-sx button.on{font-weight:700;border-bottom-color:#14538D}
 .ksv13-sx button:focus-visible{outline:2px solid var(--ksv-accent);outline-offset:-2px}
 .ksv13-dau{background:#fff;border:1px solid var(--ksv-line);border-radius:10px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .ksv13-dau>b{font-size:15px;margin-right:6px}.ksv13-dau .ksv-chips{display:contents}
@@ -1580,9 +1580,9 @@ const CSS = `
 .ksv13-tag{display:flex;flex-wrap:wrap;gap:6px}.ksv13-tag span{border:1px solid var(--ksv-line);border-radius:6px;padding:2px 6px;font-size:12px}
 .ksv13-ok{font-size:13px;color:#1d7a4a;font-weight:600}
 .ksv13-it{font-size:13px;color:#c2410c}
-.ksv13-dg{font-size:13px}.ksv13-dg b{background:#1557b0;color:#fff;padding:2px 6px;border-radius:6px}
+.ksv13-dg{font-size:13px}.ksv13-dg b{background:#14538D;color:#fff;padding:2px 6px;border-radius:6px}
 .ksv13-gia{font-size:24px;font-weight:700;color:var(--ksv-fg);line-height:1.15;font-variant-numeric:tabular-nums}
-.ksv13 .ksv-side .ksv-btn{background:#1557b0}
+.ksv13 .ksv-side .ksv-btn{background:#14538D}
 .ksv13-note{margin:0;font-size:13px;color:var(--ksv-muted);background:#fff;border:1px solid var(--ksv-line);border-radius:10px;padding:12px}
 .ksv13-mhead{position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid var(--ksv-line);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 4px}
 .ksv13-x{width:44px;height:44px;font-size:20px;background:none;border:0;color:var(--ksv-fg);flex:none}.ksv13-mhead b{flex:1;text-align:center;font-size:17px}
@@ -1603,7 +1603,7 @@ const CSS = `
 .ksv13-keo{display:none}.ksv13-man{display:none}
 .ksv13-the{display:flex;border-bottom:1px solid var(--ksv-line);margin:0 -4px}
 .ksv13-the button{flex:1;background:none;border:0;border-bottom:3px solid transparent;padding:10px 6px;font:inherit;font-size:14px;color:var(--ksv-muted);cursor:pointer;min-height:44px}
-.ksv13-the button.on{color:var(--ksv-fg);font-weight:700;border-bottom-color:var(--ksv-accent,#1557b0)}.ksv13-the small{font-weight:400;color:var(--ksv-muted)}
+.ksv13-the button.on{color:var(--ksv-fg);font-weight:700;border-bottom-color:var(--ksv-accent,#14538D)}.ksv13-the small{font-weight:400;color:var(--ksv-muted)}
 .ksv13-dnut{display:flex;gap:8px;flex-wrap:wrap}.ksv13-huy{color:#c2410c !important;border-color:#c2410c !important}
 @media (max-width:900px){.ksv13-man{display:block;position:fixed;inset:0;background:rgba(20,38,59,.45);z-index:140}
   .ksv13-sheet{position:fixed;left:0;right:0;bottom:0;margin:0;z-index:141;border-radius:16px 16px 0 0;max-height:88vh;overflow:auto;padding:16px 16px 20px;box-shadow:0 -6px 20px rgba(20,38,59,.15)}

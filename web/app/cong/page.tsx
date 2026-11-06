@@ -49,7 +49,7 @@ export default function Cong() {
   const role = toi?.loai === "doi_tac" ? "doi-tac" : toi?.loai === "co_dong" ? "co-dong" : "khach-hang";
   const canHoSo = toi && toi.loai !== "khach_hang" && ["ho_so", "bo_sung"].includes(toi.trang_thai);
   return (<>
-    <link rel="stylesheet" href="/cong/vtd.css?v=39" />
+    <link rel="stylesheet" href="/cong/vtd.css?v=40" />
     <div style={{ background: "#081826", minHeight: "100vh" }}>
       <div id="vtd-access" data-mode="inline" data-page="login" data-role={role} data-preview="off" data-vtos-screen="off" data-vtos-menu="closed">
         <div id="vtd-screen">

@@ -293,9 +293,10 @@ def test_giao_dien_dung_ban_v32_da_sua():
                "Bản thiết kế v3.2", "VTD / CỔNG KẾT NỐI"):
         assert bo not in manh, bo
     for co in ('data-go-role="nhan-vien"', 'data-go-role="khach-hang"',
-               'data-go-role="doi-tac"', 'data-go-role="co-dong"', "/cong/logo.png"):
+               'data-go-role="doi-tac"', 'data-go-role="co-dong"', "/thuong-hieu/v2/"):  # logo v2 · 07/11/2026
         assert co in manh, co
-    assert (GOC / "web/public/cong/vtd.css").exists() and (GOC / "web/public/cong/logo.png").exists()
+    assert (GOC / "web/public/cong/vtd.css").exists() and (GOC / "web/public/thuong-hieu/v2/khoachu-holdings-nen-trong.svg").exists()
+    assert "/cong/logo.png" not in manh, "logo v2: không còn dùng ảnh logo cũ trên cổng"
     login = (GOC / "web/app/login/page.tsx").read_text(encoding="utf-8")
     # SUA-5 (02/11/2026): DK-3 (#609) đổi cổng ngoài sang đăng nhập bằng MẬT KHẨU + mã xác minh máy lạ —
     # đường cũ "/ma" và "/xac-thuc" không còn trên màn hình; soát đúng hai đường mới.

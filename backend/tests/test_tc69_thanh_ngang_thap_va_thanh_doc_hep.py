@@ -161,27 +161,18 @@ def test_re_chuot_van_doc_duoc_ten_day_du():
         "chữ vẽ ra dùng nhãn ngắn, và rơi về tên đầy đủ khi nhóm không khai nhãn ngắn.")
 
 
-# ═════════════════ 4 · LOGO KHÔNG ĐƯỢC ĐỤNG TỚI ═════════════════
+# ═════════════════ 4 · LOGO ═════════════════
 
 def test_logo_khong_bi_dung_toi():
-    """Anh Tuấn 18/9: "giữ lại logo hiện tại" — sau khi em đề xuất đổi sang đơn sắc trắng.
-
-    Vòng này sửa bố cục, và một vòng sửa bố cục rất dễ tiện tay dọn luôn mấy lớp trang trí. Bốn
-    thứ dưới đây là phương án A anh Tuấn chọn ngày 12/9; bỏ cái nào cũng là đảo một quyết định mà
-    anh vừa nhắc lại là không đảo.
+    """Anh Tuấn 18/9 giữ logo cũ; ngày 07/11/2026 anh duyệt LOGO v2: "chỉ lấy logo Vietourist và thêm
+    nhận diện màu xanh navy nhiều hơn". Từ đây thanh ngang dùng logo Vietourist Holdings bản nền tối
+    (nền trong suốt) — không còn dấu VTOS, không còn bản đơn sắc trắng (anh đã bác 18/9).
     """
-    css = _doc(CSS)
-    m = re.search(r"\.top \.brand\{([^}]*)\}", _khong_chu_thich(css))
-    assert m, "không tìm thấy luật khối logo"
-    than = m.group(1)
-    assert "linear-gradient(112deg" in than, "dải chuyển sắc của khối logo bị bỏ"
-    assert "border:1px solid rgba(255,255,255,.20)" in than, "viền sáng của khối logo bị bỏ"
-    assert "box-shadow" in than, "bóng đổ của khối logo bị bỏ"
-    assert ".top .brand::after" in _khong_chu_thich(css), "vệt sáng chéo của khối logo bị bỏ"
-
     src = _doc(os.path.join(ROOT, "web", "components", "Shell.tsx"))
-    assert "vtos-logo-nen-toi.svg" in src, (
-        "tệp logo phải giữ nguyên bản ba màu — bản đơn sắc trắng đã bị anh Tuấn bác.")
+    assert "/thuong-hieu/v2/khoachu-holdings-nen-trong.svg" in src, "thanh ngang phải dùng logo Vietourist Holdings v2"
+    assert "vtos-logo-nen-toi.svg" not in _khong_chu_thich(src), "dấu VTOS đã bỏ khỏi thanh ngang (logo v2)"
+    assert "khoachu-holdings-trang" not in src, "bản đơn sắc trắng đã bị anh Tuấn bác"
+    assert "HỆ THỐNG ĐIỀU HÀNH" in src, "thiếu chữ nhỏ «Hệ thống điều hành» cạnh logo"
 
 
 # ═════════════════ 5 · VÙNG NỘI DUNG NHẬN ĐÚNG PHẦN NHẢ RA ═════════════════

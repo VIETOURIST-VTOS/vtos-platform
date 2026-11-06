@@ -10,8 +10,8 @@
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait-primary",
-  "background_color": "#10273E",
-  "theme_color": "#10273E",
+  "background_color": "#14538D",
+  "theme_color": "#14538D",
   "categories": ["business", "productivity"],
   "prefer_related_applications": false,
   "icons": [

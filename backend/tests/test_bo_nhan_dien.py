@@ -40,13 +40,13 @@ def test_tokens_css_dung_bang_mau_toi_v11():
     Giá trị cũ giữ lại trong chú thích của tokens.css để đo lại được.
     """
     src = _doc(TOKENS)
-    for bien, gia_tri in (("--vtos-nav-bg", "#10273E"),    # bản vẽ --nav
+    for bien, gia_tri in (("--vtos-nav-bg", "#14538D"),    # logo v2 07/11 — navy chính thức (bản vẽ --nav là #10273E)
                           ("--vtos-surface", "#091624"),   # bản vẽ --bg
                           ("--vtos-card", "#122C45"),      # bản vẽ --panel
                           ("--vtos-info-bg", "#183550"),   # bản vẽ --panel2
                           ("--vtos-text", "#F4F9FD"),      # TC-64 · sáng lên từ #E8F1F8
                           ("--vtos-text-mute", "#C3D5E4"), # TC-64 · sáng lên từ #9BB2C6
-                          ("--vtos-text-faint", "#A7BDD0"),# TC-64 · cũ #7B93A8 chỉ đạt 3,96
+                          ("--vtos-text-faint", "#B8CBDB"),# logo v2 07/11 (TC-64 #A7BDD0, cũ #7B93A8)
                           ("--vtos-success", "#53C49A"),   # bản vẽ --green
                           ("--vtos-warning", "#F4C36A"),   # bản vẽ --gold
                           ("--vtos-line", "#2E4E6B"),      # nâng từ #29445D (bản vẽ chỉ 1,41 lần)
@@ -238,10 +238,12 @@ def test_logo_va_favicon_dung_bo_moi():
     lay = _doc(LAYOUT)
     assert "/favicon/app-icon.svg" in lay and "/favicon/icon-180.png" in lay, \
         "layout.tsx phải khai bộ favicon mới (ô bo góc), không dùng icon-192 trần như trước"
-    assert '"#10273E"' in lay, "themeColor phải bằng nền thanh ngang, nếu không mép trình duyệt lệch màu"
+    assert '"#14538D"' in lay, "themeColor phải bằng nền thanh ngang, nếu không mép trình duyệt lệch màu"
 
     shell = _doc(os.path.join(ROOT, "web", "components", "Shell.tsx"))
-    assert "/thuong-hieu/vtos-logo-nen-toi.svg" in shell, "thanh ngang phải dùng dấu VTOS bản nền tối"
+    # Logo v2 (07/11/2026): thanh ngang dùng logo Vietourist Holdings bản nền tối, nền trong suốt.
+    assert "/thuong-hieu/v2/khoachu-holdings-nen-trong.svg" in shell, "thanh ngang phải dùng logo Vietourist Holdings v2"
+    assert os.path.exists(os.path.join(ROOT, "web", "public", "thuong-hieu", "v2", "khoachu-holdings-nen-trong.svg"))
     m = re.search(r'\.top \.brand \.brand-logo\{[^}]*height:(\d+)px', _doc(CSS))
     assert m and int(m.group(1)) >= 22, f"logo cao {m.group(1) if m else '?'}px – quy tắc 6 đòi ≥ 22px"
 

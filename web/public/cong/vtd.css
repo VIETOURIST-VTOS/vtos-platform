@@ -587,3 +587,18 @@ CG-1 — phần thêm vào bản v3.2: chọn kênh nhận mã, đồng ý đi�
 #vtd-access .v3-table-wrap.kh-bang-the td[data-nhan]::before{content:attr(data-nhan);position:absolute;left:0;top:3px;width:88px;color:#65778b;font-size:11px}
 #vtd-access .v3-table-wrap.kh-bang-the td:empty{display:none}
 }
+
+/* ══ LOGO v2 · 07/11/2026 ══ Anh Tuấn duyệt bản xem thử «Logo v2 trên VTOS và VTD»: chỉ dùng logo
+   Vietourist Holdings (bộ v2), thêm navy chính thức #14538D. Khối này đặt CUỐI tệp để đè các luật cũ;
+   logo.png cũ (ảnh chụp cẩm nang cắt bằng toạ độ) không còn được trang nào dùng nhưng vẫn giữ trong kho. */
+#vtd-access .v3-app{--v3-navy:#14538D;--v3-accent:#14538D;--v3-tint:#E8F0F8}
+#vtd-access .v3-topbar{background:#14538D;border-bottom:4px solid #0B2545;box-shadow:0 5px 20px #0b25452e}
+#vtd-access .v3-brand .logo-v2{display:block;height:38px;width:auto}
+#vtd-access .v3-button.v3-primary{background:#14538D;border-color:#0B2545}
+#vtd-access .v3-hero .v3-button.v3-primary{background:#f5e8d8;color:#17324a;border-color:#e7cfb0}
+#vtd-access .vtd-brand .logo-v2{display:block;height:44px;width:auto}
+#vtd-access .vtd-top{background:#14538D;border-color:#0B2545}
+#vtd-access .v5-brand-row .vh-logo.logo-v2-o{display:flex;align-items:center;justify-content:center;background:#14538D}
+#vtd-access .v5-brand-row .vh-logo.logo-v2-o img{position:static;width:78%;height:auto;max-width:none}
+@media(max-width:920px){#vtd-access .v3-brand .logo-v2{height:32px}}
+@media(max-width:600px){#vtd-access .vtd-brand .logo-v2{height:34px}}

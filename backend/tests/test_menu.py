@@ -525,11 +525,9 @@ def test_tong_quan_khong_con_muc_con_va_bam_thang_ve_trang_chu():
 
 
 def test_khoi_logo_noi_len_khoi_thanh_ngang():
-    """Anh Tuấn chốt 12/9 (chiều): "mở rộng khung logo hơn và làm cho nền nổi lên cao hơn".
-
-    Đo tại chỗ sau khi sửa: khối logo 224×55px, thanh ngang vẫn 72px (đệm dọc .top phải giảm còn
-    8px, vì 12+55+12 = 79px là vượt khoảng 64–72px của §I.2). Phép thử canh đúng phép tính ấy –
-    ai nới đệm hay nới khung mà quên đo lại thanh ngang thì đỏ ở đây, không đỏ ngoài trang thật.
+    """Logo v2 (anh Tuấn duyệt 07/11/2026): bỏ khối chuyển sắc nổi của 12/9 — logo Vietourist Holdings
+    nằm thẳng trên thanh navy. Phép thử vẫn canh đúng phép tính cũ: logo + đệm dọc hai đầu không
+    được vượt khoảng 64–72px của §I.2.
     """
     css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
     m = re.search(r'\.top\{[^}]*\}', css)
@@ -538,19 +536,13 @@ def test_khoi_logo_noi_len_khoi_thanh_ngang():
     assert dem, "không đọc được đệm dọc của .top"
     b = re.search(r'\.top \.brand\{[^}]*\}', css)
     assert b, "không tìm thấy quy tắc .top .brand"
-    kb = b.group(0)
-    mb = re.search(r'padding:(\d+)px (\d+)px', kb)
-    assert mb, "không đọc được đệm của khối logo"
-    assert int(mb.group(2)) >= 24, f"khung logo rộng {mb.group(2)}px mỗi bên – anh Tuấn yêu cầu mở rộng hơn"
-    assert "box-shadow" in kb, "nền logo phải có bóng đổ thì mới nổi lên khỏi thanh navy"
-    assert "inset 0 1px 0" in kb, "thiếu vệt sáng mép trên – khối phẳng lì thì không ra chiều cao"
-    logo = re.search(r'\.brand-logo\{height:(\d+)px', css) or re.search(r'\.brand \.brand-logo\{height:(\d+)px', css)
-    cao_logo = int(logo.group(1)) if logo else 28
-    cao_khoi = int(dem.group(1)) * 0 + 2 * int(mb.group(1)) + cao_logo + 3 + 10 + 2  # viền 1px hai bên
-    cao_thanh = 2 * int(dem.group(1)) + cao_khoi
+    assert "linear-gradient" not in b.group(0), "logo v2 nằm thẳng trên thanh navy, không khung chuyển sắc"
+    logo = re.search(r'\.top \.brand \.brand-logo\{height:(\d+)px', css)
+    assert logo, "không đọc được chiều cao logo"
+    cao_thanh = 2 * int(dem.group(1)) + int(logo.group(1))
     assert cao_thanh <= 72, (
-        f"khối logo {cao_khoi}px + đệm {dem.group(1)}px hai đầu = thanh ngang {cao_thanh}px, "
-        "vượt khoảng 64–72px của §I.2 – giảm đệm .top hoặc thu khối logo lại")
+        f"logo {logo.group(1)}px + đệm {dem.group(1)}px hai đầu = thanh ngang {cao_thanh}px, "
+        "vượt khoảng 64–72px của §I.2")
 
 
 def test_globals_css_can_bang_ngoac():

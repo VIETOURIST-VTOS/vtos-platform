@@ -29,11 +29,13 @@ export default function KhungRieng({ dang, toi, xong, children }: { dang: TrangR
   }, []);
   const ten = (toi?.ho_ten || "").trim().split(/\s+/).pop() || toi?.dien_thoai || "";
   return <>
-    <link rel="stylesheet" href="/cong/vtd.css?v=39" />
+    <link rel="stylesheet" href="/cong/vtd.css?v=40" />
     <style dangerouslySetInnerHTML={{ __html: CSS }} />
     <div className="kr">
       <header className="kr-top"><div className="kr-in">
-        <a className="kr-logo" href="/cong" aria-label="Vietourist — về trang Khám phá">VIET<em>OURIST</em></a>
+        {/* Logo v2 (anh Tuấn duyệt 07/11/2026): logo Vietourist Holdings bản nền tối trên thanh navy #14538D. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <a className="kr-logo" href="/cong" aria-label="Vietourist Holdings — về trang Khám phá"><img src="/thuong-hieu/v2/khoachu-holdings-nen-trong.svg" alt="" width={1107} height={269} /></a>
         <nav className="kr-nav" aria-label="Dịch vụ">{MUC.map(([k, t]) =>
           <a key={k} href={goc[k]} aria-current={dang === k ? "page" : undefined}>{t}</a>)}</nav>
         {!xong ? <span className="kr-acc kr-ghost">…</span>
@@ -54,27 +56,28 @@ export default function KhungRieng({ dang, toi, xong, children }: { dang: TrangR
 const CSS = `
 .kr{min-height:100vh;display:flex;flex-direction:column;background:#f4f7fa;color:#142a43;font-family:"Be Vietnam Pro","Segoe UI",Arial,sans-serif}
 .kr-in{max-width:1220px;margin:0 auto;width:100%;box-sizing:border-box;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.kr-top{background:#0b2342;color:#fff;position:sticky;top:0;z-index:40;box-shadow:0 2px 10px rgba(0,0,0,.18)}
-.kr-top .kr-in{display:flex;align-items:center;gap:18px;min-height:60px;flex-wrap:wrap}
-.kr-logo{color:#fff;text-decoration:none;font-weight:800;font-size:19px;letter-spacing:.6px}
-.kr-logo em{color:#f2a516;font-style:normal}
+.kr-top{background:#14538D;color:#fff;position:sticky;top:0;z-index:40;border-bottom:4px solid #0B2545;box-shadow:0 2px 10px rgba(11,37,69,.22)}
+.kr-top .kr-in{display:flex;align-items:center;gap:22px;min-height:64px;flex-wrap:wrap}
+.kr-logo{display:block;line-height:0;text-decoration:none}
+.kr-logo img{display:block;height:38px;width:auto}
 .kr-nav{display:flex;gap:4px;flex-wrap:wrap}
-.kr-nav a{color:#cfdcff;text-decoration:none;padding:8px 12px;border-radius:9px;font-weight:600;font-size:14px}
+.kr-nav a{color:#E3EEF9;text-decoration:none;padding:8px 12px;border-radius:9px;font-weight:600;font-size:14px}
 .kr-nav a:hover{color:#fff;background:rgba(255,255,255,.08)}
 .kr-nav a[aria-current=page]{color:#fff;background:rgba(255,255,255,.16)}
-.kr-acc{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;color:#fff;text-decoration:none;font-size:12px;background:rgba(255,255,255,.1);padding:6px 12px;border-radius:9px;line-height:1.3}
-.kr-acc b{font-size:13.5px}.kr-acc span{color:#cfdcff}
+.kr-acc{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;color:#14538D;text-decoration:none;font-size:12px;background:#fff;padding:6px 12px;border-radius:9px;line-height:1.3;font-weight:700}
+.kr-acc b{font-size:13.5px}.kr-acc span{color:#14538D}
+.kr-acc.kr-ghost{background:rgba(255,255,255,.12);color:#fff}
 .kr-ghost{opacity:.5}
 #vtd-access.kr-body{flex:1;display:flex;flex-direction:column;background:#f3f6fa;background-image:none;border-radius:0;overflow:visible;padding:0;margin:0;min-height:0}
 #vtd-access.kr-body>.kr-app{flex:1;margin:0;padding:0;background:#f3f6fa}
 .kr-app>.kr-in{padding-block:18px 32px;display:flex;flex-direction:column;gap:14px;min-width:0}
-.kr-foot{background:#0b2342;color:#9fb3d1;font-size:12.5px}
+.kr-foot{background:#0B2545;color:#9fb3d1;font-size:12.5px}
 .kr-foot .kr-in{padding-block:16px}.kr-foot a{color:#cfdcff}
 .kr-modal{position:fixed;inset:0;z-index:100;background:rgba(8,20,38,.55);display:flex;align-items:center;justify-content:center;padding:16px}
 .kr-box{background:#fff;color:#142a43;border-radius:14px;max-width:420px;width:100%;padding:22px;display:flex;flex-direction:column;gap:10px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
 .kr-box b{font-size:18px}.kr-box p{margin:0;color:#52677f;line-height:1.55;font-size:14px}
 .kr-act{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:6px}
-.kr-btn{background:#2a5bd7;color:#fff;border:0;border-radius:99px;padding:10px 22px;font:inherit;font-weight:700;text-decoration:none;cursor:pointer}
-.kr-btn.ghost{background:transparent;color:#2a5bd7;border:1px solid #2a5bd7}
-@media (max-width:640px){.kr-top .kr-in{gap:8px;padding-block:8px}.kr-nav{order:3;width:100%;overflow-x:auto;flex-wrap:nowrap}.kr-nav a{white-space:nowrap;padding:6px 10px;font-size:13px}}
+.kr-btn{background:#14538D;color:#fff;border:0;border-radius:99px;padding:10px 22px;font:inherit;font-weight:700;text-decoration:none;cursor:pointer}
+.kr-btn.ghost{background:transparent;color:#14538D;border:1px solid #14538D}
+@media (max-width:640px){.kr-top .kr-in{gap:8px;padding-block:8px}.kr-logo img{height:30px}.kr-nav{order:3;width:100%;overflow-x:auto;flex-wrap:nowrap}.kr-nav a{white-space:nowrap;padding:6px 10px;font-size:13px}}
 `;
