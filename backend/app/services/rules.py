@@ -7,6 +7,12 @@ from app.models.core import (Param, AuditLog, Tour, Booking, ServiceRequest, Ale
                              TOUR_TRON_GOI, KHONG_TRON_GOI, User)
 
 # ====================== THAM SỐ MẶC ĐỊNH (theo bộ chính sách 27/8/2026 + Văn bản đính chính) ======================
+# ĐỢT GTGT-1 07/11/2026 — khóa tham số kỳ kê khai GTGT khai ở ĐÂY, một chỗ duy nhất.
+# `ket_so.py` đọc nó qua `R.GTGT_KY_KE_KHAI_KEY` chứ không chép chuỗi sang tệp ấy: hai hằng số
+# mang cùng một chuỗi thì sớm muộn lệch nhau, và lúc ấy cửa đọc một khóa còn màn hình Tham số
+# sửa một khóa khác, không ai thấy.
+GTGT_KY_KE_KHAI_KEY = "gtgt_ky_ke_khai"
+
 DEFAULT_PARAMS = [
     ("nguong_bien", "0.10", "Ngưỡng biên lợi nhuận kế hoạch (cổng chặn)", "tỷ lệ", "MHQT Điều 10"),
     ("han_qt_doan", "7", "Hạn quyết toán tour đoàn", "ngày", "MHQT Điều 10; ĐC Điều 1"),
@@ -433,6 +439,15 @@ DEFAULT_PARAMS = [
     # Dòng có ngày tỷ giá TRƯỚC mốc này không bị tách và cũng không bị sửa lùi - chúng chỉ thôi
     # được giấu: `chenh_lech_ty_gia.tinh_tach()` đếm riêng chúng.
     ("tach_ty_gia_tu_ngay", "2026-10-09", "Ngày bắt đầu tách chênh lệch tỷ giá ra 635/515 (trống = chưa tách)", "YYYY-MM-DD", "Chủ tịch quyết 09/10/2026"),
+    # ĐỢT GTGT-1 07/11/2026 — KỲ KÊ KHAI THUẾ GTGT CỦA CÔNG TY: `thang` hoặc `quy`.
+    #
+    # ĐỂ TRỐNG, VÀ ĐÓ LÀ CỐ Ý. `seed_params` nạp mọi khóa ở đây với `status="active"` kèm HAI chữ
+    # ký mang tên Chủ tịch và Tổng giám đốc. Điền sẵn `thang` hay `quy` vào đây là TỰ KÝ một
+    # chính sách thuế — và nếu điền nhầm thì bước bù trừ chạy sai kỳ, lệch đúng tờ khai đã nộp.
+    # Giá trị thật đi qua `POST /params` như mọi tham số chính sách khác.
+    #
+    # Trống thì `ket_so.bu_tru_gtgt` TỪ CHỐI và nói tên khóa này, chứ không đoán.
+    ("gtgt_ky_ke_khai", "", "Kỳ kê khai thuế GTGT của công ty: thang / quy (trống = chưa đặt, không bù trừ được)", "thang|quy", "Chủ tịch chốt 07/11/2026"),
     # 48 → 4 ngày 25/9/2026, Chủ tịch quyết. Bản đề xuất Phòng Điều hành viết 4 giờ; anh Tuấn chốt 4.
     #
     # HỆ QUẢ PHẢI NÓI RA, vì nó xảy ra ngay đêm đầu tiên: hạn tính bằng GIỜ ĐỒNG HỒ, không phải
