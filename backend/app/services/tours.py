@@ -204,11 +204,17 @@ def _dat_hoa_hong_khach(t: Tour, data) -> None:
 
 def create(db: Session, u: User, data) -> Tour:
     from app.services import access as AC
-    kd_lap_doan = u.role in AC.SALES and _la_doan(data)
+    # DOT TD-1 06/11/2026 — Sales Admin mo duoc tour DOAN (Chu tich chot 06/11/2026, noi tiep
+    # quyet dinh 24/9/2026 cho Kinh doanh Doan). KHONG phai noi bang quyen: `MAN_HINH["/tours"]`
+    # da co `SALES_ADMIN` va `MAN_HINH_API["/tours"]` da co `/api/v1/tours` — thu chan ho tu truoc
+    # toi nay la dung dong duoi day. Tour LE van chi Phong Dieu hanh (DH Dieu 2), nen `_la_doan`
+    # van dung nguyen cho cu.
+    kd_lap_doan = (u.role in AC.SALES or u.role == "sales_admin") and _la_doan(data)
     if u.role not in ("nv_dh", "tp_dh") and not kd_lap_doan and not toan_quyen(u):
         raise HTTPException(403,
             "Tour lẻ: chỉ Phòng Điều hành tạo và lập dự toán (ĐH Điều 2). "
-            "Tour đoàn: Phòng Điều hành hoặc Kinh doanh Đoàn (Chủ tịch quyết 24/9/2026)")
+            "Tour đoàn: Phòng Điều hành, Kinh doanh Đoàn (24/9/2026) hoặc Sale Admin "
+            "(Chủ tịch quyết 06/11/2026)")
     code = data.code.strip().upper()
     if db.execute(select(Tour).where(Tour.code == code)).scalars().first():
         raise Gate("MA_TOUR", "Mã tour đã tồn tại")
@@ -710,3 +716,70 @@ def create_booking(db: Session, u: User, r: ServiceRequest) -> tuple[Booking, st
     for a in db.execute(select(Alert).where(Alert.kind == "sla_booking", Alert.ref == f"YC-{r.id}")).scalars(): a.resolved = True
     R.audit(db, u.username, u.role, "tao_booking", f"booking:{b.code}", after={"tour": t.code, "pax": b.pax, "amount": b.amount, "sla_phut": mins, "sla_ok": b.sla_ok, "tinh_chi_tieu": b.counts_for_target}); db.commit(); db.refresh(b)
     return b, f"Đã tạo {b.code} sau {mins} phút" + ("" if b.sla_ok else " – QUÁ 2 GIỜ, ghi vào tiêu chí đánh giá")
+# ── ĐỢT TD-1 06/11/2026 — SALE ADMIN ĐẶT LẠI MÃ TOUR Ở CỔNG CHUYỂN ─────────────────────────────
+#
+# Chủ tịch chốt 06/11/2026: "mã tour lẻ do Điều hành nhập lúc mở tour lẻ, còn mã tour đoàn do
+# Sales Admin nhập lúc mở tour đoàn", và "cả hai đều mở được". Cho Sales Admin MỞ tour đoàn thì
+# họ gõ mã lúc mở — nhưng nếu Kinh doanh Đoàn mở trước thì người gõ mã vẫn là Kinh doanh. Cửa
+# này là chỗ Sales Admin đặt lại mã, đúng lúc họ soát để chuyển sang Điều hành.
+#
+# VÌ SAO PHẢI CHẶN KHI SỔ ĐÃ DÙNG MÃ — và đây là điều nặng nhất của cửa này:
+#
+# Mã tour được CHÉP THÀNH CHUỖI vào cột `project_code` của từng dòng sổ lúc ghi
+# (`accounting.post_entry`), nó KHÔNG phải một mối nối sống. Đổi mã tour sau khi sổ đã ghi thì
+# những dòng cũ Ở LẠI VỚI MÃ CŨ: bảng đối chiếu lãi lỗ (Đợt R5b-1/R5b-2) sẽ xếp chúng vào rổ
+# "chỉ có trong sổ", còn chuyến thì rơi vào rổ "chỉ có bảng tính". Một thao tác đổi tên lặng lẽ
+# CẮT ĐÔI SỔ của một chuyến, và không ai thấy cho tới lúc đối chiếu.
+#
+# Nên cửa này TỪ CHỐI khi đã có dòng sổ, và nói ra con số. Chủ tịch chốt 06/11/2026: chặn cứng,
+# KHÔNG sửa `project_code` của sổ đã ghi — sửa là ghi lại sổ đã ghi, ngược quyết định 02/11.
+# Tour ở bước `nhap_kd` thì gần như luôn chưa có dòng sổ, nên chặn này hiếm khi cản ai — mà lúc
+# nó cản thì cản đúng.
+#
+# CHƯA CANH KHUÔN MÃ ở đây. Hôm nay không chỗ nào canh khuôn «viết tắt + DDMMYY», và canh ở đây
+# mà không canh lúc MỞ tour thì khuôn vẫn hở. Chủ tịch chốt: đo số mã cũ lệch khuôn trước đã.
+def doi_ma(db: Session, u: User, t: Tour, ma_moi: str) -> str:
+    """Sale Admin đặt lại mã tour đoàn, khi dự toán còn ở bước Kinh doanh soạn. CHẶN nếu sổ đã dùng."""
+    from app.models.accounting import JournalLine, Project
+
+    if u.role != "sales_admin" and not toan_quyen(u):
+        raise HTTPException(403, "Chỉ Sale Admin phòng Đoàn đặt lại mã tour")
+    if t.status != NHAP_KD:
+        raise Gate("TRANG_THAI",
+                   "Chỉ đổi được mã khi dự toán còn ở bước Kinh doanh soạn. Qua bước sau thì mã "
+                   "đã đi vào hồ sơ của Điều hành và của sổ.")
+    moi = (ma_moi or "").strip().upper()
+    if not moi:
+        raise Gate("MA_TOUR", "Chưa nhập mã mới")
+    if moi == t.code:
+        return "Mã không đổi"
+    if db.execute(select(Tour).where(Tour.code == moi)).scalars().first():
+        raise Gate("MA_TOUR", f"Mã {moi} đã có tour khác dùng")
+
+    # CHẶN CỨNG: sổ đã ghi là sổ đã ghi.
+    n = db.execute(select(func.count()).select_from(JournalLine)
+                   .where(JournalLine.project_code == t.code)).scalar() or 0
+    if n:
+        raise Gate("SO_DA_DUNG_MA",
+                   f"Không đổi được mã: sổ đã có {n} dòng mang mã {t.code}. Mã tour được chép "
+                   "thành chuỗi vào từng dòng sổ lúc ghi, nên đổi mã bây giờ thì những dòng ấy ở "
+                   "lại với mã cũ — bảng đối chiếu lãi lỗ sẽ xếp chúng vào rổ «chỉ có trong sổ» "
+                   "còn chuyến rơi vào rổ «chỉ có bảng tính», tức sổ của một chuyến bị cắt đôi. "
+                   "Muốn đổi thì phải xử những dòng ấy trước, và đó là việc ở sổ, cần Kế toán.")
+
+    # Bản ghi CÔNG TRÌNH phải đi theo: mã công trình = mã tour (`misa.ensure_project_for_tour`).
+    # Bỏ quên nó thì danh mục công trình giữ mã cũ, và sổ chi tiết theo công trình tìm không ra.
+    if db.execute(select(Project).where(Project.code == moi)).scalars().first():
+        raise Gate("MA_TOUR", f"Mã {moi} đã có công trình khác mang — không đổi được")
+    p = db.execute(select(Project).where(Project.code == t.code)).scalars().first()
+
+    cu = t.code
+    t.code = moi
+    if p is not None and (p.tour_id is None or p.tour_id == t.id):
+        p.code = moi
+    EV(db, t, "doi_ma_tour", u.username, f"{cu} → {moi}")
+    R.audit(db, u.username, u.role, "doi_ma_tour", f"tour:{moi}",
+            before={"code": cu}, after={"code": moi})
+    db.commit()
+    return f"Đã đổi mã tour {cu} → {moi}"
+

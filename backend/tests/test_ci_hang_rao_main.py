@@ -95,6 +95,10 @@ HANG_RAO = (
     # de do — khong do ca tep, vi ca tep `accounting/page.tsx` co nut ghi that o cho khac, va
     # do ca tep la do nham nguoi.
     "tests/test_r5b2_the_doi_chieu_lai_lo.py",
+    # ── SALES ADMIN VA MA TOUR DOAN, them ngay 06/11/2026 (Dot TD-1) ─────────────────────────
+    # Luat 3 do cho nang nhat: ma tour la `project_code` tren tung dong so, nen doi ma sau khi
+    # so da ghi la cat doi so cua mot chuyen. No TU DUNG CANH roi doi cua tu choi.
+    "tests/test_td1_sales_admin_ma_tour_doan.py",
 )
 
 
