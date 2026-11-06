@@ -493,7 +493,7 @@ const CSS = `
 .tra-hero.gon{padding:10px}.tra-hero.gon .tra-tabs{display:none}
 .tra-ht{font-size:22px}
 .tra-tabs{display:flex;gap:6px}.tra-tabs button{border:0;border-radius:99px;min-height:40px;padding:0 18px;background:rgba(255,255,255,.12);color:#fff;font-weight:700}
-.tra-tabs button.on,#vtd-access .tra .tra-tabs button.on{background:#fff;color:#1f2a5a;-webkit-text-fill-color:#1f2a5a}
+.tra-tabs button.on,#vtd-access .tra .tra-tabs button.on{background:#fff;color:#14538D;-webkit-text-fill-color:#14538D}
 #vtd-access .tra .tra-tabs button:not(.on){color:#fff;-webkit-text-fill-color:#fff}
 .tra-gal{display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:170px 170px;gap:6px;border-radius:12px;overflow:hidden}
 .tra-gal>span{position:relative;background:var(--ksv-soft);min-width:0}
