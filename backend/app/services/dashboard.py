@@ -238,6 +238,7 @@ def build(db: Session, u: User) -> dict:
         # `so_du_tuan_13` bỏ hẳn, không giữ song song: hai con số dòng tiền cạnh nhau thì người đọc
         # phải nhớ con nào là con nào, và con dễ đọc hơn (cuối kỳ, thường dương) sẽ thắng. Vì sao
         # đáy mới là câu người điều hành hỏi — xem chú thích `day_thap_nhat` ở services/finance.py.
+        _cham("ld_so_du_no_vay_phai_thu")   # KS-XE: đo từng phần của khối KPI lãnh đạo
         fc = FIN.forecast_13w(db); k["du_bao_canh_bao"] = len(fc["alerts"])
         k["so_du_thap_nhat"] = fc["thap_nhat"]
         # TC-57 · DÒNG TIỀN NAY LÀ MỘT BIỂU ĐỒ, KHÔNG PHẢI BỐN Ô "CHƯA CÓ NGUỒN".
@@ -273,6 +274,7 @@ def build(db: Session, u: User) -> dict:
                       "thu": w.get("total_in"), "chi": w.get("total_out")}
                      for w in fc["weeks"]],
         }
+        _cham("ld_du_bao_13_tuan")
         pl = RP.income_statement(db, p); k["ln_ke_toan_thang"] = dict((r[0], r[2]) for r in pl["rows"])["50"]
         # TC-41 (16/9/2026) – KẾ HOẠCH THÁNG, cửa nhập vừa mở ở /ke-hoach-thang.
         #
@@ -288,6 +290,7 @@ def build(db: Session, u: User) -> dict:
         #
         # Chỉ trả cho nhóm vai trò của nhánh này. Chỉ tiêu cả tập đoàn không phải thứ mọi tài khoản
         # đăng nhập đều đọc được, và cửa /ke-hoach cũng chặn đúng danh sách ấy.
+        _cham("ld_lai_lo_thang")
         from app.services import ke_hoach as KH
         kh = KH.hop_nhat(db, KH.ky_cua(today))
         k["ke_hoach_thang"] = {
@@ -396,7 +399,7 @@ def build(db: Session, u: User) -> dict:
         _cham("dh_sheet_doi_xe")
         try:
             from app.services import hieu_qua_xe as HQ
-            tk = HQ.theo_ky(db, today, hom_nay=today)
+            tk = HQ.theo_ky(db, today, hom_nay=today, nho=HQ.nho_cho_bang(today))   # KS-XE
             # HQ-2 — danh sách kỳ CÓ CHUYẾN đi kèm ngay lần vẽ đầu. Thiếu nó thì ô chọn kỳ không
             # hiện ra cho tới khi người đọc đổi kỳ một lần — tức là không bao giờ.
             tk["ky_co_chuyen"] = HQ.ky_co_chuyen(db)
