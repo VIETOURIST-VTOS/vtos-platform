@@ -52,11 +52,11 @@
 
   /* Trạng thái */
   --vtos-success:      #53C49A;  /* đã duyệt, thành công */
-  --vtos-danger:       #6FA8F0;  /* từ chối, cảnh báo — KS-NAVY 07/11: đỏ → navy sáng (cũ #FF6B90) */
+  --vtos-danger:       #FF6B90;  /* nghiêm trọng, quá hạn, từ chối, lỗ — KS-MUC 07/11: trả lại hồng (KS-NAVY đã đổi nhầm sang #6FA8F0, trùng --vtos-info) */
   --vtos-warning:      #F4C36A;  /* cần chú ý */
   --vtos-info:         #6FA8F0;  /* chờ xử lý */
   --vtos-success-bg:   #14392F;
-  --vtos-danger-bg:    #183550;  /* KS-NAVY · cũ #3B1B27 */
+  --vtos-danger-bg:    #3B1B27;  /* KS-MUC · trả lại */
   --vtos-warning-bg:   #35290F;
   --vtos-info-bg:      #183550;
 
@@ -142,11 +142,11 @@
   --vtos-navy-light:   #0F4C84;  /* 8,18 */
 
   --vtos-success:      #1E7A4E;  /* 5,32 */
-  --vtos-danger:       #1E63C8;  /* 5,72 — KS-NAVY 07/11: đỏ → navy sáng (cũ #A8145C) */
+  --vtos-danger:       #A8145C;  /* 6,79 — KS-MUC 07/11: trả lại (KS-NAVY đã đổi nhầm sang #1E63C8, gần --vtos-info) */
   --vtos-warning:      #8A5A00;  /* 5,93 */
   --vtos-info:         #14538D;  /* 7,92 */
   --vtos-success-bg:   #E6F4EC;
-  --vtos-danger-bg:    #E8F0FB;  /* KS-NAVY · cũ #FBE9F0 */
+  --vtos-danger-bg:    #FBE9F0;  /* KS-MUC · trả lại */
   --vtos-warning-bg:   #FBF1DC;
   --vtos-info-bg:      #E7EFF7;
 
