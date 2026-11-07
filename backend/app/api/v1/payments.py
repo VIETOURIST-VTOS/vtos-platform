@@ -17,16 +17,22 @@ from app.services import sepay as SP
 router = APIRouter(prefix="/api/v1", tags=["thu-tien"])
 
 
-def txn_out(t: BankTransaction, db: Session) -> dict:
-    b = db.get(Booking, t.booking_id) if t.booking_id else None
+def txn_out(t: BankTransaction, db: Session, ma_bk: dict | None = None, dem_pb: dict | None = None) -> dict:
+    # KS-TC · `ma_bk` / `dem_pb` là hai bảng tra NẠP SẴN cho cả danh sách (xem `list_txns`). Không
+    # truyền thì tự hỏi từng dòng như cũ — chỗ gọi lẻ một giao dịch vẫn đúng.
+    if ma_bk is not None:
+        b_code = ma_bk.get(t.booking_id, "") if t.booking_id else ""
+    else:
+        b = db.get(Booking, t.booking_id) if t.booking_id else None
+        b_code = b.code if b else ""
     return {"id": t.id, "sepay_id": t.sepay_id, "gateway": t.gateway, "account_number": t.account_number, "transaction_date": t.transaction_date,
             "transfer_type": t.transfer_type, "amount": t.amount, "content": t.content, "reference_code": t.reference_code,
-            "match_status": t.match_status, "match_note": t.match_note, "booking_id": t.booking_id, "booking_code": b.code if b else "",
+            "match_status": t.match_status, "match_note": t.match_note, "booking_id": t.booking_id, "booking_code": b_code,
             "received_at": t.received_at,
             # VPM-5: số dư chưa phân bổ đi kèm ngay trong danh sách, không bắt màn hình tự trừ.
             # RỖNG = chưa từng phân bổ dòng nào (giao dịch cũ), khác hẳn 0 = đã phân bổ hết.
             "chua_phan_bo": t.chua_phan_bo,
-            "so_dong_phan_bo": _dem_phan_bo(db, t.id)}
+            "so_dong_phan_bo": dem_pb.get(t.id, 0) if dem_pb is not None else _dem_phan_bo(db, t.id)}
 
 
 def _dem_phan_bo(db: Session, tid: int) -> int:
@@ -110,9 +116,23 @@ def robot_sepay_pull(data: PullIn, x_robot_token: str | None = Header(default=No
 # ---------- Kế toán ----------
 @router.get("/bank-transactions")
 def list_txns(status: str | None = None, limit: int = 200, u: User = Depends(require_roles(*AC.FINANCE_ROLES, mo_ta="giao dịch ngân hàng")), db: Session = Depends(get_db)):
-    q = select(BankTransaction).order_by(desc(BankTransaction.transaction_date))
+    from sqlalchemy.orm import defer
+    # Gói tin gốc SePay (`raw`) không ra màn hình danh sách — có đường riêng /raw — nên không kéo về.
+    q = select(BankTransaction).options(defer(BankTransaction.raw)).order_by(desc(BankTransaction.transaction_date))
     if status: q = q.where(BankTransaction.match_status.in_(status.split(",")))
-    return [txn_out(t, db) for t in db.execute(q.limit(limit)).scalars()]
+    # KS-TC · 08/11/2026 — BA CÂU HỎI CHO CẢ DANH SÁCH, KHÔNG PHẢI 1 + 2×200. Đo trên crm thật:
+    # trang Tài chính chờ 6–7,6 giây chỉ riêng danh sách này, vì mỗi dòng hỏi riêng mã booking và
+    # riêng số dòng phân bổ — 400 chuyến đi–về tới cơ sở dữ liệu cho 200 dòng. Nay nạp hai bảng tra
+    # một lần. Cùng số, cùng thứ tự, cùng khuôn trả về.
+    from app.models.phan_bo_tien import PhanBoTien
+    ds = list(db.execute(q.limit(limit)).scalars())
+    bk_ids = {t.booking_id for t in ds if t.booking_id}
+    ma_bk = dict(db.execute(select(Booking.id, Booking.code).where(Booking.id.in_(bk_ids))).all()) if bk_ids else {}
+    t_ids = [t.id for t in ds]
+    dem_pb = dict(db.execute(select(PhanBoTien.bank_txn_id, func.count())
+                             .where(PhanBoTien.bank_txn_id.in_(t_ids), PhanBoTien.huy == False)   # noqa: E712
+                             .group_by(PhanBoTien.bank_txn_id)).all()) if t_ids else {}
+    return [txn_out(t, db, ma_bk, {k: int(v) for k, v in dem_pb.items()}) for t in ds]
 
 
 @router.post("/bank-transactions/rematch")
