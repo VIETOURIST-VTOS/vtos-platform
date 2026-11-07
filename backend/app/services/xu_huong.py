@@ -458,9 +458,12 @@ def _doc_ban_luu(db, ma: str, ky: str) -> float | None:
     return None
 
 
-def cho_man_hinh(db, *, so_ky: int = 6, hom_nay: date | None = None) -> dict:
-    """Gói xu hướng của cả bốn chỉ tiêu, dạng bảng điều hành đọc thẳng."""
-    d = doc_that(db)
+def cho_man_hinh(db, *, so_ky: int = 6, hom_nay: date | None = None, doc=None) -> dict:
+    """Gói xu hướng của cả bốn chỉ tiêu, dạng bảng điều hành đọc thẳng.
+
+    KS-XH · `doc` (tuỳ chọn): hàm đọc dùng CHUNG với `ba_ky_cho_man_hinh` trong cùng một lần dựng
+    bảng — xem `doc_cho_bang`. Không truyền thì chạy y như trước."""
+    d = doc or doc_that(db)
     return {ma: chuoi(ma, d, so_ky=so_ky, hom_nay=hom_nay) for ma in CHI_TIEU}
 
 
@@ -469,7 +472,92 @@ def cho_man_hinh(db, *, so_ky: int = 6, hom_nay: date | None = None) -> dict:
 CHI_TIEU_BA_KY = ("doanh_thu_thang", "ln_ke_toan_thang")
 
 
-def ba_ky_cho_man_hinh(db, *, hom_nay: date | None = None) -> dict:
+def ba_ky_cho_man_hinh(db, *, hom_nay: date | None = None, doc=None) -> dict:
     """{chỉ tiêu: {thang, quy, nam}} cho hai ô lớn Doanh thu và Lợi nhuận trước thuế."""
-    d = doc_that(db)
+    d = doc or doc_that(db)
     return {ma: bo_ba_ky(ma, d, hom_nay=hom_nay) for ma in CHI_TIEU_BA_KY}
+
+
+# ══ KS-XH · 07/11/2026 — KHỐI XU HƯỚNG ĂN NỬA THỜI GIAN DỰNG BẢNG ĐIỀU HÀNH ══════════════════
+#
+# Đo trên crm thật (KS-DASH, `do_ms`): một lần dựng 28 giây thì khối này 14 giây. Hai lý do:
+#
+#   1. HỎI TRÙNG. `cho_man_hinh` và `ba_ky_cho_man_hinh` mỗi bên tự tạo một `doc_that(db)`, không
+#      chỗ nhớ: cùng một tháng bị tính lại ở chuỗi 6 tháng, ở quý, ở năm (3 năm = 36 tháng) và ở
+#      kỳ đang chạy; doanh thu và lãi tour cùng một tháng còn gọi `ket_qua_that.thang` hai lần.
+#   2. THÁNG ĐÃ QUA TÍNH LẠI MỖI 4 PHÚT. Robot dựng lại bảng mỗi vài phút, và mỗi lần lại cộng lại
+#      sổ của 36 tháng cũ — những tháng gần như không bao giờ đổi.
+#
+# CÁCH SỬA, KHÔNG ĐỔI MỘT CON SỐ:
+#   · `doc_cho_bang` — MỘT hàm đọc cho cả lần dựng, nhớ theo (chỉ tiêu, tháng) và dùng chung `nho`
+#     của `ket_qua_that.thang`. Quý và năm vẫn cộng từ tháng qua `doc_theo_ky` như cũ.
+#   · THÁNG ĐÃ ĐÓNG (trước tháng hiện tại) nhớ qua nhiều lần dựng, tối đa `NHO_THANG_CU_GIAY`. Bị
+#     XOÁ NGAY khi có ghi vào bất kỳ bảng nào các con số ấy đọc từ (`BANG_XU_HUONG_DOC`) — chặn ở
+#     tầng cơ sở dữ liệu (`after_flush`), nên cửa nào ghi, robot nào ghi cũng bắt được, không phải
+#     liệt kê đường dẫn API. Bấm «làm mới» (refresh=1) cũng xoá.
+#   · Tháng ĐANG CHẠY không bao giờ nhớ qua lần dựng: nó đổi từng giờ.
+NHO_THANG_CU_GIAY = 6 * 3600
+_NHO_THANG_CU: dict = {}            # (chỉ tiêu, "YYYY-MM") → (lúc tính, giá trị)
+
+# Bảng mà các chỉ tiêu xu hướng đọc tới (ket_qua_that → lai_lo_tour, reports.income_statement,
+# bao_cao_luu, tham số). Ghi vào bất kỳ bảng nào trong đây là xoá chỗ nhớ tháng cũ. Thêm một nguồn
+# số mới cho xu hướng thì PHẢI thêm bảng của nó vào đây — phép thử KS-XH canh điều ấy.
+LOP_XU_HUONG_DOC = {"Tour", "Booking", "Company", "Param"}          # trong app.models.core
+GOI_XU_HUONG_DOC = ("app.models.accounting", "app.models.vietrip", "app.models.quyet_toan",
+                    "app.models.suppliers", "app.models.bao_cao_luu")
+
+
+def xoa_nho_thang_cu() -> None:
+    _NHO_THANG_CU.clear()
+
+
+def _cham_toi_so_xu_huong(obj) -> bool:
+    c = type(obj)
+    return (c.__module__ == "app.models.core" and c.__name__ in LOP_XU_HUONG_DOC) \
+        or c.__module__.startswith(GOI_XU_HUONG_DOC)
+
+
+def _sau_flush(session, _ctx) -> None:
+    if not _NHO_THANG_CU:
+        return
+    for o in (*session.new, *session.dirty, *session.deleted):
+        if _cham_toi_so_xu_huong(o):
+            xoa_nho_thang_cu()
+            return
+
+
+def _gan_canh_ghi() -> None:
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session as _S
+    if not event.contains(_S, "after_flush", _sau_flush):
+        event.listen(_S, "after_flush", _sau_flush)
+
+
+_gan_canh_ghi()
+
+
+def doc_cho_bang(db, hom_nay: date) -> Callable[[str, str], float | None]:
+    """MỘT hàm đọc cho cả lần dựng bảng điều hành — xem chú thích KS-XH ở trên.
+
+    `hom_nay` bắt buộc: nó quyết định tháng nào là «đã đóng» (được nhớ), nên chỗ gọi phải nói rõ."""
+    import time
+    ky_nay = f"{hom_nay.year:04d}-{hom_nay.month:02d}"
+    goc = doc_that(db, nho={})          # hàm đọc tháng thật, `nho` chung cho doanh thu + lãi tour
+    trong_lan: dict = {}
+
+    def doc_thang(ma: str, ky: str) -> float | None:
+        k = (ma, ky)
+        if k in trong_lan:
+            return trong_lan[k]
+        cu = ky < ky_nay
+        if cu:
+            hit = _NHO_THANG_CU.get(k)
+            if hit and time.time() - hit[0] < NHO_THANG_CU_GIAY:
+                trong_lan[k] = hit[1]
+                return hit[1]
+        v = goc(ma, ky)
+        trong_lan[k] = v
+        if cu:
+            _NHO_THANG_CU[k] = (time.time(), v)
+        return v
+    return doc_theo_ky(doc_thang)

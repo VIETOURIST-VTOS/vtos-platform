@@ -343,12 +343,14 @@ def build(db: Session, u: User) -> dict:
         # gõ tay. Đổi một nơi là hai nơi nói khác nhau, và người đọc không có cách nào biết
         # nơi nào đúng. Nay một chỗ khai, một chỗ đọc.
         sec["sap_khoi_hanh_so_ngay"] = SO_NGAY_SAP_KHOI_HANH
+        _cham("dh_sap_khoi_hanh")
         # TC-46 · BA GIAI ĐOẠN CỦA CHUYẾN ĐÃ DUYỆT (anh Tuấn chốt 16/9/2026, theo bản vẽ v3.0).
         # `counts` do routes.py dựng chỉ đếm theo TRẠNG THÁI, mà trạng thái không phân biệt được
         # chuyến chưa đi với chuyến đang trên đường. Phép chia theo NGÀY nằm ở dem_tour, khai một
         # lần — xem chú thích TC-46 ở đó.
         from app.services import dem_tour as DT
         sec["tour_giai_doan"] = DT.theo_giai_doan(db, hom_nay=today)
+        _cham("dh_giai_doan")
         # TQ-1 (Chủ tịch chốt v1.1, 22/10/2026): số ĐẦY ĐỦ cho mục «Vận hành & công việc».
         # Bọc try riêng: một ô hỏng không kéo sập cả bảng điều hành.
         try:
@@ -364,12 +366,14 @@ def build(db: Session, u: User) -> dict:
         # XE HÔM NAY — cùng MỘT luật với tour, áp cho xe: lịch hôm nay trùng lịch điều xe thì xe ấy
         # đang chạy, còn lại là nằm bãi (anh Tuấn 16/9/2026). Nguồn là LỆNH ĐIỀU XE, không phải
         # nhật trình chuyến — xem chú thích đầu services/xe_hom_nay.py để biết vì sao khác nhau.
+        _cham("dh_quyet_toan_tq1")
         from app.services import xe_hom_nay as XE
         sec["xe_hom_nay"] = XE.dem(db, hom_nay=today)
         # XS-1 (Chủ tịch 25/10/2026): CHƯA có lệnh điều xe nào thì đọc sheet quyết toán của Đội xe.
         # Có lệnh rồi thì LỆNH THAY SHEET — không tính, để màn hình không có hai con số «xe đang đi».
         # Trường riêng, không trộn vào `xe_hom_nay`: số ấy đếm LỆNH, số này đếm DÒNG SHEET.
         # Bọc try riêng: sheet ngừng công bố hay mạng hỏng không được kéo sập bảng điều hành.
+        _cham("dh_xe_hom_nay")
         sec["xe_theo_sheet"] = None
         if not sec["xe_hom_nay"].get("co_lenh"):
             try:
@@ -389,6 +393,7 @@ def build(db: Session, u: User) -> dict:
         # Bọc try cùng lý lẽ với các khối khác: một ô hỏng không được kéo sập bảng điều hành. Và khi
         # hỏng thì để KHUYẾT trường chứ không trả 0 — màn hình tự hiện "Chưa kết nối", còn số 0 đọc
         # ra là "đội xe chạy 0 ngày".
+        _cham("dh_sheet_doi_xe")
         try:
             from app.services import hieu_qua_xe as HQ
             tk = HQ.theo_ky(db, today, hom_nay=today)
@@ -405,13 +410,14 @@ def build(db: Session, u: User) -> dict:
         # Quá hạn quyết toán. Hạn = ngày kết thúc + số ngày theo tham số (đoàn và lẻ khác nhau), nên
         # lọc luôn bằng ngày kết thúc: chuyến kết thúc SAU today − hạn dài nhất thì chắc chắn chưa quá
         # hạn, không cần nạp về. Bản cũ nạp 400 chuyến gần nhất rồi bỏ đi phần lớn.
+        _cham("dh_hieu_qua_xe")
         han_le = int(R.get_param(db, "han_qt_le")); han_doan = int(R.get_param(db, "han_qt_doan"))
         moc = today - timedelta(days=min(han_le, han_doan))
         sec["qua_han_qt"] = [{"code": t.code, "deadline": R.settlement_deadline(db, t)}
                              for t in db.execute(select(Tour).where(Tour.status == "ket_thuc", Tour.end_date < moc)
                                                  .order_by(desc(Tour.end_date)).limit(300)).scalars()
                              if today > R.settlement_deadline(db, t)][:100]
-    _cham("dieu_hanh")
+    _cham("dieu_hanh")   # KS-XH: trong vai điều hành, phần còn lại sau `dh_hieu_qua_xe` là danh sách quá hạn quyết toán
     # ── Khối 05 của bản vẽ V1.4: Phải thu / Phải trả theo HẠN THANH TOÁN ──────────────────────
     #
     # Giao diện dựng từ vòng TC-23 (13/9) nhưng mọi ô ghi "Chưa kết nối". Anh Tuấn kiểm 14/9: màn
@@ -466,7 +472,9 @@ def build(db: Session, u: User) -> dict:
     # lỗi ở chuỗi lịch sử không được kéo sập cả bảng điều hành.
     try:
         from app.services import xu_huong as XH
-        sec["xu_huong"] = XH.cho_man_hinh(db, so_ky=6, hom_nay=today)
+        # KS-XH: MỘT hàm đọc cho cả hai lời gọi dưới, nhớ tháng đã đóng — xem `xu_huong.doc_cho_bang`.
+        _doc_xh = XH.doc_cho_bang(db, hom_nay=today)
+        sec["xu_huong"] = XH.cho_man_hinh(db, so_ky=6, hom_nay=today, doc=_doc_xh)
         # TC-42 (16/9/2026) · anh Tuấn chốt sáu ô lớn, hai ô đầu có ô chọn THÁNG / QUÝ / NĂM.
         #
         # Ba chuỗi dựng ĐỘC LẬP (xu_huong.bo_ba_ky), không lấy chuỗi tháng làm lối lui cho quý và
@@ -475,7 +483,7 @@ def build(db: Session, u: User) -> dict:
         # không kết luận là chưa có số.
         #
         # Quý và năm là TỔNG CỦA CÁC THÁNG, không phải một truy vấn thứ hai cho cùng một câu hỏi.
-        sec["ba_ky"] = XH.ba_ky_cho_man_hinh(db, hom_nay=today)
+        sec["ba_ky"] = XH.ba_ky_cho_man_hinh(db, hom_nay=today, doc=_doc_xh)
     except Exception as ex:
         sec["xu_huong"] = {}
         sec["ba_ky"] = {}
