@@ -148,7 +148,8 @@ def test_payment_request_gates_flow_and_journal():
     assert pr["status"] == "da_chi" and len(pr["entry_ids"]) == 2
     js = [e for e in client.get("/api/v1/journal", headers=login("ketoan")).json() if e["source_ref"] == f"dc:{r1['code']}"]
     pairs = {(l["account"], l["debit"], l["credit"]) for e in js for l in e["lines"]}
-    assert {("154", 20_000_000, 0), ("331", 0, 20_000_000), ("331", 20_000_000, 0), ("1121", 0, 20_000_000)} <= pairs
+    # Đợt TKC-3: đề nghị chi `chi_tour` ghi vào `1541` (tài khoản chi tiết) thay cho `154` (cha).
+    assert {("1541", 20_000_000, 0), ("331", 0, 20_000_000), ("331", 20_000_000, 0), ("1121", 0, 20_000_000)} <= pairs
     # r2 ngoài dự toán: Kế toán chặn vì thiếu chứng từ; 2 chữ ký
     st(r2["request"]["id"], "confirm")
     assert "chứng từ" in st(r2["request"]["id"], "check", who="ketoan").json()["detail"]
@@ -170,5 +171,7 @@ def test_settlement_uses_335_for_uninvoiced_difference():
     assert client.post(f"/api/v1/tours/{t['id']}/kt-confirm", headers=login("ketoan")).status_code == 200
     es = [e for e in client.get("/api/v1/journal", headers=login("ketoan")).json() if e["source_ref"] == "tour:DN-HCM-0820"]
     pairs = {(l["account"], l["debit"], l["credit"]) for e in es for l in e["lines"]}
-    assert ("335", 0, 58_000_000) in pairs and ("632", 158_000_000, 0) in pairs
+    # Đợt TKC-3: giá vốn vào `6321` (tour nội địa) thay cho `632` (cha). `335` chưa nắn trong đợt
+    # này — con của nó (`3351`) chưa có trong danh mục mẫu đi kèm mã; để lại Đợt TKC-4.
+    assert ("335", 0, 58_000_000) in pairs and ("6321", 158_000_000, 0) in pairs
     assert client.get("/api/v1/audit", headers=login("bks")).json()["chain_ok"] is True

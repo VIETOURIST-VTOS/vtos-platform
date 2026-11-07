@@ -336,6 +336,13 @@ def on_settlement_confirmed(db: Session, t: Tour, actor: str, role: str) -> list
     if db.execute(select(JournalEntry).where(JournalEntry.source_ref == f"tour:{t.code}", JournalEntry.source_type == "quyet_toan")).scalars().first():
         return []
     from app.services.ops import posted_tour_cost
+    from app.services import tk_chi_tiet as TKCT
+    # ĐỢT TKC-3 07/11/2026 — ba vế của quyết toán lấy tài khoản ở BẢNG KHAI, không gõ cứng.
+    # `154` và `632` đều là tài khoản TỔNG HỢP trong danh mục thật. Giá vốn chọn theo LOẠI TOUR:
+    # `632` có bảy con, và một chuyến nước ngoài ghi vào `6321` (nội địa) là sai ngay dòng đầu
+    # của báo cáo doanh thu – giá vốn theo dòng sản phẩm.
+    tk_dd = TKCT.chon(db, "qt_do_dang")
+    tk_gv = TKCT.gia_von_tour(db, t.tour_type)
     d = (t.kt_confirmed_at or datetime.now()).date()
     out = []
     if (t.actual_cost or 0) > 0:
@@ -344,16 +351,16 @@ def on_settlement_confirmed(db: Session, t: Tour, actor: str, role: str) -> list
             adv = sum((r.amount or 0) for r in db.execute(select(PaymentRequest).where(PaymentRequest.tour_id == t.id, PaymentRequest.category == "tam_ung", PaymentRequest.status == "da_chi")).scalars())
             if adv > 0:   # hoàn ứng: tạm ứng đã chi trở thành chi phí tour
                 out.append(post_entry(db, "robot", "robot", d, f"Hoàn ứng tour {t.code} theo quyết toán",
-                                      [{"account": "154", "debit": adv, "tour_id": t.id}, {"account": "141", "credit": adv, "partner": "Tạm ứng tour", "tour_id": t.id}], "quyet_toan", f"tour:{t.code}", t.id, nghiep_vu="quyet_toan_hoan_ung"))
+                                      [{"account": tk_dd, "debit": adv, "tour_id": t.id}, {"account": "141", "credit": adv, "partner": "Tạm ứng tour", "tour_id": t.id}], "quyet_toan", f"tour:{t.code}", t.id, nghiep_vu="quyet_toan_hoan_ung"))
             diff = (t.actual_cost or 0) - posted_tour_cost(db, t.id)
             if diff > 0:
                 out.append(post_entry(db, "robot", "robot", d, f"Chi phí tour {t.code} chưa có hóa đơn NCC theo quyết toán (trích trước)",
-                                      [{"account": "154", "debit": diff, "tour_id": t.id}, {"account": "335", "credit": diff, "partner": "NCC dịch vụ tour", "tour_id": t.id}],
+                                      [{"account": tk_dd, "debit": diff, "tour_id": t.id}, {"account": "335", "credit": diff, "partner": "NCC dịch vụ tour", "tour_id": t.id}],
                                       "quyet_toan", f"tour:{t.code}", t.id, nghiep_vu="quyet_toan_trich_truoc"))
             elif diff < 0:
                 R.audit(db, actor, role, "canh_bao_quyet_toan", f"tour:{t.code}", after={"ly_do": f"Chi phí quyết toán {(t.actual_cost or 0):,.0f} nhỏ hơn đề nghị chi đã duyệt {(t.actual_cost or 0) - diff:,.0f} – Kế toán rà soát"})
             out.append(post_entry(db, "robot", "robot", d, f"Kết chuyển giá vốn tour {t.code}",
-                                  [{"account": "632", "debit": t.actual_cost, "tour_id": t.id}, {"account": "154", "credit": t.actual_cost, "tour_id": t.id}],
+                                  [{"account": tk_gv, "debit": t.actual_cost, "tour_id": t.id}, {"account": tk_dd, "credit": t.actual_cost, "tour_id": t.id}],
                                   "quyet_toan", f"tour:{t.code}", t.id, nghiep_vu="quyet_toan_gia_von"))
         except ValueError as ex:
             R.audit(db, actor, role, "ghi_so_that_bai", f"tour:{t.code}", after={"ly_do": str(ex)})

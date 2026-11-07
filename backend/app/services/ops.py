@@ -184,8 +184,25 @@ def mail_text(u: User, dept: str, d: date, p1: str, p2: dict, p3: str, p4: str, 
               f"— {u.full_name}" + (f" · Mã NV {staff_code}" if staff_code else "") + f" · {name}"]
     return subject, "\n".join(lines)
 
-CATEGORY_ACCOUNT = {"chi_tour": "154", "marketing": "641", "hanh_chinh": "642", "hoa_hong": "641",
-                    "tra_ncc_thu_ho": "3388"}   # KS-16d: trả khách sạn / nhà hàng tiền thu hộ — duyệt: Nợ 3388 / Có 331. tam_ung: ghi 141 khi chi, hoàn ứng vào 154 khi Kế toán xác nhận quyết toán
+# ĐỢT TKC-3 07/11/2026 — BẢNG NÀY CHỈ CÒN NÓI «LOẠI CHI NÀO GHI CÔNG NỢ», KHÔNG NÓI TÀI KHOẢN.
+#
+# Bản cũ gõ thẳng `154` / `641` / `642` — cả ba là tài khoản TỔNG HỢP trong danh mục thật, và
+# `post_entry` nhận bút toán vào tài khoản cha mà không chặn, nên việc này im lặng suốt. Đo trên
+# sổ thật 07/11/2026 (thẻ «Bút toán ghi vào tài khoản cha», bảng «Theo đường ghi»): đường
+# `de_nghi_chi` đã ghi 27 dòng / 27 chứng từ vào `154`.
+#
+# Và lỗ thứ hai, nặng hơn: `misa.CATEGORY_ACCOUNT` khai CÙNG các loại chi ấy ở CẤP CON (1541,
+# 6417, 6428) theo đúng các quyết định 08/10, 26/10 và 31/10/2026. Hai bảng cùng nói một luật,
+# và chúng ĐÃ LỆCH — cùng một khoản chi nằm ở `154` trong sổ VTOS và `1541` trong bảng kê xuất
+# sang MISA. Nay bảng này chỉ giữ KHÓA, số hiệu tài khoản lấy ở `services/tk_chi_tiet.py`, và
+# `test_tkc3_3` canh hai bảng khớp nhau.
+#
+# Các loại chi KHÔNG có ở đây thì KHÔNG ghi công nợ lúc duyệt, và đó là cố ý: `hoan_tien` ghi ở
+# bước khác, `tam_ung` ghi 141 khi chi rồi hoàn ứng vào chi phí tour khi Kế toán xác nhận quyết
+# toán. Thêm một loại vào đây là mở một đường ghi sổ mới — không phải một dòng cấu hình.
+CATEGORY_TK_KHOA = {"chi_tour": "dn_chi_chi_tour", "marketing": "dn_chi_marketing",
+                    "hanh_chinh": "dn_chi_hanh_chinh", "hoa_hong": "dn_chi_hoa_hong",
+                    "tra_ncc_thu_ho": "dn_chi_tra_ncc_thu_ho"}
 # ĐỘI XE — Chủ tịch quyết 05/10/2026: "liên quan đến sửa chữa, hư hỏng, tiền bạc là do TGĐ / CT
 # duyệt và thấy". Hai loại `sua_chua_xe` và `tam_ung_tai_xe` KHÔNG đổi người ký: cửa duyệt vẫn là
 # TGĐ (và Chủ tịch khi cần hai chữ ký), y như mọi loại chi khác. Thứ chúng đổi là người XÁC NHẬN
@@ -885,11 +902,17 @@ def co_unc(db: Session, r: PaymentRequest) -> bool:
 
 
 def _post_liability(db: Session, r: PaymentRequest):
-    """Duyệt đề nghị chi có hóa đơn/hợp đồng NCC → ghi nhận công nợ: Nợ 154/641/642 – Có 331 (hoàn tiền khách: không ghi tại bước này)."""
-    acc = CATEGORY_ACCOUNT.get(r.category)
-    if not acc: return
+    """Duyệt đề nghị chi có hóa đơn/hợp đồng NCC → ghi nhận công nợ: Nợ (TK chi phí chi tiết theo
+    bảng khai `services/tk_chi_tiet.py`) – Có 331. Hoàn tiền khách: không ghi tại bước này."""
+    from app.services import tk_chi_tiet as TKCT
+    khoa = CATEGORY_TK_KHOA.get(r.category)
+    if not khoa: return
     t = db.get(Tour, r.tour_id) if r.tour_id else None
     try:
+        # `chon` nằm TRONG `try` cùng với `post_entry`, không đứng trước nó: một tham số tài khoản
+        # bị ký sai phải rơi vào đúng đường «ghi sổ thất bại» đã có (ghi nhật ký, Kế toán thấy và
+        # sửa tham số), chứ không được làm hỏng cả bước DUYỆT đề nghị chi của người đang ký.
+        acc = TKCT.chon(db, khoa)
         e = ACC.post_entry(db, "robot", "robot", date.today(), f"Đề nghị chi {r.code} – {r.supplier_name}: {r.description[:80]}",
                            [{"account": acc, "debit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id, "note": "" if r.has_invoice else "Không hóa đơn – không được trừ TNDN"},
                             {"account": "331", "credit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}], "de_nghi_chi", f"dc:{r.code}", r.tour_id, nghiep_vu="de_nghi_chi")
