@@ -75,6 +75,24 @@ function KetSo() {
     } catch (x) { toast(errMsg(x), true); } finally { setDang(false); }
   };
 
+  // ĐỢT GTGT-2 07/11/2026 — BÙ TRỪ THUẾ GTGT CUỐI KỲ. Đứng RIÊNG khỏi bốn bước kết chuyển, y
+  // như tách tỷ giá ngay trên, và vì một lý do mạnh hơn: bốn bước kia đóng tài khoản KẾT QUẢ
+  // KINH DOANH về 911 hoặc 154, còn 133 và 3331 là tài khoản BẢNG CÂN ĐỐI — chúng bù trừ vào
+  // nhau, không đóng về đâu. Gộp chung một khung thì người đọc tưởng nó cũng là một bước kết
+  // chuyển, và sẽ đi tìm nó trong danh sách bước.
+  const [gt, setGt] = useState<any>(null);
+  const taiGt = useCallback(() => {
+    api<any>(`/ket-so/bu-tru-gtgt/xem-truoc?ky=${ky}`).then(setGt).catch(() => setGt(null));
+  }, [ky]);
+  useEffect(taiGt, [taiGt]);
+  const buTruGt = async () => {
+    setDang(true);
+    try {
+      const d = await api<any>("/ket-so/bu-tru-gtgt", { method: "POST", json: { ky } });
+      setGt(d); toast(d.message); load();
+    } catch (x) { toast(errMsg(x), true); } finally { setDang(false); }
+  };
+
   const ketChuyen = async (buoc?: number[]) => {
     setDang(true);
     try {
@@ -233,6 +251,27 @@ function KetSo() {
                 <p className="muted">{tg.ghi_chu}</p>
                 {!tg.da_ghi && tg.da_bat && (tg.but_toan || []).length > 0 && (
                   <button onClick={tachTg} disabled={dang}>Ghi bút toán tách</button>)}
+              </div>)}
+            {/* ĐỢT GTGT-2 — thẻ CHỈ HIỆN câu máy chủ đã nói: không tự cộng lại một con số nào,
+                không tự diễn giải cảnh báo. Máy chủ trả gì thì in nấy, y như thẻ tách tỷ giá. */}
+            {gt && (
+              <div className="buoc">
+                <b>Bù trừ thuế GTGT đầu vào – đầu ra</b>{" "}
+                {gt.da_ghi ? <>✓ {gt.chung_tu}</> : "○"}{" "}
+                <span className="muted">
+                  đầu ra phải nộp {vnd(gt.dau_ra_phai_nop)} · đầu vào được khấu trừ{" "}
+                  {vnd(gt.dau_vao_duoc_khau_tru)} · <b>bù trừ {vnd(gt.so_bu_tru)}</b>
+                  {gt.ky_ke_khai ? <> · kê khai theo {gt.ky_ke_khai === "quy" ? "quý" : "tháng"}</>
+                                 : <> · <b>chưa đặt kỳ kê khai</b></>}
+                </span>
+                <p className="muted small" style={{ margin: "6px 0 0" }}>
+                  Nợ {gt.tk_no} / Có {gt.tk_co} · còn phải nộp {vnd(gt.con_phai_nop)} · còn được
+                  khấu trừ {vnd(gt.con_duoc_khau_tru)}
+                </p>
+                {gt.canh_bao?.map((c: string, i: number) => <p key={i} className="warn">{c}</p>)}
+                <p className="muted">{gt.ghi_chu}</p>
+                {!gt.da_ghi && gt.da_bat && (gt.but_toan || []).length > 0 && (
+                  <button onClick={buTruGt} disabled={dang}>Ghi bút toán bù trừ</button>)}
               </div>)}
             {kc.buoc.map((b: Buoc) => (
               <div key={b.buoc} className="buoc">
