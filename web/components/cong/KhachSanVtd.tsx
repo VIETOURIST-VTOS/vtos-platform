@@ -1212,7 +1212,7 @@ const CSS = `
 .ksv-card-on{outline:2px solid #14538D;outline-offset:0}
 .ksv-khoa{background:#c9d1de!important;color:#4a5568!important;border-color:#c9d1de!important;cursor:not-allowed}
 @media (max-width:760px){.ksv-mapbox{position:relative;top:0}}
-.ksv{--ksv-fg:#23252c;--ksv-muted:#5f6472;--ksv-line:#e1e4eb;--ksv-soft:#eef1f7;--ksv-card:#fff;--ksv-band:#1f2a5a;--ksv-accent:#14538D;--ksv-ink:#14538D;
+.ksv{--ksv-fg:#23252c;--ksv-muted:#5f6472;--ksv-line:#e1e4eb;--ksv-soft:#eef1f7;--ksv-card:#fff;--ksv-band:#14538D;--ksv-accent:#14538D;--ksv-ink:#14538D;
   --ksv-asoft:#e8eefc;--ksv-price:#1E63C8;--ksv-ok:#1c7f46;--ksv-oksoft:#e5f4ea;--ksv-star:#e39a2d;
   display:flex;flex-direction:column;gap:14px;color:var(--ksv-fg);min-width:0}
 .ksv h2,.ksv h3{text-wrap:balance}
@@ -1229,7 +1229,7 @@ const CSS = `
 .ksv-dates{padding:0}.ksv-dates label{flex:1;display:flex;flex-direction:column;justify-content:center;padding:6px 12px;min-width:0}
 .ksv-dates label+label{border-left:1px solid #e1e4eb}
 .ksv-khach{all:unset;flex:1;cursor:pointer;min-width:0}.ksv-khach b{font-size:15px}
-.ksv-btn-tim{border:0;border-radius:99px;background:var(--ksv-accent);color:#fff;font-weight:700;font-size:16px;padding:0 32px;min-height:54px;letter-spacing:.03em}
+.ksv-btn-tim{border:0;border-radius:99px;background:#1E63C8;color:#fff;font-weight:700;font-size:16px;padding:0 32px;min-height:54px;letter-spacing:.03em}
 .ksv-pop{position:absolute;top:calc(100% + 6px);right:0;width:280px;background:#fff;border:1px solid var(--ksv-line);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:14px;display:flex;flex-direction:column;gap:10px;z-index:25}
 .ksv-step{display:flex;align-items:center;justify-content:space-between}.ksv-step div{display:flex;align-items:center;gap:10px}
 .ksv-step button{width:34px;height:34px;border-radius:50%;border:1px solid var(--ksv-line);background:#fff;font-size:18px;line-height:1}

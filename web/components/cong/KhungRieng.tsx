@@ -55,7 +55,7 @@ export default function KhungRieng({ dang, toi, xong, children }: { dang: TrangR
 
 const CSS = `
 .kr{min-height:100vh;display:flex;flex-direction:column;background:#f4f7fa;color:#142a43;font-family:"Be Vietnam Pro","Segoe UI",Arial,sans-serif}
-.kr-in{max-width:1220px;margin:0 auto;width:100%;box-sizing:border-box;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.kr-in{max-width:1440px;margin:0 auto;width:100%;box-sizing:border-box;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px))}
 .kr-top{background:#14538D;color:#fff;position:sticky;top:0;z-index:40;border-bottom:4px solid #0B2545;box-shadow:0 2px 10px rgba(11,37,69,.22)}
 .kr-top .kr-in{display:flex;align-items:center;gap:22px;min-height:64px;flex-wrap:wrap}
 .kr-logo{display:block;line-height:0;text-decoration:none}
