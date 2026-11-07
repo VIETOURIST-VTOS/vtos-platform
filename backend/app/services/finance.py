@@ -139,12 +139,16 @@ def mark_overdue(db: Session) -> int:
 
 
 # ---------- Dự báo dòng tiền 13 tuần ----------
-def forecast_13w(db: Session, start: date | None = None) -> dict:
+def forecast_13w(db: Session, start: date | None = None, opening: float | None = None) -> dict:
     start = start or date.today()
     start = start - timedelta(days=start.weekday())            # đầu tuần (Thứ Hai)
     weeks = [(start + timedelta(days=7 * i), start + timedelta(days=7 * i + 6)) for i in range(13)]
-    b = RP.balances(db, f"{date.today():%Y-%m}")
-    opening = sum(b.get(c, 0.0) for c in ("111", "112"))
+    # KS-KD · `opening` (tuỳ chọn): số dư tiền 111 + 112 lũy kế tới kỳ tháng HIỆN TẠI mà chỗ gọi đã
+    # có sẵn — bảng điều hành truyền `k["tien"]`, tính bằng đúng `RP.balances` của cùng kỳ. Không
+    # truyền thì tự cộng như cũ.
+    if opening is None:
+        b = RP.balances(db, f"{date.today():%Y-%m}")
+        opening = sum(b.get(c, 0.0) for c in ("111", "112"))
     rows = [{"week": i + 1, "from": w0, "to": w1, "in": {}, "out": {}} for i, (w0, w1) in enumerate(weeks)]
 
     def put(d: date, side: str, key: str, amt: float):
