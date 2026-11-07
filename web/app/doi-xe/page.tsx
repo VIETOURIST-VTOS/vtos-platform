@@ -233,7 +233,7 @@ function DoiXe() {
     </div>
     {/* Nếu năm mức cộng lại không đủ tổng số xe thì NÓI RA ngay, đừng để người đọc tự trừ. Máy chủ
         tự khai số lệch (`thieu_trong_o_dem`), nên màn hình không phải đoán. */}
-    {tq.thieu_trong_o_dem > 0 && <p className="note red">Có <b>{tq.thieu_trong_o_dem}</b> xe không nằm
+    {tq.thieu_trong_o_dem > 0 && <p className="cb-do">Có <b>{tq.thieu_trong_o_dem}</b> xe không nằm
       trong ô đếm nào ở trên — nghĩa là máy chủ xếp chúng vào một mức mà dãy ô này chưa in. Đừng đọc
       các con số trên như đã đủ; báo CNTT.</p>}
     <p className="muted">{tq.ghi_chu}{tq.chan_khi_thieu_giay ? " Đang BẬT chế độ chặn khi thiếu giấy tờ." : " Chế độ chặn khi thiếu giấy tờ đang TẮT – thiếu hồ sơ chỉ cảnh báo, chưa dừng lệnh điều xe."}</p>

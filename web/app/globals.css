@@ -75,6 +75,13 @@ td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}.num{t
 .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:calc(11/14*1rem);font-weight:600;background:var(--panel2);color:var(--ink2);white-space:nowrap}
 .tag.ok{background:var(--okbg);color:var(--teal)}.tag.warn{background:var(--warnbg);color:var(--orange)}.tag.red{background:var(--redbg);color:var(--red)}.tag.navy{background:var(--navy2);color:#fff}
 .gate{border-left:4px solid var(--orange);background:var(--warnbg);padding:8px 12px;border-radius:4px;margin:8px 0;font-size:calc(13/14*1rem)}.gate.pass{border-color:var(--teal);background:var(--okbg)}.gate.fail{border-color:var(--red);background:var(--redbg)}
+/* KS-MUC2 07/11/2026 — câu cảnh báo theo mức, dùng chung cho mọi màn crm. Trước đây khoảng 20 chỗ gắn
+   lớp «warn» / «red» / «note» mà không có kiểu nào tô — câu cảnh báo hiện như chữ thường.
+   Ô: cb-do (nghiêm trọng / quá hạn / lỗi), cb-vang (cần chú ý). Chữ số: so-do, so-vang, so-xanh-la. */
+.cb-do,.cb-vang{padding:8px 10px;border-radius:8px;margin:8px 0;color:var(--vtos-text)}
+.cb-do{border-left:4px solid var(--vtos-danger);background:var(--vtos-danger-bg)}
+.cb-vang{border-left:4px solid var(--vtos-warning);background:var(--vtos-warning-bg)}
+.so-do{color:var(--vtos-danger)}.so-vang{color:var(--vtos-warning)}.so-xanh-la{color:var(--vtos-success)}
 .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:92vw;padding:11px 16px;border-radius:8px;font-weight:600;font-size:calc(13.5/14*1rem);box-shadow:0 6px 24px rgba(0,0,0,.25);z-index:20;background:var(--okbg);color:var(--teal);border:1px solid var(--teal)}
 .toast.err{background:var(--redbg);color:var(--red);border-color:var(--red)}
 label{display:block;font-size:calc(12/14*1rem);color:var(--ink2);margin-top:8px}

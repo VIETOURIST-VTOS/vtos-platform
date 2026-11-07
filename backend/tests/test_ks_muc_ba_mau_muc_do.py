@@ -44,3 +44,33 @@ def test_ks_muc_2_thanh_muc_do_ba_mau_va_canh_bao_la_vang():
     assert ".vh-muc.warn{color:var(--vtos-warning)" in css
     tsx = _doc("web", "components", "KhoiVanHanh.tsx")
     assert 'red: "c-do", warn: "c-vang", info: "c-xanh"' in tsx
+
+
+def test_ks_muc_3_cau_canh_bao_nao_cung_co_mau():
+    """KS-MUC2: lớp «warn» / «red» / «note» gắn mà không có kiểu tô thì câu cảnh báo hiện như chữ
+    thường. Trang nào dùng lớp trơn ấy phải tự khai nó trong `<style jsx>` của CHÍNH thành phần đó;
+    còn lại dùng bộ dùng chung `cb-do` / `cb-vang` / `so-do` / `so-vang` / `so-xanh-la`."""
+    g = _doc("web", "app", "globals.css")
+    for lop in (".cb-do{", ".cb-vang{", ".so-do{", ".so-vang{", ".so-xanh-la{"):
+        assert lop in g, lop
+    xau = []
+    for thu_muc in ("app", "components"):
+        for goc, _, tep in os.walk(os.path.join(GOC, "web", thu_muc)):
+            for t in tep:
+                if not t.endswith(".tsx"):
+                    continue
+                p = os.path.join(goc, t)
+                s = open(p, encoding="utf-8").read()
+                # chia theo thành phần: mỗi `function X(` là một phạm vi <style jsx> riêng
+                phan = re.split(r"\n(?:export )?(?:default )?function ", s)
+                for k in phan:
+                    dung = set(re.findall(r'className=\{?"(warn|red|note[^"]*)"', k))
+                    for m in re.findall(r'className=\{[^}]*?\? "(red|warn)" : "(red|warn)"', k):
+                        dung |= set(m)
+                    if not dung:
+                        continue
+                    for lop in dung:
+                        ten = lop.split()[0]
+                        if not re.search(r"^\s*\." + re.escape(ten) + r"\s*\{", k, re.M):
+                            xau.append(f"{os.path.relpath(p, GOC)}: «{lop}»")
+    assert not xau, "lớp cảnh báo không có kiểu tô:\n" + "\n".join(sorted(set(xau)))

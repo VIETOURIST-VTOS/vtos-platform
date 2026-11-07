@@ -39,7 +39,7 @@ const so = (v: any) => (v === null || v === undefined
  *  là dựng con số thứ hai cho cùng một luật, và ngày máy chủ đổi thì màn hình nói sai. */
 function TreNgay({ n, qua }: { n: number; qua: boolean }) {
   if (!qua) return <span className="muted">{n} ngày</span>;
-  return <b className="red">{n} ngày</b>;
+  return <b className="so-do">{n} ngày</b>;
 }
 
 function SoConNo() {

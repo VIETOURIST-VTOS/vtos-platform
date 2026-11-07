@@ -385,7 +385,7 @@ function MucDoChan() {
     <>
       <h2 style={{ marginTop: 28 }}>Mức độ chặn của từng phép kiểm</h2>
       {d.chua_dat_muc?.length ? (
-        <p className="warn">
+        <p className="cb-vang">
           {d.chua_dat_muc.length} phép kiểm chưa ai đặt mức, đang chạy ở mức nhẹ nhất
           (cảnh báo nhưng cho qua): {d.chua_dat_muc.join(", ")}
         </p>
@@ -402,7 +402,7 @@ function MucDoChan() {
         {d.dong.map((r: any) => (
           <tr key={r.id}>
             <td>{r.ten}<div className="small muted">{r.ma_phep_kiem}</div></td>
-            <td>{r.muc_do ? d.muc_do[r.muc_do] : <span className="warn">chưa đặt</span>}</td>
+            <td>{r.muc_do ? d.muc_do[r.muc_do] : <span className="so-vang">chưa đặt</span>}</td>
             <td>{r.nguoi_xu_ly || "—"}</td>
             <td>{r.han_xu_ly_ngay ? `${r.han_xu_ly_ngay} ngày` : "—"}</td>
             <td>{r.nguoi_thay_the || "—"}</td>
@@ -767,7 +767,7 @@ function TienCapCha() {
           {/* Cờ `is_detail` lệch với bảng quan hệ cha–con là một chuyện phải nói ra, không phải
               một chi tiết kỹ thuật giấu đi: ai viết phép chặn dựa vào cờ ấy sẽ chặn sai chỗ. */}
           {d.co_is_detail_lech?.length ? (
-            <div className="warn">
+            <div className="cb-vang">
               <p><b>{d.co_is_detail_lech.length} tài khoản có cờ `is_detail` lệch</b> với bảng
                  quan hệ cha–con: {d.co_is_detail_lech.join(", ")}.</p>
               <p className="small">Thẻ này đọc bảng quan hệ, nên số ở trên vẫn đúng. Nhưng phép
@@ -948,7 +948,7 @@ function DoiChieuLaiLo() {
 
         {/* Ba rổ cảnh báo đến THẲNG từ máy chủ — màn hình không tự nghĩ ra rổ nào. */}
         {(d.canh_bao || []).map((cb: any, i: number) => (
-          <div key={i} className={cb.muc === "do" ? "red" : "warn"} style={{ padding: "8px 10px", borderRadius: 8, margin: "8px 0" }}>
+          <div key={i} className={cb.muc === "do" ? "cb-do" : "cb-vang"}>
             <b>{cb.so_dong} dòng — {cb.ten}</b>
             <div className="small">{cb.chi_tiet}</div>
             {(cb.ma || []).length ? <div className="small">Mã: {(cb.ma || []).join(", ")}</div> : null}

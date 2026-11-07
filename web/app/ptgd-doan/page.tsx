@@ -127,7 +127,7 @@ function BanLamViec() {
               <td data-nhan="Trường còn thiếu">
                 {r.thieu.length === 0
                   ? <Tag cls="ok">đủ trường</Tag>
-                  : <b className="red">{r.thieu.join(" · ")}</b>}
+                  : <b className="so-do">{r.thieu.join(" · ")}</b>}
               </td>
               <td><Link className="act" href={`/tours?q=${encodeURIComponent(r.ma)}`}>Mở chuyến để duyệt</Link></td>
             </tr>
@@ -151,10 +151,10 @@ function BanLamViec() {
             {d.duoi_bien_hai_chu_ky.map((r: any) => (
               <tr key={r.tour_id}>
                 <td data-nhan="Mã chuyến"><span className="mono">{r.ma}</span><br /><span className="muted">{r.ten}</span></td>
-                <td className="num" data-nhan="Biên kế hoạch"><b className="red">{pct(r.bien_ke_hoach)}</b></td>
+                <td className="num" data-nhan="Biên kế hoạch"><b className="so-do">{pct(r.bien_ke_hoach)}</b></td>
                 <td data-nhan="Giải trình 4 mục">
                   {r.thieu.some((x: string) => x.includes("giải trình"))
-                    ? <b className="red">chưa đủ – chưa trình được</b>
+                    ? <b className="so-do">chưa đủ – chưa trình được</b>
                     : <span className="muted">đã viết</span>}
                 </td>
                 <td data-nhan="Chữ ký còn thiếu">
@@ -215,7 +215,7 @@ function BanLamViec() {
               <td className="num" data-nhan="Biên kế hoạch">{pct(r.bien_ke_hoach)}</td>
               <td className="num" data-nhan="Biên thực tế"><b>{pct(r.bien_thuc_te)}</b></td>
               <td className="num" data-nhan="Lệch">
-                {r.lech_bien < 0 ? <b className="red">{pct(r.lech_bien)}</b> : <span className="teal">+{pct(r.lech_bien)}</span>}
+                {r.lech_bien < 0 ? <b className="so-do">{pct(r.lech_bien)}</b> : <span className="so-xanh-la">+{pct(r.lech_bien)}</span>}
               </td>
             </tr>
           ))}
