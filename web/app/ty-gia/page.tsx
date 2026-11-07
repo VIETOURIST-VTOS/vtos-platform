@@ -195,7 +195,7 @@ function TyGiaPage() {
             </p>
           )}
           {tra?.gan_nhat && (
-            <p className="warn">{tra.gan_nhat.canh_bao} Số: {tra.gan_nhat.ty_gia.toLocaleString("vi-VN")}</p>
+            <p className="cb-vang">{tra.gan_nhat.canh_bao} Số: {tra.gan_nhat.ty_gia.toLocaleString("vi-VN")}</p>
           )}
 
           <button className="act" disabled={!f.ty_gia || !f.tien_te} onClick={them}>Ghi tỷ giá</button>

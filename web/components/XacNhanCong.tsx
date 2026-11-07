@@ -68,7 +68,7 @@ export default function XacNhanCong({ period }: { period: string }) {
                   ? <><td className="num">{r.cong}</td><td className="num">{r.ngay_phep}</td><td className="num">{r.ngay_khong_luong}</td></>
                   : k.dem_bao_cao && <><td className="num">{r.ngay_bao_cao}</td><td className="num">{r.dung_gio}</td><td className="num">{r.tp_da_cham}</td></>}
                 <td className="num">{r.nghi_da_duyet}</td>
-                <td className="warn">{r.can_xem}</td></tr>)}</tbody></table>}
+                <td className="so-vang">{r.can_xem}</td></tr>)}</tbody></table>}
         </td></tr>}
       </Fragment>)}</tbody></table>
   </div>;

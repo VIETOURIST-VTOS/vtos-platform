@@ -97,7 +97,7 @@ function LaiLoTour() {
 
     {/* Cảnh báo chất lượng đặt Ở ĐẦU bảng. Giấu ở cuối thì người đọc đã ra quyết định xong mới thấy. */}
     {d?.canh_bao?.map((w: any) => (
-      <div key={w.loai} className={"note " + (w.muc === "do" ? "red" : "warn")} style={{ marginTop: 10 }}>
+      <div key={w.loai} className={w.muc === "do" ? "cb-do" : "cb-vang"} style={{ marginTop: 10 }}>
         <b>{w.tom_tat}</b>
         <div className="muted" style={{ fontSize: 13 }}>{w.chi_tiet}</div>
         {w.ma_tour?.length ? <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
@@ -111,7 +111,7 @@ function LaiLoTour() {
       <div className="kpi"><b className={c.loi_nhuan < 0 ? "red" : ""}>{vnd(c.loi_nhuan)}</b><span>lợi nhuận</span></div>
       <div className="kpi"><b>{pc(c.bien)}</b><span>biên</span></div>
       <div className="kpi"><b>{c.so_dong_tinh}</b><span>tour đã tính</span></div>
-      {c.so_dong_bo_qua > 0 && <div className="kpi"><b className="red">{c.so_dong_bo_qua}</b><span>tour KHÔNG tính (chưa có giá vốn)</span></div>}
+      {c.so_dong_bo_qua > 0 && <div className="kpi"><b className="so-do">{c.so_dong_bo_qua}</b><span>tour KHÔNG tính (chưa có giá vốn)</span></div>}
     </div>}
     {c && <p className="muted" style={{ fontSize: 12 }}>{c.ghi_chu}</p>}
 
@@ -283,7 +283,7 @@ function BanQuyetToan({ qt, mat, setMat }: { qt: any; mat: string; setMat: (m: s
         <td className="num">{so(r.loi_nhuan)}</td>
         <td className="muted" style={{ fontSize: 12 }}>
           {r.khoan_chi.map((k: any) => `${k.ten_khoan} ${k.so_tien === null ? "—" : vnd(k.so_tien)}`).join(" · ")}
-          {r.co_lech ? <div className="red">{r.co_lech}</div> : null}</td>
+          {r.co_lech ? <div className="so-do">{r.co_lech}</div> : null}</td>
       </tr>))}
     </tbody></table> : <p className="muted">Tệp không có dòng khách nào.</p>)}
 
