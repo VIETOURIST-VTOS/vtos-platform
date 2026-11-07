@@ -29,7 +29,7 @@ export default function KhungRieng({ dang, toi, xong, children }: { dang: TrangR
   }, []);
   const ten = (toi?.ho_ten || "").trim().split(/\s+/).pop() || toi?.dien_thoai || "";
   return <>
-    <link rel="stylesheet" href="/cong/vtd.css?v=41" />
+    <link rel="stylesheet" href="/cong/vtd.css?v=42" />
     <style dangerouslySetInnerHTML={{ __html: CSS }} />
     <div className="kr">
       <header className="kr-top"><div className="kr-in">

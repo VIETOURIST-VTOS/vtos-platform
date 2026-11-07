@@ -449,7 +449,7 @@ html,body{margin:0;padding:0}body{font-family:Arial,sans-serif}
 #vtd-access .v4-guide details{background:#f8fbff;padding:12px;border-radius:12px;border:1px solid #cad9e7}
 #vtd-access .v4-guide details>div{display:grid;gap:5px;margin-top:10px}
 #vtd-access .v4-guide .v3-button{justify-content:flex-start;text-align:left;line-height:1.5;background:white;color:#203e58}
-#vtd-access .v4-error{background:#E8F0FB;color:#1E63C8;border-left:3px solid #1E63C8;padding:12px;border-radius:6px}
+#vtd-access .v4-error{background:#fff0f0;color:#8e2533;border-left:3px solid #c84b65;padding:12px;border-radius:6px}/* KS-MUC3: báo lỗi giữ màu đỏ (KS-NAVY đổi nhầm) */
 #vtd-access .v4-auth .vtd-form{display:block}
 #vtd-access .v4-auth .v3-field{margin:14px 0;color:#234059}
 #vtd-access .v4-auth .v3-field input,#vtd-access .v4-auth .v3-field select{width:100%;max-width:100%;box-sizing:border-box;background:white;color:#183650;border:1px solid #b9cbdc;padding:12px;border-radius:9px;font:16px Arial,sans-serif}
@@ -515,7 +515,7 @@ CG-1 — phần thêm vào bản v3.2: chọn kênh nhận mã, đồng ý đi�
 #vtd-access .kenh-otp label.tat{opacity:.5;cursor:not-allowed}
 #vtd-access .kenh-otp input{width:auto;margin:0}
 #vtd-access .kenh-otp small{color:#52677f}
-#vtd-access .cong-loi{background:#E8F0FB;color:#1E63C8;border-radius:8px;padding:9px 12px;font-size:13px;margin:6px 0}
+#vtd-access .cong-loi{background:#fbe3ec;color:#a8145c;border-radius:8px;padding:9px 12px;font-size:13px;margin:6px 0}/* KS-MUC3 */
 #vtd-access .cong-ok{background:#e3f3ea;color:#1d7a4a;border-radius:8px;padding:9px 12px;font-size:13px;margin:6px 0}
 #vtd-access .cong-dong-y{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#142a43;margin:6px 0}
 #vtd-access .cong-dong-y input{width:auto;margin-top:3px}

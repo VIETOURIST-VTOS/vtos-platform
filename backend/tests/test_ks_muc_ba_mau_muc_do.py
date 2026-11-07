@@ -74,3 +74,17 @@ def test_ks_muc_3_cau_canh_bao_nao_cung_co_mau():
                         if not re.search(r"^\s*\." + re.escape(ten) + r"\s*\{", k, re.M):
                             xau.append(f"{os.path.relpath(p, GOC)}: «{lop}»")
     assert not xau, "lớp cảnh báo không có kiểu tô:\n" + "\n".join(sorted(set(xau)))
+
+
+def test_ks_muc_4_cong_khach_bao_loi_va_cho_mat_tien_khong_navy():
+    """KS-MUC3 (08/11/2026): cổng kh/dt/ir đổi «tất cả đỏ sang navy» (#699, #704) nhưng báo lỗi,
+    «chỉ còn N phòng», tiền hoàn khi hủy, nút Hủy đơn và dấu ✕ «không bao gồm» là CẢNH BÁO, không
+    phải trang trí — Chủ tịch duyệt trả màu cũ. Giá, nút chính, hero vẫn navy."""
+    navy = ("#1E63C8", "#14538D", "#E8F0FB")
+    vtd = _doc("web", "public", "cong", "vtd.css")
+    ks = _doc("web", "components", "cong", "KhachSanVtd.tsx")
+    tr = _doc("web", "components", "cong", "ToursAgoda.tsx")
+    for nguon, chon in ((vtd, ".v4-error{"), (vtd, ".cong-loi{"), (ks, ".ksv-loi{"), (ks, ".ksv13-it{"),
+                        (ks, ".ksv13-do{"), (ks, ".ksv13-huy{"), (tr, ".tra-ko li::before{")):
+        k = _khoi(nguon, chon)
+        assert not any(m.lower() in k.lower() for m in navy), f"{chon} lại bị tô navy: {k}"
