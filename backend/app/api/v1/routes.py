@@ -189,9 +189,26 @@ def dash_key(u: User) -> tuple:
     return (u.role, u.id if u.role in ("nv_dh", "tp_dh", "nv_kd") else 0)
 
 
+import threading as _threading
+# KS-XH · MỘT lần dựng một lúc. Đo 07/11/2026: người bấm «làm mới» đúng lúc robot đang dựng thì
+# hai lần dựng giành nhau máy chủ 512 MB và CẢ HAI chậm gấp ba (28 giây → 80 giây). Nay lần đến
+# sau CHỜ lần trước xong; nếu lần trước vừa dựng đúng vai trò của mình thì dùng luôn, khỏi dựng lại.
+_DASH_KHOA = _threading.Lock()
+
+
 def build_dashboard(db: Session, u: User) -> dict:
     """Dựng bảng điều khiển và ghi vào cache. Tách ra khỏi endpoint để robot nền dựng sẵn được –
     người mở trang không phải là người trả giá cho lần dựng đầu."""
+    import time
+    t_hoi = time.time()
+    with _DASH_KHOA:
+        hit = _DASH_CACHE.get(dash_key(u))
+        if hit and hit[1] is not None and hit[0] >= t_hoi:
+            return hit[1]
+        return _dung_dashboard(db, u)
+
+
+def _dung_dashboard(db: Session, u: User) -> dict:
     import time
     t0 = time.time()
     payload = _dashboard_payload(db, u)
@@ -278,6 +295,10 @@ def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Sessio
         if tuoi >= 300:
             danh_dau_cu()
         return {**hit[1], "cached": True, "tuoi_giay": int(tuoi)}
+    if refresh:
+        # KS-XH: «làm mới» là người dùng muốn số tính lại từ sổ — kể cả các tháng đã đóng.
+        from app.services import xu_huong as _XH
+        _XH.xoa_nho_thang_cu()
     return build_dashboard(db, u)
 
 
