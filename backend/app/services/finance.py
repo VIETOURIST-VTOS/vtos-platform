@@ -152,9 +152,13 @@ def forecast_13w(db: Session, start: date | None = None, opening: float | None =
     # KS-KD · `opening` (tuỳ chọn): số dư tiền 111 + 112 lũy kế tới kỳ tháng HIỆN TẠI mà chỗ gọi đã
     # có sẵn — bảng điều hành truyền `k["tien"]`, tính bằng đúng `RP.balances` của cùng kỳ. Không
     # truyền thì tự cộng như cũ.
+    # KS-TC · 08/11/2026 — không truyền thì đọc QUA BỘ NHỚ SỐ DƯ của bảng điều hành (KS-SD,
+    # `dashboard._so_du_no_vay_phai_thu`) thay vì tự cộng lại cả sổ cái. Cùng một phép tính
+    # `RP.balances` của cùng kỳ, nên cùng con số; bộ nhớ ấy xoá ngay khi có ghi sổ. Đo trên crm thật:
+    # trang Tài chính chờ 4–5 giây chỉ để cộng lại số dư mà bảng điều hành vừa cộng xong.
     if opening is None:
-        b = RP.balances(db, f"{date.today():%Y-%m}")
-        opening = sum(b.get(c, 0.0) for c in ("111", "112"))
+        from app.services import dashboard as _DB
+        opening = _DB._so_du_no_vay_phai_thu(db, f"{date.today():%Y-%m}")["tien"]
     rows = [{"week": i + 1, "from": w0, "to": w1, "in": {}, "out": {}} for i, (w0, w1) in enumerate(weeks)]
 
     def put(d: date, side: str, key: str, amt: float):
