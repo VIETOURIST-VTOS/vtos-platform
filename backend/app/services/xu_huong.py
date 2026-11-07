@@ -509,6 +509,48 @@ GOI_XU_HUONG_DOC = ("app.models.accounting", "app.models.vietrip", "app.models.q
 
 def xoa_nho_thang_cu() -> None:
     _NHO_THANG_CU.clear()
+    _NHO_KQT_CU.clear()
+
+
+# KS-KD · 07/11/2026 — cùng chỗ nhớ, cùng cách xoá, cho KẾT QUẢ ĐẦY ĐỦ của `ket_qua_that.thang` ở
+# tháng đã đóng. Khối «Doanh thu theo phòng» (`dashboard.doanh_thu_phong`) cộng lũy kế năm bằng
+# cách gọi `thang` cho từng tháng từ tháng 1 — đo trên crm 1,4 giây mỗi lần dựng. Khoá giữ đúng
+# khuôn khoá của `ket_qua_that.thang` (`("kqt.thang", "YYYY-MM")`), nên truyền thẳng làm `nho`.
+_NHO_KQT_CU: dict = {}              # ("kqt.thang", "YYYY-MM") → (lúc tính, kết quả)
+
+
+class _NhoKqt(dict):
+    """`nho` cho `ket_qua_that.thang`: tháng đã đóng đọc/ghi qua `_NHO_KQT_CU`, còn lại như dict thường."""
+
+    def __init__(self, ky_nay: str):
+        super().__init__()
+        self.ky_nay = ky_nay
+
+    def _cu(self, k) -> bool:
+        return (isinstance(k, tuple) and len(k) == 2 and k[0] == "kqt.thang"
+                and isinstance(k[1], str) and k[1] < self.ky_nay)
+
+    def __contains__(self, k) -> bool:
+        if dict.__contains__(self, k):
+            return True
+        if self._cu(k):
+            import time
+            hit = _NHO_KQT_CU.get(k)
+            if hit and time.time() - hit[0] < NHO_THANG_CU_GIAY:
+                dict.__setitem__(self, k, hit[1])
+                return True
+        return False
+
+    def __setitem__(self, k, v) -> None:
+        dict.__setitem__(self, k, v)
+        if self._cu(k):
+            import time
+            _NHO_KQT_CU[k] = (time.time(), v)
+
+
+def nho_kqt_cho_bang(hom_nay: date) -> dict:
+    """`nho` truyền vào `ket_qua_that.thang` cho bảng điều hành — xem chú thích KS-KD ở trên."""
+    return _NhoKqt(f"{hom_nay.year:04d}-{hom_nay.month:02d}")
 
 
 def _cham_toi_so_xu_huong(obj) -> bool:
@@ -518,7 +560,7 @@ def _cham_toi_so_xu_huong(obj) -> bool:
 
 
 def _sau_flush(session, _ctx) -> None:
-    if not _NHO_THANG_CU:
+    if not _NHO_THANG_CU and not _NHO_KQT_CU:
         return
     for o in (*session.new, *session.dirty, *session.deleted):
         if _cham_toi_so_xu_huong(o):
@@ -542,7 +584,8 @@ def doc_cho_bang(db, hom_nay: date) -> Callable[[str, str], float | None]:
     `hom_nay` bắt buộc: nó quyết định tháng nào là «đã đóng» (được nhớ), nên chỗ gọi phải nói rõ."""
     import time
     ky_nay = f"{hom_nay.year:04d}-{hom_nay.month:02d}"
-    goc = doc_that(db, nho={})          # hàm đọc tháng thật, `nho` chung cho doanh thu + lãi tour
+    # hàm đọc tháng thật; `nho` chung cho doanh thu + lãi tour, và (KS-KD) nhớ tháng đã đóng
+    goc = doc_that(db, nho=nho_kqt_cho_bang(hom_nay))
     trong_lan: dict = {}
 
     def doc_thang(ma: str, ky: str) -> float | None:

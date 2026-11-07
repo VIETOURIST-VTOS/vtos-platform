@@ -220,3 +220,51 @@ def test_lam_moi_xoa_nho_so_du():
     tok = client.post("/api/v1/auth/login", data={"username": "chutich", "password": "Vtos@Demo#2026"}).json()["access_token"]
     client.get("/api/v1/dashboard?refresh=1", headers={"Authorization": f"Bearer {tok}"})
     assert "2000-01" not in DBS._NHO_SO_DU
+
+
+# ── KS-KD · doanh thu theo phòng + dự báo 13 tuần ──────────────────────────────────────────────
+def test_doanh_thu_phong_nho_trung_khop_va_chi_nho_thang_da_dong():
+    from app.services import dashboard as DBS, xu_huong as XH
+    XH.xoa_nho_thang_cu()
+    db = _db(); hn = date.today()
+    try:
+        cu = DBS.doanh_thu_phong(db, hn)
+        assert DBS.doanh_thu_phong(db, hn, nho=XH.nho_kqt_cho_bang(hn)) == cu
+        assert DBS.doanh_thu_phong(db, hn, nho=XH.nho_kqt_cho_bang(hn)) == cu   # lần sau lấy từ nhớ
+    finally:
+        db.close()
+    ky_nay = f"{hn.year:04d}-{hn.month:02d}"
+    if hn.month > 1:
+        assert XH._NHO_KQT_CU, "tháng đã đóng của năm phải được nhớ"
+    assert all(k[1] < ky_nay for k in XH._NHO_KQT_CU), "tháng đang chạy không được nhớ qua lần dựng"
+
+
+def test_doanh_thu_phong_ghi_tour_xoa_nho():
+    from app.services import xu_huong as XH
+    from app.models.core import Tour
+    from sqlalchemy import select
+    from sqlalchemy.orm.attributes import flag_modified
+    XH._NHO_KQT_CU[("kqt.thang", "2000-01")] = (time.time(), {})
+    db = _db()
+    try:
+        t = db.execute(select(Tour)).scalars().first()
+        flag_modified(t, "name"); db.flush()
+        assert not XH._NHO_KQT_CU, "ghi vào Tour phải xoá nhớ kết quả tháng cũ"
+        db.rollback()
+    finally:
+        db.close()
+
+
+def test_du_bao_13_tuan_truyen_so_du_dau_ky_ra_dung_so_cu():
+    from app.services import finance as FIN, dashboard as DBS
+    db = _db(); hn = date.today()
+    try:
+        DBS.xoa_nho_so_du()
+        tien = DBS._so_du_no_vay_phai_thu(db, f"{hn:%Y-%m}")["tien"]
+        a = FIN.forecast_13w(db)
+        b = FIN.forecast_13w(db, opening=tien)
+        assert a == b, "số dư đầu kỳ truyền vào phải đúng bằng số dư dự báo tự cộng"
+    finally:
+        db.close()
+    src = open(os.path.join(os.path.dirname(os.path.dirname(__file__)), "app", "services", "dashboard.py"), encoding="utf-8").read()
+    assert 'FIN.forecast_13w(db, opening=k["tien"])' in src, "bảng điều hành phải truyền số dư đã có cho dự báo"
