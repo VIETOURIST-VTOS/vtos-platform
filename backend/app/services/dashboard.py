@@ -66,6 +66,59 @@ def doanh_thu_phong(db: Session, today: date) -> dict:
     return ra
 
 
+
+# ══ KS-SD · 07/11/2026 — SỐ DƯ TIỀN · NỢ VAY · PHẢI THU NHỚ GIỮA CÁC LẦN DỰNG ══════════════════
+#
+# Đo trên crm thật (`do_ms.ld_so_du_no_vay_phai_thu`): 1,2 giây mỗi lần robot dựng bảng điều hành.
+# Số dư tiền (TK 111 + 112) là số dư LŨY KẾ — `RP.balances` cộng lại toàn bộ sổ (hơn 25 nghìn
+# chứng từ) cho mọi tài khoản, mỗi vài phút một lần, trong khi sổ không đổi.
+#
+# Chủ tịch chọn «Nhớ số dư, ghi sổ là tính lại»: ba con số được nhớ theo kỳ, và bị XOÁ NGAY khi có
+# ghi vào bất kỳ bảng nào chúng đọc tới — sổ kế toán (bút toán, dòng bút toán, khoá kỳ…), hợp đồng
+# tài chính, booking. Bắt ở `after_flush` của SQLAlchemy, nên cửa nào, robot nào ghi cũng bị bắt;
+# bấm «làm mới» bảng điều hành cũng xoá. Phép tính bên trong y nguyên — chỉ chuyển chỗ.
+_NHO_SO_DU: dict = {}             # kỳ "YYYY-MM" → {"tien", "no_vay", "phai_thu"}
+GOI_SO_DU_DOC = ("app.models.accounting", "app.models.finance")
+LOP_SO_DU_DOC = {"Booking"}       # trong app.models.core
+
+
+def xoa_nho_so_du() -> None:
+    _NHO_SO_DU.clear()
+
+
+def _sau_flush_so_du(session, _ctx) -> None:
+    if not _NHO_SO_DU:
+        return
+    for o in (*session.new, *session.dirty, *session.deleted):
+        c = type(o)
+        if c.__module__.startswith(GOI_SO_DU_DOC) or (
+                c.__module__ == "app.models.core" and c.__name__ in LOP_SO_DU_DOC):
+            xoa_nho_so_du()
+            return
+
+
+def _gan_canh_ghi_so_du() -> None:
+    from sqlalchemy import event
+    if not event.contains(Session, "after_flush", _sau_flush_so_du):
+        event.listen(Session, "after_flush", _sau_flush_so_du)
+
+
+_gan_canh_ghi_so_du()
+
+
+def _so_du_no_vay_phai_thu(db: Session, p: str) -> dict:
+    if p in _NHO_SO_DU:
+        return dict(_NHO_SO_DU[p])
+    k: dict = {}
+    b = RP.balances(db, p)
+    k["tien"] = sum(b.get(c, 0.0) for c in ("111", "112"))
+    from app.models.finance import FinContract
+    k["no_vay"] = sum((c.outstanding or 0) for c in db.execute(select(FinContract).where(FinContract.kind == "vay", FinContract.status != "tat_toan")).scalars())
+    k["phai_thu"] = float(db.execute(select(func.coalesce(func.sum(func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0) - func.coalesce(Booking.paid, 0)), 0)).where(Booking.cancelled == False, (func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0) - func.coalesce(Booking.paid, 0)) > 0)).scalar() or 0)
+    _NHO_SO_DU[p] = dict(k)
+    return k
+
+
 def build(db: Session, u: User) -> dict:
     """Số liệu dashboard theo vai trò – chỉ đọc, tính từ dữ liệu hiện có."""
     today = date.today(); p = f"{today:%Y-%m}"
@@ -229,11 +282,8 @@ def build(db: Session, u: User) -> dict:
     k["canh_bao_do"] = db.execute(select(func.count()).select_from(Alert).where(Alert.resolved == False, Alert.level == "red")).scalar()
     _cham("kpi_thang")
     if role in ("chutich", "tgd", "ketoan", "bks", "cntt"):
-        b = RP.balances(db, p)
-        k["tien"] = sum(b.get(c, 0.0) for c in ("111", "112"))
-        from app.models.finance import FinContract
-        k["no_vay"] = sum((c.outstanding or 0) for c in db.execute(select(FinContract).where(FinContract.kind == "vay", FinContract.status != "tat_toan")).scalars())
-        k["phai_thu"] = float(db.execute(select(func.coalesce(func.sum(func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0) - func.coalesce(Booking.paid, 0)), 0)).where(Booking.cancelled == False, (func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0) - func.coalesce(Booking.paid, 0)) > 0)).scalar() or 0)
+        # KS-SD: ba con số này nhớ giữa các lần dựng, xoá ngay khi có ghi sổ — xem `_so_du_no_vay_phai_thu`.
+        k.update(_so_du_no_vay_phai_thu(db, p))
         # TC-48 · ĐÁY thay cho CUỐI KỲ (anh Tuấn chốt 17/9/2026: "để đáy thấp nhất, bỏ số tuần 13").
         # `so_du_tuan_13` bỏ hẳn, không giữ song song: hai con số dòng tiền cạnh nhau thì người đọc
         # phải nhớ con nào là con nào, và con dễ đọc hơn (cuối kỳ, thường dương) sẽ thắng. Vì sao

@@ -300,6 +300,8 @@ def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Sessio
         from app.services import xu_huong as _XH, hieu_qua_xe as _HQ
         _XH.xoa_nho_thang_cu()
         _HQ.xoa_nho_thang_cu()   # KS-XE
+        from app.services import dashboard as _DBS
+        _DBS.xoa_nho_so_du()     # KS-SD
     return build_dashboard(db, u)
 
 
