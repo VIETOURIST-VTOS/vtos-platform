@@ -1277,7 +1277,7 @@ const CSS = `
 .ksv-btn.wide{width:100%;margin-top:6px}
 .ksv-link{all:unset;cursor:pointer;color:var(--ksv-ink);font-weight:600}
 .ksv-muted{color:var(--ksv-muted)}.ksv-okc{color:var(--ksv-ok)}
-.ksv-loi{background:#E8F0FB;color:#14538D;border-radius:8px;padding:10px 14px}
+.ksv-loi{background:#fdecea;color:#8a1f1f;border-radius:8px;padding:10px 14px}
 .ksv-ok{background:var(--ksv-oksoft);color:var(--ksv-ok);border-radius:10px;padding:10px 14px}
 .ksv-gal{display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:170px 170px;gap:6px;border-radius:12px;overflow:hidden}
 .ksv-gal span{position:relative;background:var(--ksv-soft)}.ksv-gal span:first-child{grid-row:span 2}
@@ -1579,7 +1579,7 @@ const CSS = `
 .ksv13-dc{font-size:13px;color:var(--ksv-muted)}.ksv13-dc a{font-weight:600}
 .ksv13-tag{display:flex;flex-wrap:wrap;gap:6px}.ksv13-tag span{border:1px solid var(--ksv-line);border-radius:6px;padding:2px 6px;font-size:12px}
 .ksv13-ok{font-size:13px;color:#1d7a4a;font-weight:600}
-.ksv13-it{font-size:13px;color:#1E63C8}
+.ksv13-it{font-size:13px;color:#c2410c}
 .ksv13-dg{font-size:13px}.ksv13-dg b{background:#14538D;color:#fff;padding:2px 6px;border-radius:6px}
 .ksv13-gia{font-size:24px;font-weight:700;color:var(--ksv-fg);line-height:1.15;font-variant-numeric:tabular-nums}
 .ksv13 .ksv-side .ksv-btn{background:#14538D}
@@ -1598,13 +1598,13 @@ const CSS = `
 .ksv13-nut{display:flex;flex-wrap:wrap;gap:10px}.ksv13-nut .ksv-btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-height:44px}
 .ksv13-xgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;border-top:1px solid var(--ksv-line);padding-top:12px;font-size:14px}
 .ksv13-xgrid>div{display:flex;flex-direction:column;gap:2px}
-.ksv13-do{color:#1E63C8;font-weight:600}
+.ksv13-do{color:#c2410c;font-weight:600}
 .ksv13-hnut{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .ksv13-keo{display:none}.ksv13-man{display:none}
 .ksv13-the{display:flex;border-bottom:1px solid var(--ksv-line);margin:0 -4px}
 .ksv13-the button{flex:1;background:none;border:0;border-bottom:3px solid transparent;padding:10px 6px;font:inherit;font-size:14px;color:var(--ksv-muted);cursor:pointer;min-height:44px}
 .ksv13-the button.on{color:var(--ksv-fg);font-weight:700;border-bottom-color:var(--ksv-accent,#14538D)}.ksv13-the small{font-weight:400;color:var(--ksv-muted)}
-.ksv13-dnut{display:flex;gap:8px;flex-wrap:wrap}.ksv13-huy{color:#1E63C8 !important;border-color:#1E63C8 !important}
+.ksv13-dnut{display:flex;gap:8px;flex-wrap:wrap}.ksv13-huy{color:#c2410c !important;border-color:#c2410c !important}
 @media (max-width:900px){.ksv13-man{display:block;position:fixed;inset:0;background:rgba(20,38,59,.45);z-index:140}
   .ksv13-sheet{position:fixed;left:0;right:0;bottom:0;margin:0;z-index:141;border-radius:16px 16px 0 0;max-height:88vh;overflow:auto;padding:16px 16px 20px;box-shadow:0 -6px 20px rgba(20,38,59,.15)}
   .ksv13-keo{display:block;width:40px;height:4px;border-radius:2px;background:var(--ksv-line);align-self:center}
