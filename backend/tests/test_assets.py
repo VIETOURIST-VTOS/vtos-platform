@@ -122,6 +122,8 @@ def test_khong_trich_qua_gia_tri_con_lai():
     h = login("ketoan")
     r = client.post("/api/v1/prepaid", headers=h, json={
         "code": "CC-LE01", "name": "Khoản lẻ 3 kỳ", "kind": "ccdc", "start_date": "2029-09-01",
+        # ĐỢT CPTT-1 07/11/2026 — `expense_account` nay là ô BẮT BUỘC (mặc định `6423` đã bỏ).
+        "expense_account": "6423",
         "amount": 10_000_000, "months": 3})
     assert r.status_code == 201, r.text
     monthly = r.json()["monthly"]                       # 3.333.333
@@ -141,7 +143,9 @@ def test_khong_trich_qua_gia_tri_con_lai():
 def test_khoa_ky_chan_ghi_so():
     h = login("ketoan")
     client.post("/api/v1/prepaid", headers=h, json={
-        "code": "CC-KHOA", "name": "Khoản kỳ bị khóa", "start_date": "2030-01-01", "amount": 6_000_000, "months": 6})
+        "code": "CC-KHOA", "name": "Khoản kỳ bị khóa", "start_date": "2030-01-01",
+        "expense_account": "6423",      # ĐỢT CPTT-1 — ô bắt buộc
+        "amount": 6_000_000, "months": 6})
     assert client.post("/api/v1/periods/2030-01/lock", headers=h, json={"note": "test"}).status_code == 200
     r = client.post("/api/v1/prepaid/allocation/2030-01/post", headers=h)
     assert r.status_code == 422 and "khóa" in r.json()["detail"]

@@ -163,6 +163,34 @@ def post_depreciation(db: Session, u: User, period: str) -> dict:
 
 # ---------- Phân bổ chi phí trả trước / CCDC ----------
 
+# ĐÍCH PHÂN BỔ 242 — LẤY NGUYÊN DANH SÁCH CỦA MISA, không tự mở rộng.
+# MISA ghi bút toán phân bổ là `Nợ 154, 622, 623, 627, 635, 641, 642, 241 / Có 242`.
+# ĐO ĐƯỢC KHI VIẾT LUẬT NÀY: bản đầu em để `("62", "64", "241")` và dựng cảnh bằng `6323`
+# (giá vốn dịch vụ cho thuê xe) — SAI, vì 632x KHÔNG nằm trong danh sách của MISA. Chi phí
+# đội xe ở VTOS đi vào `627`, rồi bước 0 của kết sổ đẩy 627 → 154 → 632. Cho chọn thẳng 632x
+# là đi tắt qua bước ấy, và chi phí đội xe sẽ bị tính hai lần.
+TK_PHAN_BO_NHOM = ("154", "622", "623", "627", "635", "641", "642", "241")
+
+
+def tk_chi_phi_nhan_phan_bo(db: Session) -> list[dict]:
+    """Danh mục TK chi phí có thể nhận phân bổ 242 — ĐỌC THẲNG DANH MỤC, không gõ cứng.
+
+    Hai điều kiện, và cả hai đều có lý do đo được:
+
+      · CHỈ TÀI KHOẢN CHI TIẾT (không có con). Đo trên main 07/11/2026: `642` và `641` đều LÀ
+        tài khoản cha. Cho chọn tài khoản cha là mời người dùng tạo ra đúng thứ Chủ tịch đã chốt
+        07/11/2026 là phải chặn.
+      · CHỈ CÁC NHÓM MISA LIỆT KÊ làm đích phân bổ — xem `TK_PHAN_BO_NHOM` ngay trên.
+
+    Gõ cứng một danh sách ngắn trong mã thì danh mục đổi là danh sách lệch, mà không ai biết.
+    """
+    cac = {a.code: a for a in db.execute(select(Account)).scalars()}
+    lam_cha = {a.parent for a in cac.values() if a.parent}
+    return [{"ma": a.code, "ten": a.name}
+            for a in sorted(cac.values(), key=lambda x: x.code)
+            if a.code.startswith(TK_PHAN_BO_NHOM) and a.code not in lam_cha]
+
+
 def monthly_allocation(p: PrepaidExpense) -> float:
     if p.months <= 0:
         return 0.0
@@ -344,7 +372,8 @@ def create_prepaid(db: Session, u: User, data: dict) -> PrepaidExpense:
     p = PrepaidExpense(
         code=(data.get("code") or _next_code(db, PrepaidExpense, "CC")).strip()[:30],
         name=(data.get("name") or "").strip()[:200], kind=data.get("kind") or "ccdc",
-        asset_account=data.get("asset_account") or "242", expense_account=data.get("expense_account") or "6423",
+        asset_account=data.get("asset_account") or "242",
+        expense_account=(data.get("expense_account") or "").strip(),
         partner_code=(data.get("partner_code") or "")[:60], project_code=(data.get("project_code") or "")[:40],
         department=(data.get("department") or "")[:20], start_date=data["start_date"],
         amount=float(data.get("amount") or 0), months=int(data.get("months") or 1),
@@ -357,6 +386,26 @@ def create_prepaid(db: Session, u: User, data: dict) -> PrepaidExpense:
         raise ValueError("Giá trị phân bổ phải lớn hơn 0")
     if p.months <= 0:
         raise ValueError("Số kỳ phân bổ phải lớn hơn 0")
+    # ĐỢT CPTT-1 07/11/2026 — TK CHI PHÍ LÀ Ô BẮT BUỘC, MẶC ĐỊNH `6423` ĐÃ BỎ.
+    #
+    # Trước đợt này ô ấy mặc định `"6423"` (Chi phí đồ dùng văn phòng) và màn hình KHÔNG có chỗ
+    # chọn, nên mọi khoản nhập qua màn hình đều phân bổ vào 6423: bảo hiểm xe lẽ ra vào 6323,
+    # thuê văn phòng lẽ ra vào 6427. Sổ vẫn cân, báo cáo vẫn ra số, chỉ cơ cấu chi phí là sai —
+    # và người nhập không có cách nào biết. Để mặc định là để máy trả lời hộ một câu chưa ai hỏi.
+    #
+    # VÀ CHỈ NHẬN TÀI KHOẢN CHI TIẾT: `642` và `641` đều LÀ tài khoản cha trên danh mục. Nhận
+    # chúng ở đây là tự tay dựng thêm chỗ phải nắn lại ở đợt chặn tài khoản cha (Chủ tịch chốt
+    # 07/11/2026).
+    _tk = (p.expense_account or "").strip()
+    if not _tk:
+        raise ValueError("Chưa chọn TK chi phí nhận phân bổ — mỗi khoản phân bổ vào một tài "
+                         "khoản chi phí khác nhau, máy không đoán thay được")
+    _cac = {a.code: a for a in db.execute(select(Account)).scalars()}
+    if _tk not in _cac:
+        raise ValueError(f"TK chi phí {_tk} không có trong danh mục tài khoản")
+    if _tk in {a.parent for a in _cac.values() if a.parent}:
+        raise ValueError(f"TK chi phí {_tk} là tài khoản tổng hợp (có tài khoản con) — chọn tài "
+                         "khoản chi tiết nhất")
     if db.execute(select(PrepaidExpense).where(PrepaidExpense.code == p.code)).scalar_one_or_none():
         raise ValueError(f"Mã {p.code} đã tồn tại")
     db.add(p); db.flush()
