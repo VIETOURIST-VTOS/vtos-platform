@@ -246,7 +246,7 @@ def pdf_phieu(db: Session, d: DonKsVtd) -> bytes:
     p.rect(14, y, 182, 34)
     p.set_xy(16, y + 2)
     p.set_font("VN", "", 8.5)
-    p.multi_cell(128, 4.6, f"Thanh toán · Payment: Đã thanh toán đủ {_vnd(d.tong)}" + (f" · {kenh}" if kenh else "")
+    p.multi_cell(128, 4.6, f"Thanh toán · Payment: Đã thanh toán đủ {_vnd(d.tong or 0)}" + (f" · {kenh}" if kenh else "")
                  + (f" · {tra_luc:%d/%m/%Y}" if tra_luc else ""), align="L")
     p.set_x(16)
     p.multi_cell(128, 4.6, "Đặt phòng và chi trả bởi · Booked and payable by:", align="L")
@@ -364,8 +364,8 @@ def pdf_hoa_don(db: Session, d: DonKsVtd) -> bytes:
     y += 2
     p.rect(14, y0, 132, y - y0)
     p.rect(146, y0, 50, y - y0)
-    tong = [("Tổng tiền phòng · Room total", _vnd(d.tien_phong), False), ("Giảm giá / voucher", "− " + _vnd(d.giam_voucher) if d.giam_voucher else _vnd(0), False),
-            ("TỔNG CỘNG TIỀN THANH TOÁN · TOTAL PAID", _vnd(d.tong), True),
+    tong = [("Tổng tiền phòng · Room total", _vnd(d.tien_phong or 0), False), ("Giảm giá / voucher", "− " + _vnd(d.giam_voucher or 0) if (d.giam_voucher or 0) else _vnd(0), False),
+            ("TỔNG CỘNG TIỀN THANH TOÁN · TOTAL PAID", _vnd(d.tong or 0), True),
             (f"Trong đó thuế GTGT {S.VAT_PT}% · incl. VAT {S.VAT_PT}%", _vnd(S.vat_trong(int(d.tong or 0))), False),
             ("Phương thức · Method", kenh or "—", False)]
     for a, b, dam in tong:
@@ -418,7 +418,7 @@ def email_html(db: Session, d: DonKsVtd) -> tuple[str, str, str]:
 <h1 style="margin:0;font-size:21px">Đơn đặt phòng của quý khách đã được xác nhận!</h1>
 <p style="margin:2px 0 12px;color:#4d5b6a;font-size:13px">Your booking is confirmed</p>
 <p>Thân gửi <b>{d.ho_ten}</b>,</p>
-<p>Mã đặt phòng của quý khách là <b>{d.ma}</b>. Vietourist đã nhận đủ <b>{_vnd(d.tong)}</b> và đã báo khách sạn. Phiếu xác nhận và hóa đơn đặt phòng (PDF) được đính kèm thư này; quý khách tải lại được trong «Đơn của tôi».</p>
+<p>Mã đặt phòng của quý khách là <b>{d.ma}</b>. Vietourist đã nhận đủ <b>{_vnd(d.tong or 0)}</b> và đã báo khách sạn. Phiếu xác nhận và hóa đơn đặt phòng (PDF) được đính kèm thư này; quý khách tải lại được trong «Đơn của tôi».</p>
 </div>
 <div {o}><b style="font-size:17px">{ten_ks}</b><br><span style="color:#4d5b6a">{(k.dia_chi if k else '') or (k.tinh_thanh if k else '')}</span></div>
 <div {o}><table width="100%" style="font-size:14px"><tr>
@@ -431,7 +431,7 @@ def email_html(db: Session, d: DonKsVtd) -> tuple[str, str, str]:
 <p style="color:#1d7a4a;font-weight:bold">✓ Đã xác nhận và thanh toán đơn đặt phòng</p></div>
 <div {o}><b style="font-size:16px">Chi tiết thanh toán · Payment details</b>
 <table width="100%" style="font-size:14px;margin-top:6px">{tien}
-<tr><td style="border-top:1px solid #dce3ea;padding-top:8px"><b>Tổng tiền · Total</b></td><td style="border-top:1px solid #dce3ea;padding-top:8px;text-align:right"><b>{_vnd(d.tong)}</b></td></tr></table>
+<tr><td style="border-top:1px solid #dce3ea;padding-top:8px"><b>Tổng tiền · Total</b></td><td style="border-top:1px solid #dce3ea;padding-top:8px;text-align:right"><b>{_vnd(d.tong or 0)}</b></td></tr></table>
 <p style="font-size:12px;color:#4d5b6a">Đã gồm {S.VAT_PT}% VAT ({_vnd(S.vat_trong(int(d.tong or 0)))}). Không thu thêm tại khách sạn, trừ dịch vụ quý khách tự dùng.<br>
 Đã thanh toán{f' ngày {tra_luc:%d/%m/%Y}' if tra_luc else ''}{f' · {kenh}' if kenh else ''}.</p></div>
 <div {o}><b style="font-size:16px">Chính sách hủy · Cancellation policy</b><ul style="padding-left:18px">{huy}</ul>
@@ -445,7 +445,7 @@ Gửi bởi: <b>{ph['ten']}</b> · MST {ph['mst']} · {ph['dia_chi']} · Hotline
     chu = (f"Thân gửi {d.ho_ten},\n\nĐơn đặt phòng {d.ma} tại {ten_ks} đã được xác nhận (Your booking is confirmed).\n"
            f"Nhận phòng {_dmy(d.vao)} · trả phòng {_dmy(d.ra)} · {d.so_phong} phòng\n"
            + "".join(f"{_nhan_dv(v)} · {v['x'].get('loai_phong', '')} · {v['x'].get('goi', '')} · {_khach(v['kh'], v['x'])} · {_huy(v['x'])}\n" for v in dv)
-           + f"Đã thanh toán: {_vnd(d.tong)} (đã gồm {S.VAT_PT}% VAT)\n"
+           + f"Đã thanh toán: {_vnd(d.tong or 0)} (đã gồm {S.VAT_PT}% VAT)\n"
            + (f"Mã xác nhận của khách sạn: {d.ma_xac_nhan_ks}\n" if d.ma_xac_nhan_ks else "")
            + "Phiếu xác nhận và hóa đơn đặt phòng đính kèm thư này; tải lại trong «Đơn của tôi».\n\n"
            + f"{ph['ten']} · Hotline {ph['hotline']}")
