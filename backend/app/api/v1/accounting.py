@@ -821,6 +821,48 @@ def tien_ghi_cap_cha(tu: date | None = None, den: date | None = None, gioi_han: 
     for g in theo_tk:
         g["no"], g["co"] = round(g["no"], 0), round(g["co"], 0)
 
+    # ĐỢT TKC-2 07/11/2026 — GỘP THEO ĐƯỜNG GHI. Nhịp 1 của ba nhịp Chủ tịch chốt 07/11/2026:
+    # ĐO trên dữ liệu thật → NẮN từng đường ghi → mới BẬT CHẶN.
+    #
+    # Vì sao bảng này phải có, và vì sao bảng «theo tài khoản» ngay trên chưa đủ: bảng kia nói
+    # «12 tài khoản cha đang có bút toán», còn nhịp 2 là sửa MÃ của từng đường ghi. Tài khoản
+    # không cho biết phải sửa tệp nào; đường ghi thì cho.
+    #
+    # CỘT `ky_cuoi` LÀ CỘT ĐỂ QUYẾT, không phải để trang trí. Đường ghi còn ghi trong kỳ gần đây
+    # thì VẪN ĐANG CHẠY — phải nắn mã trước khi bật chặn, không thì chặn là gãy. Đường ghi có kỳ
+    # cuối đã lâu (số dư đầu kỳ, điều chỉnh kiểm toán) thì không còn ghi nữa, nó chỉ để lại SỐ CŨ
+    # — và số cũ là việc Kế toán trưởng quyết riêng, không cần sửa một dòng mã nào. Nhờ cột này
+    # mà nhịp 2 tự chia thành VIỆC SỬA MÃ và VIỆC DỌN SỐ, hai loại việc khác hẳn nhau.
+    #
+    # ĐẾM TRÊN TOÀN BỘ, KHÔNG CẮT Ở `gioi_han` — y như bảng theo tài khoản. Bảng từng chứng từ
+    # bên dưới mới bị cắt; cộng nhẩm một bảng đã cắt rồi tưởng là toàn bộ chính là chỗ hỏng mà
+    # bảng gộp của Đợt TKC-1 sinh ra để chặn.
+    from app.services.chung_tu_loai import NGHIEP_VU as _NV
+    gop_d = {}
+    for l, e in het:
+        k = (e.source_type or "", e.loai_nghiep_vu or "")
+        g = gop_d.get(k)
+        if g is None:
+            g = gop_d[k] = {"nguon": k[0], "nghiep_vu": k[1],
+                            "ten_nghiep_vu": (_NV.get(k[1]) or ("", ""))[0],
+                            "so_dong": 0, "_ct": set(), "_tk": set(), "_ky": set(),
+                            "no": 0, "co": 0}
+        g["so_dong"] += 1
+        g["_ct"].add(e.id)
+        g["_tk"].add(l.account_code)
+        if e.period:
+            g["_ky"].add(e.period)
+        g["no"] += l.debit or 0
+        g["co"] += l.credit or 0
+    theo_duong = []
+    for g in gop_d.values():
+        ky = sorted(g.pop("_ky"))
+        theo_duong.append({**g, "so_chung_tu": len(g.pop("_ct")),
+                           "tai_khoan": sorted(g.pop("_tk")),
+                           "ky_dau": ky[0] if ky else "", "ky_cuoi": ky[-1] if ky else "",
+                           "no": round(g["no"], 0), "co": round(g["co"], 0)})
+    theo_duong.sort(key=lambda g: (-g["so_dong"], g["nguon"], g["nghiep_vu"]))
+
     # Cờ `is_detail` nói gì so với bảng quan hệ cha–con. Hai bên lệch nhau là một chuyện phải nói
     # ra: nó nghĩa là cờ ấy đã cũ, và bất cứ ai sau này viết phép chặn dựa vào cờ sẽ chặn sai chỗ.
     co_sai = sorted(a.code for a in cac_tk
@@ -832,6 +874,7 @@ def tien_ghi_cap_cha(tu: date | None = None, den: date | None = None, gioi_han: 
         "so_tai_khoan_cha": len(cha),
         "so_tai_khoan_co_but_toan": len(theo_tk),
         "theo_tai_khoan": theo_tk,
+        "theo_duong_ghi": theo_duong,
         "co_is_detail_lech": co_sai,
         "so_dong": len(het), "cat_bot": len(het) > gioi_han, "dong": dong,
         "so_tien": round(sum((l.debit or 0) + (l.credit or 0) for l, _ in het), 0),

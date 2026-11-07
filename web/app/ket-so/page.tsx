@@ -796,6 +796,38 @@ function TienCapCha() {
             </>
           ) : null}
 
+          {/* ĐỢT TKC-2 — GỘP THEO ĐƯỜNG GHI. Đây là bảng để QUYẾT nhịp 2: tài khoản không cho
+              biết phải sửa tệp nào, đường ghi thì cho. Cột «Kỳ cuối» chia việc làm hai loại —
+              còn ghi gần đây thì phải NẮN MÃ trước khi chặn; kỳ cuối đã lâu thì chỉ còn SỐ CŨ,
+              là việc Kế toán trưởng quyết riêng, không sửa một dòng mã nào. */}
+          {d.theo_duong_ghi?.length ? (
+            <>
+              <h4 style={{ marginTop: 20 }}>Theo đường ghi</h4>
+              <p className="muted small" style={{ margin: "0 0 4px" }}>
+                Đếm trên TOÀN BỘ, không cắt ở giới hạn. «Kỳ cuối» còn gần đây nghĩa là đường ghi
+                ấy vẫn đang chạy — phải nắn mã trước khi bật chặn.
+              </p>
+              <table><thead><tr>
+                <th>Đường ghi</th><th>Nghiệp vụ</th><th className="num">Dòng</th>
+                <th className="num">Chứng từ</th><th>Tài khoản cha chạm</th>
+                <th>Kỳ đầu</th><th>Kỳ cuối</th><th className="num">Tiền</th>
+              </tr></thead><tbody>
+                {d.theo_duong_ghi.map((g: any) => (
+                  <tr key={g.nguon + "|" + g.nghiep_vu}>
+                    <td>{g.nguon || <span className="muted">—</span>}</td>
+                    <td>{g.ten_nghiep_vu || g.nghiep_vu || <span className="muted">—</span>}</td>
+                    <td className="num">{g.so_dong}</td>
+                    <td className="num">{g.so_chung_tu}</td>
+                    <td>{(g.tai_khoan || []).join(" ")}</td>
+                    <td>{g.ky_dau || <span className="muted">—</span>}</td>
+                    <td><b>{g.ky_cuoi || "—"}</b></td>
+                    <td className="num">{vnd(g.no + g.co)}</td>
+                  </tr>
+                ))}
+              </tbody></table>
+            </>
+          ) : null}
+
           {d.dong?.length ? (
             <>
               <h4 style={{ marginTop: 20 }}>Từng chứng từ</h4>
