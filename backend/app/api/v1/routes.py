@@ -193,9 +193,27 @@ def build_dashboard(db: Session, u: User) -> dict:
     """Dựng bảng điều khiển và ghi vào cache. Tách ra khỏi endpoint để robot nền dựng sẵn được –
     người mở trang không phải là người trả giá cho lần dựng đầu."""
     import time
+    t0 = time.time()
     payload = _dashboard_payload(db, u)
+    # KS-NHANH bước 2: ghi lại tổng thời gian dựng để đo trên máy thật (đọc ở `do_ms` của gói).
+    payload = {**payload, "do_ms": {**payload.get("do_ms", {}), "tong": int((time.time() - t0) * 1000)}}
+    print("dashboard build", dash_key(u), payload["do_ms"])
     _DASH_CACHE[dash_key(u)] = (time.time(), payload)
     return payload
+
+
+def danh_dau_cu() -> None:
+    global _DASH_DIRTY
+    _DASH_DIRTY = True
+
+
+def can_dung_lai(tuoi_toi_da: float = 240) -> bool:
+    """Robot hỏi: có cần dựng lại không? Có — khi có người ghi, khi bản nhớ còn trống (vừa khởi
+    động) hoặc khi có bản quá `tuoi_toi_da` giây (kể cả lúc không ai ghi gì)."""
+    import time
+    if _DASH_DIRTY or not _DASH_CACHE:
+        return True
+    return any(time.time() - ts >= tuoi_toi_da for ts, _ in _DASH_CACHE.values())
 
 
 def lam_moi_cache_nen(db: Session) -> int:
@@ -206,7 +224,9 @@ def lam_moi_cache_nen(db: Session) -> int:
     """
     from app.models.core import User as _U
     n = 0
-    for role, uid in list(_DASH_CACHE.keys()):
+    # KS-NHANH: máy chủ vừa khởi động thì bản nhớ trống — dựng sẵn cho Chủ tịch để người mở trang
+    # đầu tiên sau mỗi lần cập nhật không phải chờ. Chỉ khi TRỐNG HẲN, không tự thêm vai trò khác.
+    for role, uid in (list(_DASH_CACHE.keys()) or [("chutich", 0)]):
         u = db.get(_U, uid) if uid else db.execute(select(_U).where(_U.role == role, _U.active == True)).scalars().first()
         if u is None: continue
         try:
@@ -247,12 +267,25 @@ def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Sessio
     import time
     key = dash_key(u)
     hit = _DASH_CACHE.get(key)
-    if hit and not refresh and time.time() - hit[0] < 300:
-        return {**hit[1], "cached": True}
+    if hit and not refresh:
+        tuoi = time.time() - hit[0]
+        # KS-NHANH · 07/11/2026 — đo trên crm thật: dựng lại từ đầu 38 giây, lấy bản nhớ 0,3 giây.
+        # Trước đây bản nhớ quá 5 phút là bỏ và bắt người mở trang chờ dựng lại; mà robot nền chỉ
+        # dựng lại khi CÓ ai ghi dữ liệu, nên lúc vắng hay ngay sau mỗi lần cập nhật máy chủ thì
+        # Chủ tịch mở trang là đứng «Đang tải…» nửa phút. Nay: CÒN bản nhớ thì luôn trả ngay (kèm
+        # tuổi của nó), và đánh dấu cũ để robot nền dựng lại trong vòng 2 phút. Chỉ khi chưa từng có
+        # bản nhớ (lần đầu sau khởi động) hoặc người dùng bấm làm mới thì mới dựng tại chỗ.
+        if tuoi >= 300:
+            danh_dau_cu()
+        return {**hit[1], "cached": True, "tuoi_giay": int(tuoi)}
     return build_dashboard(db, u)
 
 
 def _dashboard_payload(db: Session, u: User) -> dict:
+    import time as _t
+    _m = {"_": _t.time()}; do = {}
+    def _cham(ten):
+        now = _t.time(); do[ten] = int((now - _m["_"]) * 1000); _m["_"] = now
     # việc chờ tôi xử lý: chỉ xét tour đang trong luồng (không quét tour đã kết thúc / đã duyệt hàng loạt)
     active = db.execute(select(Tour).where(Tour.status.in_(["nhap", "cho_xac_nhan", "cho_duyet", "da_dong_so", "kt_xac_nhan"]))).scalars().all()
     if u.role in ("chutich", "tp_dh"):
@@ -268,11 +301,15 @@ def _dashboard_payload(db: Session, u: User) -> dict:
         for a in T.allowed_actions(db, t, u):
             if a in ("confirm", "sign", "approve", "close", "kt_confirm", "cntt_check"):
                 todo.append({"tour_id": t.id, "code": t.code, "name": t.name, "action": a})
+    _cham("viec_cho_toi")
     counts = {st: n for st, n in db.execute(select(Tour.status, func.count()).group_by(Tour.status)).all()}
     alerts = [a for a in db.execute(select(Alert).where(Alert.resolved == False).order_by(desc(Alert.created_at)).limit(300)).scalars()
               if u.role in a.to_roles.split(",") or u.role in ("chutich", "tgd", "cntt", "bks")][:60]
+    _cham("dem_va_canh_bao")
     from app.services import dashboard as DB_
     extra = DB_.build(db, u)
+    do.update(extra.pop("do_ms", {}) if isinstance(extra, dict) else {})
+    _cham("khoi_tong_hop")
     # ══════════════════════════════════════════════════════════════════════════════════════════
     # TC-66 · GỬI KÈM MÃ PHÁP NHÂN ĐỂ KHỐI DÒNG TIỀN KHÔNG PHẢI HỎI THÊM MỘT LƯỢT
     # ══════════════════════════════════════════════════════════════════════════════════════════
@@ -294,6 +331,8 @@ def _dashboard_payload(db: Session, u: User) -> dict:
                "pending_requests": db.execute(select(func.count()).select_from(ServiceRequest).where(ServiceRequest.booking_id == None)).scalar(),
                "pending_params": db.execute(select(func.count()).select_from(Param).where(Param.status == "pending")).scalar(),
                "alerts": [alert_out(a) for a in alerts], "threshold": R.get_param(db, "nguong_bien"), **extra}
+    _cham("dong_goi")
+    payload["do_ms"] = do
     return payload
 
 
