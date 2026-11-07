@@ -111,6 +111,10 @@ HANG_RAO = (
     # Luat 1 canh rang mac dinh `6423` KHONG quay lai; luat 2 canh khong ai chon duoc tai
     # khoan cha; luat 4 canh man hinh thuc su GUI hai o chu khong chi ve ra chung.
     "tests/test_cptt1_hai_o_chi_phi_tra_truoc.py",
+    # ── THE DOC BU TRU THUE GTGT, them ngay 07/11/2026 (Dot GTGT-2) ─────────────────────────
+    # Luat 2 canh the KHONG tu cong lai; luat 3 canh the IN RA moi canh bao may chu tra — mot
+    # dau khong ai doc duoc thi bang khong co dau (bai hoc Dot R2-KC1).
+    "tests/test_gtgt2_the_bu_tru_gtgt.py",
 )
 
 
