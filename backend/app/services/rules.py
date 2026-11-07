@@ -579,6 +579,18 @@ DEFAULT_PARAMS = [
      "Chủ tịch chốt nguyên tắc 12/9/2026 – TỶ LỆ CHƯA KÝ"),
 ]
 
+# ĐỢT TKC-3 07/11/2026 — BẢNG KHAI «đường ghi → tài khoản chi tiết» NỐI VÀO ĐÂY, KHÔNG CHÉP TAY.
+#
+# Mỗi khóa trong `tk_chi_tiet.KHOA` thành một dòng tham số, nên Kế toán trưởng đổi được tài khoản
+# con trên màn Tham số đã có (có hai chữ ký, có ngày hiệu lực) mà không phải mở một đợt mã.
+#
+# `+=` chứ không gõ lại từng dòng: gõ lại là dựng nguồn thứ hai cho cùng một luật, và hai nguồn
+# thì sớm muộn lệch nhau — đúng chỗ `ops.CATEGORY_ACCOUNT` và `misa.CATEGORY_ACCOUNT` đã lệch
+# (154 trong sổ VTOS, 1541 trong bảng kê MISA, cùng một khoản chi).
+from app.services.tk_chi_tiet import tham_so_mac_dinh as _tk_tham_so   # noqa: E402
+
+DEFAULT_PARAMS += _tk_tham_so()
+
 # Tham số mang giá trị NGÀY chứ không phải số. propose_param kiểm giá trị bằng float(), nên nếu
 # không khai ở đây thì một ngày tháng bị trả về "Giá trị phải là số" và không đường nào nhập được.
 #

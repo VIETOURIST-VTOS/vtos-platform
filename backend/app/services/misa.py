@@ -316,7 +316,10 @@ def import_audited_checkpoint(db: Session, u: User, column: str = "close", repla
     if close_lines:
         # Đóng thẳng phần doanh thu/chi phí còn treo vào 421 (không cần qua 911 vì đây là 1 bút toán):
         # tổng các dòng xóa số dư P&L ở trên có (Nợ − Có) = −kq, nên dòng 421 cần (Nợ − Có) = +kq để tự cân.
-        close_lines.append({"account": "421", "debit": max(kq, 0), "credit": max(-kq, 0), "note": "Kết chuyển KQKD còn treo vào lợi nhuận sau thuế chưa phân phối (chốt sổ kiểm toán)"})
+        from app.services import tk_chi_tiet as TKCT
+        # Đợt TKC-3: `421` là tài khoản TỔNG HỢP (con: 4211 năm trước / 4212 năm nay). Ghi vào cha
+        # là để lại một số dư không nói được nó thuộc năm nào.
+        close_lines.append({"account": TKCT.chon(db, "kc_lai_lo"), "debit": max(kq, 0), "credit": max(-kq, 0), "note": "Kết chuyển KQKD còn treo vào lợi nhuận sau thuế chưa phân phối (chốt sổ kiểm toán)"})
         ACC.post_entry(db, u.username, u.role, as_of, f"Kết chuyển KQKD để chốt sổ kiểm toán {as_of:%d/%m/%Y}", close_lines, "ket_chuyen", ref_close, nghiep_vu="ket_chuyen_chot_so")
         db.flush()
 

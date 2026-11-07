@@ -123,6 +123,10 @@ HANG_RAO = (
     # Luat 2 canh bang gop DEM TREN TOAN BO, khong cat o `gioi_han`. Luat 4 canh dot nay CHUA
     # CHAN GI — nhip 1 la DO, va cua van CHI DOC.
     "tests/test_tkc2_duong_ghi_vao_tai_khoan_cha.py",
+    # ── NHIP 2a CUA BA NHIP TAI KHOAN CHA, them 07/11/2026 (Dot TKC-3) ──────────────────────
+    # Luat 1 canh BANG KHAI co MOT nguon (tham so sinh ra tu KHOA, khong chep tay). Luat 3 canh
+    # `ops` va `misa` khong con la HAI bang lech nhau. Dot nay CHUA BAT CHAN — do la nhip 3.
+    "tests/test_tkc3_nan_duong_ghi_ve_tai_khoan_con.py",
 )
 
 

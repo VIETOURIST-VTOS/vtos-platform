@@ -91,8 +91,12 @@ def test_settlement_posts_154_331_and_632():
     es = [x for x in journal() if x["source_ref"] == "tour:DN-HCM-0820"]
     assert len(es) == 2
     pairs = {(l["account"], l["debit"], l["credit"]) for e in es for l in e["lines"]}
-    assert {("154", 158000000, 0), ("335", 0, 158000000), ("632", 158000000, 0), ("154", 0, 158000000)} <= pairs   # chưa có đề nghị chi → toàn bộ trích trước 335
-    led = client.get("/api/v1/ledger", params={"account": "154", "period": P}, headers=login("tgd")).json()
+    # ĐỢT TKC-3 07/11/2026 — `154` và `632` là tài khoản TỔNG HỢP; quyết toán nay ghi vào tài
+    # khoản CHI TIẾT theo bảng khai `services/tk_chi_tiet.py`, và giá vốn chọn theo LOẠI TOUR
+    # (chuyến này là tour nội địa → `6321`). Phép thử cũ khai `154` / `632` chính là phép thử
+    # đang GIỮ LẠI lỗi, nên nó phải đổi cùng đợt chứ không phải được nới ra.
+    assert {("1541", 158000000, 0), ("335", 0, 158000000), ("6321", 158000000, 0), ("1541", 0, 158000000)} <= pairs   # chưa có đề nghị chi → toàn bộ trích trước 335
+    led = client.get("/api/v1/ledger", params={"account": "1541", "period": P}, headers=login("tgd")).json()
     assert led["closing"] == 0 and led["total_debit"] == 158000000
 
 

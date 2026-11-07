@@ -333,7 +333,9 @@ def closing_entries_draft(db: Session, u: User, period: str) -> list[JournalEntr
     if te: out.append(ACC.post_entry(db, u.username, u.role, d, f"Kết chuyển chi phí kỳ {period} sang 911", [{"account": "911", "debit": te}] + lines_exp, "ket_chuyen", f"period:{period}", post=False, nghiep_vu="ket_chuyen_chi_phi"))
     net = tr - te
     if abs(net) >= 1:
-        ln = [{"account": "911", "debit": net}, {"account": "421", "credit": net}] if net > 0 else [{"account": "421", "debit": -net}, {"account": "911", "credit": -net}]
+        from app.services import tk_chi_tiet as TKCT
+        tk_ln = TKCT.chon(db, "kc_lai_lo")   # Đợt TKC-3: `421` là cha (4211 năm trước / 4212 năm nay)
+        ln = [{"account": "911", "debit": net}, {"account": tk_ln, "credit": net}] if net > 0 else [{"account": tk_ln, "debit": -net}, {"account": "911", "credit": -net}]
         out.append(ACC.post_entry(db, u.username, u.role, d, f"Kết chuyển lãi/lỗ kỳ {period}: {net:,.0f}", ln, "ket_chuyen", f"period:{period}", post=False, nghiep_vu="ket_chuyen_lai_lo"))
     db.commit()
     return out
