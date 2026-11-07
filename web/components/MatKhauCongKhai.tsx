@@ -82,8 +82,8 @@ export default function MatKhauCongKhai({ canWrite }: { canWrite?: boolean }) {
   }
 
   return (
-    <div className="card" style={{ marginBottom: 12, borderLeft: "3px solid #b91c1c" }}>
-      <b style={{ color: "#b91c1c" }}>
+    <div className="card" style={{ marginBottom: 12, borderLeft: "3px solid var(--vtos-danger)" }}>
+      <b style={{ color: "var(--vtos-danger)" }}>
         {s.chua_tung_dang_nhap} tài khoản chưa từng đăng nhập — mật khẩu còn nguyên như lúc gieo
       </b>
       <p className="muted" style={{ marginTop: 6 }}>

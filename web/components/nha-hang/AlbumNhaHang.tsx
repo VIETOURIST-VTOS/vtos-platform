@@ -185,7 +185,7 @@ export default function AlbumNhaHang({ nid, toast, onDoi }: { nid: number; toast
           <b style={{ fontSize: 16 }}>{x.chu_thich || <span className="muted">(chưa có chú thích)</span>}</b>
           <div className="muted">{x.nhom_ten}</div>
           <div><Tag cls={MAU_TT[x.trang_thai]}>{x.trang_thai_ten}</Tag></div>
-          {x.ly_do_tra_lai && <div style={{ color: "var(--red, #e5484d)", fontSize: 13 }}>Trả lại: {x.ly_do_tra_lai}</div>}
+          {x.ly_do_tra_lai && <div style={{ color: "var(--red, #1E63C8)", fontSize: 13 }}>Trả lại: {x.ly_do_tra_lai}</div>}
           <div style={{ flex: 1 }} />
           {a.duoc_tai && <div style={{ borderTop: "1px solid var(--line, #2a3b4d)", paddingTop: 10, display: "flex", alignItems: "center", gap: 6 }} onClick={(e) => e.stopPropagation()}>
             {x.la_bia ? <span className="muted">Đang làm bìa</span>
@@ -282,7 +282,7 @@ export function AnhChoDuyet({ toast, onDoi }: { toast: (m: string, loi?: boolean
         <td>{a.nha_hang_ten}{a.la_bia && <div><Tag cls="ok">Ảnh bìa</Tag></div>}</td>
         <td>{a.nhom_ten} · {a.chu_thich || <span className="muted">(thiếu chú thích)</span>}</td>
         <td>{a.can_cu_ten}{a.can_cu_ghi_chu && <div className="muted">{a.can_cu_ghi_chu}</div>}
-          {a.khong_duyet && <div style={{ color: "var(--red, #e5484d)" }}>{a.khong_duyet}</div>}</td>
+          {a.khong_duyet && <div style={{ color: "var(--red, #1E63C8)" }}>{a.khong_duyet}</div>}</td>
         <td className="muted">{a.tai_boi}</td></tr>)}
         {!x.anh.length && <tr><td colSpan={6} className="muted">Không có ảnh chờ duyệt.</td></tr>}</tbody></table></div>
     {x.anh.length > MOI_TRANG && <div style={{ display: "flex", gap: 6, alignItems: "center", margin: "8px 0" }}>

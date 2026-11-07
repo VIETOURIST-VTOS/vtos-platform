@@ -34,7 +34,7 @@ export default function DanhGiaNoiBo({ toast, nid }: { toast: Toast; nid?: numbe
       {!nid && <button className="act grey" onClick={() => taiTep("/nha-hang/danh-gia.xlsx", "danh_gia_nha_hang.xlsx").catch((e) => toast(errMsg(e), true))}>Xuất Excel</button>}</div>
     {!nid && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, margin: "12px 0" }}>
       {the("Bài trong 30 ngày", x.dem.ba_muoi_ngay)}
-      {the("Sao thấp (≤ 2★) chưa được trả lời", x.dem.thap_chua_tra_loi, "#b33a3a")}
+      {the("Sao thấp (≤ 2★) chưa được trả lời", x.dem.thap_chua_tra_loi, "var(--vtos-danger)")}
       {the("Đã ẩn · chờ TP ĐH xem lại", x.dem.cho_xem_lai, "#b07a10")}
       {the("Đơn «đã dùng» chưa được chấm", x.dem.chua_cham)}</div>}
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "8px 0" }}>{LOC.map(([k, t]) =>
@@ -42,7 +42,7 @@ export default function DanhGiaNoiBo({ toast, nid }: { toast: Toast; nid?: numbe
     <div style={{ overflowX: "auto" }}><table><thead><tr>{!nid && <th>Nhà hàng</th>}<th>Sao</th><th>Nhận xét</th><th>Trả lời</th><th></th></tr></thead>
       <tbody>{ds.map((b: any) => <tr key={b.id} className="at-dg-dong" style={coAn(b) ? { background: "rgba(176,122,16,.08)" } : undefined}>
         {!nid && <td><b>{b.nha_hang}</b><div className="muted">{b.ten} · ăn {ngay(b.ngay_an)}</div></td>}
-        <td><span style={{ color: b.diem <= 2 ? "#b33a3a" : "#b07a10" }}>★ {b.diem}</span>
+        <td><span style={{ color: b.diem <= 2 ? "var(--vtos-danger)" : "#b07a10" }}>★ {b.diem}</span>
           <div className="muted" style={{ fontSize: 12 }}>{Object.entries(x.muc_ten as Record<string, string>).filter(([k]) => b[k]).map(([k, t]) => `${t} ${b[k]}`).join(" · ")}</div></td>
         <td style={{ maxWidth: 420 }}>
           <div style={{ whiteSpace: "pre-line", textDecoration: b.an ? "line-through" : undefined, opacity: b.an ? .7 : 1 }}>{b.nhan_xet || <span className="muted">(không ghi nhận xét)</span>}</div>

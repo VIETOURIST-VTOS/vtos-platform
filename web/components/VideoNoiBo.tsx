@@ -121,8 +121,8 @@ export default function VideoNoiBo({ goc, oid, toast, loaiPhong = [], mon = [], 
         <label style={{ display: "flex", flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "flex-start", fontSize: 13 }}><input type="checkbox" style={{ width: "auto", margin: 0 }} checked={o.xac_nhan_quyen} onChange={(e) => setO({ ...o, xac_nhan_quyen: e.target.checked })} /><span>Xác nhận Vietourist được phép dùng video này cho khách xem</span></label>
         <div><button className="act teal" disabled={busy || !f || !o.loai || !o.nguon.trim() || !o.xac_nhan_quyen} onClick={tai}>Tải video lên</button>
           {tien && <span className="muted" style={{ marginLeft: 8 }}>Đang tải {(tien.da / MB).toFixed(0)} / {(tien.tong / MB).toFixed(0)} MB</span>}</div>
-        {loiTai && <div role="alert" style={{ padding: "8px 10px", borderRadius: 6, background: "#fdecea", color: "#8a1c12", fontSize: 13 }}>Chưa tải được video: {loiTai}</div>}
-        {tien && <div style={{ height: 8, background: "#dde3eb", borderRadius: 99, overflow: "hidden" }}><i style={{ display: "block", height: "100%", width: `${(100 * tien.da) / tien.tong}%`, background: "#0f7b74" }} /></div>}
+        {loiTai && <div role="alert" style={{ padding: "8px 10px", borderRadius: 6, background: "var(--vtos-danger-bg)", color: "var(--vtos-danger)", fontSize: 13 }}>Chưa tải được video: {loiTai}</div>}
+        {tien && <div style={{ height: 8, background: "#dde3eb", borderRadius: 99, overflow: "hidden" }}><i style={{ display: "block", height: "100%", width: `${(100 * tien.da) / tien.tong}%`, background: "var(--vtos-sky)" }} /></div>}
       </>)}
     </div>
     <p className="muted" style={{ margin: 0, fontSize: 12 }}>Tải lên là hiện trên cổng (video «Giới thiệu» đứng đầu). Người tải tự xóa; TP Điều hành, Chủ tịch, TGĐ ẩn / xóa mọi video. Tối đa {x.toi_da} video.</p>

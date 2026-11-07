@@ -159,7 +159,7 @@ export default function SuaTaiKhoan(
       </span>
       <button className="act grey" style={{ margin: 0, marginLeft: "auto" }} onClick={onClose}>Đóng</button>
     </div>
-    {loi && <p style={{ color: "#f2868a", fontSize: 12.5 }}>{loi}</p>}
+    {loi && <p style={{ color: "var(--vtos-danger)", fontSize: 12.5 }}>{loi}</p>}
 
     {/* ---- 1. Thông tin tài khoản ---- */}
     <div style={{ borderTop: "1px solid var(--line, #2a3b55)", paddingTop: 12, marginTop: 10 }}>
@@ -323,7 +323,7 @@ export default function SuaTaiKhoan(
     {/* ---- 5. C · Xoá bản ghi ---- */}
     <div style={{ borderTop: "1px solid var(--line, #2a3b55)", paddingTop: 12, marginTop: 12 }}>
       <div className="row" style={{ gap: 8, alignItems: "baseline" }}>
-        <b style={{ fontSize: 13, color: "#f2868a" }}>C · Xoá bản ghi</b>
+        <b style={{ fontSize: 13, color: "var(--vtos-danger)" }}>C · Xoá bản ghi</b>
         <span className="muted" style={{ fontSize: 11.5 }}>HCNS · Chủ tịch · TGĐ</span>
       </div>
       <Khoa co={duocXoa} can="HCNS, Chủ tịch hoặc TGĐ">
@@ -337,7 +337,7 @@ export default function SuaTaiKhoan(
         {xoaDuoc && <div style={{ marginTop: 8, fontSize: 12 }}>
           {xoaDuoc.xoa_duoc
             ? <span style={{ color: "#58d79b" }}>✓ Bản ghi trống, xoá được.</span>
-            : <div style={{ color: "#f2868a" }}>✕ Chưa xoá được:
+            : <div style={{ color: "var(--vtos-danger)" }}>✕ Chưa xoá được:
                 <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
                   {(xoaDuoc.can_tro || []).map((c: string, i: number) => <li key={i}>{c}</li>)}
                 </ul>
