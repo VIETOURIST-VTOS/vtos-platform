@@ -284,8 +284,13 @@ def post_allocation(db: Session, u: User, period: str) -> dict:
     if not rows:
         raise ValueError(f"Kỳ {period} không có khoản nào phải phân bổ")
     groups: dict[tuple, float] = {}
+    from app.services import tk_chi_tiet as TKCT
     for r in rows:
-        k = (r["expense_account"], r["asset_account"], r["project_code"], r["department"])
+        # ĐỢT TKC-5 — nắn ở chỗ GHI SỔ, không sửa lùi bản ghi của người nhập: các khoản nhập
+        # TRƯỚC đợt này đang mang `242` (tài khoản tổng hợp), và Chủ tịch chốt 02/11/2026 để
+        # nguyên số cũ. `cho_phan_bo_cua` giữ nguyên tài khoản nào vốn đã là chi tiết.
+        src = TKCT.cho_phan_bo_cua(db, r["asset_account"], r["months"])
+        k = (r["expense_account"], src, r["project_code"], r["department"])
         groups[k] = groups.get(k, 0.0) + (r["amount"] or 0)
     lines = []
     for (exp, src, proj, dept), amt in sorted(groups.items()):
@@ -400,10 +405,13 @@ def dispose_asset(db: Session, u: User, a: FixedAsset, on: date, reason: str) ->
 
 
 def create_prepaid(db: Session, u: User, data: dict) -> PrepaidExpense:
+    from app.services.tk_chi_tiet import cho_phan_bo_cua
     p = PrepaidExpense(
         code=(data.get("code") or _next_code(db, PrepaidExpense, "CC")).strip()[:30],
         name=(data.get("name") or "").strip()[:200], kind=data.get("kind") or "ccdc",
-        asset_account=data.get("asset_account") or "242",
+        # ĐỢT TKC-5 08/11/2026 — `242` là tài khoản TỔNG HỢP (`2421` ngắn hạn / `2422` dài hạn).
+        # Để trống ở đây rồi suy ra theo SỐ KỲ ngay dưới, sau khi số kỳ đã qua cửa kiểm.
+        asset_account=(data.get("asset_account") or "").strip()[:10],
         expense_account=(data.get("expense_account") or "").strip(),
         partner_code=(data.get("partner_code") or "")[:60], project_code=(data.get("project_code") or "")[:40],
         department=(data.get("department") or "")[:20], start_date=data["start_date"],
@@ -417,6 +425,8 @@ def create_prepaid(db: Session, u: User, data: dict) -> PrepaidExpense:
         raise ValueError("Giá trị phân bổ phải lớn hơn 0")
     if p.months <= 0:
         raise ValueError("Số kỳ phân bổ phải lớn hơn 0")
+    # Người nhập đặt tay thì GIỮ NGUYÊN (miễn là tài khoản chi tiết); bỏ trống thì suy theo số kỳ.
+    p.asset_account = cho_phan_bo_cua(db, p.asset_account, p.months)
     # ĐỢT CPTT-1 07/11/2026 — TK CHI PHÍ LÀ Ô BẮT BUỘC, MẶC ĐỊNH `6423` ĐÃ BỎ.
     #
     # Trước đợt này ô ấy mặc định `"6423"` (Chi phí đồ dùng văn phòng) và màn hình KHÔNG có chỗ

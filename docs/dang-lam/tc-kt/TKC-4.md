@@ -2,7 +2,7 @@
 
 | Làn | Mã việc | Tệp sẽ đụng | Bắt đầu | Trạng thái |
 |---|---|---|---|---|
-| TC-KT | TKC-4 — hóa đơn, lương, vay, kết chuyển chi phí đội xe | backend/app/services/tk_chi_tiet.py, backend/app/services/accounting.py, backend/app/services/hr.py, backend/app/services/finance.py, backend/app/services/ket_so.py, backend/tests/test_tkc4_bon_duong_ghi_tiep_theo.py, backend/tests/test_accounting.py, backend/tests/test_ky2_tk627_va_ten_tt99.py, backend/tests/test_ci_hang_rao_main.py, .github/workflows/ci.yml, docs/dang-lam/tc-kt/TKC-4.md | 08-11-2026 00:40 | đang làm |
+| TC-KT | TKC-4 — hóa đơn, lương, vay, kết chuyển chi phí đội xe | backend/app/services/tk_chi_tiet.py, backend/app/services/accounting.py, backend/app/services/hr.py, backend/app/services/finance.py, backend/app/services/ket_so.py, backend/tests/test_tkc4_bon_duong_ghi_tiep_theo.py, backend/tests/test_accounting.py, backend/tests/test_ky2_tk627_va_ten_tt99.py, backend/tests/test_ci_hang_rao_main.py, .github/workflows/ci.yml, docs/dang-lam/tc-kt/TKC-4.md | 08-11-2026 00:40 | xong |
 
 Đợt TKC-3 dựng bảng khai chung và nắn ba đường. Đợt này nắn bốn đường nữa qua CÙNG bảng ấy:
 hóa đơn (511, 3331) · lương (642, 334, 632, 338) · vay (341, 635) · kết chuyển chi phí đội xe

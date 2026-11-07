@@ -43,7 +43,8 @@ VAI_XEM_DON = tuple(dict.fromkeys(S.VAI_XEM + VAI_KE_TOAN + VAI_SALES))
 MA_RE = re.compile(r"KS\d{4}[A-HJ-NP-Z2-9]{4}")
 _CHU = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 TK_TIEN, TK_THU_HO, TK_PHI = "1121", "3388", "6428"
-TK_KM = "641"                       # KS-16: voucher VTD Rewards — chi phí bán hàng, VTD chịu thay khách
+# KS-16: voucher VTD Rewards — chi phí bán hàng, VTD chịu thay khách.
+# ĐỢT TKC-5 08/11/2026: `641` là tài khoản TỔNG HỢP (sáu con). Lấy ở bảng khai.
 NGUON_SO = "ks_vtd"
 
 
@@ -1136,9 +1137,10 @@ def kt_chot(db: Session, u: User, did: int, hoa_hong: int | None, now: datetime 
     if hoa_hong is None or not (0 <= int(hoa_hong) <= giu):
         raise LoiDon(f"Ghi hoa hồng theo hợp đồng, 0 – {_vnd(giu)} đ")
     if km > 0:
+        from app.services import tk_chi_tiet as TKCT
         ten, ma_dt = _doi_tuong_ks(db, d)
         d.km_but_toan = _ghi_so(db, u, now.date(), f"Voucher VTD Rewards — đặt phòng {d.ma} (Vietourist chịu thay khách)",
-                                [{"account": TK_KM, "debit": km, "note": d.ma},
+                                [{"account": TKCT.chon(db, "khuyen_mai_rewards"), "debit": km, "note": d.ma},
                                  {"account": TK_THU_HO, "credit": km, "partner": ten, "partner_code": ma_dt, "note": d.ma}],
                                 f"{d.ma}:km", "khuyen_mai_rewards")
     d.hoa_hong, d.phai_tra_ks = int(hoa_hong), giu - int(hoa_hong)
@@ -1158,7 +1160,9 @@ def kt_chot(db: Session, u: User, did: int, hoa_hong: int | None, now: datetime 
     return d
 
 
-TK_DT_HH = "511"
+# ĐỢT TKC-5 08/11/2026 — `511` là tài khoản TỔNG HỢP (`5111` / `5113` / `5118`, và `5113` lại có
+# bảy con). Doanh thu hoa hồng khách sạn lấy ở bảng khai `services/tk_chi_tiet.py` chứ không gõ
+# cứng; một hằng số ở đây là một nguồn thứ hai cho cùng một luật.
 
 
 def ghi_dt_hoa_hong(db: Session, u: User, d: DonKsVtd, ngay: date) -> str:
@@ -1166,11 +1170,12 @@ def ghi_dt_hoa_hong(db: Session, u: User, d: DonKsVtd, ngay: date) -> str:
     VAT riêng). Ghi khi đề nghị chi trả khách sạn đã chi; không còn gì phải trả thì ghi ngay lúc chốt."""
     if d.dt_but_toan or not (d.hoa_hong or 0) or int(d.hoa_hong or 0) <= 0:
         return d.dt_but_toan
+    from app.services import tk_chi_tiet as TKCT
     ten, ma_dt = _doi_tuong_ks(db, d)
     hh = int(d.hoa_hong)
     d.dt_but_toan = _ghi_so(db, u, ngay, f"Doanh thu hoa hồng khách sạn — đặt phòng {d.ma} ({ten})",
                             [{"account": TK_THU_HO, "debit": hh, "partner": ten, "partner_code": ma_dt, "note": d.ma},
-                             {"account": TK_DT_HH, "credit": hh, "note": d.ma}], f"{d.ma}:hh", "doanh_thu_hoa_hong")
+                             {"account": TKCT.chon(db, "hoa_hong_khach_san"), "credit": hh, "note": d.ma}], f"{d.ma}:hh", "doanh_thu_hoa_hong")
     R.audit(db, u.username, u.role, "ks_vtd_ghi_dt_hoa_hong", f"don_ks_vtd:{d.ma}", after={"hoa_hong": hh, "but_toan": d.dt_but_toan})
     db.flush()
     return d.dt_but_toan

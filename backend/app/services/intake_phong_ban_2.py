@@ -868,7 +868,12 @@ def _cc_kiem(db: Session, r):
 def _cc_nap(db: Session, r, boi):
     from app.models.assets import PrepaidExpense
     from app.services.intake import _so, _ngay
+    from app.services.tk_chi_tiet import cho_phan_bo
+    # ĐỢT TKC-5 08/11/2026 — đường nạp HÀNG LOẠT phải suy ra TK chờ phân bổ y như cửa nhập tay,
+    # không để rơi vào mặc định `242` của mô hình. Đúng lỗ mà Đợt CPTT-2 đã bịt cho TK chi phí.
+    _so_ky = int(_so(r.get("so_ky_pb")) or 1)
     p = PrepaidExpense(code=str(r.get("ma_ccdc") or "").strip().upper()[:30],
+                       asset_account=cho_phan_bo(db, _so_ky),
                        name=str(r.get("ten") or "").strip()[:200],
                        kind=str(r.get("loai") or "ccdc").strip()[:20],
                        partner_code=str(r.get("nha_cung_cap") or "").strip()[:60],
@@ -878,7 +883,7 @@ def _cc_nap(db: Session, r, boi):
                        expense_account=str(r.get("tk_chi_phi") or "").strip()[:10],
                        project_code=str(r.get("ma_cong_trinh") or "").strip()[:40],
                        start_date=_ngay(r.get("ngay_bat_dau_pb")) or date.today(),
-                       amount=_so(r.get("gia_tri")), months=int(_so(r.get("so_ky_pb")) or 1),
+                       amount=_so(r.get("gia_tri")), months=_so_ky,
                        opening_allocated=_so(r.get("da_phan_bo")),
                        opening_period=str(r.get("ky_so_du") or "").strip()[:7],
                        quantity=int(_so(r.get("so_luong")) or 1),

@@ -109,7 +109,17 @@ def test_tkc4_2_hoa_don_khong_gan_chuyen_KHONG_roi_vao_doanh_thu_tour():
         xe = TK.doanh_thu_hoa_don(db, Tour(tour_type="thue_xe"))
         khong = TK.doanh_thu_hoa_don(db, None)
         assert nd == "51131" and nn == "51137" and xe == "51133", (nd, nn, xe)
-        assert khong == "51136", "hóa đơn không gắn chuyến ra " + khong
+        # SỬA 08/11/2026 (Đợt TKC-5): Đợt TKC-4 chọn `51136` cho hóa đơn không gắn chuyến, và
+        # ĐÓ LÀ MỘT LỖI đã lọt lên main. `accounting.NEED_PROJECT` khai MỌI tài khoản dưới
+        # `5113` bắt buộc có mã công trình, nên một hóa đơn không thuộc chuyến nào ghi vào
+        # `51136` bị `post_entry` TỪ CHỐI — không phải ghi sai, mà là không phát hành được.
+        # Luật cũ chỉ đo CHỌN tài khoản nào, không đo bút toán có ghi được không, nên nó xanh.
+        # Nay đòi tài khoản ấy nằm NGOÀI nhóm bắt buộc mã công trình.
+        from app.services.accounting import NEED_PROJECT
+        assert not khong.startswith(NEED_PROJECT), (
+            "hóa đơn không gắn chuyến ra `" + khong + "` — tài khoản này bắt buộc mã công "
+            "trình, mà hóa đơn ấy không có chuyến nào để ghi")
+        assert khong == "5118", "hóa đơn không gắn chuyến ra " + khong
         assert khong != nd, (
             "hóa đơn KHÔNG gắn chuyến nào lại rơi vào doanh thu tour nội địa — cộng thêm vào "
             "doanh thu tour một khoản không phải của nó")
