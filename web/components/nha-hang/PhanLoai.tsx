@@ -140,7 +140,7 @@ export function BangPhanLoai({ toast, onMo }: { toast: Toast; onMo: (nid: number
         <div>{thu.da_ghi ? "Đã ghi" : "Sẽ đổi"} <b>{thu.doi.length}</b> nhà hàng · giữ nguyên {thu.giu_nguyen} · lỗi {thu.loi.length}</div>
         {thu.doi.slice(0, 15).map((d: any) => <div key={d.id} className="muted">{d.ma} · {d.ten}: {d.hang_cu || "—"} {"₫".repeat(d.gia_cu) || ""} → <b>{d.hang || "—"} {"₫".repeat(d.gia)}</b></div>)}
         {thu.doi.length > 15 && <div className="muted">… và {thu.doi.length - 15} nhà hàng nữa</div>}
-        {thu.loi.map((l: any, i: number) => <div key={i} style={{ color: "#b33a3a" }}>Dòng {l.dong} · {l.ma}: {l.loi}</div>)}
+        {thu.loi.map((l: any, i: number) => <div key={i} style={{ color: "var(--vtos-danger)" }}>Dòng {l.dong} · {l.ma}: {l.loi}</div>)}
         {!thu.da_ghi && thu.doi.length > 0 && <button className="act teal" style={{ marginTop: 6 }} disabled={busy} onClick={() => nhap(true)}>Ghi {thu.doi.length} nhà hàng</button>}</div>}
     </div>}
 

@@ -119,7 +119,7 @@ export default function HoSoNhanVien({ uid, hoTen, onClose }:
       <button className="act grey" style={{ margin: 0, marginLeft: "auto" }} onClick={onClose}>Đóng</button>
     </div>
 
-    {loi && <p className="muted" style={{ color: "#f2868a" }}>{loi}</p>}
+    {loi && <p className="muted" style={{ color: "var(--vtos-danger)" }}>{loi}</p>}
     {!d && !loi && <p className="muted">Đang mở hồ sơ…</p>}
 
     {d && <>

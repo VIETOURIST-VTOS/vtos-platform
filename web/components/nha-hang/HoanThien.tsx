@@ -10,7 +10,7 @@ import { Tag, errMsg } from "@/components/ui";
 type Toast = (m: string, loi?: boolean) => void;
 const MA = ["bia", "album", "mon", "thuc_don", "gioi_thieu", "lien_he", "danh_gia"] as const;   // AT-3: + đánh giá khách
 const COT_NGAN: Record<string, string> = { bia: "BÌA", album: "ALBUM", mon: "MÓN", thuc_don: "THỰC ĐƠN", gioi_thieu: "GIỚI THIỆU", lien_he: "LIÊN HỆ", danh_gia: "ĐÁNH GIÁ" };
-const mau = (md: string) => (md === "du" ? "#1f7a50" : md === "dang" ? "#b07a10" : "#b33a3a");
+const mau = (md: string) => (md === "du" ? "#1f7a50" : md === "dang" ? "#b07a10" : "var(--vtos-danger)");
 const ngay = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "—");
 
 function Thanh({ diem, md }: { diem: number; md: string }) {
@@ -24,7 +24,7 @@ function O({ m }: { m: any }) {
   const sl = m.ma === "album" || m.ma === "mon" ? (m.chi_tiet.match(/^(\d+)/)?.[1] ?? "") : "";
   if (m.dat) return <span title={m.chi_tiet} style={{ color: "#1f7a50" }}>✓{sl ? ` ${sl}` : ""}</span>;
   if (m.diem > 0) return <span title={m.chi_tiet} style={{ color: "#b07a10" }}>½{sl ? ` ${sl}` : ""}</span>;
-  return <span title={m.chi_tiet} style={{ color: "#b33a3a" }}>✗</span>;
+  return <span title={m.chi_tiet} style={{ color: "var(--vtos-danger)" }}>✗</span>;
 }
 
 /** Tab «Hoàn thiện» — bảng mọi nhà hàng, lọc, giao việc (Chủ tịch), xuất Excel. */
@@ -59,7 +59,7 @@ export function BangHoanThien({ toast, onMo }: { toast: Toast; onMo: (nid: numbe
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, margin: "12px 0" }}>
       {the(`Đủ để giới thiệu đẹp (≥ ${x.nguong.du}%)`, x.dem.du, "#1f7a50")}
       {the(`Đang hoàn thiện (${x.nguong.thieu}–${x.nguong.du - 1}%)`, x.dem.dang, "#b07a10")}
-      {the(`Thiếu nhiều (< ${x.nguong.thieu}%)`, x.dem.thieu, "#b33a3a")}
+      {the(`Thiếu nhiều (< ${x.nguong.thieu}%)`, x.dem.thieu, "var(--vtos-danger)")}
       {the("Chưa giao người biên tập", x.chua_giao)}</div>
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
       <button className={`act ${!loc ? "teal" : "grey"}`} onClick={() => setLoc("")}>Tất cả {x.nha_hang.length}</button>
@@ -87,7 +87,7 @@ export function BangHoanThien({ toast, onMo }: { toast: Toast; onMo: (nid: numbe
         <td>{o.tinh_thanh || "—"}</td><td><Thanh diem={o.diem} md={o.muc_do} /></td>
         {MA.map((k) => <td key={k}><O m={o.muc.find((m: any) => m.ma === k)} /></td>)}
         <td>{o.nguoi || <span className="muted">— chưa giao —</span>}</td>
-        <td>{o.han ? <span style={{ color: o.qua_han ? "#b33a3a" : undefined }}>{o.qua_han ? "quá hạn " : ""}{ngay(o.han)}</span> : <span className="muted">—</span>}</td></tr>)}
+        <td>{o.han ? <span style={{ color: o.qua_han ? "var(--vtos-danger)" : undefined }}>{o.qua_han ? "quá hạn " : ""}{ngay(o.han)}</span> : <span className="muted">—</span>}</td></tr>)}
         {!ds.length && <tr><td colSpan={13} className="muted">Không có nhà hàng khớp bộ lọc.</td></tr>}</tbody></table></div>
     <p className="muted" style={{ fontSize: 12 }}>Bấm tên nhà hàng → mở hồ sơ ở đúng tab còn thiếu. ✓ đạt · ½ một phần · ✗ thiếu; con số = số đã duyệt. Hợp đồng và đặt bàn không tính ở đây (đã có 5 điều kiện mở đặt bàn riêng).</p>
   </section>;
@@ -116,7 +116,7 @@ export function ViecCuaToi({ toast, onMo, ten }: { toast: Toast; onMo: (nid: num
                 onClick={(e) => { e.preventDefault(); const m = o.muc.find((v: any) => !v.dat); onMo(o.id, m ? TAB[m.ma] : "album"); }}>
                 <b>{o.ten}</b>
                 <span className="muted" style={{ fontSize: 13 }}>{o.diem}%{k === "cho_duyet" ? ` · ${o.cho_duyet} mục chờ duyệt` : thieu.length ? ` · thiếu ${thieu.join(", ")}` : ""}</span>
-                {o.han && <span style={{ fontSize: 13, color: o.qua_han ? "#b33a3a" : undefined }}>{o.qua_han ? "Quá hạn" : "Hạn"} {ngay(o.han)}</span>}</a>;
+                {o.han && <span style={{ fontSize: 13, color: o.qua_han ? "var(--vtos-danger)" : undefined }}>{o.qua_han ? "Quá hạn" : "Hạn"} {ngay(o.han)}</span>}</a>;
             })}</div>;
         })}</div>}
     <p className="muted" style={{ fontSize: 12 }}>Cột do máy xếp theo dữ liệu: «Đang xin nhà hàng» khi bấm ghi đã xin; «Chờ duyệt» khi có ảnh / món / thực đơn chờ TP ĐH; «Đủ» khi điểm ≥ 80%.</p>
@@ -131,7 +131,7 @@ export function HoSoHoanThien({ nid, toast, onTab, lamMoi }: { nid: number; toas
   useEffect(() => { load(); }, [load, lamMoi]);
   if (!x) return null;
   const con = x.muc.filter((m: any) => !m.dat);
-  const vien = (m: any) => (m.dat ? ["#cfe6da", "rgba(31,122,80,.08)"] : m.diem > 0 ? ["#f0dcb0", "rgba(176,122,16,.08)"] : ["#f0c9c9", "rgba(179,58,58,.08)"]);
+  const vien = (m: any) => (m.dat ? ["#cfe6da", "rgba(31,122,80,.08)"] : m.diem > 0 ? ["#f0dcb0", "rgba(176,122,16,.08)"] : ["var(--vtos-danger-bg)", "rgba(179,58,58,.08)"]);
   const NUT: Record<string, string> = { album: "Mở Album →", mon: "Món ăn →", tdnh: "Thực đơn →", gt: "Giới thiệu →", tt: "Thông tin →", dg: "Đánh giá →" };
   const ghi = async () => {
     setBusy(true);

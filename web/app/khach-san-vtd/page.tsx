@@ -354,9 +354,9 @@ function Phong({ h, x, toast, goi, busy }: { h: any; x: any; toast: (m: string, 
       <div className="grid">{([["ten", "Tên loại phòng", "Deluxe hướng biển"], ["dien_tich", "Diện tích (m²)", "32"], ["giuong", "Giường", "1 giường đôi lớn"], ["thu_tu", "Thứ tự hiện", "0"]] as const).map(([k2, t2, ph]) =>
         <label key={k2}>{t2}<input value={lp[k2] ?? ""} placeholder={ph} onChange={(e) => setLp({ ...lp, [k2]: e.target.value })} /></label>)}</div>
       <fieldset style={{ border: "1px solid var(--line, #2a3b4d)", borderRadius: 8, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}><legend>Đặc điểm</legend>
-        <label>Đặc điểm ngắn (hiện ở thẻ phòng) <span className="muted" style={{ color: (lp.mo_ta || "").length > 300 ? "#d9534f" : undefined }}>{(lp.mo_ta || "").length} / 300 ký tự</span>
+        <label>Đặc điểm ngắn (hiện ở thẻ phòng) <span className="muted" style={{ color: (lp.mo_ta || "").length > 300 ? "var(--vtos-danger)" : undefined }}>{(lp.mo_ta || "").length} / 300 ký tự</span>
           <input value={lp.mo_ta ?? ""} placeholder="Ban công hướng biển · bồn tắm" onChange={(e) => setLp({ ...lp, mo_ta: e.target.value })} /></label>
-        {(lp.mo_ta || "").length > 300 && <span style={{ color: "#d9534f", fontSize: 12 }}>Quá 300 ký tự — rút gọn, phần dài đưa xuống Mô tả chi tiết. Máy không tự cắt.</span>}
+        {(lp.mo_ta || "").length > 300 && <span style={{ color: "var(--vtos-danger)", fontSize: 12 }}>Quá 300 ký tự — rút gọn, phần dài đưa xuống Mô tả chi tiết. Máy không tự cắt.</span>}
         <label>Mô tả chi tiết <span className="muted">{(lp.mo_ta_dai || "").length} / 3.000 ký tự · khách bấm «Xem thêm» mới hiện</span>
           <textarea rows={4} value={lp.mo_ta_dai ?? ""} onChange={(e) => setLp({ ...lp, mo_ta_dai: e.target.value })} /></label>
         <div>Tiện nghi <span className="muted">(chọn sẵn + thêm tên khác)</span>
@@ -562,7 +562,7 @@ function PhongTrong({ kid, toast }: { kid: number; toast: (m: string, l?: boolea
         <button className="act grey" disabled={busy} onClick={() => luu(false, true)}>Về theo hồ sơ</button>
         <button className="act grey" onClick={() => setSua(null)}>Thôi</button></div></div>}
     <style>{`.ksv-lich td,.ksv-lich th{padding:6px}.ksv-o{min-width:46px;min-height:44px;border-radius:6px;border:1px solid transparent;background:#1c3d5e;color:inherit;font:inherit;cursor:pointer;position:relative}
-      .ksv-o.het{background:#5a4614;color:#ffe08a}.ksv-o.dong{background:#4a2330;color:#ffb4bf;font-weight:700}.ksv-o.chon{border-color:#4cc38a;box-shadow:0 0 0 2px #4cc38a}
+      .ksv-o.het{background:#5a4614;color:#ffe08a}.ksv-o.dong{background:var(--vtos-danger-bg);color:var(--vtos-danger);font-weight:700}.ksv-o.chon{border-color:#4cc38a;box-shadow:0 0 0 2px #4cc38a}
       .ksv-o i{position:absolute;top:2px;right:4px;font-style:normal;color:#7fc4ff}.ksv-o:disabled{cursor:default}`}</style>
   </div>;
 }
@@ -600,7 +600,7 @@ function DonDat({ toast }: { toast: (m: string, l?: boolean) => void }) {
     <div style={{ overflowX: "auto" }}><table><thead><tr><th>Mã · khách</th><th>Khách sạn · phòng</th><th>Ngày ở</th><th>Tiền</th><th>Trạng thái</th><th>Việc</th></tr></thead>
       <tbody>{x.don.map((d: any) => <tr key={d.id}><DongDon d={d} />
         <td><Tag cls={MAU_DON[d.trang_thai]}>{d.trang_thai_ten}</Tag>
-          {d.trang_thai === "da_tra" && <div style={{ color: d.qua_han_chot ? "#ff8a9a" : undefined, fontWeight: d.qua_han_chot ? 700 : 400 }}>{d.qua_han_chot ? "Quá hạn chốt" : "Hạn chốt"} {gio(d.han_chot)}</div>}
+          {d.trang_thai === "da_tra" && <div style={{ color: d.qua_han_chot ? "var(--vtos-danger)" : undefined, fontWeight: d.qua_han_chot ? 700 : 400 }}>{d.qua_han_chot ? "Quá hạn chốt" : "Hạn chốt"} {gio(d.han_chot)}</div>}
           {d.trang_thai === "da_xac_nhan" && <div className="muted">mã KS {d.ma_xac_nhan_ks} · {d.xac_nhan_boi}</div>}
           {d.trang_thai === "da_huy" && <div className="muted">{d.ly_do_huy}{d.so_hoan ? ` · hoàn ${tien(d.so_hoan)} (${d.hoan_tt_ten || "xong"})` : ""}</div>}
           {d.yeu_cau && <div className="muted">Yêu cầu: {d.yeu_cau}</div>}</td>
@@ -609,7 +609,7 @@ function DonDat({ toast }: { toast: (m: string, l?: boolean) => void }) {
           <button className="act teal" disabled={busy || v(d.id).ma.trim().length < 3} onClick={() => goi(`/khach-san-vtd/don/${d.id}/xac-nhan`, { ma_ks: v(d.id).ma })}>Đã xác nhận → gửi phiếu</button></div>}
           {x.vai.dh && ["da_tra", "da_xac_nhan"].includes(d.trang_thai) && <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
             <label>Lý do (khi khách sạn hết phòng)<input value={v(d.id).ly} onChange={(e) => setO({ ...o, [d.id]: { ...v(d.id), ly: e.target.value } })} placeholder="KS báo hết Deluxe ngày 6/11" /></label>
-            <button className="act grey" style={{ color: "#ffb4bf" }} disabled={busy || v(d.id).ly.trim().length < 5} onClick={() => goi(`/khach-san-vtd/don/${d.id}/het-phong`, { ly_do: v(d.id).ly })}>KS hết phòng → hoàn 100%</button></div>}
+            <button className="act grey" style={{ color: "var(--vtos-danger)" }} disabled={busy || v(d.id).ly.trim().length < 5} onClick={() => goi(`/khach-san-vtd/don/${d.id}/het-phong`, { ly_do: v(d.id).ly })}>KS hết phòng → hoàn 100%</button></div>}
           {x.vai.mien_phat && d.trang_thai === "da_huy" && d.giu_lai > 0 && d.hoa_hong === null && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label>Lý do miễn phạt<input value={v(d.id).ly} onChange={(e) => setO({ ...o, [d.id]: { ...v(d.id), ly: e.target.value } })} /></label>
             <button className="act grey" disabled={busy || v(d.id).ly.trim().length < 5} onClick={() => goi(`/khach-san-vtd/don/${d.id}/mien-phat`, { ly_do: v(d.id).ly })}>Miễn phạt · hoàn đủ {tien(d.da_tra)}</button></div>}

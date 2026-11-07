@@ -34,7 +34,7 @@ export default function DanhGiaKsNoiBo({ toast, nid }: { toast: Toast; nid?: num
       </div>
     {!nid && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, margin: "12px 0" }}>
       {the("Bài trong 30 ngày", x.dem.ba_muoi_ngay)}
-      {the("Điểm thấp (≤ 5) chưa được trả lời", x.dem.thap_chua_tra_loi, "#b33a3a")}
+      {the("Điểm thấp (≤ 5) chưa được trả lời", x.dem.thap_chua_tra_loi, "var(--vtos-danger)")}
       {the("Đã ẩn · chờ TP ĐH xem lại", x.dem.cho_xem_lai, "#b07a10")}
       {the("Đơn đã ở (30 ngày) chưa được chấm", x.dem.chua_cham)}</div>}
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "8px 0" }}>{LOC.map(([k, t]) =>
@@ -42,7 +42,7 @@ export default function DanhGiaKsNoiBo({ toast, nid }: { toast: Toast; nid?: num
     <div style={{ overflowX: "auto" }}><table><thead><tr>{!nid && <th>Khách sạn</th>}<th>Điểm</th><th>Nhận xét</th><th>Trả lời</th><th></th></tr></thead>
       <tbody>{ds.map((b: any) => <tr key={b.id} className="ksv-dg-dong" style={coAn(b) ? { background: "rgba(176,122,16,.08)" } : undefined}>
         {!nid && <td><b>{b.khach_san}</b><div className="muted">{b.ten} · {b.loai_phong} · ở {b.thang_o}</div></td>}
-        <td><b style={{ color: b.diem <= 5 ? "#e07a7a" : "#7fc4ff" }}>{b.diem}/10</b>
+        <td><b style={{ color: b.diem <= 5 ? "var(--vtos-danger)" : "#7fc4ff" }}>{b.diem}/10</b>
           <div className="muted" style={{ fontSize: 12 }}>{Object.entries(x.muc_ten as Record<string, string>).filter(([k]) => b[k]).map(([k, t]) => `${t} ${b[k]}`).join(" · ")}</div></td>
         <td style={{ maxWidth: 420 }}>
           <div style={{ whiteSpace: "pre-line", textDecoration: b.an ? "line-through" : undefined, opacity: b.an ? .7 : 1 }}>{b.tieu_de && <b>{b.tieu_de}<br /></b>}{b.nhan_xet || <span className="muted">(không ghi nhận xét)</span>}</div>

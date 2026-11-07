@@ -84,7 +84,7 @@ export function MonAnNhaHang({ nid, toast, onDoi }: { nid: number; toast: (m: st
           {m.mo_ta && <div style={{ fontSize: 13 }}>{m.mo_ta}</div>}
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{m.di_ung_ten.map((d: string) => <Tag key={d} cls="warn">{d}</Tag>)}{m.cay && <Tag cls="red">Cay</Tag>}{m.chay && <Tag cls="ok">Chay</Tag>}</div>
           {m.anh_id && !m.anh_da_duyet && <div className="muted" style={{ fontSize: 12 }}>Ảnh món chưa duyệt — khách chưa thấy ảnh</div>}
-          {m.ly_do_tra_lai && <div style={{ color: "var(--red, #e5484d)", fontSize: 13 }}>Trả lại: {m.ly_do_tra_lai}</div>}
+          {m.ly_do_tra_lai && <div style={{ color: "var(--red, #1E63C8)", fontSize: 13 }}>Trả lại: {m.ly_do_tra_lai}</div>}
           <div style={{ flex: 1 }} />
           <div style={{ display: "flex", gap: 6, alignItems: "center", borderTop: "1px solid var(--line, #2a3b4d)", paddingTop: 8, flexWrap: "wrap" }}>
             <Tag cls={MAU_TT[m.trang_thai]}>{m.trang_thai_ten}</Tag><span style={{ flex: 1 }} />
@@ -206,7 +206,7 @@ export function NoiDungChoDuyet({ toast, onDoi }: { toast: (m: string, loi?: boo
       <div className="wrap"><table><thead><tr>{x.duoc_duyet && <th></th>}<th>Nhà hàng</th><th>Món</th><th>Dị ứng</th><th>Ảnh</th><th>Người sửa</th></tr></thead>
         <tbody>{x.mon.map((m: any) => <tr key={m.id}>
           {x.duoc_duyet && <td><input type="checkbox" aria-label={`Chọn món ${m.ten}`} disabled={!!m.khong_duyet} checked={chon.includes(m.id)} onChange={(e) => setChon(e.target.checked ? [...chon, m.id] : chon.filter((i) => i !== m.id))} /></td>}
-          <td>{m.nha_hang_ten}</td><td><b>{m.ten}</b> <span className="muted">· {m.nhom_ten}</span>{m.mo_ta && <div className="muted">{m.mo_ta}</div>}{m.khong_duyet && <div style={{ color: "var(--red, #e5484d)" }}>{m.khong_duyet}</div>}</td>
+          <td>{m.nha_hang_ten}</td><td><b>{m.ten}</b> <span className="muted">· {m.nhom_ten}</span>{m.mo_ta && <div className="muted">{m.mo_ta}</div>}{m.khong_duyet && <div style={{ color: "var(--red, #1E63C8)" }}>{m.khong_duyet}</div>}</td>
           <td>{[...m.di_ung_ten, m.cay ? "Cay" : "", m.chay ? "Chay" : ""].filter(Boolean).join(", ") || "—"}</td>
           <td>{m.anh_nho ? <AnhNoiBo src={m.anh_nho} alt={m.ten} style={{ width: 72, height: 54, borderRadius: 6 }} /> : <span className="muted">—</span>}</td>
           <td className="muted">{m.sua_boi || m.tao_boi}</td></tr>)}
@@ -218,7 +218,7 @@ export function NoiDungChoDuyet({ toast, onDoi }: { toast: (m: string, loi?: boo
         <tbody>{x.thuc_don.map((b: any) => <tr key={b.id}>
           <td>{b.trang_dau ? <AnhNoiBo src={b.trang_dau} alt={`${b.loai_ten} ${b.ten}`} style={{ width: 60, height: 80, borderRadius: 4, objectFit: "contain" }} /> : "—"}</td>
           <td>{b.nha_hang_ten}</td><td>{b.loai_ten} · <b>{b.ten}</b> <span className="muted">· {b.so_trang} trang</span></td><td>{b.hieu_luc_tu}</td>
-          <td className="muted">{b.can_cu}</td><td className="muted">{b.tai_boi}{b.khong_duyet && <div style={{ color: "var(--red, #e5484d)" }}>{b.khong_duyet}</div>}</td>
+          <td className="muted">{b.can_cu}</td><td className="muted">{b.tai_boi}{b.khong_duyet && <div style={{ color: "var(--red, #1E63C8)" }}>{b.khong_duyet}</div>}</td>
           {x.duoc_duyet && <td style={{ whiteSpace: "nowrap" }}><button className="act teal" disabled={busy || !!b.khong_duyet} onClick={() => goi(`/nha-hang/thuc-don-nh/${b.id}/duyet`, { duyet: true })}>Duyệt</button>
             <button className="act grey" disabled={busy} onClick={() => goi(`/nha-hang/thuc-don-nh/${b.id}/duyet`, { duyet: false })}>Trả lại</button></td>}</tr>)}
           {!x.thuc_don.length && <tr><td colSpan={7} className="muted">Không có thực đơn chờ duyệt.</td></tr>}</tbody></table></div>
