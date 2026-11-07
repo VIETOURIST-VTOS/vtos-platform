@@ -107,6 +107,21 @@ def test_gtgt2_2_the_duoc_goi_DUNG_MOT_lan_va_KHONG_tu_cong_lai():
 
 
 # ───────────────────────────────────────────────────────────────────────────────────────── LUẬT 3
+def _dat_ky_ke_khai(gia_tri):
+    """Đặt tham số kỳ kê khai THẲNG VÀO CSDL và trả giá trị cũ — cùng lối `test_gtgt1` dựng cảnh."""
+    from sqlalchemy import select
+    from app.db.session import SessionLocal
+    from app.models.core import Param
+    from app.services import rules as R
+    with SessionLocal() as db:
+        p = db.execute(select(Param).where(Param.key == R.GTGT_KY_KE_KHAI_KEY)).scalars().first()
+        assert p is not None, "chưa có dòng tham số `gtgt_ky_ke_khai` trong sổ tham số"
+        cu, p.value = p.value, gia_tri
+        db.commit()
+    R.clear_param_cache()
+    return cu
+
+
 def test_gtgt2_3_in_ra_MOI_canh_bao_va_chi_hien_nut_khi_ghi_duoc():
     """Hai điều, và cả hai là chỗ Đợt R2-KC1 (23/10/2026) đã mất một lần.
 
@@ -125,11 +140,20 @@ def test_gtgt2_3_in_ra_MOI_canh_bao_va_chi_hien_nut_khi_ghi_duoc():
     assert "but_toan" in than, "nút ghi không xét có bút toán nào để ghi không"
 
     # Đo bằng CỬA THẬT: chưa đặt kỳ kê khai thì `da_bat` phải là False, tức nút phải ẩn.
-    d = client.get("/api/v1/ket-so/bu-tru-gtgt/xem-truoc", headers=login("ketoan"),
-                   params={"ky": "2026-03"}).json()
+    #
+    # KS-GT2 (07/11/2026) · TỰ DỰNG CẢNH «chưa đặt», không trông vào bộ dữ liệu mẫu. Hàng rào gộp
+    # chạy nhiều tệp phép thử trong MỘT tiến trình, và `test_gtgt1` chạy trước đã đặt kỳ kê khai
+    # thẳng vào CSDL (`_dat_ky_ke_khai`) — nên ở đây tham số đã có giá trị, `da_bat` ra True, và
+    # hàng rào đỏ cho mọi PR sau #712. Luật «bộ mặc định phải để trống» vẫn được canh ở đúng chỗ
+    # của nó: `test_gtgt1_4` đọc thẳng `DEFAULT_PARAMS`.
+    cu = _dat_ky_ke_khai("")
+    try:
+        d = client.get("/api/v1/ket-so/bu-tru-gtgt/xem-truoc", headers=login("ketoan"),
+                       params={"ky": "2026-03"}).json()
+    finally:
+        _dat_ky_ke_khai(cu)
     assert d["da_bat"] is False, (
-        "bộ dữ liệu mẫu để trống `gtgt_ky_ke_khai` nên `da_bat` phải là False — nếu khác thì ai "
-        "đó đã điền sẵn một chính sách thuế vào bộ mặc định")
+        "chưa đặt `gtgt_ky_ke_khai` mà `da_bat` vẫn là True — nút ghi sẽ hiện khi chưa có kỳ kê khai")
     assert any("gtgt_ky_ke_khai" in c for c in d["canh_bao"]), (
         "chưa đặt kỳ kê khai mà cửa không nói tên tham số cần đặt")
 
