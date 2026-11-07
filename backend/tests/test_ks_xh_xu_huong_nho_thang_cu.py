@@ -158,3 +158,65 @@ def test_kpi_lanh_dao_do_tung_phan():
     do = client.get("/api/v1/dashboard?refresh=1", headers={"Authorization": f"Bearer {tok}"}).json()["do_ms"]
     for k in ("ld_so_du_no_vay_phai_thu", "ld_du_bao_13_tuan", "ld_lai_lo_thang", "kpi_lanh_dao"):
         assert k in do, k
+
+
+# ── KS-SD · số dư tiền · nợ vay · phải thu nhớ giữa các lần dựng ───────────────────────────────
+def test_so_du_nho_trung_khop_va_lan_sau_lay_tu_nho():
+    from app.services import dashboard as DBS
+    DBS.xoa_nho_so_du()
+    db = _db(); p = f"{date.today():%Y-%m}"
+    try:
+        a = DBS._so_du_no_vay_phai_thu(db, p)
+        assert p in DBS._NHO_SO_DU
+        DBS._NHO_SO_DU[p] = {**DBS._NHO_SO_DU[p], "tien": -1.0}     # đánh dấu để biết lần sau đọc từ nhớ
+        assert DBS._so_du_no_vay_phai_thu(db, p)["tien"] == -1.0
+        DBS.xoa_nho_so_du()
+        assert DBS._so_du_no_vay_phai_thu(db, p) == a, "tính lại phải ra đúng số cũ"
+    finally:
+        db.close()
+
+
+def test_so_du_ghi_booking_xoa_nho_ghi_canh_bao_thi_khong():
+    from app.services import dashboard as DBS
+    from app.models.core import Booking, Alert
+    from sqlalchemy import select
+    from sqlalchemy.orm.attributes import flag_modified
+    db = _db(); p = f"{date.today():%Y-%m}"
+    try:
+        DBS._so_du_no_vay_phai_thu(db, p)
+        a = db.execute(select(Alert)).scalars().first()
+        if a is not None:
+            a.resolved = not a.resolved; db.flush()
+            assert DBS._NHO_SO_DU, "ghi cảnh báo không đụng số dư — không được xoá nhớ"
+        b = db.execute(select(Booking)).scalars().first()
+        flag_modified(b, "amount"); db.flush()
+        assert not DBS._NHO_SO_DU, "ghi booking phải xoá nhớ số dư ngay"
+        db.rollback()
+    finally:
+        db.close()
+
+
+def test_so_du_ghi_but_toan_xoa_nho():
+    from app.services import dashboard as DBS
+    from app.models.accounting import JournalEntry
+    from sqlalchemy import select
+    from sqlalchemy.orm.attributes import flag_modified
+    db = _db(); p = f"{date.today():%Y-%m}"
+    try:
+        DBS._so_du_no_vay_phai_thu(db, p)
+        e = db.execute(select(JournalEntry)).scalars().first()
+        if e is None:
+            pytest.skip("dữ liệu mẫu không có bút toán")
+        flag_modified(e, "description"); db.flush()
+        assert not DBS._NHO_SO_DU, "ghi sổ kế toán phải xoá nhớ số dư ngay"
+        db.rollback()
+    finally:
+        db.close()
+
+
+def test_lam_moi_xoa_nho_so_du():
+    from app.services import dashboard as DBS
+    DBS._NHO_SO_DU["2000-01"] = {"tien": 1.0, "no_vay": 0, "phai_thu": 0}
+    tok = client.post("/api/v1/auth/login", data={"username": "chutich", "password": "Vtos@Demo#2026"}).json()["access_token"]
+    client.get("/api/v1/dashboard?refresh=1", headers={"Authorization": f"Bearer {tok}"})
+    assert "2000-01" not in DBS._NHO_SO_DU
