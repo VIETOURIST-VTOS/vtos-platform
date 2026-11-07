@@ -415,7 +415,7 @@ SO_SANH = ("ngay_xe_hoat_dong", "cong_suat_khai_thac", "km_chay_rong", "chi_phi_
            "doanh_thu", "loi_nhuan", "tieu_hao_l100")
 
 
-def theo_ky(db: Session, moc: date, hom_nay: date | None = None) -> dict:
+def theo_ky(db: Session, moc: date, hom_nay: date | None = None, nho: dict | None = None) -> dict:
     """Ba kỳ của ô chọn trên khối: tháng / quý / năm, tính đến `moc`, kèm so sánh với kỳ trước.
 
     `moc` KHÔNG còn bắt buộc là hôm nay (HQ-2a, 13/10/2026). Trước đây nó luôn là hôm nay, nên suốt
@@ -452,7 +452,9 @@ def theo_ky(db: Session, moc: date, hom_nay: date | None = None) -> dict:
         nhom["quy"] = _nhom_ky(mq)["quy"]
         nhan["quy"] = f"Quý {(mq.month - 1) // 3 + 1}/{mq.year}"
 
-    nho: dict = {}
+    # KS-XE: chỗ gọi được truyền `nho` riêng (bảng điều hành truyền `nho_cho_bang`); không truyền
+    # thì như cũ — một chỗ nhớ chết cùng lần gọi.
+    nho = {} if nho is None else nho
     out: dict = {}
     for ten, kys in nhom.items():
         o = _gop(db, kys, nho)
@@ -497,3 +499,76 @@ def theo_ky(db: Session, moc: date, hom_nay: date | None = None) -> dict:
     out["chuoi"] = _chuoi(db, moc, nho)
     out["moc"] = moc.isoformat()
     return out
+
+
+# ══ KS-XE · 07/11/2026 — KHỐI HIỆU QUẢ ĐỘI XE TÍNH LẠI CẢ NĂM MỖI VÀI PHÚT ══════════════════════
+#
+# Đo trên crm thật (`do_ms.dh_hieu_qua_xe`): 3,0 giây mỗi lần robot dựng bảng điều hành. `theo_ky`
+# tính `chi_so` cho mọi tháng của năm và các kỳ so sánh trước đó — tháng đã qua gần như không bao
+# giờ đổi, nhưng cứ vài phút lại cộng lại sổ chuyến của chúng một lần.
+#
+# Cùng cách đã dùng cho khối xu hướng (KS-XH, `xu_huong.doc_cho_bang`), và cùng ba điều giữ:
+#   · CHỈ tháng đã đóng (trước tháng của `hom_nay`) được nhớ qua lần dựng, tối đa 6 giờ.
+#   · Ghi vào bất kỳ bảng nào `chi_so` đọc tới (`GOI_XE_DOC`, `LOP_XE_DOC`) là XOÁ NGAY — bắt ở
+#     `after_flush` nên cửa nào, robot nào ghi cũng bị bắt. Bấm «làm mới» bảng điều hành cũng xoá.
+#   · Chỉ bảng điều hành dùng (`nho_cho_bang`). Màn chi tiết đội xe và phép thử vẫn gọi `theo_ky`
+#     không kèm `nho` — tính từ sổ như trước.
+NHO_THANG_CU_GIAY = 6 * 3600
+_NHO_THANG_CU: dict = {}             # "YYYY-MM" → (lúc tính, kết quả chi_so)
+GOI_XE_DOC = ("app.models.fleet", "app.models.hr", "app.models.finance", "app.models.accounting")
+LOP_XE_DOC = {"Booking", "Param"}    # trong app.models.core
+
+
+def xoa_nho_thang_cu() -> None:
+    _NHO_THANG_CU.clear()
+
+
+def _sau_flush(session, _ctx) -> None:
+    if not _NHO_THANG_CU:
+        return
+    for o in (*session.new, *session.dirty, *session.deleted):
+        c = type(o)
+        if c.__module__.startswith(GOI_XE_DOC) or (
+                c.__module__ == "app.models.core" and c.__name__ in LOP_XE_DOC):
+            xoa_nho_thang_cu()
+            return
+
+
+def _gan_canh_ghi() -> None:
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session as _S
+    if not event.contains(_S, "after_flush", _sau_flush):
+        event.listen(_S, "after_flush", _sau_flush)
+
+
+_gan_canh_ghi()
+
+
+class _NhoChoBang(dict):
+    """Chỗ nhớ của MỘT lần dựng bảng, nhưng tháng đã đóng thì đọc/ghi qua `_NHO_THANG_CU`."""
+
+    def __init__(self, ky_nay: str):
+        super().__init__()
+        self.ky_nay = ky_nay
+
+    def __contains__(self, k) -> bool:
+        if dict.__contains__(self, k):
+            return True
+        if isinstance(k, str) and k < self.ky_nay:
+            import time
+            hit = _NHO_THANG_CU.get(k)
+            if hit and time.time() - hit[0] < NHO_THANG_CU_GIAY:
+                dict.__setitem__(self, k, hit[1])
+                return True
+        return False
+
+    def __setitem__(self, k, v) -> None:
+        dict.__setitem__(self, k, v)
+        if isinstance(k, str) and k < self.ky_nay:
+            import time
+            _NHO_THANG_CU[k] = (time.time(), v)
+
+
+def nho_cho_bang(hom_nay: date) -> dict:
+    """Chỗ nhớ truyền vào `theo_ky` cho bảng điều hành — xem chú thích KS-XE ở trên."""
+    return _NhoChoBang(f"{hom_nay.year:04d}-{hom_nay.month:02d}")

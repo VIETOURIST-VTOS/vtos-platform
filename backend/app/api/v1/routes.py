@@ -297,8 +297,9 @@ def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Sessio
         return {**hit[1], "cached": True, "tuoi_giay": int(tuoi)}
     if refresh:
         # KS-XH: «làm mới» là người dùng muốn số tính lại từ sổ — kể cả các tháng đã đóng.
-        from app.services import xu_huong as _XH
+        from app.services import xu_huong as _XH, hieu_qua_xe as _HQ
         _XH.xoa_nho_thang_cu()
+        _HQ.xoa_nho_thang_cu()   # KS-XE
     return build_dashboard(db, u)
 
 

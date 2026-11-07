@@ -117,3 +117,44 @@ def test_dieu_hanh_do_tung_khoi_con():
     do = client.get("/api/v1/dashboard?refresh=1", headers={"Authorization": f"Bearer {tok}"}).json()["do_ms"]
     for k in ("dh_sap_khoi_hanh", "dh_giai_doan", "dh_xe_hom_nay", "dh_hieu_qua_xe", "xu_huong"):
         assert k in do, k
+
+
+# ── KS-XE · cùng cách cho khối Hiệu quả đội xe ─────────────────────────────────────────────────
+def test_xe_so_dung_chung_trung_khop_va_chi_nho_thang_da_dong():
+    from app.services import hieu_qua_xe as HQ
+    HQ.xoa_nho_thang_cu()
+    db = _db(); hn = date.today()
+    try:
+        cu = HQ.theo_ky(db, hn, hom_nay=hn)
+        assert HQ.theo_ky(db, hn, hom_nay=hn, nho=HQ.nho_cho_bang(hn)) == cu
+        assert HQ.theo_ky(db, hn, hom_nay=hn, nho=HQ.nho_cho_bang(hn)) == cu   # lần sau lấy từ nhớ
+    finally:
+        db.close()
+    ky_nay = f"{hn.year:04d}-{hn.month:02d}"
+    assert all(k < ky_nay for k in HQ._NHO_THANG_CU), "tháng đang chạy không được nhớ qua lần dựng"
+
+
+def test_xe_ghi_so_chuyen_xoa_nho():
+    from app.services import hieu_qua_xe as HQ
+    from app.models.hr import Vehicle
+    from sqlalchemy import select
+    HQ._NHO_THANG_CU["2000-01"] = (time.time(), {})
+    db = _db()
+    try:
+        v = db.execute(select(Vehicle)).scalars().first()
+        if v is None:
+            pytest.skip("không có xe trong dữ liệu mẫu")
+        v.plate = v.plate; db.add(v)
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(v, "plate"); db.flush()
+        assert not HQ._NHO_THANG_CU, "ghi vào bảng đội xe phải xoá nhớ tháng cũ"
+        db.rollback()
+    finally:
+        db.close()
+
+
+def test_kpi_lanh_dao_do_tung_phan():
+    tok = client.post("/api/v1/auth/login", data={"username": "chutich", "password": "Vtos@Demo#2026"}).json()["access_token"]
+    do = client.get("/api/v1/dashboard?refresh=1", headers={"Authorization": f"Bearer {tok}"}).json()["do_ms"]
+    for k in ("ld_so_du_no_vay_phai_thu", "ld_du_bao_13_tuan", "ld_lai_lo_thang", "kpi_lanh_dao"):
+        assert k in do, k
