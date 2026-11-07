@@ -23,6 +23,8 @@ function BankAccounts() {
   const [range, setRange] = useState(H1);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState("");
+  const [sua, setSua] = useState<any>(null);
+  const [form, setForm] = useState({ sepay: "", prefixes: "", keywords: "" });
   const canWrite = ["ketoan", "chutich"].includes(user?.role || "");
 
   const reload = async () => {
@@ -61,6 +63,31 @@ function BankAccounts() {
   };
 
   const pct = (a: number, b: number) => (b ? Math.round((1000 * a) / b) / 10 : 0);
+
+  // ĐỢT A1 — nối màn hình vào cửa `PATCH /bank-accounts/{code}` đã có sẵn. Không mở cửa mới,
+  // không thêm một dòng nào vào bảng quyền: `/bank-accounts` đã khai nhóm `/api/v1/bank-accounts`.
+  const moSua = (r: any) => {
+    setSua(r);
+    setForm({ sepay: r.sepay_account_number || "",
+              prefixes: (r.match_prefixes || []).join(", "),
+              keywords: (r.match_keywords || []).join(", ") });
+  };
+
+  // Tách chuỗi người gõ thành danh sách. KHÔNG tự viết hoa ở đây — máy chủ đã chuẩn hóa một lần
+  // trong `BankPatch`, và chuẩn hóa ở hai nơi thì sớm muộn hai nơi khác nhau.
+  const tach = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
+
+  const luuSua = () => {
+    if (!sua) return;
+    run("lưu ô nhận diện", () => api(`/bank-accounts/${encodeURIComponent(sua.code)}`, {
+      // `json:` chứ không `body:` — bộ gọi API tự đặt `Content-Type: application/json` cho
+      // nhánh ấy; dùng `body:` thì máy chủ nhận một thân không khai kiểu và trả 422.
+      method: "PATCH",
+      json: { sepay_account_number: form.sepay.trim(),
+              match_prefixes: tach(form.prefixes),
+              match_keywords: tach(form.keywords) },
+    }), () => setSua(null));
+  };
 
   return (<>
     <p className="muted">MISA theo dõi tiền gửi theo <b>từng tài khoản ngân hàng</b>; sổ nạp sang VTOS lại ghi cột đối tượng trên TK 112
@@ -142,10 +169,51 @@ function BankAccounts() {
 
     {!!rows.length && <div className="panel wrap">
       <h3>Danh mục tài khoản ngân hàng ({rows.length})</h3>
-      <table><thead><tr><th>Mã</th><th>Ngân hàng</th><th>Số tài khoản</th><th>Loại tiền</th><th>Tiểu khoản 112</th><th>Trạng thái</th></tr></thead>
+      {/* ĐỢT A1 08/11/2026 — BA Ô NHẬN DIỆN, VÀ VÌ SAO CHÚNG PHẢI CÓ CHỖ NHẬP.
+          Máy phân loại sổ đã có đủ: cửa xem trước, cửa ghi, bản đồ chứng từ MISA 22.095 dòng. Đo
+          trên sổ thật 08/11/2026 thì nó khớp được ĐÚNG 0/26 dòng đang nằm trên `1121` — vì ba ô
+          dùng để nhận diện ngân hàng (`sepay_account_number`, `match_prefixes`, `match_keywords`)
+          trống ở CẢ 20 tài khoản, và cửa `PATCH /bank-accounts/{code}` tuy đã có trong mã nhưng
+          KHÔNG màn hình nào gọi. Một cửa mồ côi — thứ làn này đã dọn ba lần (R5b-2, V341-1, GTGT-2). */}
+      <p className="muted">Ba cột <b>SePay</b>, <b>Tiền tố</b>, <b>Từ khóa</b> là thứ máy dùng để biết một dòng sổ
+        thuộc ngân hàng nào. Trống cả ba thì dòng của ngân hàng ấy <b>không bao giờ</b> phân loại được —
+        nó nằm lại trên tài khoản cha, và đó không phải sai số, đó là không ghi được.</p>
+      {(() => {
+        const trong = rows.filter((r) => !(r.sepay_account_number || "").trim()
+          && !(r.match_prefixes || []).length && !(r.match_keywords || []).length);
+        return trong.length
+          ? <p><Tag cls="warn">{trong.length}/{rows.length} tài khoản chưa khai ô nhận diện nào</Tag></p>
+          : <p><Tag cls="ok">Cả {rows.length} tài khoản đều đã có ít nhất một ô nhận diện</Tag></p>;
+      })()}
+      <table><thead><tr><th>Mã</th><th>Ngân hàng</th><th>Số tài khoản</th><th>Loại tiền</th><th>Tiểu khoản 112</th>
+        <th>SePay</th><th>Tiền tố</th><th>Từ khóa</th><th>Trạng thái</th>{canWrite && <th></th>}</tr></thead>
         <tbody>{rows.map((r) => <tr key={r.code}><td><b>{r.code}</b></td><td>{r.bank_name}</td><td>{r.account_number}</td>
           <td>{r.currency}</td><td>{r.account_code}</td>
-          <td>{r.active ? <Tag cls="ok">Đang dùng</Tag> : <Tag cls="grey">Ngừng</Tag>}</td></tr>)}</tbody></table>
+          <td>{r.sepay_account_number || <span className="muted">—</span>}</td>
+          <td>{(r.match_prefixes || []).join(", ") || <span className="muted">—</span>}</td>
+          <td>{(r.match_keywords || []).join(", ") || <span className="muted">—</span>}</td>
+          <td>{r.active ? <Tag cls="ok">Đang dùng</Tag> : <Tag cls="grey">Ngừng</Tag>}</td>
+          {canWrite && <td><button className="act" onClick={() => moSua(r)}>Sửa</button></td>}</tr>)}</tbody></table>
+
+      {canWrite && !!sua && <div className="panel" style={{ marginTop: 12 }}>
+        <h3>Sửa ô nhận diện — {sua.bank_name} · {sua.account_number}</h3>
+        <p className="muted">Tiểu khoản <b>{sua.account_code}</b>. Đợt này <b>không</b> đổi tiểu khoản,
+          <b> không</b> đụng một dòng sổ nào — chỉ khai cách nhận ra ngân hàng.</p>
+        <div className="grid">
+          <label>Số tài khoản SePay
+            <input value={form.sepay} onChange={(e) => setForm({ ...form, sepay: e.target.value })}
+              placeholder="số tài khoản đã đăng ký với SePay" /></label>
+          <label>Tiền tố số chứng từ <span className="muted">(cách nhau bằng dấu phẩy)</span>
+            <input value={form.prefixes} onChange={(e) => setForm({ ...form, prefixes: e.target.value })}
+              placeholder="TPB1, TPNBT1" /></label>
+          <label>Từ khóa trong diễn giải <span className="muted">(cách nhau bằng dấu phẩy)</span>
+            <input value={form.keywords} onChange={(e) => setForm({ ...form, keywords: e.target.value })}
+              placeholder="TPBANK, TIEN PHONG" /></label>
+        </div>
+        <p><button className="act" disabled={!!busy} onClick={luuSua}>Lưu</button>{" "}
+          <button className="act" onClick={() => setSua(null)}>Hủy</button></p>
+        <p className="muted">Lưu xong, bấm <b>Xem trước</b> ở trên để biết ngay bao nhiêu dòng khớp được.</p>
+      </div>}
     </div>}
   </>);
 }

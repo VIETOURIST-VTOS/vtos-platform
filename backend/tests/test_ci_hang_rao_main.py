@@ -137,6 +137,10 @@ HANG_RAO = (
     # tu mot loi that cua Dot TKC-4. Luat 3 canh khoan CU mang `242` van ghi so vao con MA
     # ban ghi KHONG bi sua lui.
     "tests/test_tkc5_hoa_hong_khuyen_mai_tra_truoc.py",
+    # ── VIEC A, nhip 1, them 08/11/2026 (Dot A1) ───────────────────────────────────────────
+    # Luat 1 canh cua `PATCH /bank-accounts/{code}` KHONG con mo coi — lan thu TU trong lan
+    # nay. Luat 4 canh dot nay KHONG ghi mot dong so nao: so du cay `112` truoc va sau y nguyen.
+    "tests/test_a1_o_nhan_dien_ngan_hang.py",
 )
 
 
