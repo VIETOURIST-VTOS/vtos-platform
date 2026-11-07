@@ -191,6 +191,37 @@ def tk_chi_phi_nhan_phan_bo(db: Session) -> list[dict]:
             if a.code.startswith(TK_PHAN_BO_NHOM) and a.code not in lam_cha]
 
 
+def kiem_tk_chi_phi(db: Session, tk: str) -> str:
+    """Câu TỪ CHỐI nếu TK chi phí nhận phân bổ không hợp lệ; chuỗi RỖNG nếu hợp lệ.
+
+    MỘT HÀM CHO CẢ HAI ĐƯỜNG NHẬP — cửa nhập tay (`create_prepaid`) và cửa nạp Excel
+    (`intake_phong_ban_2._cc_kiem`). Đợt CPTT-1 (07/11/2026) viết bộ luật này thẳng trong
+    `create_prepaid`; Đợt CPTT-2 rút nó ra đây đúng lúc đường thứ hai cần dùng. Chép luật ra hai
+    chỗ thì sớm muộn hai chỗ lệch nhau, và lúc ấy một khoản nạp qua Excel được nhận trong khi
+    cùng khoản ấy nhập tay bị từ chối — không ai hiểu nổi vì sao.
+
+    Ba điều kiện, theo đúng thứ tự người dùng sửa được:
+
+      · CÓ GHI — mỗi khoản phân bổ vào một tài khoản chi phí khác nhau, máy không đoán thay được.
+      · CÓ TRONG DANH MỤC — gõ sai số là bút toán phân bổ sau này không ghi được.
+      · LÀ TÀI KHOẢN CHI TIẾT, và THUỘC NHÓM MISA LIỆT KÊ làm đích phân bổ.
+    """
+    tk = (tk or "").strip()
+    if not tk:
+        return ("Chưa chọn TK chi phí nhận phân bổ — mỗi khoản phân bổ vào một tài khoản chi phí "
+                "khác nhau, máy không đoán thay được")
+    cac = {a.code: a for a in db.execute(select(Account)).scalars()}
+    if tk not in cac:
+        return f"TK chi phí {tk} không có trong danh mục tài khoản"
+    if tk in {a.parent for a in cac.values() if a.parent}:
+        return (f"TK chi phí {tk} là tài khoản tổng hợp (có tài khoản con) — chọn tài khoản chi "
+                "tiết nhất")
+    if not tk.startswith(TK_PHAN_BO_NHOM):
+        return (f"TK chi phí {tk} không nằm trong nhóm nhận phân bổ ("
+                + ", ".join(TK_PHAN_BO_NHOM) + ")")
+    return ""
+
+
 def monthly_allocation(p: PrepaidExpense) -> float:
     if p.months <= 0:
         return 0.0
@@ -396,16 +427,12 @@ def create_prepaid(db: Session, u: User, data: dict) -> PrepaidExpense:
     # VÀ CHỈ NHẬN TÀI KHOẢN CHI TIẾT: `642` và `641` đều LÀ tài khoản cha trên danh mục. Nhận
     # chúng ở đây là tự tay dựng thêm chỗ phải nắn lại ở đợt chặn tài khoản cha (Chủ tịch chốt
     # 07/11/2026).
-    _tk = (p.expense_account or "").strip()
-    if not _tk:
-        raise ValueError("Chưa chọn TK chi phí nhận phân bổ — mỗi khoản phân bổ vào một tài "
-                         "khoản chi phí khác nhau, máy không đoán thay được")
-    _cac = {a.code: a for a in db.execute(select(Account)).scalars()}
-    if _tk not in _cac:
-        raise ValueError(f"TK chi phí {_tk} không có trong danh mục tài khoản")
-    if _tk in {a.parent for a in _cac.values() if a.parent}:
-        raise ValueError(f"TK chi phí {_tk} là tài khoản tổng hợp (có tài khoản con) — chọn tài "
-                         "khoản chi tiết nhất")
+    # ĐỢT CPTT-2 07/11/2026 — bộ luật này RÚT RA `kiem_tk_chi_phi`, vì đường nạp Excel cần
+    # đúng nó. Chép luật ra hai chỗ thì sớm muộn hai chỗ lệch nhau, và lúc ấy một khoản nạp qua
+    # Excel được nhận trong khi cùng khoản ấy nhập tay bị từ chối — không ai hiểu nổi vì sao.
+    _loi = kiem_tk_chi_phi(db, p.expense_account)
+    if _loi:
+        raise ValueError(_loi)
     if db.execute(select(PrepaidExpense).where(PrepaidExpense.code == p.code)).scalar_one_or_none():
         raise ValueError(f"Mã {p.code} đã tồn tại")
     db.add(p); db.flush()

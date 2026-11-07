@@ -115,6 +115,10 @@ HANG_RAO = (
     # Luat 2 canh the KHONG tu cong lai; luat 3 canh the IN RA moi canh bao may chu tra — mot
     # dau khong ai doc duoc thi bang khong co dau (bai hoc Dot R2-KC1).
     "tests/test_gtgt2_the_bu_tru_gtgt.py",
+    # ── COT TK CHI PHI TRONG MAU EXCEL NAP CCDC, them 07/11/2026 (Dot CPTT-2) ───────────────
+    # Luat 2 canh cho nang nhat: MOT bo luat cho HAI duong nhap. Chep luat ra hai cho thi som
+    # muon hai cho lech nhau, va luc ay Excel nhan cai ma nhap tay tu choi.
+    "tests/test_cptt2_cot_tk_chi_phi_trong_mau_excel.py",
 )
 
 
