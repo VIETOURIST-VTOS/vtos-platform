@@ -71,6 +71,12 @@ def build(db: Session, u: User) -> dict:
     today = date.today(); p = f"{today:%Y-%m}"
     role = u.role
     out: dict = {"role": role, "as_of": datetime.now(), "approvals": [], "kpis": {}, "sections": {}}
+    # KS-NHANH bước 2 (07/11/2026): đo từng khối để tìm khối ăn 38 giây trên crm thật. Chỉ ghi số
+    # mili-giây vào `do_ms`, không đổi phép tính nào.
+    import time as _t
+    _m = {"_": _t.time()}; _do = out["do_ms"] = {}
+    def _cham(ten):
+        now = _t.time(); _do[ten] = int((now - _m["_"]) * 1000); _m["_"] = now
     # --- việc chờ duyệt của tôi (mọi phân hệ) ---
     ap = out["approvals"]
     if role in ("chutich", "tgd"):
@@ -209,6 +215,7 @@ def build(db: Session, u: User) -> dict:
         n = db.execute(select(func.count()).select_from(ServiceRequest).where(ServiceRequest.booking_id == None)).scalar()
         if n: ap.append({"label": f"{n} yêu cầu chờ tạo booking (≤ 2 giờ)", "href": "/requests"})
 
+    _cham("viec_cho_duyet")
     # --- KPI theo cấp ---
     k = out["kpis"]
     tours_m = _month_tours(db, today.year, today.month)
@@ -220,6 +227,7 @@ def build(db: Session, u: User) -> dict:
     row = db.execute(select(func.count(), func.coalesce(func.sum(func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0)), 0)).where(Booking.created_at >= m0, Booking.cancelled == False)).one()
     k["booking_thang"] = int(row[0]); k["doanh_thu_booking_thang"] = float(row[1])
     k["canh_bao_do"] = db.execute(select(func.count()).select_from(Alert).where(Alert.resolved == False, Alert.level == "red")).scalar()
+    _cham("kpi_thang")
     if role in ("chutich", "tgd", "ketoan", "bks", "cntt"):
         b = RP.balances(db, p)
         k["tien"] = sum(b.get(c, 0.0) for c in ("111", "112"))
@@ -292,6 +300,7 @@ def build(db: Session, u: User) -> dict:
                                                 kh["loi_nhuan_truoc_thue"]["gia_tri"]),
             "cua_nhap": "/ke-hoach-thang",
         }
+    _cham("kpi_lanh_dao")
     # --- phần theo phòng ---
     sec = out["sections"]
     # Hai phòng Kinh doanh được đo bằng hai thước đo khác nhau, nên màn hình phải hiện hai bảng khác nhau
@@ -318,6 +327,7 @@ def build(db: Session, u: User) -> dict:
         sec["kd_doan"] = {"so_chuyen": doan_tours,
                           "rows": sorted([{"sales": users.get(i, i), "profit_share": v} for i, v in doan.items()], key=lambda r: -r["profit_share"])}
         sec["doanh_thu_phong"] = doanh_thu_phong(db, today)
+    _cham("kinh_doanh")
     if role in ("tp_dh", "nv_dh", "chutich", "tgd"):
         d7 = int(R.get_param(db, "moc_d7")); rows = []
         for t in db.execute(select(Tour).options(selectinload(Tour.bookings))
@@ -401,6 +411,7 @@ def build(db: Session, u: User) -> dict:
                              for t in db.execute(select(Tour).where(Tour.status == "ket_thuc", Tour.end_date < moc)
                                                  .order_by(desc(Tour.end_date)).limit(300)).scalars()
                              if today > R.settlement_deadline(db, t)][:100]
+    _cham("dieu_hanh")
     # ── Khối 05 của bản vẽ V1.4: Phải thu / Phải trả theo HẠN THANH TOÁN ──────────────────────
     #
     # Giao diện dựng từ vòng TC-23 (13/9) nhưng mọi ô ghi "Chưa kết nối". Anh Tuấn kiểm 14/9: màn
@@ -425,6 +436,7 @@ def build(db: Session, u: User) -> dict:
         sec["phai_thu_vi_sao"] = thu["vi_sao"]
         sec["phai_tra_vi_sao"] = tra["vi_sao"]
 
+    _cham("phai_thu_tra")
     # ── TC-32 · khối 04c Tồn đọng theo bộ phận ───────────────────────────────────────────────
     # KHÔNG thêm cửa nhập nào (ranh giới 09/9): bộ phận suy ra từ chuỗi PQ-9 đã có sẵn
     # cảnh báo → người phụ trách → users.department.
@@ -444,6 +456,7 @@ def build(db: Session, u: User) -> dict:
     sec["ton_dong_da_loai"] = _td["da_loai"]
     sec["ton_dong_vi_sao"] = _td["vi_sao"]
 
+    _cham("ton_dong_bo_phan")
     # ── TC-36 · xu hướng bốn chỉ tiêu (biểu đồ nhỏ trên thẻ) ─────────────────────────────────
     # Anh Tuấn chốt 15/9: thẻ vừa hiện số vừa hiện xu hướng so kỳ trước. Phép tính nằm trọn ở
     # `xu_huong.py`; ở đây chỉ gọi. KHÔNG tính lại doanh thu/lợi nhuận bằng công thức riêng —
@@ -468,6 +481,7 @@ def build(db: Session, u: User) -> dict:
         sec["ba_ky"] = {}
         R.audit(db, "robot", "robot", "xu_huong_loi", "dashboard", after={"ly_do": str(ex)[:200]})
 
+    _cham("xu_huong")
     # ── TC-42 · Tồn đọng cần xử lý, tách theo ba mức độ ──────────────────────────────────────
     # Trước vòng này màn hình có đúng MỘT con số (1483 cảnh báo đỏ), và một con số nằm một mình
     # thì không nói được điều gì để hành động. `Alert.level` đã có sẵn trong sổ nên chiều "mức độ"
@@ -481,6 +495,7 @@ def build(db: Session, u: User) -> dict:
         sec["ton_dong_theo_muc"] = None
         R.audit(db, "robot", "robot", "ton_dong_muc_loi", "dashboard",
                 after={"ly_do": str(ex)[:200]})
+    _cham("ton_dong_muc")
     # TQ-1: VIỆC đang mở — lọc theo quyền người xem TRƯỚC, gộp theo hồ sơ SAU (tong_quan_viec).
     # `ton_dong_theo_muc` ở trên đếm LƯỢT CẢNH BÁO và không lọc theo quyền; giữ tới khi màn hình
     # chuyển hẳn sang khối mới rồi bỏ.
@@ -491,6 +506,7 @@ def build(db: Session, u: User) -> dict:
         sec["viec_van_hanh"] = None
         R.audit(db, "robot", "robot", "tq1_viec_loi", "dashboard", after={"ly_do": str(ex)[:200]})
 
+    _cham("viec_dang_mo")
     # ── TC-33 · khối 08 Tiến độ báo cáo & kết luận chỉ đạo ───────────────────────────────────
     # Cũng không thêm bảng nào: danh sách phòng phải nộp đã khai ở `bao_cao_phong.PHONG`, bản đã
     # nộp nằm ở `bao_cao_luu`. Đối chiếu hai cái là ra.
@@ -508,6 +524,7 @@ def build(db: Session, u: User) -> dict:
     sec["tien_do_so_thieu"] = _bc["so_thieu"]
     sec["tien_do_vi_sao"] = _bc["vi_sao"]
     sec["tien_do_chi_dao_vi_sao"] = _bc["chi_dao_vi_sao"]
+    _cham("tien_do_bao_cao")
     if role in ("hcns", "chutich", "tgd"):
         s = OPS.work_days_in(today.year, today.month, until=today)
         emps = OPS.nhan_vien_phai_nop(db)   # BC-1: mọi nhân viên văn phòng trừ HDV, tài xế, Ban TGĐ
@@ -517,6 +534,7 @@ def build(db: Session, u: User) -> dict:
                                        DailyReport.report_date <= today)).scalar() or 0
         sec["bao_cao_ngay"] = {"nhan_su": len(emps), "ngay_lam_viec": len(s), "ty_le_nop": (so_bao_cao / (len(emps) * len(s))) if emps and s else 0,
                               "thieu_2_ngay": db.execute(select(func.count()).select_from(Alert).where(Alert.kind == "bc_ngay_2", Alert.resolved == False)).scalar()}
+    _cham("cuoi")
     return out
 
 

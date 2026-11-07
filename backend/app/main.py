@@ -184,10 +184,12 @@ def _mot_luot_robot(i: int) -> None:
                 CS.robot_cskh(db)
             except Exception as e:  # noqa
                 print("robot cskh error", e)
-        # Dựng sẵn bảng điều khiển mỗi 2 phút khi có thay đổi: người mở trang không phải là
-        # người trả giá cho lần dựng đầu (4 giây trên dữ liệu thật).
+        # Dựng sẵn bảng điều khiển mỗi 2 phút: người mở trang không phải là người trả giá cho lần
+        # dựng (đo 07/11/2026 trên crm thật: 38 giây). KS-NHANH: trước chỉ dựng khi CÓ ai ghi, nên
+        # lúc vắng bản nhớ cứ cũ dần và sau mỗi lần cập nhật máy chủ thì trống. Nay dựng khi có ghi,
+        # khi bản nhớ trống (vừa khởi động → dựng sẵn cho Chủ tịch), hoặc khi có bản quá 4 phút.
         from app.api.v1 import routes as _r
-        if i % 2 == 0 and getattr(_r, "_DASH_DIRTY", True):
+        if (i % 2 == 0 or not _r._DASH_CACHE) and _r.can_dung_lai():
             _r._DASH_DIRTY = False
             _r.lam_moi_cache_nen(db)
     finally:
