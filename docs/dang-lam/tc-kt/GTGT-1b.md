@@ -1,0 +1,8 @@
+# Sổ giữ chỗ — làn TC-KT · Đợt GTGT-1b
+
+Một đợt một tệp (Đợt SO-DOT 02/11/2026). Luật: [../README.md](../README.md).
+Mọi dòng trong tệp này PHẢI có cột `Làn` là `TC-KT`.
+
+| Làn | Mã việc | Tệp sẽ đụng | Bắt đầu | Trạng thái |
+|---|---|---|---|---|
+| TC-KT | **GTGT-1b — SỬA DÒNG SỔ CỦA ĐỢT GTGT-1: THIẾU MỘT TÊN TỆP, VÀ CHÍNH CI ĐÃ NÓI RA.** Đợt GTGT-1 (PR #703, gộp 07/11/2026) vá **bảy** tệp nhưng dòng sổ chỉ gọi tên **sáu**: thiếu `backend/app/services/chung_tu_loai.py` — bước khai nghiệp vụ `bu_tru_gtgt` được thêm vào bản vá SAU khi dòng sổ đã viết, và không ai cập nhật dòng sổ. Hậu quả đo được: `test_gn3_moi_tep_ma_deu_phai_co_mot_dong_dang_lam_giu_cho` **ĐỎ trên PR #703** với đúng một dòng — `· backend/app/services/chung_tu_loai.py`. 228 phép thử xanh, 1 đỏ, và cái đỏ ấy KHÔNG phải lỗi mã: nó nói rằng nhánh đang đụng một tệp mà không làn nào tuyên bố giữ, nên làn kế tiếp không có cách nào biết mà tránh — đúng thứ sổ giữ chỗ sinh ra để chặn. **VÌ SAO MÁY CHỦ TỊCH BÁO XANH MÀ CI BÁO ĐỎ**, và đây là chỗ đáng ghi lại: `test_gn3` chỉ chạy được khi có DANH SÁCH TỆP ĐỔI của một pull request (`_tep_doi()`); chạy tại chỗ thì nó `skip`. Nên hàng rào trên máy không bao giờ bắt được loại lỗi này, và phép tự kiểm của bản vá cũng không — nó canh `HANG_RAO` và `ci.yml` nhưng chưa bao giờ canh rằng **mọi tệp bản vá ghi vào đều có tên trong dòng sổ của chính đợt ấy**. Đợt này thêm phép tự kiểm đó vào khuôn bản vá, nên lỗi này không lặp lại được. Đợt này KHÔNG đụng một dòng mã nào — chỉ sửa sổ. | docs/dang-lam/tc-kt/GTGT-1.md, docs/dang-lam/tc-kt/GTGT-1b.md | 07-11-2026 06:45 | đang làm |
