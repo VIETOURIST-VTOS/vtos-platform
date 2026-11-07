@@ -51,7 +51,7 @@ def test_tokens_css_dung_bang_mau_toi_v11():
                           ("--vtos-warning", "#F4C36A"),   # bản vẽ --gold
                           ("--vtos-line", "#2E4E6B"),      # nâng từ #29445D (bản vẽ chỉ 1,41 lần)
                           ("--vtos-navy", "#6FA8F0"),      # nâng từ #438BEA (chữ 13px chỉ 4,16)
-                          ("--vtos-danger", "#6FA8F0"),    # KS-NAVY 07/11: đỏ → navy sáng (cũ #FF6B90)
+                          ("--vtos-danger", "#FF6B90"),    # KS-MUC 07/11: trả lại hồng cho mức nghiêm trọng
                           ("--vtos-sky", "#1E63C8"),       # nền nút, chữ trắng 5,72
                           ("--vtos-heading", "#FFFFFF")):   # TC-64 · cũ #DCE9F4, mờ hơn thân bài
         assert re.search(re.escape(bien) + r":\s*" + gia_tri, src, re.I), \

@@ -1,0 +1,46 @@
+"""KS-MUC (07/11/2026) — ba mức độ phải ba màu, trên mọi màn hình crm.
+
+Đợt KS-NAVY (#704) đổi `--vtos-danger` sang xanh navy sáng: ở nền tối nó TRÙNG ĐÚNG `--vtos-info`
+(#6FA8F0), ở nền sáng gần như trùng. Mức Nghiêm trọng, Quá hạn, Từ chối, Lỗ, số âm, báo lỗi… thành
+cùng một màu với Theo dõi — Chủ tịch soát màn hình 07/11 và chỉ ra. Cùng lúc tìm ra lỗi cũ từ TQ-1
+(23/10): thanh mức «Cảnh báo» trên khối Vận hành lấy `--vtos-info` chứ không phải `--vtos-warning`.
+
+Navy giữ cho thương hiệu (logo, thanh trên, menu, nút); mức độ dùng ba màu riêng.
+"""
+import os, re
+GOC = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _doc(*p):
+    return open(os.path.join(GOC, *p), encoding="utf-8").read()
+
+
+def _khoi(css: str, chon: str) -> str:
+    i = css.index(chon)
+    return css[i:css.index("}", i)]
+
+
+def _bien(khoi: str, ten: str) -> str:
+    m = re.search(re.escape(ten) + r":\s*(#[0-9A-Fa-f]{6})", khoi)
+    assert m, ten
+    return m.group(1).upper()
+
+
+def test_ks_muc_1_nguy_hiem_khac_theo_doi_o_ca_hai_nen():
+    css = _doc("web", "app", "tokens.css")
+    toi = _khoi(css, ":root")
+    assert _bien(toi, "--vtos-danger") == "#FF6B90"
+    assert _bien(toi, "--vtos-danger") != _bien(toi, "--vtos-info"), "nền tối: nghiêm trọng trùng màu theo dõi"
+    i = css.index("#A8145C")
+    assert "--vtos-danger" in css[css.rfind("\n", 0, i):i], "nền sáng: --vtos-danger phải là #A8145C"
+    for ten in ("--vtos-danger", "--vtos-warning", "--vtos-info"):
+        assert ten in toi
+
+
+def test_ks_muc_2_thanh_muc_do_ba_mau_va_canh_bao_la_vang():
+    css = _doc("web", "components", "KhoiVanHanh.css")
+    assert ".c-vang{background:var(--vtos-warning)}" in css, "mức Cảnh báo phải vàng"
+    assert ".c-xanh{background:var(--vtos-info)}" in css
+    assert ".vh-muc.warn{color:var(--vtos-warning)" in css
+    tsx = _doc("web", "components", "KhoiVanHanh.tsx")
+    assert 'red: "c-do", warn: "c-vang", info: "c-xanh"' in tsx
