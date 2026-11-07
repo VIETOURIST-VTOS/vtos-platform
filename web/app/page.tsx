@@ -162,7 +162,11 @@ function Dash() {
     <div className="mh01-hang-3">
       <KhoiKinhDoanhLe ds={sec.kd_le} bieu_do={bd.kd_le} dt={sec.doanh_thu_phong} />
       <KhoiKinhDoanhDoan d={sec.kd_doan} bieu_do={bd.kd_doan} dt={sec.doanh_thu_phong} />
-      <KhoiBaoCaoNgay d={sec.bao_cao_ngay} bieu_do={bd.bao_cao_ngay} />
+      {/* KS-AN · 08/11/2026 — máy chủ chỉ gửi `bao_cao_ngay` cho Chủ tịch, TGĐ, HCNS
+          (services/dashboard.py). Vắng hẳn trường ấy = vai trò không được xem → không bày khối;
+          trước đây khối hiện «Chưa kết nối» như thể hệ thống hỏng. Có trường mà rỗng (null) thì
+          vẫn để khối tự báo «Chưa kết nối». Lưới `auto-fit` giãn hai khối Kinh doanh lấp chỗ. */}
+      {"bao_cao_ngay" in sec && <KhoiBaoCaoNgay d={sec.bao_cao_ngay} bieu_do={bd.bao_cao_ngay} />}
     </div>
 
   </div>);

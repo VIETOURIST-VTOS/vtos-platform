@@ -248,6 +248,12 @@ export default function KhoiKetQuaKinhDoanh() {
   const [ky, setKy] = useState<string>("");
   const [d, setD] = useState<any>(null);
   const [loi, setLoi] = useState<string>("");
+  // KS-AN · 08/11/2026 — VAI TRÒ KHÔNG ĐƯỢC XEM THÌ KHÔNG BÀY KHỐI (Chủ tịch duyệt «Ẩn hẳn
+  // khối»). Máy chủ trả 403 cho PTGĐ, TP Điều hành, GĐ KD, HCNS, CNTT, nhân viên… và trước đây
+  // khối vẫn hiện với nhãn «Chưa kết nối» kèm cả đường dẫn /api/… — người đọc tưởng hệ thống
+  // hỏng. Ẩn theo CÂU TRẢ LỜI CỦA MÁY CHỦ, không theo danh sách vai trò viết cứng ở đây: đổi quyền
+  // ở Phân quyền thì khối tự theo. Lỗi khác 403 (mất mạng, máy chủ lỗi) vẫn báo «Chưa kết nối».
+  const [khong_quyen, setKhongQuyen] = useState(false);
 
   useEffect(() => {
     let bo = false;
@@ -257,7 +263,11 @@ export default function KhoiKetQuaKinhDoanh() {
       // nhận về. Chép ngược lại thì mỗi lần đổi bề rộng phải gọi máy chủ hai lượt — lượt hai chỉ để
       // hỏi lại đúng điều vừa được trả lời.
       .then((r) => { if (!bo) setD(r); })
-      .catch((e) => { if (!bo) setLoi(errMsg(e) || "Không tải được kết quả kinh doanh"); });
+      .catch((e) => {
+        if (bo) return;
+        if (e?.status === 403) { setKhongQuyen(true); return; }
+        setLoi(errMsg(e) || "Không tải được kết quả kinh doanh");
+      });
     return () => { bo = true; };
   }, [kind, ky]);
 
@@ -309,6 +319,8 @@ export default function KhoiKetQuaKinhDoanh() {
       )}
     </div>
   );
+
+  if (khong_quyen) return null;
 
   if (loi || !d) {
     return (
