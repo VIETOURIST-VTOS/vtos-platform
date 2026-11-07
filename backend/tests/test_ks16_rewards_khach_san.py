@@ -73,7 +73,9 @@ def test_voucher_diem_va_so_ke_toan(db, k3, bat):
     # Kế toán chốt: khách sạn nhận như không có voucher; voucher ghi Nợ 641 / Có 3388
     S.kt_chot(db, _u(db, "kt"), d.id, 400_000, SAU); db.commit()
     assert d.phai_tra_ks == 3_400_000 and S.khuyen_mai(db, d) == 150_000
-    assert _ct(db, d.km_but_toan) == [("3388", 0, 150_000), ("641", 150_000, 0)]
+    # ĐỢT TKC-5 08/11/2026 — `641` là tài khoản TỔNG HỢP (sáu con). Voucher VTD Rewards ghi
+    # vào `6418` (chi phí bằng tiền khác) theo bảng khai `services/tk_chi_tiet.py`.
+    assert _ct(db, d.km_but_toan) == [("3388", 0, 150_000), ("6418", 150_000, 0)]
     kt = S.hang_ke_toan(db, _u(db, "kt"), SAU)["phai_tra_ks"][0]
     assert kt["phai_tra"] == 3_400_000 and kt["khuyen_mai"] == 150_000
     RW.tinh(db, CHU, hn)

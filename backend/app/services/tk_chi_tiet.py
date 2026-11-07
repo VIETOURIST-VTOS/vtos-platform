@@ -57,7 +57,7 @@ KHOA: dict[str, tuple[str, str]] = {
     "hd_doanh_thu_noi_dia":    ("51131", "Hóa đơn – doanh thu tour NỘI ĐỊA"),
     "hd_doanh_thu_nuoc_ngoai": ("51137", "Hóa đơn – doanh thu tour NƯỚC NGOÀI"),
     "hd_doanh_thu_thue_xe":    ("51133", "Hóa đơn – doanh thu cho thuê xe"),
-    "hd_doanh_thu_khong_tour": ("51136", "Hóa đơn KHÔNG gắn chuyến nào – doanh thu dịch vụ khác"),
+    "hd_doanh_thu_khong_tour": ("5118", "Hóa đơn KHÔNG gắn chuyến nào – doanh thu khác"),
     "hd_gtgt_dau_ra":          ("33311", "Hóa đơn – thuế GTGT đầu ra"),
     # Bảng lương (`hr.post_payroll_entries`)
     "luong_chi_phi_quan_ly":   ("6421", "Lương HĐLĐ – chi phí nhân viên quản lý"),
@@ -70,6 +70,46 @@ KHOA: dict[str, tuple[str, str]] = {
     "vay_lai":                 ("6351", "Vay – chi phí lãi vay"),
     # Kết chuyển chi phí đội xe 627 -> 154 -> 632 (`ket_so`, bước 0)
     "kc_627_gia_von":          ("6323", "Kết chuyển chi phí đội xe – giá vốn dịch vụ cho thuê xe"),
+    # ── ĐỢT TKC-5 08/11/2026 — hoa hồng, khuyến mãi, chi phí trả trước ─────────────────────
+    # VÌ SAO CẢ BA DÒNG DOANH THU KHÔNG-GẮN-CHUYẾN ĐỀU LÀ `5118`, KHÔNG PHẢI `5113x`:
+    # `accounting.NEED_PROJECT = ("154", "5113", "632")` — MỌI tài khoản dưới `5113` BẮT BUỘC có
+    # mã công trình. Đơn khách sạn và đơn đặt bàn không thuộc chuyến nào, nên ghi vào `51134` /
+    # `51136` là bút toán bị TỪ CHỐI ngay ở `post_entry`, không phải ghi sai mà là không ghi
+    # được. Đo được 08/11/2026 bằng chính phép thử KS-16: «Tài khoản 51134 phải ghi mã công
+    # trình (mã tour)».
+    # Giữ BA khóa riêng dù cả ba cùng mặc định `5118`: lựa chọn vẫn nhìn thấy được và đổi được
+    # trên màn Tham số. Muốn tách hoa hồng khách sạn về `51134` thì phải quyết trước rằng mã đơn
+    # khách sạn có được tính là «công trình» hay không — đó là chữ ký của Kế toán trưởng, không
+    # phải việc của người viết phần mềm.
+    "hoa_hong_khach_san":      ("5118", "Doanh thu hoa hồng khách sạn (cổng VTD)"),
+    "hoa_hong_nha_hang":       ("5118", "Doanh thu hoa hồng nhà hàng (đặt bàn)"),
+    "khuyen_mai_rewards":      ("6418", "Voucher VTD Rewards – Vietourist chịu thay khách"),
+    "ccdc_ngan_han":           ("2421", "Chi phí trả trước / CCDC – phân bổ trong 12 kỳ trở xuống"),
+    "ccdc_dai_han":            ("2422", "Chi phí trả trước / CCDC – phân bổ trên 12 kỳ"),
+}
+
+# KHÓA NÀO ĐƯỢC PHÉP TRỎ VÀO MỘT TÀI KHOẢN BẮT BUỘC MÃ CÔNG TRÌNH, VÀ VÌ SAO.
+#
+# `accounting.NEED_PROJECT = ("154", "5113", "632")`: mọi bút toán vào các cây ấy phải mang mã
+# công trình, nếu không `post_entry` TỪ CHỐI. Nên một khóa trỏ vào đó chỉ an toàn khi chỗ ghi sổ
+# của nó LUÔN có chuyến — hoặc khi nghiệp vụ ấy nằm trong danh sách miễn của `account_rule_check`
+# (`luong`, `ket_chuyen`, `misa`, `so_du_dau_ky`, `kiem_toan`, `dao`).
+#
+# Bảng này KHAI RA điều đó. Thêm một khóa trỏ vào `154` / `5113` / `632` mà quên khai ở đây là
+# `test_tkc5_1` đỏ — và đỏ ấy đúng: ngày 08/11/2026 Đợt TKC-4 đã cho hóa đơn KHÔNG gắn chuyến ghi
+# vào `51136`, bút toán bị từ chối, và hóa đơn ấy không phát hành được. Luật cũ chỉ đo CHỌN tài
+# khoản nào chứ không đo ghi được hay không, nên nó xanh suốt tới lúc một phép thử khác đỏ.
+CAN_CONG_TRINH = {
+    "dn_chi_chi_tour":        "đề nghị chi loại `chi_tour` luôn gắn một chuyến",
+    "qt_do_dang":             "quyết toán tour và kết chuyển 627 luôn đi theo một chuyến / một kỳ",
+    "qt_gia_von_noi_dia":     "quyết toán tour luôn gắn chuyến",
+    "qt_gia_von_nuoc_ngoai":  "quyết toán tour luôn gắn chuyến",
+    "qt_gia_von_thue_xe":     "quyết toán tour luôn gắn chuyến",
+    "kc_627_gia_von":         "nghiệp vụ `ket_chuyen` nằm trong danh sách miễn của account_rule_check",
+    "hd_doanh_thu_noi_dia":   "chỉ dùng cho hóa đơn ĐÃ gắn chuyến",
+    "hd_doanh_thu_nuoc_ngoai": "chỉ dùng cho hóa đơn ĐÃ gắn chuyến",
+    "hd_doanh_thu_thue_xe":   "chỉ dùng cho hóa đơn ĐÃ gắn chuyến",
+    "luong_ctv_gia_von":      "nghiệp vụ `luong` nằm trong danh sách miễn của account_rule_check",
 }
 
 # Doanh thu hóa đơn chọn theo LOẠI TOUR của chuyến hóa đơn gắn vào — xem `doanh_thu_hoa_don`.
@@ -187,3 +227,26 @@ def vay_goc(db: Session, hop_dong, hom_nay=None) -> str:
         return chon(db, "vay_goc_ngan_han")
     moc = hom_nay or _date.today()
     return chon(db, "vay_goc_ngan_han" if (han - moc).days <= 365 else "vay_goc_dai_han")
+
+
+def cho_phan_bo(db: Session, so_ky: int) -> str:
+    """Tài khoản chờ phân bổ của một khoản CCDC / chi phí trả trước, theo SỐ KỲ phân bổ.
+
+    Từ 12 kỳ trở xuống là NGẮN HẠN (`2421`), trên 12 kỳ là DÀI HẠN (`2422`) — suy ra từ dữ liệu
+    người nhập đã khai, không hỏi ai. Kế toán trưởng vẫn đặt được tay từng khoản qua ô
+    `asset_account` của cửa nhập, và đặt tay thì `cho_phan_bo_cua` dưới đây giữ nguyên.
+    """
+    return chon(db, "ccdc_ngan_han" if int(so_ky or 1) <= 12 else "ccdc_dai_han")
+
+
+def cho_phan_bo_cua(db: Session, tk: str, so_ky: int) -> str:
+    """Giữ nguyên tài khoản đã khai NẾU nó là tài khoản chi tiết; là CHA thì nắn xuống con.
+
+    Tồn tại vì các khoản CCDC ĐÃ NHẬP TRƯỚC đợt này đang mang `242` — tài khoản tổng hợp. Nắn
+    ở chỗ GHI SỔ chứ không sửa lùi bản ghi của người nhập: Chủ tịch chốt 02/11/2026 để nguyên
+    số cũ, và một bản vá tự đi sửa dữ liệu người dùng là thứ không ai rà lại được.
+    """
+    tk = (tk or "").strip()
+    if tk and not la_tai_khoan_cha(db, tk):
+        return tk
+    return cho_phan_bo(db, so_ky)

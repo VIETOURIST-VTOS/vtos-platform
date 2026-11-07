@@ -37,7 +37,9 @@ DON_TOI_DA_NGAY = 10
 TRANG_THAI_HUY_DUOC = ("cho_nhan", "cho_tra", "da_giu", "het_han")
 DOI_DUOC = ("cho_nhan", "cho_tra", "da_giu")
 TK_TIEN, TK_THU_HO, TK_PHI = "1121", "3388", "6428"      # DT-3: đại lý thu hộ nhà hàng; phí thẻ như phí ngân hàng
-TK_KM = "641"                                               # KS-16b: voucher VTD Rewards — VTD chịu thay khách
+# KS-16b: voucher VTD Rewards — VTD chịu thay khách.
+# ĐỢT TKC-5 08/11/2026: `641` là tài khoản TỔNG HỢP (sáu con). Lấy ở bảng khai
+# `services/tk_chi_tiet.py` — một hằng số ở đây là một nguồn thứ hai cho cùng một luật.
 
 
 def _co_the_tra(d: DonDatBan, tra: int) -> bool:
@@ -300,9 +302,10 @@ def kt_ghi_km(db: Session, u: User, did: int, now: datetime | None = None) -> Do
         raise LoiDatBan("Đơn không có phần voucher VTD chịu để ghi", 409)
     if d.km_but_toan:
         raise LoiDatBan("Đã ghi sổ phần voucher", 409)
+    from app.services import tk_chi_tiet as TKCT
     ten, ma_dt = _doi_tuong_nh(db, d)
     d.km_but_toan = _ghi_so(db, u, d, now.date(), f"Voucher VTD Rewards — đặt bàn {d.ma} (Vietourist chịu thay khách)",
-                            [{"account": TK_KM, "debit": km, "note": d.ma},
+                            [{"account": TKCT.chon(db, "khuyen_mai_rewards"), "debit": km, "note": d.ma},
                              {"account": TK_THU_HO, "credit": km, "partner": ten, "partner_code": ma_dt, "note": d.ma}],
                             f"{d.ma}:km", "khuyen_mai_rewards")
     R.audit(db, u.username, u.role, "dat_ban_ghi_km", f"dat_ban:{d.ma}", after={"km": km, "but_toan": d.km_but_toan})
@@ -315,11 +318,12 @@ def ghi_dt_hoa_hong(db: Session, u: User, d: DonDatBan, ngay: date) -> str:
     lúc chốt nếu không còn gì phải trả."""
     if d.dt_but_toan or not (d.hoa_hong or 0) or int(d.hoa_hong or 0) <= 0:
         return d.dt_but_toan
+    from app.services import tk_chi_tiet as TKCT
     ten, ma_dt = _doi_tuong_nh(db, d)
     hh = int(d.hoa_hong)
     d.dt_but_toan = _ghi_so(db, u, d, ngay, f"Doanh thu hoa hồng nhà hàng — đặt bàn {d.ma} ({ten})",
                             [{"account": TK_THU_HO, "debit": hh, "partner": ten, "partner_code": ma_dt, "note": d.ma},
-                             {"account": "511", "credit": hh, "note": d.ma}], f"{d.ma}:hh", "doanh_thu_hoa_hong")
+                             {"account": TKCT.chon(db, "hoa_hong_nha_hang"), "credit": hh, "note": d.ma}], f"{d.ma}:hh", "doanh_thu_hoa_hong")
     R.audit(db, u.username, u.role, "dat_ban_ghi_dt_hoa_hong", f"dat_ban:{d.ma}", after={"hoa_hong": hh, "but_toan": d.dt_but_toan})
     db.flush()
     return d.dt_but_toan

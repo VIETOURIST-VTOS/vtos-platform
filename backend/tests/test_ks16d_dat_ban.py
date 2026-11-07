@@ -70,11 +70,15 @@ def test_ks16e_dat_ban_ghi_doanh_thu_hoa_hong(db):
     db.add(Attachment(doi_tuong="de_nghi_chi", doi_tuong_id=r.code, loai="unc", ten_tep="u.pdf", checksum="u", khoa_luu="u"))
     db.commit()
     O.step(db, _u(db, "kt"), r, "pay", "CK 9", "chuyen_khoan")
-    assert _ct(db, d.dt_but_toan) == [("3388", 20_000, 0), ("511", 0, 20_000)]
+    # ĐỢT TKC-5 08/11/2026 — `511` là tài khoản TỔNG HỢP. Doanh thu hoa hồng khách sạn /
+    # nhà hàng ghi vào `5118` (doanh thu khác) chứ KHÔNG vào `5113x`: mọi tài khoản dưới
+    # `5113` bắt buộc có mã công trình (`accounting.NEED_PROJECT`), mà đơn khách sạn và đơn
+    # đặt bàn không thuộc chuyến nào.
+    assert _ct(db, d.dt_but_toan) == [("3388", 20_000, 0), ("5118", 0, 20_000)]
     with pytest.raises(S.LoiDatBan, match="Đã ghi"):
         S.kt_ghi_dt_hoa_hong(db, _u(db, "kt"), d.id, ve)
     d2 = _nhan(db, _dat(db, nl=2, cach="coc", gio="19:00"))
     _tra_qr(db, d2, sid="T2")
     ve2 = _dung(db, d2)
     S.kt_chot(db, _u(db, "kt"), d2.id, 900_000, ve2, 90_000); db.commit()        # hoa hồng = toàn bộ → trả 0
-    assert d2.payment_request_id is None and _ct(db, d2.dt_but_toan) == [("3388", 90_000, 0), ("511", 0, 90_000)]
+    assert d2.payment_request_id is None and _ct(db, d2.dt_but_toan) == [("3388", 90_000, 0), ("5118", 0, 90_000)]

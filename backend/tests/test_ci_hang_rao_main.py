@@ -131,6 +131,12 @@ HANG_RAO = (
     # Luat 2 canh HOA DON KHONG GAN CHUYEN khong roi vao doanh thu tour noi dia. Luat 3
     # canh no goc vay chon theo KY HAN cua khe uoc, do o ca hai phia moc 12 thang.
     "tests/test_tkc4_bon_duong_ghi_tiep_theo.py",
+    # ── NHIP 2c, them 08/11/2026 (Dot TKC-5) ───────────────────────────────────────────────
+    # Luat 1 canh MOT luat cho CA BANG: khoa nao tro vao mot tai khoan BAT BUOC ma cong
+    # trinh (`154` / `5113` / `632`) thi phai khai ly do o `CAN_CONG_TRINH`. Luat ay sinh ra
+    # tu mot loi that cua Dot TKC-4. Luat 3 canh khoan CU mang `242` van ghi so vao con MA
+    # ban ghi KHONG bi sua lui.
+    "tests/test_tkc5_hoa_hong_khuyen_mai_tra_truoc.py",
 )
 
 

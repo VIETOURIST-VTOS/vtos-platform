@@ -53,7 +53,9 @@ def test_tra_du_voucher_va_chot(db):
     db.commit()
     assert S.khuyen_mai(db, d) == 50_000
     S.kt_chot(db, _u(db, "kt"), d.id, 2_000_000, ve); db.commit()
-    assert _ct(db, d.km_but_toan) == [("3388", 0, 50_000), ("641", 50_000, 0)]
+    # ĐỢT TKC-5 08/11/2026 — `641` là tài khoản TỔNG HỢP (sáu con). Voucher VTD Rewards ghi
+    # vào `6418` (chi phí bằng tiền khác) theo bảng khai `services/tk_chi_tiet.py`.
+    assert _ct(db, d.km_but_toan) == [("3388", 0, 50_000), ("6418", 50_000, 0)]
     th = S.thu_ho_ncc(db, _ncc(db))[0]
     assert th["thuoc_nha_hang"] == 1_800_000 and th["voucher_vtd"] == 50_000
 
@@ -97,7 +99,7 @@ def test_huy_va_khong_den(db):
                     now=S.gio_an(d2) + dt.timedelta(minutes=40)); db.commit()
     assert d2.so_hoan == 0 and v2.trang_thai == "da_dung" and S.khuyen_mai(db, d2) == 40_000
     S.kt_ghi_km(db, _u(db, "kt"), d2.id, NAY); db.commit()
-    assert _ct(db, d2.km_but_toan) == [("3388", 0, 40_000), ("641", 40_000, 0)]
+    assert _ct(db, d2.km_but_toan) == [("3388", 0, 40_000), ("6418", 40_000, 0)]
     with pytest.raises(S.LoiDatBan, match="Đã ghi"):
         S.kt_ghi_km(db, _u(db, "kt"), d2.id, NAY)
     # chưa trả mà hết hạn trả → voucher trả điểm

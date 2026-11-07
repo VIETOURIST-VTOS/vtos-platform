@@ -107,7 +107,10 @@ def test_phan_bo_242():
     assert p.status_code == 200, p.text
     ent = [x for x in client.get("/api/v1/journal?period=2026-07", headers=h).json() if x["source_ref"] == "pb:2026-07"]
     assert len(ent) == 1
-    assert {l["account"] for l in ent[0]["lines"]} == {"6423", "242"}
+    # ĐỢT TKC-5 08/11/2026 — `242` là tài khoản TỔNG HỢP (`2421` ngắn hạn / `2422` dài hạn).
+    # Khoản phép thử phân bổ 12 kỳ → ngắn hạn `2421`. Phép thử cũ khai `242` chính là phép thử
+    # đang GIỮ LẠI lỗi, nên nó đổi cùng đợt chứ không được nới ra.
+    assert {l["account"] for l in ent[0]["lines"]} == {"6423", "2421"}
     assert round(sum(l["debit"] for l in ent[0]["lines"])) == 10_000_000
 
     tab8 = client.get("/api/v1/prepaid/allocation?period=2026-08", headers=h).json()

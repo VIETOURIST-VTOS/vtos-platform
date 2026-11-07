@@ -42,7 +42,11 @@ def test_ghi_khi_da_chi_tra_khach_san(db, k3, bat):
     db.commit()
     O.step(db, _u(db, "kt"), r, "pay", "CK 7", "chuyen_khoan")
     assert r.status == "da_chi" and d.dt_but_toan
-    assert _ct(db, d.dt_but_toan) == [("3388", 400_000, 0), ("511", 0, 400_000)]
+    # ĐỢT TKC-5 08/11/2026 — `511` là tài khoản TỔNG HỢP. Doanh thu hoa hồng khách sạn /
+    # nhà hàng ghi vào `5118` (doanh thu khác) chứ KHÔNG vào `5113x`: mọi tài khoản dưới
+    # `5113` bắt buộc có mã công trình (`accounting.NEED_PROJECT`), mà đơn khách sạn và đơn
+    # đặt bàn không thuộc chuyến nào.
+    assert _ct(db, d.dt_but_toan) == [("3388", 400_000, 0), ("5118", 0, 400_000)]
     with pytest.raises(S.LoiDon, match="Đã ghi"):
         S.kt_ghi_dt_hoa_hong(db, _u(db, "kt"), d.id, SAU)
 
@@ -52,7 +56,7 @@ def test_tra_0_ghi_ngay_va_ghi_bu_don_cu(db, k3, bat):
     k, lp, g = k3
     d = _xong_don(db, k, g)
     S.kt_chot(db, _u(db, "kt"), d.id, int(d.tong), SAU); db.commit()                # hoa hồng = toàn bộ → trả 0
-    assert d.payment_request_id is None and _ct(db, d.dt_but_toan) == [("3388", int(d.tong), 0), ("511", 0, int(d.tong))]
+    assert d.payment_request_id is None and _ct(db, d.dt_but_toan) == [("3388", int(d.tong), 0), ("5118", 0, int(d.tong))]
     # đơn chốt trước KS-16e: có hoa hồng, không đề nghị chi, chưa có bút toán → hiện danh sách chờ ghi, Kế toán ghi bù
     d2 = _xong_don(db, k, g, sid="T2")
     d2.hoa_hong, d2.phai_tra_ks, d2.chot_luc = 300_000, int(d2.tong) - 300_000, SAU; db.commit()
@@ -61,5 +65,5 @@ def test_tra_0_ghi_ngay_va_ghi_bu_don_cu(db, k3, bat):
     with pytest.raises(S.LoiDon):
         S.kt_ghi_dt_hoa_hong(db, _u(db, "dh"), d2.id, SAU)                          # không phải Kế toán
     S.kt_ghi_dt_hoa_hong(db, _u(db, "kt"), d2.id, SAU); db.commit()
-    assert _ct(db, d2.dt_but_toan) == [("3388", 300_000, 0), ("511", 0, 300_000)]
+    assert _ct(db, d2.dt_but_toan) == [("3388", 300_000, 0), ("5118", 0, 300_000)]
     assert S.hang_ke_toan(db, _u(db, "kt"), SAU)["cho_ghi_dt"] == []
