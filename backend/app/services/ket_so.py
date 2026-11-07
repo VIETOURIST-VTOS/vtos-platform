@@ -43,7 +43,10 @@ BUOC_KET_CHUYEN = {
     # nhưng cách chữa không phải là nhét 627 vào một bước đóng về 911 (làm thế là tính chi phí đội xe
     # hai lần: một lần qua 911, một lần nữa qua 154 -> 632).
     0: {"ten": "Kết chuyển chi phí sản xuất chung qua chi phí dở dang sang giá vốn",
-        "quy_tac": "KC_627_154_632", "tien_to": ("627",), "ben_du": "no", "ve_tk": "154"},
+        # ĐỢT TKC-4 07/11/2026: `154` là tài khoản TỔNG HỢP. Bước này mang `ve_khoa` (khóa trong
+        # bảng khai `services/tk_chi_tiet.py`) thay cho một số hiệu gõ cứng; ba bước còn lại giữ
+        # `ve_tk` vì `911` vốn đã là tài khoản chi tiết.
+        "quy_tac": "KC_627_154_632", "tien_to": ("627",), "ben_du": "no", "ve_khoa": "qt_do_dang"},
     1: {"ten": "Kết chuyển doanh thu và thu nhập", "quy_tac": "KC_DOANH_THU",
         "tien_to": ("511", "515", "711"), "ben_du": "co", "ve_tk": "911"},
     2: {"ten": "Kết chuyển giá vốn", "quy_tac": "KC_GIA_VON",
@@ -293,7 +296,9 @@ def ket_chuyen(db: Session, u: User, ky: str, buoc_chon: list[int] | None = None
                               "note": f"kết chuyển kỳ {ky}"
                                       + (" – SỐ DƯ NGƯỢC CHIỀU, đã đảo chiều dòng" if so < 0 else "")})
             net = round(sum(float(l.get("debit") or 0) - float(l.get("credit") or 0) for l in lines), 0)
-            ve = BUOC_KET_CHUYEN[b]["ve_tk"]
+            from app.services import tk_chi_tiet as TKCT
+            _buoc = BUOC_KET_CHUYEN[b]
+            ve = TKCT.chon(db, _buoc["ve_khoa"]) if _buoc.get("ve_khoa") else _buoc["ve_tk"]
             if net > 0:
                 lines.append({"account": ve, "credit": net})
             elif net < 0:
@@ -308,9 +313,12 @@ def ket_chuyen(db: Session, u: User, ky: str, buoc_chon: list[int] | None = None
                 # đúng chỗ hỏng mà bước trên vừa chữa.
                 _gv = "debit" if net < 0 else "credit"
                 _dd = "credit" if net < 0 else "debit"
-                lines.append({"account": TK_GIA_VON, _gv: abs(net),
+                # ĐỢT TKC-4: `632` và `154` là tài khoản TỔNG HỢP. Hai hằng số ở đầu tệp GIỮ
+                # NGUYÊN vì chúng còn dùng cho phép ĐỌC CÂY (`account_code.startswith`), nơi gốc
+                # cha mới đúng; chỉ hai dòng GHI này đổi sang tài khoản chi tiết.
+                lines.append({"account": TKCT.chon(db, "kc_627_gia_von"), _gv: abs(net),
                               "note": f"chi phí đội xe kỳ {ky} – không chia theo chuyến (Chủ tịch quyết 09/10/2026)"})
-                lines.append({"account": TK_CHI_PHI_DO_DANG, _dd: abs(net)})
+                lines.append({"account": TKCT.chon(db, "qt_do_dang"), _dd: abs(net)})
         else:
             lai = xt["lai_truoc_buoc_4"]
             if abs(lai) < 1:

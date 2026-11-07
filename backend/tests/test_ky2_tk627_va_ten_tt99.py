@@ -161,10 +161,19 @@ def test_sua_xe_khong_duoc_treo_242():
 
 # ------------------------------------------------- bước 0: 627 → 154
 
-def test_627_thuoc_mot_buoc_ket_chuyen_chu_khong_phai_lo_thung():
+def test_627_thuoc_mot_buoc_ket_chuyen_chu_khong_phai_lo_thung(db):
     from app.services import ket_so as KS
     assert KS._tk_cua_buoc("627") == 0, "627 không thuộc bước nào – sẽ bị báo là tài khoản bỏ sót"
-    assert KS.BUOC_KET_CHUYEN[0]["ve_tk"] == KS.TK_CHI_PHI_DO_DANG == "154"
+    # ĐỢT TKC-4 07/11/2026 — bước 0 nay mang `ve_khoa` (khóa trong bảng khai
+    # `services/tk_chi_tiet.py`) chứ không gõ cứng `154`, vì `154` là tài khoản TỔNG HỢP. Hằng số
+    # `TK_CHI_PHI_DO_DANG` GIỮ NGUYÊN là `154` và vẫn phải giữ: nó dùng cho phép ĐỌC CÂY
+    # (`account_code.startswith`), nơi gốc cha mới đúng.
+    from app.services import tk_chi_tiet as TKCT
+    assert "ve_tk" not in KS.BUOC_KET_CHUYEN[0], "bước 0 còn gõ cứng một số hiệu tài khoản"
+    assert KS.TK_CHI_PHI_DO_DANG == "154", "gốc đọc cây chi phí dở dang phải là `154`"
+    _ve = TKCT.chon(db, KS.BUOC_KET_CHUYEN[0]["ve_khoa"])
+    assert _ve.startswith(KS.TK_CHI_PHI_DO_DANG) and _ve != KS.TK_CHI_PHI_DO_DANG, (
+        "bước 0 phải đóng về một tài khoản CON của `154`, nhận " + _ve)
     for b in KS.BUOC_VE_911:
         assert KS.BUOC_KET_CHUYEN[b]["ve_tk"] == KS.TK_XAC_DINH_KQ, \
             f"bước {b} phải đóng về 911; đổi đích của nó là đổi cả báo cáo kết quả kinh doanh"
@@ -206,10 +215,16 @@ def test_ket_chuyen_627_qua_154_sang_632_chu_khong_ve_911(db, ke_toan):
     # Chủ tịch quyết 09/10/2026: đi QUA 154 rồi sang THẲNG 632, không chia theo chuyến. Hai chặng
     # trong CÙNG một chứng từ – nếu tách hai chứng từ thì có một khoảnh khắc 154 giữ số dư dở dang
     # không chuyến nào nhận, và khoảnh khắc ấy kéo dài bằng khoảng cách giữa hai lần ai đó bấm.
-    assert tk["154"][0] >= 8_000_000 and tk["154"][1] >= 8_000_000, \
-        "154 phải vừa nhận vừa trả trong cùng chứng từ – không để lại số dư dở dang"
-    assert round(tk["154"][0] - tk["154"][1]) == 0, "154 phải về 0 trong chính chứng từ này"
-    assert tk["632"][0] >= 8_000_000, "chi phí đội xe chưa sang giá vốn"
+    # Đợt TKC-4: hai chặng nay ghi vào tài khoản CHI TIẾT (`1541`, `6323`) chứ không vào cha.
+    # Đọc theo tài khoản bảng khai trả về, không gõ lại số hiệu ở đây — gõ lại là dựng nguồn thứ hai.
+    from app.services import tk_chi_tiet as TKCT
+    _dd = TKCT.chon(db, "qt_do_dang")
+    _gv = TKCT.chon(db, "kc_627_gia_von")
+    assert "154" not in tk and "632" not in tk, "còn ghi vào tài khoản tổng hợp"
+    assert tk[_dd][0] >= 8_000_000 and tk[_dd][1] >= 8_000_000, \
+        _dd + " phải vừa nhận vừa trả trong cùng chứng từ – không để lại số dư dở dang"
+    assert round(tk[_dd][0] - tk[_dd][1]) == 0, _dd + " phải về 0 trong chính chứng từ này"
+    assert tk[_gv][0] >= 8_000_000, "chi phí đội xe chưa sang giá vốn"
 
     # Bước 0 KHÔNG được làm đổi lãi của kỳ: nó mới chuyển chi phí sang dở dang.
     xt2 = KS.xem_truoc_ket_chuyen(db, KY)

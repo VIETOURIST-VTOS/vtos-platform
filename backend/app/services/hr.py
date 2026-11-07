@@ -571,26 +571,34 @@ def post_payroll_entries(db: Session, run: PayrollRun, bo_sung_so: int | None = 
         tncn = sum(r.get("tncn", 0) for r in rows_)
         bhxh = sum(r.get("bhxh", 0) for r in rows_)
         doan_phi = sum(r.get("doan_phi", 0) for r in rows_)
+        # ĐỢT TKC-4 07/11/2026 — `642`, `334`, `632`, `338` đều là tài khoản TỔNG HỢP trong danh
+        # mục thật. Năm bút toán lương nay lấy tài khoản ở bảng khai `services/tk_chi_tiet.py`.
+        # `3335` / `3383` / `3382` KHÔNG đổi: cả ba đã là tài khoản chi tiết.
+        from app.services import tk_chi_tiet as TKCT
+        tk_cpql = TKCT.chon(db, "luong_chi_phi_quan_ly")
+        tk_nld = TKCT.chon(db, "luong_phai_tra_nld")
+        tk_ctv_gv = TKCT.chon(db, "luong_ctv_gia_von")
+        tk_ctv_pt = TKCT.chon(db, "luong_ctv_phai_tra")
         try:
             if hdld > 0:
                 ids.append(ACC.post_entry(db, "robot", "robot", d, f"Lương tháng {run.period} – {ten}{bs}",
-                                          [{"account": "642", "debit": hdld}, {"account": "334", "credit": hdld}],
+                                          [{"account": tk_cpql, "debit": hdld}, {"account": tk_nld, "credit": hdld}],
                                           "luong", tc, nghiep_vu="luong_hdld").id)
             if ctv > 0:
                 ids.append(ACC.post_entry(db, "robot", "robot", d, f"Thù lao HDV/CTV tháng {run.period} – {ten}{bs}",
-                                          [{"account": "632", "debit": ctv}, {"account": "338", "credit": ctv}],
+                                          [{"account": tk_ctv_gv, "debit": ctv}, {"account": tk_ctv_pt, "credit": ctv}],
                                           "luong", tc, nghiep_vu="thu_lao_ctv").id)
             if tncn > 0:
                 ids.append(ACC.post_entry(db, "robot", "robot", d, f"Khấu trừ TNCN 10% thù lao CTV tháng {run.period} – {ten}{bs}",
-                                          [{"account": "338", "debit": tncn}, {"account": "3335", "credit": tncn}],
+                                          [{"account": tk_ctv_pt, "debit": tncn}, {"account": "3335", "credit": tncn}],
                                           "luong", tc, nghiep_vu="khau_tru_tncn").id)
             if bhxh > 0:
                 ids.append(ACC.post_entry(db, "robot", "robot", d, f"BHXH phần người lao động tháng {run.period} – {ten}{bs}",
-                                          [{"account": "334", "debit": bhxh}, {"account": "3383", "credit": bhxh}],
+                                          [{"account": tk_nld, "debit": bhxh}, {"account": "3383", "credit": bhxh}],
                                           "luong", tc, nghiep_vu="bhxh_nld").id)
             if doan_phi > 0:
                 ids.append(ACC.post_entry(db, "robot", "robot", d, f"Đoàn phí công đoàn tháng {run.period} – {ten}{bs}",
-                                          [{"account": "334", "debit": doan_phi}, {"account": "3382", "credit": doan_phi}],
+                                          [{"account": tk_nld, "debit": doan_phi}, {"account": "3382", "credit": doan_phi}],
                                           "luong", tc, nghiep_vu="doan_phi").id)
         except ValueError as ex:
             R.audit(db, "robot", "robot", "ghi_so_that_bai", tc, after={"ly_do": str(ex)})

@@ -76,7 +76,10 @@ def test_invoice_flow_and_vat_split():
     assert res["invoice"]["number"] == 1 and res["invoice"]["provider_ref"].startswith("LOCAL-")
     e = next(x for x in journal() if x["source_ref"].startswith("invoice:"))
     acc = {l["account"]: (l["debit"], l["credit"]) for l in e["lines"]}
-    assert acc["131"][0] == 7960000 and acc["511"][1] == inv["pre_tax"] and acc["3331"][1] == inv["vat"]
+    # ĐỢT TKC-4 07/11/2026 — `511` và `3331` là tài khoản TỔNG HỢP. Hóa đơn nay ghi vào tài khoản
+    # CHI TIẾT theo bảng khai `services/tk_chi_tiet.py`: doanh thu chọn theo LOẠI TOUR của chuyến
+    # (booking phép thử là tour nội địa → `51131`), thuế GTGT đầu ra → `33311`.
+    assert acc["131"][0] == 7960000 and acc["51131"][1] == inv["pre_tax"] and acc["33311"][1] == inv["vat"]
     # hủy → bút toán đảo, hóa đơn giữ số
     assert client.post(f"/api/v1/invoices/{inv['id']}/cancel", json={"reason": ""}, headers=login("ketoan")).status_code == 422
     assert "đảo" in client.post(f"/api/v1/invoices/{inv['id']}/cancel", json={"reason": "Khách đổi thông tin"}, headers=login("ketoan")).json()["message"]

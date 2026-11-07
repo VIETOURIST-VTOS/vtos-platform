@@ -2,7 +2,7 @@
 
 | Làn | Mã việc | Tệp sẽ đụng | Bắt đầu | Trạng thái |
 |---|---|---|---|---|
-| TC-KT | TKC-3 — một bảng khai «đường ghi → tài khoản chi tiết» | backend/app/services/tk_chi_tiet.py, backend/app/services/rules.py, backend/app/services/ops.py, backend/app/services/accounting.py, backend/app/services/misa.py, backend/app/services/reports.py, backend/tests/test_tkc3_nan_duong_ghi_ve_tai_khoan_con.py, backend/tests/test_accounting.py, backend/tests/test_ops.py, backend/tests/test_ci_hang_rao_main.py, .github/workflows/ci.yml, docs/dang-lam/tc-kt/TKC-3.md | 07-11-2026 23:45 | đang làm |
+| TC-KT | TKC-3 — một bảng khai «đường ghi → tài khoản chi tiết» | backend/app/services/tk_chi_tiet.py, backend/app/services/rules.py, backend/app/services/ops.py, backend/app/services/accounting.py, backend/app/services/misa.py, backend/app/services/reports.py, backend/tests/test_tkc3_nan_duong_ghi_ve_tai_khoan_con.py, backend/tests/test_accounting.py, backend/tests/test_ops.py, backend/tests/test_ci_hang_rao_main.py, .github/workflows/ci.yml, docs/dang-lam/tc-kt/TKC-3.md | 07-11-2026 23:45 | xong |
 
 Nhịp 1 (Đợt TKC-2) đo trên sổ thật: 187 dòng vào 13 tài khoản cha. Đọc mã đếm được 14 chỗ gõ
 cứng tài khoản cha. Đợt này nắn BA đường (đề nghị chi, quyết toán tour, kết chuyển lãi/lỗ) qua

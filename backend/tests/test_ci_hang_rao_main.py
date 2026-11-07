@@ -127,6 +127,10 @@ HANG_RAO = (
     # Luat 1 canh BANG KHAI co MOT nguon (tham so sinh ra tu KHOA, khong chep tay). Luat 3 canh
     # `ops` va `misa` khong con la HAI bang lech nhau. Dot nay CHUA BAT CHAN — do la nhip 3.
     "tests/test_tkc3_nan_duong_ghi_ve_tai_khoan_con.py",
+    # ── NHIP 2b, them 07/11/2026 (Dot TKC-4) ───────────────────────────────────────────────
+    # Luat 2 canh HOA DON KHONG GAN CHUYEN khong roi vao doanh thu tour noi dia. Luat 3
+    # canh no goc vay chon theo KY HAN cua khe uoc, do o ca hai phia moc 12 thang.
+    "tests/test_tkc4_bon_duong_ghi_tiep_theo.py",
 )
 
 

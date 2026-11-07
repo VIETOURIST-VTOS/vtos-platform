@@ -52,6 +52,36 @@ KHOA: dict[str, tuple[str, str]] = {
     "qt_gia_von_thue_xe":     ("6323", "Quyết toán – giá vốn dịch vụ cho thuê xe"),
     # ── Kết chuyển lãi/lỗ (`reports.ket_chuyen`, `misa.chot_so_kiem_toan`) ─────────────────
     "kc_lai_lo":              ("4212", "Kết chuyển lãi/lỗ về lợi nhuận sau thuế chưa phân phối"),
+    # ── ĐỢT TKC-4 07/11/2026 — bốn đường ghi tiếp theo ─────────────────────────────────────
+    # Phát hành hóa đơn (`accounting.on_invoice_issued`)
+    "hd_doanh_thu_noi_dia":    ("51131", "Hóa đơn – doanh thu tour NỘI ĐỊA"),
+    "hd_doanh_thu_nuoc_ngoai": ("51137", "Hóa đơn – doanh thu tour NƯỚC NGOÀI"),
+    "hd_doanh_thu_thue_xe":    ("51133", "Hóa đơn – doanh thu cho thuê xe"),
+    "hd_doanh_thu_khong_tour": ("51136", "Hóa đơn KHÔNG gắn chuyến nào – doanh thu dịch vụ khác"),
+    "hd_gtgt_dau_ra":          ("33311", "Hóa đơn – thuế GTGT đầu ra"),
+    # Bảng lương (`hr.post_payroll_entries`)
+    "luong_chi_phi_quan_ly":   ("6421", "Lương HĐLĐ – chi phí nhân viên quản lý"),
+    "luong_phai_tra_nld":      ("3341", "Lương – phải trả công nhân viên"),
+    "luong_ctv_gia_von":       ("6326", "Thù lao HDV/CTV – giá vốn dịch vụ khác"),
+    "luong_ctv_phai_tra":      ("3388", "Thù lao HDV/CTV và khấu trừ TNCN – phải trả, phải nộp khác"),
+    # Khế ước vay (`finance.settle`)
+    "vay_goc_ngan_han":        ("34111", "Vay – nợ gốc NGẮN HẠN (đáo hạn trong 12 tháng)"),
+    "vay_goc_dai_han":         ("34112", "Vay – nợ gốc DÀI HẠN (đáo hạn sau 12 tháng)"),
+    "vay_lai":                 ("6351", "Vay – chi phí lãi vay"),
+    # Kết chuyển chi phí đội xe 627 -> 154 -> 632 (`ket_so`, bước 0)
+    "kc_627_gia_von":          ("6323", "Kết chuyển chi phí đội xe – giá vốn dịch vụ cho thuê xe"),
+}
+
+# Doanh thu hóa đơn chọn theo LOẠI TOUR của chuyến hóa đơn gắn vào — xem `doanh_thu_hoa_don`.
+# `511` có ba con và `5113` lại có bảy con nữa, nên đây là bảng HAI TẦNG rút gọn: mỗi loại tour
+# trỏ thẳng vào một tài khoản bậc năm.
+DOANH_THU_THEO_LOAI = {
+    "le_noi_dia":      "hd_doanh_thu_noi_dia",
+    "doan_noi_dia":    "hd_doanh_thu_noi_dia",
+    "non_package":     "hd_doanh_thu_noi_dia",
+    "le_nuoc_ngoai":   "hd_doanh_thu_nuoc_ngoai",
+    "doan_nuoc_ngoai": "hd_doanh_thu_nuoc_ngoai",
+    "thue_xe":         "hd_doanh_thu_thue_xe",
 }
 
 # Giá vốn quyết toán chọn theo LOẠI TOUR, không phải một hằng số.
@@ -123,3 +153,37 @@ def chon(db: Session, khoa: str) -> str:
 def gia_von_tour(db: Session, tour_type: str) -> str:
     """Tài khoản giá vốn của một chuyến, theo loại tour. Loại lạ → về nội địa và KHÔNG im lặng."""
     return chon(db, GIA_VON_THEO_LOAI.get((tour_type or "").strip(), "qt_gia_von_noi_dia"))
+
+
+def doanh_thu_hoa_don(db: Session, tour) -> str:
+    """Tài khoản doanh thu của một hóa đơn, theo loại tour của chuyến nó gắn vào.
+
+    HÓA ĐƠN KHÔNG GẮN CHUYẾN NÀO ra `51136` (dịch vụ khác), KHÔNG ra doanh thu tour nội địa.
+    Lấy mặc định là nội địa cho một hóa đơn không biết thuộc đâu là cộng thêm vào doanh thu tour
+    nội địa một khoản không phải của nó — và báo cáo doanh thu theo dòng sản phẩm sai từ đó,
+    một cách im lặng.
+    """
+    loai = (getattr(tour, "tour_type", "") or "").strip() if tour is not None else ""
+    if tour is None:
+        return chon(db, "hd_doanh_thu_khong_tour")
+    return chon(db, DOANH_THU_THEO_LOAI.get(loai, "hd_doanh_thu_khong_tour"))
+
+
+def vay_goc(db: Session, hop_dong, hom_nay=None) -> str:
+    """Tài khoản nợ gốc của một khế ước: NGẮN HẠN nếu đáo hạn trong 12 tháng, không thì DÀI HẠN.
+
+    Suy ra TỪ DỮ LIỆU đã có trên khế ước (`maturity`), không hỏi ai — đây là phép phân loại kỳ
+    hạn của TT200 chứ không phải một lựa chọn chính sách.
+
+    `34113` (Nợ dài hạn đến hạn trả) CỐ Ý không dùng ở đây: nó là tài khoản của bước PHÂN LOẠI
+    LẠI khi lập báo cáo, không phải tài khoản để ghi một lần trả gốc hay một lần nhận vay vào.
+
+    Khế ước KHÔNG khai ngày đáo hạn thì về NGẮN HẠN. Hai lựa chọn đều là đoán; ngắn hạn là phía
+    làm nợ phải trả ngắn hạn trông lớn hơn, tức phía thận trọng hơn khi đọc khả năng thanh toán.
+    """
+    from datetime import date as _date
+    han = getattr(hop_dong, "maturity", None)
+    if han is None:
+        return chon(db, "vay_goc_ngan_han")
+    moc = hom_nay or _date.today()
+    return chon(db, "vay_goc_ngan_han" if (han - moc).days <= 365 else "vay_goc_dai_han")
