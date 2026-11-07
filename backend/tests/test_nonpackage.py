@@ -75,5 +75,5 @@ def test_close_month_posts_accounting():
     res = client.post("/api/v1/non-package/close-month", json={"month": "2026-07"}, headers=login("ketoan")).json(); assert row["tour_code"] in res["closed"], res
     d = client.get(f"/api/v1/tours/{row['tour_id']}/detail", headers=h).json(); assert d["status"] == "kt_xac_nhan" and d["actual_revenue"] == 3000000 and d["actual_cost"] == 2400000
     es = [e for e in client.get("/api/v1/journal", headers=login("ketoan")).json() if e["source_ref"] == f"tour:{row['tour_code']}"]
-    pairs = {(l["account"], l["debit"], l["credit"]) for e in es for l in e["lines"]}; assert ("632", 2400000, 0) in pairs and ("335", 0, 2400000) in pairs
+    pairs = {(l["account"], l["debit"], l["credit"]) for e in es for l in e["lines"]}; assert ("6321", 2400000, 0) in pairs and ("335", 0, 2400000) in pairs   # TKC-3/4: giá vốn ghi vào TK chi tiết 6321
     assert client.get("/api/v1/audit", headers=login("bks")).json()["chain_ok"] is True
