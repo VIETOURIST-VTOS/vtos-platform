@@ -119,6 +119,10 @@ HANG_RAO = (
     # Luat 2 canh cho nang nhat: MOT bo luat cho HAI duong nhap. Chep luat ra hai cho thi som
     # muon hai cho lech nhau, va luc ay Excel nhan cai ma nhap tay tu choi.
     "tests/test_cptt2_cot_tk_chi_phi_trong_mau_excel.py",
+    # ── NHIP 1 CUA BA NHIP TAI KHOAN CHA, them 07/11/2026 (Dot TKC-2) ───────────────────────
+    # Luat 2 canh bang gop DEM TREN TOAN BO, khong cat o `gioi_han`. Luat 4 canh dot nay CHUA
+    # CHAN GI — nhip 1 la DO, va cua van CHI DOC.
+    "tests/test_tkc2_duong_ghi_vao_tai_khoan_cha.py",
 )
 
 
