@@ -737,6 +737,57 @@ def _du_tren_cha(db: Session, cha: str, ky: str) -> float:
     return round(float(n or 0) - float(c or 0), 0)
 
 
+def _so_lieu_gtgt(db: Session, ky: str) -> tuple:
+    """KS-KSO · 08/11/2026 — năm con số của bản xem trước bù trừ GTGT trong HAI câu hỏi thay cho bảy.
+
+    Đo trên crm thật: bản xem trước này chờ 4,3–4,7 giây. Nó đọc danh mục tài khoản HAI lần để dựng
+    hai cây, rồi quét sổ cái NĂM lần (phát sinh đầu ra trong kỳ, đầu vào trong kỳ, đầu vào lũy kế, dư
+    trên chính 3331, dư trên chính 133). Năm lần ấy cùng một tập dòng — dòng đã ghi sổ của hai cây,
+    kỳ ≤ `ky` — chỉ khác cách cộng. Nay quét MỘT lần, gom theo tài khoản, tách phần trong kỳ bằng
+    CASE, rồi cộng ở đây đúng như `_ps_cay` / `_du_tren_cha` cộng. Cùng công thức, cùng làm tròn."""
+    from sqlalchemy import case
+    cac = {a.code: a for a in db.execute(select(Account)).scalars()}
+
+    def cay(goc: str) -> list[str]:
+        ra, cho = [], [goc]
+        while cho:
+            c = cho.pop()
+            if c in cac and c not in ra:
+                ra.append(c)
+                cho += [x.code for x in cac.values() if x.parent == c]
+        return sorted(ra)
+
+    cay_ra, cay_vao = cay(TK_GTGT_RA_CHA), cay(TK_GTGT_VAO_CHA)
+    trong = JournalEntry.period == ky
+    gom = {}
+    for ma, n_lk, c_lk, n_ky, c_ky in db.execute(
+            select(JournalLine.account_code, func.sum(JournalLine.debit), func.sum(JournalLine.credit),
+                   func.sum(case((trong, JournalLine.debit), else_=0)),
+                   func.sum(case((trong, JournalLine.credit), else_=0)))
+            .join(JournalEntry)
+            .where(JournalEntry.status == "da_ghi_so", JournalEntry.period <= ky,
+                   JournalLine.account_code.in_(sorted(set(cay_ra) | set(cay_vao)
+                                                       | {TK_GTGT_RA_CHA, TK_GTGT_VAO_CHA})))
+            .group_by(JournalLine.account_code)).all():
+        gom[ma] = (float(n_lk or 0), float(c_lk or 0), float(n_ky or 0), float(c_ky or 0))
+
+    def ps(cay_: list[str], luy_ke: bool) -> dict:
+        no = co = 0.0
+        for ma in cay_:
+            if ma in gom:
+                g = gom[ma]
+                no += g[0] if luy_ke else g[2]
+                co += g[1] if luy_ke else g[3]
+        return {"no": round(no, 0), "co": round(co, 0)}
+
+    def du_cha(cha: str) -> float:
+        g = gom.get(cha, (0.0, 0.0, 0.0, 0.0))
+        return round(g[0] - g[1], 0)
+
+    return (ps(cay_ra, False), ps(cay_vao, False), ps(cay_vao, True),
+            du_cha(TK_GTGT_RA_CHA), du_cha(TK_GTGT_VAO_CHA))
+
+
 def xem_truoc_bu_tru_gtgt(db: Session, ky: str) -> dict:
     """Bản xem trước. Mọi đường GHI ở tệp này đều có một đường XEM TRƯỚC — xem ghi chú đầu tệp.
 
@@ -753,11 +804,10 @@ def xem_truoc_bu_tru_gtgt(db: Session, ky: str) -> dict:
     from app.services import rules as R
     ky_kk = (R.get_param_chu(db, R.GTGT_KY_KE_KHAI_KEY) or "").strip().lower()
 
-    cay_ra, cay_vao = _cay_tk(db, TK_GTGT_RA_CHA), _cay_tk(db, TK_GTGT_VAO_CHA)
-    ps_ra = _ps_cay(db, cay_ra, ky, luy_ke=False)
-    ps_vao = _ps_cay(db, cay_vao, ky, luy_ke=False)
+    # KS-KSO: hai câu hỏi thay bảy — xem `_so_lieu_gtgt`. `_cay_tk`, `_ps_cay`, `_du_tren_cha` vẫn
+    # giữ nguyên làm thước đối chiếu cho phép thử.
+    ps_ra, ps_vao, lk_vao, cha_ra, cha_vao = _so_lieu_gtgt(db, ky)
     # Dư Nợ 133 ĐẦU KỲ = lũy kế đến hết kỳ trừ đi phát sinh trong kỳ.
-    lk_vao = _ps_cay(db, cay_vao, ky, luy_ke=True)
     du_dau_vao = round((lk_vao["no"] - lk_vao["co"]) - (ps_vao["no"] - ps_vao["co"]), 0)
 
     dau_ra = round(ps_ra["co"] - ps_ra["no"], 0)
@@ -770,7 +820,6 @@ def xem_truoc_bu_tru_gtgt(db: Session, ky: str) -> dict:
     da = db.execute(select(JournalEntry).where(JournalEntry.source_type == NGUON_BU_TRU_GTGT,
                                                JournalEntry.source_ref == ref,
                                                JournalEntry.status == "da_ghi_so")).scalars().first()
-    cha_ra, cha_vao = _du_tren_cha(db, TK_GTGT_RA_CHA, ky), _du_tren_cha(db, TK_GTGT_VAO_CHA, ky)
 
     canh = []
     if not ky_kk:
