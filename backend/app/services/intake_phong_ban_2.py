@@ -855,6 +855,11 @@ def _cc_kiem(db: Session, r):
         _ngay(r.get("ngay_bat_dau_pb"))
     except ValueError as ex:
         loi.append(str(ex))
+    # ĐỢT CPTT-2 — CÙNG MỘT HÀM với cửa nhập tay (`assets.create_prepaid`). Không chép luật.
+    from app.services.assets import kiem_tk_chi_phi
+    _loi_tk = kiem_tk_chi_phi(db, r.get("tk_chi_phi"))
+    if _loi_tk:
+        loi.append(_loi_tk)
     trung = db.execute(select(PrepaidExpense).where(
         func.upper(PrepaidExpense.code) == ma)).scalars().first() if ma else None
     return loi, cb, (trung.code if trung is not None else None)
@@ -868,6 +873,10 @@ def _cc_nap(db: Session, r, boi):
                        kind=str(r.get("loai") or "ccdc").strip()[:20],
                        partner_code=str(r.get("nha_cung_cap") or "").strip()[:60],
                        department=str(r.get("bo_phan") or "").strip()[:20],
+                       # ĐỢT CPTT-2 — cột có trong mẫu mà không đọc ở đây thì bằng không có cột,
+                       # đúng chỗ Đợt CPTT-1 phát hiện ở màn hình (ô có trên form mà không gửi).
+                       expense_account=str(r.get("tk_chi_phi") or "").strip()[:10],
+                       project_code=str(r.get("ma_cong_trinh") or "").strip()[:40],
                        start_date=_ngay(r.get("ngay_bat_dau_pb")) or date.today(),
                        amount=_so(r.get("gia_tri")), months=int(_so(r.get("so_ky_pb")) or 1),
                        opening_allocated=_so(r.get("da_phan_bo")),
@@ -1528,6 +1537,18 @@ def bo_nap(_c) -> dict:
                        chon={k: v["ten"] for k, v in PREPAID_KINDS.items()}),
                     _c("nha_cung_cap", "Nhà cung cấp"),
                     _c("bo_phan", "Bộ phận sử dụng", vi_du="doi_xe"),
+                    # ĐỢT CPTT-2 07/11/2026 — hai cột này ĐÃ CÓ trong bảng và trong cửa nhập
+                    # tay từ Đợt CPTT-1, chỉ mẫu Excel là thiếu. Thiếu nên mọi dòng nạp hàng
+                    # loạt rơi vào mặc định `6423` của mô hình.
+                    #
+                    # KHAI `kieu="chu"` CHỨ KHÔNG `kieu="chon"`, và đó là chỗ có lý do:
+                    # `_c(..., chon={...})` cần danh sách dựng sẵn lúc nạp mô-đun, mà danh mục
+                    # tài khoản thì phải hỏi CSDL. Nên việc canh nằm ở `_cc_kiem`, nơi có `db`.
+                    _c("tk_chi_phi", "TK chi phí nhận phân bổ", True, vi_du="627",
+                       ghi_chu="Tài khoản CHI TIẾT trong nhóm 154, 622, 623, 627, 635, 641, "
+                               "642, 241 — không nhận tài khoản tổng hợp như 641 hay 642"),
+                    _c("ma_cong_trinh", "Mã công trình (tour)",
+                       ghi_chu="Để trống nếu khoản này không thuộc chuyến nào"),
                     _c("ngay_bat_dau_pb", "Ngày bắt đầu phân bổ", True, kieu="ngay", vi_du="01/08/2026"),
                     _c("gia_tri", "Giá trị phân bổ", True, kieu="tien", min=0, vi_du="48000000"),
                     _c("so_ky_pb", "Số kỳ phân bổ", True, kieu="so", vi_du="12"),
