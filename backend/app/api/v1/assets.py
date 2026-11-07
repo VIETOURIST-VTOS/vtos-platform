@@ -41,9 +41,14 @@ def prepaid_out(p: PrepaidExpense) -> dict:
 
 
 @router.get("/assets/meta")
-def meta(u: User = Depends(require_roles(*READ))):
-    """Danh mục loại TSCĐ / CCDC và trạng thái – để dựng form giống MISA."""
-    return {"asset_kinds": ASSET_KINDS, "asset_status": ASSET_STATUS, "prepaid_kinds": PREPAID_KINDS, "prepaid_status": PREPAID_STATUS}
+def meta(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Danh mục loại TSCĐ / CCDC và trạng thái – để dựng form giống MISA.
+
+    ĐỢT CPTT-1 07/11/2026 thêm `tk_chi_phi`: bộ TK nhận phân bổ 242, ĐỌC THẲNG DANH MỤC chứ
+    không gõ cứng một danh sách ngắn ở đây — danh mục đổi thì danh sách gõ cứng lệch, mà không
+    ai biết. Chỉ tài khoản CHI TIẾT, xem `assets.tk_chi_phi_nhan_phan_bo`."""
+    return {"asset_kinds": ASSET_KINDS, "asset_status": ASSET_STATUS, "prepaid_kinds": PREPAID_KINDS,
+            "prepaid_status": PREPAID_STATUS, "tk_chi_phi": AS.tk_chi_phi_nhan_phan_bo(db)}
 
 
 # ---------- Thẻ tài sản cố định ----------

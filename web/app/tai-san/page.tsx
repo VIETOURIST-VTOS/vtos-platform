@@ -53,7 +53,10 @@ function TaiSan() {
         start_date: f.start_date, quantity: Number(f.quantity) || 1, note: f.note || "" };
       if (la) Object.assign(body, { purchase_date: f.purchase_date || null, cost: soTien(f.cost),
         depr_months: Number(f.depr_months) || 0, salvage: soTien(f.salvage) });
-      else Object.assign(body, { amount: soTien(f.cost), months: Number(f.depr_months) || 1 });
+      else Object.assign(body, { amount: soTien(f.cost), months: Number(f.depr_months) || 1,
+        // ĐỢT CPTT-1 — hai ô này CHỈ của chi phí trả trước, nên nằm trong nhánh `else` chứ không
+        // rải chung: tài sản cố định có đường khấu hao riêng với TK của riêng nó.
+        expense_account: f.expense_account || "", project_code: f.project_code || "" });
       await api(la ? "/fixed-assets" : "/prepaid", { method: "POST", json: body });
       toast("Đã ghi. Nhớ đính kèm hóa đơn và biên bản bàn giao."); setF(null); await load();
     } catch (e) { toast(errMsg(e), true); } finally { setLuu(false); }
@@ -84,13 +87,24 @@ function TaiSan() {
       {canGhi && !f && <button className="act" onClick={() => setF({ loai, code: "", name: "",
         kind: Object.keys((loai === "ts" ? meta?.asset_kinds : meta?.prepaid_kinds) || {})[0] || "",
         department: "", purchase_date: "", start_date: "", cost: "", depr_months: "", salvage: "",
-        quantity: 1, note: "" })}>+ Thêm</button>}
-      <table><thead><tr><th>Mã</th><th>Tên</th><th>Nhóm</th><th>Bộ phận</th><th>Bắt đầu</th>
+        expense_account: "", project_code: "", quantity: 1, note: "" })}>+ Thêm</button>}
+      {loai === "tt" && rows.some((a: any) => a.expense_account === CANH_BAO_TK_CU) &&
+        <p className="muted small">
+          <Tag cls="warn">{rows.filter((a: any) => a.expense_account === CANH_BAO_TK_CU).length} khoản đang phân bổ vào {CANH_BAO_TK_CU}</Tag>{" "}
+          Những khoản này nhập trước khi màn hình có ô chọn, hoặc nạp từ Excel — đường nạp hàng
+          loạt chưa có cột TK chi phí (đợt riêng). Sửa là việc của Kế toán, máy không tự đổi.
+        </p>}
+      <table><thead><tr><th>Mã</th><th>Tên</th><th>Nhóm</th><th>Bộ phận</th>
+        {loai === "tt" && <><th>TK chi phí</th><th>Công trình</th></>}<th>Bắt đầu</th>
         <th className="num">{tienTen}</th><th className="num">{thangTen}</th>
         <th className="num">Mỗi kỳ</th><th>Trạng thái</th><th></th></tr></thead>
         <tbody>{rows.length ? rows.map((a: any) => <tr key={a.id}>
           <td className="mono">{a.code}</td><td><b>{a.name}</b></td>
           <td className="muted">{a.kind_name}</td><td className="muted">{a.department}</td>
+          {loai === "tt" && <>
+            <td className="mono">{a.expense_account === CANH_BAO_TK_CU
+              ? <Tag cls="warn">{a.expense_account}</Tag> : a.expense_account}</td>
+            <td className="mono muted">{a.project_code || "—"}</td></>}
           <td>{fmtD(a.start_date)}</td>
           <td className="num">{vnd(a.cost ?? a.amount)}</td>
           <td className="num muted">{a.depr_months ?? a.months}</td>
@@ -164,6 +178,16 @@ function TaiSan() {
         <label>{f.loai === "ts" ? "Nguyên giá" : "Số tiền"}
           <input type="number" step={100000} value={f.cost}
                  onChange={(e) => setF({ ...f, cost: e.target.value })} /></label>
+        {f.loai === "tt" && <label>TK chi phí nhận phân bổ
+          <select value={f.expense_account}
+                  onChange={(e) => setF({ ...f, expense_account: e.target.value })}>
+            <option value="">— chọn tài khoản —</option>
+            {(meta?.tk_chi_phi || []).map((t: any) =>
+              <option key={t.ma} value={t.ma}>{t.ma} — {t.ten}</option>)}
+          </select></label>}
+        {f.loai === "tt" && <label>Mã công trình (tour)
+          <input value={f.project_code} placeholder="để trống nếu không thuộc chuyến nào"
+                 onChange={(e) => setF({ ...f, project_code: e.target.value })} /></label>}
         <label>Số kỳ {f.loai === "ts" ? "khấu hao (tháng)" : "phân bổ"}
           <input type="number" value={f.depr_months}
                  onChange={(e) => setF({ ...f, depr_months: e.target.value })} /></label>
@@ -185,5 +209,10 @@ function TaiSan() {
     <div className="panel"><CapPhatTaiSan /></div>
   </>);
 }
+
+// ĐỢT CPTT-1 07/11/2026 — TK mặc định CŨ của chi phí trả trước. Trước đợt này màn hình
+// không có ô chọn nên mọi khoản rơi vào đây, và đường nạp Excel vẫn còn rơi vào đây
+// (đợt riêng). Hiện ra để Kế toán sửa, KHÔNG tự đổi — đổi hộ là đoán thay người.
+const CANH_BAO_TK_CU = "6423";
 
 export default function Page() { return <Shell><TaiSan /></Shell>; }

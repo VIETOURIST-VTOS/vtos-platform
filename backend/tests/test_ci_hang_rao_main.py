@@ -107,6 +107,10 @@ HANG_RAO = (
     # Luat 1 canh hai cong thuc KHONG doi xung (dau ra trong ky, dau vao co du dau ky) — chep
     # nham thanh doi xung la cho sai kinh dien. Luat 2 canh but toan ghi vao TAI KHOAN CON.
     "tests/test_gtgt1_bu_tru_thue_gtgt.py",
+    # ── HAI O CON THIEU CUA CHI PHI TRA TRUOC 242, them 07/11/2026 (Dot CPTT-1) ─────────────
+    # Luat 1 canh rang mac dinh `6423` KHONG quay lai; luat 2 canh khong ai chon duoc tai
+    # khoan cha; luat 4 canh man hinh thuc su GUI hai o chu khong chi ve ra chung.
+    "tests/test_cptt1_hai_o_chi_phi_tra_truoc.py",
 )
 
 
