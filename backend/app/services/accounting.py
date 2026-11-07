@@ -319,11 +319,18 @@ def on_receipt_confirmed(db: Session, r: Receipt, actor: str, role: str) -> Jour
 
 
 def on_invoice_issued(db: Session, inv: Invoice) -> JournalEntry:
-    """Phát hành hóa đơn → Nợ 131 – Có 511 (doanh thu chưa thuế), Có 3331 (thuế GTGT)."""
+    """Phát hành hóa đơn → Nợ 131 – Có doanh thu (chưa thuế), Có thuế GTGT đầu ra.
+
+    ĐỢT TKC-4 07/11/2026: `511` và `3331` đều là tài khoản TỔNG HỢP. Doanh thu chọn theo LOẠI
+    TOUR của chuyến hóa đơn gắn vào; hóa đơn không gắn chuyến nào ra «doanh thu dịch vụ khác»
+    chứ KHÔNG ra doanh thu tour nội địa — xem `tk_chi_tiet.doanh_thu_hoa_don`.
+    """
+    from app.services import tk_chi_tiet as TKCT
+    _t = db.get(Tour, inv.tour_id) if inv.tour_id else None
     lines = [{"account": "131", "debit": inv.total, "partner": inv.customer_name, "booking_id": inv.booking_id},
-             {"account": "511", "credit": inv.pre_tax, "partner": inv.customer_name, "booking_id": inv.booking_id}]
+             {"account": TKCT.doanh_thu_hoa_don(db, _t), "credit": inv.pre_tax, "partner": inv.customer_name, "booking_id": inv.booking_id}]
     if (inv.vat or 0) > 0:
-        lines.append({"account": "3331", "credit": inv.vat, "partner": inv.customer_name})
+        lines.append({"account": TKCT.chon(db, "hd_gtgt_dau_ra"), "credit": inv.vat, "partner": inv.customer_name})
     return post_entry(db, "robot", "robot", inv.issue_date, f"Hóa đơn {inv.series}-{inv.number:07d} – {inv.customer_name}", lines,
                       "hoa_don", f"invoice:{inv.series}-{inv.number}", inv.tour_id, nghiep_vu="phat_hanh_hoa_don")
 

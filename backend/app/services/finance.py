@@ -92,9 +92,15 @@ def settle(db: Session, u: User, s: FinSchedule, done_on: date, bank_ref: str, a
     # `accounting.on_receipt_confirmed`. Khế ước luôn chạy qua ngân hàng (trả gốc, trả lãi, nhận
     # vay, giải ngân, thu hồi), nên cả năm dòng là `1121` — KHÔNG có nhánh tiền mặt ở đây, và
     # không đợt nào được thêm một nhánh như thế mà không hỏi Kế toán trưởng.
-    lines = {"tra_goc": [{"account": "341", "debit": amt}, {"account": TK_TIEN_GUI_CT, "credit": amt}],
-             "tra_lai": [{"account": "635", "debit": amt}, {"account": TK_TIEN_GUI_CT, "credit": amt}],
-             "nhan_vay": [{"account": TK_TIEN_GUI_CT, "debit": amt}, {"account": "341", "credit": amt}],
+    # ĐỢT TKC-4 07/11/2026 — `341` và `635` là tài khoản TỔNG HỢP (`341` -> `3411` -> `34111` /
+    # `34112` / `34113`). Nợ gốc chọn theo KỲ HẠN của chính khế ước (`maturity`), suy ra từ dữ
+    # liệu đã có chứ không hỏi ai — xem `tk_chi_tiet.vay_goc`.
+    from app.services import tk_chi_tiet as TKCT
+    tk_goc = TKCT.vay_goc(db, c)
+    tk_lai = TKCT.chon(db, "vay_lai")
+    lines = {"tra_goc": [{"account": tk_goc, "debit": amt}, {"account": TK_TIEN_GUI_CT, "credit": amt}],
+             "tra_lai": [{"account": tk_lai, "debit": amt}, {"account": TK_TIEN_GUI_CT, "credit": amt}],
+             "nhan_vay": [{"account": TK_TIEN_GUI_CT, "debit": amt}, {"account": tk_goc, "credit": amt}],
              "giai_ngan": [{"account": acc, "debit": amt}, {"account": TK_TIEN_GUI_CT, "credit": amt}],
              "thu_hoi": [{"account": TK_TIEN_GUI_CT, "debit": amt}, {"account": acc, "credit": amt}]}[s.kind]
     for l in lines: l["partner"] = c.partner
