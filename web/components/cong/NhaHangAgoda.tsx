@@ -444,7 +444,7 @@ export default function NhaHangAgoda({ ten = "", lienHe = "", coSdt = false, sdt
 const CSS = `
 .nhv{--ksv-accent:#14538D;--ksv-ink:#14538D}
 .nhv-hero{background:linear-gradient(135deg,#0B2545,#1E63C8);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px;color:#fff}
-.nhv-hero.gon{padding:10px;background:#1f2a5a}
+.nhv-hero.gon{padding:10px;background:#14538D}
 .nhv-ht{font-size:22px;font-weight:800;text-wrap:balance}.nhv-hs{font-size:13px;opacity:.9;margin-top:-6px}
 .nhv-sbar{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,.7fr) minmax(0,1.1fr) auto;gap:8px}
 .nhv-khach{padding:6px 10px}
