@@ -126,7 +126,8 @@ def test_match_paid_close_return_and_advance_posting():
     es = [e for e in client.get("/api/v1/journal", headers=login("ketoan")).json() if e["source_ref"] == "tour:DN-HCM-0820"]
     pairs = {(l["account"], l["debit"], l["credit"]) for e in es for l in e["lines"]}
     # hoàn ứng 141 → 154; phần chưa có lệnh chi (85.275.000 − 54.000.000 − 1.000.000) trích 335; kết chuyển 632
-    assert ("154", 1000000, 0) in pairs and ("141", 0, 1000000) in pairs and ("335", 0, 30275000) in pairs and ("632", 85275000, 0) in pairs
+    # TKC-3/4 (#720, #723): bút toán ghi vào TÀI KHOẢN CHI TIẾT — 154 → 1541, 632 → 6321.
+    assert ("1541", 1000000, 0) in pairs and ("141", 0, 1000000) in pairs and ("335", 0, 30275000) in pairs and ("6321", 85275000, 0) in pairs
     assert client.get("/api/v1/audit", headers=login("bks")).json()["chain_ok"] is True
 
 

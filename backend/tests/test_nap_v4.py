@@ -344,7 +344,9 @@ def test_tai_san_nap_chi_tao_moi(db):
 
 
 def test_ccdc_da_phan_bo_khong_duoc_vuot_gia_tri(db):
-    kq = nap(db, "cong_cu_dung_cu", [{"ma_ccdc": "CCV4-1", "ten": "Bộ lốp",
+    # CPTT-2 (#713): `tk_chi_phi` là cột BẮT BUỘC — thiếu nó thì dòng dừng ở lỗi «thiếu tk chi phí»
+    # trước khi tới luật đang đo ở đây, nên phải có đủ cột.
+    kq = nap(db, "cong_cu_dung_cu", [{"ma_ccdc": "CCV4-1", "ten": "Bộ lốp", "tk_chi_phi": "627",
                                       "ngay_bat_dau_pb": "01/08/2026", "gia_tri": "48.000.000",
                                       "so_ky_pb": "12", "da_phan_bo": "60.000.000",
                                       "ky_so_du": "2026-07"}])
