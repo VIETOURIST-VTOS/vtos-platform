@@ -221,4 +221,4 @@ def test_mau_bieu_do_khong_bi_doi_ke_trong_vong_chinh_chu():
     lại cả bộ ba — việc riêng, không gộp vào vòng chỉnh chữ."""
     assert _bien("--vtos-navy").upper() == "#6FA8F0"
     assert _bien("--vtos-success").upper() == "#53C49A"
-    assert _bien("--vtos-danger").upper() == "#6FA8F0"   # KS-NAVY 07/11: đỏ → navy sáng
+    assert _bien("--vtos-danger").upper() == "#FF6B90"   # KS-MUC 07/11: trả lại hồng

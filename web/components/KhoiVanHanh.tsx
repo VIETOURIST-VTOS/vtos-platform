@@ -45,7 +45,9 @@ const gio = (s?: string | null) => (s && s.length >= 16 ? `${s.slice(11, 16)} ·
 const TEN_MUC: Record<string, string> = {
   red: "Nghiêm trọng", warn: "Cảnh báo", info: "Theo dõi", chua_phan_loai: "Chưa phân loại",
 };
-const MAU_MUC: Record<string, string> = { red: "c-do", warn: "c-vang", info: "c-xam", chua_phan_loai: "c-la" };
+// KS-MUC 07/11: ba mức ba màu; chưa phân loại xám (trước đây «Cảnh báo» lấy nhầm màu xanh của «Theo dõi»).
+const MAU_MUC: Record<string, string> = { red: "c-do", warn: "c-vang", info: "c-xanh", chua_phan_loai: "c-xam" };
+const DONG_MUC: Record<string, string> = { red: " qh", warn: " cb", info: " td" };
 
 /** Một con số trong ô. `undefined` = máy chủ chưa có trường; `null` = máy chủ tính hỏng. */
 function So({ v, dv, onThuLai }: { v: any; dv?: string; onThuLai?: () => void }) {
@@ -117,11 +119,11 @@ export function KhoiVanHanh({ d, onThuLai, luu_dem }: {
           <div className="vh-nhan">Việc nghiêm trọng</div>
           <So v={do_} dv="việc đang mở ở mức đỏ" onThuLai={onThuLai} />
           {v && tong > 0 && <div className="vh-thanh" aria-hidden="true">
-            {thanh.map((m: any) => <i key={m.ma} className={MAU_MUC[m.ma] || "c-la"}
+            {thanh.map((m: any) => <i key={m.ma} className={MAU_MUC[m.ma] || "c-xam"}
               style={{ width: `${(m.viec / tong) * 100}%` }} />)}</div>}
           {v && <>
             {(v.theo_muc || []).map((m: any) => (
-              <div key={m.ma} className={"vh-dong" + (m.ma === "red" ? " qh" : "")}>
+              <div key={m.ma} className={"vh-dong" + (DONG_MUC[m.ma] || "")}>
                 <span className="v">{so(m.viec)}</span>
                 <span className="t"><b>{TEN_MUC[m.ma] || m.ten}</b>
                   {tong > 0 && m.viec > 0 && <small>{Math.round((m.viec / tong) * 100)}% · {so(m.canh_bao)} cảnh báo</small>}</span></div>))}

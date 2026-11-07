@@ -39,14 +39,16 @@ def _month_tours(db: Session, y: int, m: int) -> list[Tour]:
                                   Tour.kt_confirmed_at >= dau, Tour.kt_confirmed_at < cuoi)).scalars())
 
 
-def doanh_thu_phong(db: Session, today: date) -> dict:
+def doanh_thu_phong(db: Session, today: date, nho: dict | None = None) -> dict:
     """TC-98 · Doanh thu PKD Lẻ và PKD Đoàn: tháng này và lũy kế năm đến hôm nay.
 
     Đọc qua ĐÚNG `ket_qua_that.thang` mà khối Doanh thu ở đầu màn hình dùng, nên tổng hai phòng
     (cộng phần "khác") khớp con số doanh thu tháng/năm ở trên — không có công thức thứ hai.
     Tháng chưa có chuyến nào đủ số thì phòng ấy là 0 đồng, 0 chuyến."""
     from app.services import ket_qua_that as KQT
-    nho: dict = {}
+    # KS-KD: bảng điều hành truyền `xu_huong.nho_kqt_cho_bang` — tháng đã đóng nhớ qua lần dựng,
+    # xoá ngay khi có ghi sổ. Không truyền thì như cũ: chỗ nhớ chết cùng lần gọi.
+    nho = {} if nho is None else nho
     ky_nay = f"{today:%Y-%m}"
     ra = {"ky": ky_nay, "nam": today.year}
     thang_nay = KQT.thang(db, ky_nay, nho=nho)["theo_mang"]
@@ -289,7 +291,9 @@ def build(db: Session, u: User) -> dict:
         # phải nhớ con nào là con nào, và con dễ đọc hơn (cuối kỳ, thường dương) sẽ thắng. Vì sao
         # đáy mới là câu người điều hành hỏi — xem chú thích `day_thap_nhat` ở services/finance.py.
         _cham("ld_so_du_no_vay_phai_thu")   # KS-XE: đo từng phần của khối KPI lãnh đạo
-        fc = FIN.forecast_13w(db); k["du_bao_canh_bao"] = len(fc["alerts"])
+        # KS-KD: số dư đầu kỳ của dự báo CHÍNH LÀ `k["tien"]` vừa lấy ở trên (cùng `RP.balances`, cùng
+        # kỳ tháng hiện tại) — truyền vào để dự báo khỏi cộng lại cả sổ kế toán lần thứ hai.
+        fc = FIN.forecast_13w(db, opening=k["tien"]); k["du_bao_canh_bao"] = len(fc["alerts"])
         k["so_du_thap_nhat"] = fc["thap_nhat"]
         # TC-57 · DÒNG TIỀN NAY LÀ MỘT BIỂU ĐỒ, KHÔNG PHẢI BỐN Ô "CHƯA CÓ NGUỒN".
         #
@@ -379,7 +383,8 @@ def build(db: Session, u: User) -> dict:
         sec["kd_le"] = sorted([{"sales": users.get(i, i), "revenue": v, "pct": v / moc if moc else 0} for i, v in le.items()], key=lambda r: -(r["revenue"] or 0))
         sec["kd_doan"] = {"so_chuyen": doan_tours,
                           "rows": sorted([{"sales": users.get(i, i), "profit_share": v} for i, v in doan.items()], key=lambda r: -r["profit_share"])}
-        sec["doanh_thu_phong"] = doanh_thu_phong(db, today)
+        from app.services import xu_huong as _XH
+        sec["doanh_thu_phong"] = doanh_thu_phong(db, today, nho=_XH.nho_kqt_cho_bang(today))   # KS-KD
     _cham("kinh_doanh")
     if role in ("tp_dh", "nv_dh", "chutich", "tgd"):
         d7 = int(R.get_param(db, "moc_d7")); rows = []
