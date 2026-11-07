@@ -38,10 +38,24 @@ def phai_thu_khach(db: Session, den_ngay: date | None = None) -> dict:
     Quá hạn tính theo NGÀY KHỞI HÀNH: tiền tour phải thu đủ trước khi khách lên xe, nên một booking đã khởi
     hành mà còn dư nợ là khoản đã đi khỏi tầm kiểm soát, không phải khoản "sắp thu"."""
     hom_nay = den_ngay or date.today()
-    tours = {t.id: t for t in db.execute(select(Tour)).scalars()}
-    sales = {u.id: u.full_name for u in db.execute(select(User)).scalars()}
+    # KS-CN · 08/11/2026 — CHỈ KÉO VỀ NHỮNG BOOKING CÒN CHÊNH, VÀ CHỈ NHỮNG CỘT CẦN. Đo trên crm
+    # thật: trang Công nợ chờ 4–5,7 giây, phần lớn là nạp nguyên vẹn hơn mười nghìn booking và mọi
+    # tour thành đối tượng đầy đủ để rồi bỏ đi gần hết. Lọc `phải thu − đã thu ≠ 0` ngay trong SQL
+    # là AN TOÀN với cách làm tròn bên dưới: chênh đúng bằng 0 thì hai vế làm tròn cũng bằng nhau,
+    # nên dòng ấy vốn không vào rổ nào. Chênh khác 0 (kể cả 0,4 đồng) vẫn kéo về và để `_q` quyết
+    # như cũ — không đổi một con số nào.
+    chenh = (func.coalesce(Booking.amount, 0) - func.coalesce(Booking.discount, 0)
+             - func.coalesce(Booking.paid, 0))
+    bks = db.execute(select(Booking.id, Booking.code, Booking.customer_name, Booking.tour_id,
+                            Booking.sales_id, Booking.amount, Booking.discount, Booking.paid)
+                     .where(Booking.cancelled == False, chenh != 0).order_by(Booking.id)).all()   # noqa: E712
+    t_ids = {b.tour_id for b in bks if b.tour_id}
+    tours = {r.id: r for r in db.execute(select(Tour.id, Tour.code, Tour.name, Tour.start_date)
+                                         .where(Tour.id.in_(t_ids))).all()} if t_ids else {}
+    s_ids = {b.sales_id for b in bks if b.sales_id}
+    sales = dict(db.execute(select(User.id, User.full_name).where(User.id.in_(s_ids))).all()) if s_ids else {}
     con_thu, tra_lai, qua_han = [], [], 0.0
-    for b in db.execute(select(Booking).where(Booking.cancelled == False)).scalars():
+    for b in bks:
         phai = _q((b.amount or 0) - (b.discount or 0))
         da = _q(b.paid or 0)
         t = tours.get(b.tour_id)
@@ -69,7 +83,7 @@ def phai_thu_khach(db: Session, den_ngay: date | None = None) -> dict:
 
 def phai_tra_ncc(db: Session) -> dict:
     """Phải trả nhà cung cấp, tách nghĩa vụ đã xác lập khỏi phần còn đang chờ duyệt."""
-    tours = {t.id: t.code for t in db.execute(select(Tour)).scalars()}
+    tours = dict(db.execute(select(Tour.id, Tour.code)).all())   # KS-CN: hai cột, không nạp cả tour
 
     def gom(trang_thai):
         rows = list(db.execute(select(PaymentRequest)

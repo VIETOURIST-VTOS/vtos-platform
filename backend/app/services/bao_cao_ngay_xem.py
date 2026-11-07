@@ -231,18 +231,45 @@ def viec_cua(db: Session, u: User, ngay: int = 30) -> dict:
 
 # ---------------------------------------------------------------- tổng hợp
 
-def _noi_dung(db: Session, r: DailyReport) -> dict:
+def _nap_noi_dung(db: Session, ids: list[int]) -> tuple[dict, dict]:
+    """KS-BC · số tệp và lịch sử xem của NHIỀU báo cáo trong hai câu hỏi (cho bảng tổng hợp)."""
+    from app.models.attachments import Attachment
+    tep: dict[int, int] = {}
+    ls: dict[int, list] = {}
+    if not ids:
+        return tep, ls
+    try:
+        for (did,) in db.execute(select(Attachment.doi_tuong_id).where(
+                Attachment.doi_tuong == "bao_cao_ngay", Attachment.doi_tuong_id.in_([str(i) for i in ids]))).all():
+            try:
+                tep[int(did)] = tep.get(int(did), 0) + 1
+            except (TypeError, ValueError):
+                pass
+    except Exception:          # bảng tệp đổi tên cột thì vẫn mở được năm phần
+        tep = {}
+    for x in db.execute(select(DailyReportReview).where(DailyReportReview.report_id.in_(ids))
+                        .order_by(DailyReportReview.id)).scalars():
+        ls.setdefault(x.report_id, []).append(x)
+    return tep, ls
+
+
+def _noi_dung(db: Session, r: DailyReport, nap: tuple[dict, dict] | None = None) -> dict:
     from app.models.attachments import Attachment
     tep = 0
-    try:
-        tep = len(list(db.execute(select(Attachment.id).where(
-            Attachment.doi_tuong == "bao_cao_ngay", Attachment.doi_tuong_id == str(r.id))).scalars()))
-    except Exception:          # bảng tệp đổi tên cột thì vẫn mở được năm phần
-        tep = 0
+    if nap is not None:
+        tep = nap[0].get(r.id, 0)
+        ds_xem = nap[1].get(r.id, [])
+    else:
+        try:
+            tep = len(list(db.execute(select(Attachment.id).where(
+                Attachment.doi_tuong == "bao_cao_ngay", Attachment.doi_tuong_id == str(r.id))).scalars()))
+        except Exception:          # bảng tệp đổi tên cột thì vẫn mở được năm phần
+            tep = 0
+        ds_xem = list(db.execute(select(DailyReportReview).where(DailyReportReview.report_id == r.id)
+                                 .order_by(DailyReportReview.id)).scalars())
     lich_su = [{"hanh_dong": x.hanh_dong, "ly_do": x.ly_do, "diem": x.diem, "lan_nop": x.lan_nop, "boi": x.boi,
                 "luc": x.luc.isoformat() if x.luc else None}
-               for x in db.execute(select(DailyReportReview).where(DailyReportReview.report_id == r.id)
-                                   .order_by(DailyReportReview.id)).scalars()]
+               for x in ds_xem]
     return {"p1": r.part1_done, "p2": O.parse_part2(r.part2_numbers), "p3": r.part4_plan, "p4": r.part3_issues,
             "vuong_mac_cho": r.vuong_mac_cho, "vuong_mac_cho_ten": ten_phong(r.vuong_mac_cho) if r.vuong_mac_cho else "",
             "vuong_mac_han": r.vuong_mac_han.isoformat() if r.vuong_mac_han else None,
@@ -256,15 +283,22 @@ def tong_hop(db: Session, u: User, d: date, phong: str = "", now: datetime | Non
     pv_tt, pv_nd = pham_vi_trang_thai(db, u), pham_vi_noi_dung(db, u)
     if pv_tt is not None and not pv_tt:
         raise PermissionError("Bạn chưa được giao xem báo cáo ngày của phòng nào")
-    emps = [e for e in O.nhan_vien_phai_nop(db) if trong(pv_tt, e.department)]
+    tat_ca = O.nhan_vien_phai_nop(db)          # KS-BC: một lần, dùng lại cho danh sách người giao việc
+    emps = [e for e in tat_ca if trong(pv_tt, e.department)]
     cac_phong = sorted({e.department for e in emps}, key=lambda m: ten_phong(m))
     if phong:
         emps = [e for e in emps if e.department == phong]
     bc = {r.user_id: r for r in db.execute(select(DailyReport).where(DailyReport.report_date == d)).scalars()}
+    # KS-BC · 08/11/2026 — NẠP MỘT LẦN CHO CẢ BẢNG. Đo trên crm thật: bảng này chờ 4,3–4,8 giây vì
+    # mỗi nhân viên hỏi riêng ngày nghỉ, báo cáo, hạn nộp, số tệp và lịch sử xem (≈ 5 câu × mỗi
+    # người). Nay: ngày nghỉ một câu, hạn nộp một lần, tệp + lịch sử hai câu. Cùng luật, cùng số.
+    nghi_san = O.nghi_ca_ngay_nhieu(db, [e.id for e in emps], d)
+    han_san = O.han_nop(db, d)
+    nap = _nap_noi_dung(db, [r.id for r in bc.values()])
     dong, dem = [], {"dung_han": 0, "muon": 0, "chua_den_han": 0, "qua_han": 0, "khong_nghia_vu": 0}
     xl = {"cho_xem": 0, "can_bo_sung": 0, "qua_han": 0}
     for e in emps:
-        tt = O.trang_thai_ngay(db, e, e.user_id, d, now)
+        tt = O.trang_thai_ngay(db, e, e.user_id, d, now, nghi_san=nghi_san, bc_san=bc, han_san=han_san)
         dem[tt["ma"]] = dem.get(tt["ma"], 0) + 1
         r = bc.get(e.user_id)
         doc = r is not None and (r.user_id == u.id or trong(pv_nd, e.department))
@@ -285,7 +319,7 @@ def tong_hop(db: Session, u: User, d: date, phong: str = "", now: datetime | Non
             "diem_tp": r.manager_score if r else None, "nguoi_xem": r.reviewed_by if r else "",
             "doc_duoc": doc, "xem_xet_duoc": bool(r is not None and doc and not tu_minh and xem != "da_xem"),
             "tu_minh": tu_minh,
-            "noi_dung": _noi_dung(db, r) if doc else None,
+            "noi_dung": _noi_dung(db, r, nap) if doc else None,
         })
     thu_tu = {"qua_han": 0, "muon": 1, "chua_den_han": 2, "dung_han": 3, "khong_nghia_vu": 4}
     xem_tt = {"cho_xem": 0, "can_bo_sung": 1, "da_xem": 2, "": 3}
@@ -294,7 +328,7 @@ def tong_hop(db: Session, u: User, d: date, phong: str = "", now: datetime | Non
     phai = len(emps) - dem["khong_nghia_vu"]
     da_nop = dem["dung_han"] + dem["muon"]
     nguoi_giao = [{"user_id": e.user_id, "ten": e.full_name, "phong_ten": ten_phong(e.department)}
-                  for e in O.nhan_vien_phai_nop(db) if trong(pv_nd, e.department) and e.user_id != u.id] \
+                  for e in tat_ca if trong(pv_nd, e.department) and e.user_id != u.id] \
         if pv_nd is None or pv_nd else []
     return {
         "ngay": d.isoformat(), "as_of": now.isoformat(timespec="minutes"), "mui_gio": "Asia/Ho_Chi_Minh",

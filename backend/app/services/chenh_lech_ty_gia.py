@@ -98,10 +98,27 @@ def _la_ngoai_te(r, m) -> bool:
     return bool(tt) and tt != "VND"
 
 
-def _dong_ngoai_te(db: Session):
-    """Mọi dòng mang ngoại tệ của mọi bảng, kèm tên bảng. Một vòng quét, nhiều phép đếm dùng chung."""
+def _dong_ngoai_te(db: Session, ky: str | None = None, co_ty_gia: bool = False):
+    """Mọi dòng mang ngoại tệ của mọi bảng, kèm tên bảng. Một vòng quét, nhiều phép đếm dùng chung.
+
+    KS-KSO · 08/11/2026 — hai bộ lọc TUỲ CHỌN, đẩy xuống SQL những gì chỗ gọi vốn sẽ bỏ đi ngay:
+    `co_ty_gia` bỏ dòng không có tỷ giá; `ky` chỉ lấy dòng có ngày tỷ giá trong tháng ấy (bảng không
+    có cột ngày thì không dòng nào vào được một kỳ, nên bỏ qua cả bảng). Không truyền thì quét như cũ.
+    Kiểm «đồng tiền khác VND» vẫn làm ở đây bằng Python, đúng như trước."""
+    from datetime import timedelta
     for bang, m in BANG_NGOAI_TE.items():
-        for r in db.execute(select(m["model"])).scalars():
+        md = m["model"]
+        q = select(md).where(md.tien_te.isnot(None), md.tien_te != "")
+        if co_ty_gia:
+            q = q.where(md.ty_gia.isnot(None), md.ty_gia != 0)
+        if ky is not None:
+            if not m["ngay"]:
+                continue
+            dau = date(int(ky[:4]), int(ky[5:7]), 1)
+            sau = (dau + timedelta(days=32)).replace(day=1)
+            cot = getattr(md, m["ngay"])
+            q = q.where(cot >= dau, cot < sau)
+        for r in db.execute(q).scalars():
             if not _la_ngoai_te(r, m):
                 continue
             yield bang, m, r
@@ -322,10 +339,14 @@ def tinh_tach(db: Session, ky: str | None = None) -> dict:
     moc = tu_ngay(db)
     moc_d = date.fromisoformat(moc) if moc else None
     so = _so_ty_gia(db)
-    ma_tour = {t.id: t.code for t in db.execute(select(Tour)).scalars()}
+    # KS-KSO: chỉ những dòng có tỷ giá và nằm trong kỳ — đúng hai điều kiện vòng dưới vốn kiểm đầu
+    # tiên rồi bỏ qua. Trước đây nạp TOÀN BỘ bảy bảng ngoại tệ và toàn bộ tour cho mỗi lần xem trước.
+    dong = list(_dong_ngoai_te(db, ky, co_ty_gia=True))
+    t_ids = {getattr(r, "tour_id", None) for _b, _m, r in dong} - {None}
+    ma_tour = dict(db.execute(select(Tour.id, Tour.code).where(Tour.id.in_(t_ids))).all()) if t_ids else {}
 
     tach, truoc_moc, thieu_so, khong_ro = [], [], [], []
-    for bang, m, r in _dong_ngoai_te(db):
+    for bang, m, r in dong:
         tg = getattr(r, "ty_gia", None)
         if not tg:
             continue

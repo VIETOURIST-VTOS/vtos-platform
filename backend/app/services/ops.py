@@ -121,6 +121,25 @@ def nhan_vien_phai_nop(db: Session) -> list[Employee]:
             if phai_nop(e)]
 
 
+def nghi_ca_ngay_nhieu(db: Session, employee_ids, d: date) -> dict[int, str]:
+    """KS-BC · `nghi_ca_ngay` cho NHIỀU người trong MỘT câu hỏi — cùng điều kiện, cùng luật nửa ngày
+    không miễn, cùng tên loại nghỉ. Người không nghỉ thì không có khoá."""
+    from app.models.hrm import LeaveRequest, LEAVE_KINDS
+    ids = list(employee_ids)
+    ra: dict[int, str] = {}
+    if not ids:
+        return ra
+    for lr in db.execute(select(LeaveRequest).where(
+            LeaveRequest.employee_id.in_(ids), LeaveRequest.status == "duyet",
+            LeaveRequest.kind.in_(NGHI_MIEN_BAO_CAO),
+            LeaveRequest.date_from <= d, LeaveRequest.date_to >= d).order_by(LeaveRequest.id)).scalars():
+        if lr.employee_id in ra:
+            continue
+        if (lr.date_to - lr.date_from).days + 1 <= (lr.days or 0) + 1e-9:
+            ra[lr.employee_id] = LEAVE_KINDS.get(lr.kind, {}).get("ten", lr.kind)
+    return ra
+
+
 def nghi_ca_ngay(db: Session, employee_id: int, d: date) -> str | None:
     """Tên loại nghỉ nếu ngày d là ngày nghỉ CẢ NGÀY đã duyệt; nửa ngày không miễn."""
     from app.models.hrm import LeaveRequest, LEAVE_KINDS
@@ -309,18 +328,29 @@ def submit_report(db: Session, u: User, d: date, p1: str, p2: str, p3: str, p4: 
     return r
 
 
-def trang_thai_ngay(db: Session, e: Employee | None, user_id: int, d: date, now: datetime | None = None) -> dict:
-    """Một ngày của một người: không có nghĩa vụ / chưa đến hạn / quá hạn chưa nộp / đúng hạn / muộn."""
+_CHUA = object()
+
+
+def trang_thai_ngay(db: Session, e: Employee | None, user_id: int, d: date, now: datetime | None = None,
+                    *, nghi_san: dict | None = None, bc_san: dict | None = None, han_san=_CHUA) -> dict:
+    """Một ngày của một người: không có nghĩa vụ / chưa đến hạn / quá hạn chưa nộp / đúng hạn / muộn.
+
+    KS-BC · 08/11/2026 — `nghi_san` / `bc_san` / `han_san` là ba thứ chỗ gọi đã NẠP SẴN cho cả danh
+    sách cùng ngày `d` (bảng tổng hợp báo cáo ngày gọi hàm này cho từng nhân viên: trước đây mỗi
+    người ba câu hỏi riêng). Không truyền thì tự hỏi như cũ — cùng luật, cùng kết quả."""
     now = now or gio_vn()
     if d.weekday() == 6:
         return {"ngay": d.isoformat(), "ma": "khong_nghia_vu", "ten": "Chủ nhật"}
     if e is not None:
-        nghi = nghi_ca_ngay(db, e.id, d)
+        nghi = nghi_san.get(e.id) if nghi_san is not None else nghi_ca_ngay(db, e.id, d)
         if nghi:
             return {"ngay": d.isoformat(), "ma": "khong_nghia_vu", "ten": f"{nghi} đã duyệt"}
-    r = db.execute(select(DailyReport).where(DailyReport.user_id == user_id, DailyReport.report_date == d)).scalars().first()
+    if bc_san is not None:
+        r = bc_san.get(user_id)
+    else:
+        r = db.execute(select(DailyReport).where(DailyReport.user_id == user_id, DailyReport.report_date == d)).scalars().first()
     if r is None:
-        qua = now >= han_nop(db, d)
+        qua = now >= (han_nop(db, d) if han_san is _CHUA else han_san)
         return {"ngay": d.isoformat(), "ma": "qua_han" if qua else "chua_den_han",
                 "ten": "Quá hạn chưa nộp" if qua else "Chưa nộp · chưa đến hạn"}
     dau = r.first_submitted_at or r.submitted_at
