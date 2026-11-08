@@ -86,6 +86,16 @@ KHOA: dict[str, tuple[str, str]] = {
     "khuyen_mai_rewards":      ("6418", "Voucher VTD Rewards – Vietourist chịu thay khách"),
     "ccdc_ngan_han":           ("2421", "Chi phí trả trước / CCDC – phân bổ trong 12 kỳ trở xuống"),
     "ccdc_dai_han":            ("2422", "Chi phí trả trước / CCDC – phân bổ trên 12 kỳ"),
+    # ── ĐỢT TGIA-1 08/11/2026 — tách chênh lệch tỷ giá (`ket_so.tach_ty_gia`) ──────────────
+    # `632`, `635`, `515` đều là tài khoản TỔNG HỢP. Hai vế lỗ/lãi có tài khoản con TRÙNG TÊN
+    # trong danh mục thật (`6352` Lỗ tỷ giá, `5154` Lãi tỷ giá) nên không phải hỏi ai.
+    # Vế giá vốn đi MỘT DÒNG cho cả kỳ (Chủ tịch chốt 08/11/2026), giữ đúng quyết định đã ghi
+    # trong `ket_so`: bút toán này là phân loại lại CẢ KỲ, «không thuộc riêng chuyến nào» — và
+    # vì nguồn là `ket_chuyen` nên `account_rule_check` miễn nó khỏi đòi mã công trình.
+    "ty_gia_lo":               ("6352", "Chênh lệch tỷ giá – lỗ tỷ giá"),
+    "ty_gia_lai":              ("5154", "Chênh lệch tỷ giá – lãi tỷ giá"),
+    "ty_gia_gia_von":          ("6326", "Chênh lệch tỷ giá – vế giá vốn (một dòng cho cả kỳ)"),
+    "ty_gia_danh_gia_lai":     ("4131", "Chênh lệch tỷ giá – đánh giá lại cuối kỳ"),
 }
 
 # KHÓA NÀO ĐƯỢC PHÉP TRỎ VÀO MỘT TÀI KHOẢN BẮT BUỘC MÃ CÔNG TRÌNH, VÀ VÌ SAO.
@@ -110,6 +120,12 @@ CAN_CONG_TRINH = {
     "hd_doanh_thu_nuoc_ngoai": "chỉ dùng cho hóa đơn ĐÃ gắn chuyến",
     "hd_doanh_thu_thue_xe":   "chỉ dùng cho hóa đơn ĐÃ gắn chuyến",
     "luong_ctv_gia_von":      "nghiệp vụ `luong` nằm trong danh sách miễn của account_rule_check",
+    # ĐỢT TGIA-1 08/11/2026 — và luật `test_tkc5_1` đã BẮT ĐÚNG chỗ này ngay lần chạy đầu: thêm
+    # `ty_gia_gia_von` = `6326` mà quên khai lý do là đỏ. Lý do có thật: bút toán tách tỷ giá đi
+    # qua nguồn `ket_chuyen` (`ket_so.NGUON_TACH_TY_GIA`), nằm trong danh sách miễn của
+    # `account_rule_check` — và đó là quyết định đã ghi sẵn trong `ket_so`: chênh lệch tỷ giá của
+    # cả kỳ «không thuộc riêng chuyến nào».
+    "ty_gia_gia_von":         "nghiệp vụ `ket_chuyen` nằm trong danh sách miễn của account_rule_check",
 }
 
 # Doanh thu hóa đơn chọn theo LOẠI TOUR của chuyến hóa đơn gắn vào — xem `doanh_thu_hoa_don`.

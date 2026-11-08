@@ -319,7 +319,11 @@ def test_bang_luong_ky_nhap_thi_ghi_vao_dau_vao_va_thuc_linh_trong_van_trong(db)
 # ====================== TÀI SẢN ======================
 def _ts(ma="TSV4-1", **kw):
     d = {"ma_ts": ma, "ten": "Xe khách 45 chỗ", "loai": "huu_hinh", "nhom": "Phương tiện vận tải",
-         "ngay_bat_dau_kh": "01/01/2026", "nguyen_gia": "3.200.000.000", "so_thang_kh": "120"}
+         "ngay_bat_dau_kh": "01/01/2026", "nguyen_gia": "3.200.000.000", "so_thang_kh": "120",
+         # TSCD-1 (#735, 08/11/2026): «TK nguyên giá» là cột BẮT BUỘC, phải là tài khoản CHI TIẾT
+         # của loại tài sản (2113 phương tiện vận tải) — thiếu thì dòng dừng ở «Thiếu tk nguyên giá»
+         # trước khi tới luật đang đo.
+         "tk_nguyen_gia": "2113"}
     d.update(kw); return d
 
 
@@ -340,7 +344,7 @@ def test_tai_san_nap_chi_tao_moi(db):
     assert lai["da_nap"] == 0 and lai["da_co"] == 1
     from app.models.assets import FixedAsset
     a = db.execute(select(FixedAsset).where(FixedAsset.code == "TSV4-1")).scalars().first()
-    assert a.cost == 3_200_000_000 and a.asset_account == "211"
+    assert a.cost == 3_200_000_000 and a.asset_account == "2113"
 
 
 def test_ccdc_da_phan_bo_khong_duoc_vuot_gia_tri(db):
