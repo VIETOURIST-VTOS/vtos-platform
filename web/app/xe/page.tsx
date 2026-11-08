@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
-import { api, vnd, pct } from "@/lib/api";
+import { api, vnd, pct, soTien } from "@/lib/api";
 import { errMsg } from "@/components/ui";
 
 /** Bàn làm việc Giám đốc đội xe — màn `/xe`.
@@ -55,6 +55,139 @@ const NGAN_KEO: Record<string, { ten: string; toi: string; nhan: string }> = {
   "de-xuat":    { ten: "Đề xuất chờ duyệt", toi: "/requests", nhan: "Mở màn đề xuất" },
 };
 
+/** Ngăn kéo CHI PHÍ KỲ — nhập và gỡ ngay tại chỗ, không rời trang.
+ *
+ *  Đây là bước 2 của ngăn kéo: bản đầu chỉ dẫn sang màn Lãi lỗ, nên giám đốc vẫn phải nhảy
+ *  màn — trái đúng điều màn /xe sinh ra để tránh. Chọn nhóm này làm cái đầu tiên vì nó là
+ *  việc lặp mỗi tháng và là chỗ tháng 10 từng thiếu 161,5 triệu.
+ *
+ *  Luật phạm vi do MÁY CHỦ giữ, không phải giao diện: nhóm «xe» bắt buộc chọn xe, nhóm «đội»
+ *  cấm gắn xe. Giao diện chỉ hiện/ẩn ô chọn xe cho đỡ sai tay — nếu lệch thì máy chủ trả 422
+ *  kèm câu giải thích, và câu ấy được hiện nguyên văn chứ không nuốt. */
+function NganKeoChiPhiKy({ ky, onXong }: { ky: string; onXong: () => void }) {
+  const { toast } = useShell();
+  const [d, setD] = useState<any>(null);
+  const [xe, setXe] = useState<any[]>([]);
+  const [f, setF] = useState<any>({ nhom: "", vehicle_id: "", so_tien: "", mo_ta: "", chung_tu: "" });
+  const [luu, setLuu] = useState(false);
+  const [goId, setGoId] = useState<number | null>(null);
+  const [lyDo, setLyDo] = useState("");
+
+  const doc = useCallback(async () => {
+    try {
+      setD(await api(`/fleet/chi-phi-ky?ky=${ky}`));
+      const r: any = await api("/fleet/xe");
+      setXe(r.rows || r || []);
+    } catch (e) { toast(errMsg(e), true); }
+  }, [ky, toast]);
+  useEffect(() => { doc(); }, [doc]);
+
+  const nhomDangChon = (d?.nhom || []).find((n: any) => n.ma === f.nhom);
+  const theoXe = nhomDangChon?.pham_vi === "xe";
+  const rows = (d?.rows || []).filter((r: any) => r.ky === ky);
+  const tong = rows.reduce((a: number, r: any) => a + (r.so_tien || 0), 0);
+
+  async function ghi() {
+    if (!f.nhom) { toast("Chọn nhóm chi phí", true); return; }
+    setLuu(true);
+    try {
+      const r: any = await api("/fleet/chi-phi-ky", {
+        method: "POST",
+        json: {
+          ky, nhom: f.nhom, so_tien: soTien(f.so_tien) || 0,
+          vehicle_id: theoXe ? Number(f.vehicle_id) || null : null,
+          mo_ta: f.mo_ta, chung_tu: f.chung_tu,
+        },
+      });
+      toast(r?.message || "Đã ghi.");
+      setF({ nhom: "", vehicle_id: "", so_tien: "", mo_ta: "", chung_tu: "" });
+      await doc(); onXong();
+    } catch (e) { toast(errMsg(e), true); }
+    finally { setLuu(false); }
+  }
+
+  async function go(id: number) {
+    // Lý do là BẮT BUỘC ở máy chủ. Hỏi ngay tại dòng chứ không bật hộp thoại trình duyệt:
+    // một khoản biến mất khỏi báo cáo mà không ai biết vì sao là cách nhanh nhất làm lãi lỗ
+    // tháng này không đối chiếu được với tháng trước.
+    if (!lyDo.trim()) { toast("Gỡ một khoản phải ghi lý do", true); return; }
+    try {
+      const r: any = await api(`/fleet/chi-phi-ky/${id}?ly_do=${encodeURIComponent(lyDo)}`,
+                               { method: "DELETE" });
+      toast(r?.message || "Đã gỡ.");
+      setGoId(null); setLyDo("");
+      await doc(); onXong();
+    } catch (e) { toast(errMsg(e), true); }
+  }
+
+  return (<>
+    <div style={{ border: "1px solid #dce3ec", borderRadius: 8, padding: 14, marginBottom: 16 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
+        <label style={{ flex: "1 1 240px" }}>
+          <span className="muted" style={{ display: "block", fontSize: 13 }}>Nhóm chi phí</span>
+          <select value={f.nhom} onChange={(e) => setF({ ...f, nhom: e.target.value, vehicle_id: "" })}
+                  style={{ width: "100%" }}>
+            <option value="">— chọn nhóm —</option>
+            {(d?.nhom || []).map((n: any) => (
+              <option key={n.ma} value={n.ma}>
+                {n.ten} ({n.pham_vi === "xe" ? "theo xe" : "cả đội"})
+              </option>))}
+          </select>
+        </label>
+        {/* Ô xe chỉ hiện với nhóm phạm vi «xe» — nhóm «đội» gắn xe là máy chủ từ chối. */}
+        {theoXe && <label style={{ flex: "1 1 200px" }}>
+          <span className="muted" style={{ display: "block", fontSize: 13 }}>Xe *</span>
+          <select value={f.vehicle_id} onChange={(e) => setF({ ...f, vehicle_id: e.target.value })}
+                  style={{ width: "100%" }}>
+            <option value="">— chọn xe —</option>
+            {xe.map((v: any) => <option key={v.id} value={v.id}>{v.plate}</option>)}
+          </select>
+        </label>}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
+        <label style={{ flex: "1 1 150px" }}>
+          <span className="muted" style={{ display: "block", fontSize: 13 }}>Số tiền</span>
+          <input value={f.so_tien} onChange={(e) => setF({ ...f, so_tien: e.target.value })}
+                 style={{ width: "100%" }} inputMode="numeric" />
+        </label>
+        <label style={{ flex: "2 1 260px" }}>
+          <span className="muted" style={{ display: "block", fontSize: 13 }}>Diễn giải</span>
+          <input value={f.mo_ta} onChange={(e) => setF({ ...f, mo_ta: e.target.value })}
+                 style={{ width: "100%" }} placeholder="VD: Bảo dưỡng T11 – 50H-944.58" />
+        </label>
+        <label style={{ flex: "1 1 150px" }}>
+          <span className="muted" style={{ display: "block", fontSize: 13 }}>Chứng từ</span>
+          <input value={f.chung_tu} onChange={(e) => setF({ ...f, chung_tu: e.target.value })}
+                 style={{ width: "100%" }} />
+        </label>
+      </div>
+      <button type="button" onClick={ghi} disabled={luu}>{luu ? "Đang ghi…" : "Ghi vào kỳ"}</button>
+    </div>
+
+    <h3 style={{ margin: "0 0 8px" }}>
+      Đã ghi trong kỳ {rows.length ? <span className="muted">· {vnd(tong)} đ</span> : null}
+    </h3>
+    {rows.length === 0
+      ? <p className="muted">Kỳ này chưa ghi khoản nào. Đó là THIẾU SỐ, không phải bằng 0.</p>
+      : <table><thead><tr><th>Nhóm</th><th>Xe</th><th>Diễn giải</th>
+          <th style={{ textAlign: "right" }}>Số tiền</th><th></th></tr></thead>
+        <tbody>{rows.map((r: any) => (<tr key={r.id}>
+          <td>{r.nhom_ten}</td>
+          <td>{r.xe || <span className="muted">cả đội</span>}</td>
+          <td>{r.mo_ta}</td>
+          <td style={{ textAlign: "right" }}>{vnd(r.so_tien)}</td>
+          <td>{goId === r.id
+            ? <span style={{ display: "flex", gap: 6 }}>
+                <input value={lyDo} onChange={(e) => setLyDo(e.target.value)}
+                       placeholder="lý do gỡ" style={{ width: 160 }} />
+                <button type="button" onClick={() => go(r.id)}>Xác nhận</button>
+                <button type="button" onClick={() => { setGoId(null); setLyDo(""); }}>Thôi</button>
+              </span>
+            : <button type="button" onClick={() => { setGoId(r.id); setLyDo(""); }}>Gỡ</button>}
+          </td></tr>))}</tbody></table>}
+  </>);
+}
+
 function BanLamViecXe() {
   const { toast } = useShell();
   const [ky, setKy] = useState(() => new Date().toISOString().slice(0, 7));
@@ -81,6 +214,20 @@ function BanLamViecXe() {
   const k = keo ? NGAN_KEO[keo] : null;
 
   return (<>
+    {/* THANH CHỨC NĂNG — toàn bộ là việc của đội xe. Thay cho thanh dọc đã ẩn: giám đốc
+        vẫn đi được tới các màn của chính phân hệ mình, nhưng không thấy phân hệ phòng khác. */}
+    <nav aria-label="Màn hình đội xe"
+         style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 14,
+                  borderBottom: "1px solid #dce3ec" }}>
+      <span style={{ padding: "8px 12px", fontWeight: 700,
+                     borderBottom: "3px solid #1d5bbf" }}>Bàn làm việc</span>
+      <Link href="/doi-xe" style={{ padding: "8px 12px" }}>Hồ sơ xe</Link>
+      <Link href="/doi-xe/xe-hom-nay" style={{ padding: "8px 12px" }}>Xe hôm nay</Link>
+      <Link href="/doi-xe/gia-dau" style={{ padding: "8px 12px" }}>Giá dầu &amp; định mức</Link>
+      <Link href="/hieu-qua-doi-xe" style={{ padding: "8px 12px" }}>Hiệu quả khai thác</Link>
+      <Link href="/lai-lo-doi-xe" style={{ padding: "8px 12px" }}>Lãi lỗ đội xe</Link>
+    </nav>
+
     {/* thanh trên — CHỈ đội xe */}
     <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-end",
                   justifyContent: "space-between", marginBottom: 18 }}>
@@ -192,9 +339,14 @@ function BanLamViecXe() {
     {/* ④ DIỄN BIẾN — kỳ chưa có số thì nói «chưa đủ dữ liệu», KHÔNG vẽ cột bằng 0. */}
     {db && <section>
       <h2>Diễn biến lợi nhuận đội xe</h2>
+      {/* Câu lưu ý đi KÈM bảng, đặt NGAY TRÊN nó. Ai đọc cái dốc cũng phải đọc luôn lý do
+          cái dốc có thể không thật: kỳ thiếu lương, thiếu bảo dưỡng thì biên luôn cao hơn
+          kỳ đã nhập đủ. Đo 09/11/2026: kỳ 07 biên 46,2% với 0 dòng chi phí kỳ, kỳ 10 biên
+          15,1% với 23 dòng. */}
+      {db.luu_y && <p style={{ color: "#a66a00" }}><strong>Lưu ý:</strong> {db.luu_y}</p>}
       {db.du_ve
         ? <table><thead><tr><th>Kỳ</th><th style={{ textAlign: "right" }}>Lợi nhuận</th>
-            <th style={{ textAlign: "right" }}>Biên</th></tr></thead>
+            <th style={{ textAlign: "right" }}>Biên</th><th>Chi phí kỳ</th></tr></thead>
             <tbody>{db.diem.map((p: any) => (
               <tr key={p.ky}>
                 <td>{kyDoc(p.ky)}</td>
@@ -202,6 +354,14 @@ function BanLamViecXe() {
                   {p.co_so ? vnd(p.loi_nhuan) : <span className="muted">chưa đủ dữ liệu</span>}</td>
                 <td style={{ textAlign: "right" }}>
                   {p.co_so ? pct(p.bien) : <span className="muted">—</span>}</td>
+                <td>{!p.co_so ? <span className="muted">—</span>
+                   : p.du_chi_phi_ky
+                     ? <span className="muted">{vnd(p.chi_phi_ky)} đ · {p.so_nhom_chi_phi_ky} nhóm</span>
+                     : <span className="tag" style={{ background: "#fdf6e7", color: "#a66a00",
+                                                      fontWeight: 700 }}
+                             title={`Biên kỳ này đang đọc cao hơn thực tế — ${p.vi_sao_chua_du}`}>
+                         SỐ CHƯA ĐỦ · {p.vi_sao_chua_du}
+                       </span>}</td>
               </tr>))}</tbody></table>
         : <p className="muted">{db.vi_sao}</p>}
     </section>}
@@ -228,7 +388,11 @@ function BanLamViecXe() {
         {hd?.viec.filter((v: any) => v.ngan_keo === keo).map((v: any) => (
           <p key={v.ma}><strong>{v.tieu_de}</strong><br /><span className="muted">{v.mo_ta}</span></p>
         ))}
-        <p><Link href={k.toi}>{k.nhan} →</Link></p>
+        {/* BƯỚC 2 của ngăn kéo: nhóm nào đã có form thì làm NGAY TẠI ĐÂY, không rời trang.
+            Nhóm chưa có thì vẫn dẫn sang màn cũ — dẫn sang còn hơn không đi được. */}
+        {keo === "chi-phi-ky"
+          ? <NganKeoChiPhiKy ky={ky} onXong={() => doc(ky)} />
+          : <p><Link href={k.toi}>{k.nhan} →</Link></p>}
         <p className="muted">Đóng ngăn kéo thì bàn tự đọc lại số.</p>
         <button type="button" onClick={() => { setKeo(null); doc(ky); }}>Xong — đọc lại số</button>
       </aside>

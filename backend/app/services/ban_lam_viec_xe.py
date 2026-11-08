@@ -293,7 +293,25 @@ def ban_lam_viec(db: Session, ky: str, quyen: dict | None = None) -> dict:
            "nhom_thieu": nhom_thieu, "sheet": sheet, "xe_dem": _dem_xe(db),
            "vtos_dang_chay": vtos_dang_chay}
 
-    # ④ Kỳ nào chưa có số thì để None, KHÔNG thay bằng 0.
+    # ④ Kỳ nào chưa có số thì để `None`, KHÔNG thay bằng 0.
+    #
+    # Và kỳ nào CHƯA ĐO ĐỦ CHI PHÍ thì phải nói ra, nếu không bảng này nói dối:
+    # biên của một kỳ thiếu lương, thiếu bảo dưỡng luôn cao hơn biên của một kỳ
+    # đủ, nên đặt cạnh nhau là vẽ ra một cái dốc không có thật. Đo 09/11/2026:
+    # kỳ 07/2026 biên 46,2% với 0 dòng chi phí kỳ, kỳ 10/2026 biên 15,1% với 23
+    # dòng. Cái dốc ấy phần lớn là chênh lệch ĐO, không phải chênh lệch LÀM.
+    ky_list = [_ky_truoc(ky, i) for i in range(SO_KY_DIEN_BIEN)]
+    cpk_theo_ky: dict[str, dict] = {k: {"tong": 0.0, "nhom": set()} for k in ky_list}
+    try:
+        for r in db.execute(select(FleetPeriodCost).where(
+                FleetPeriodCost.ky.in_(ky_list))).scalars():
+            o = cpk_theo_ky.get(r.ky)
+            if o is not None:
+                o["tong"] += (r.so_tien or 0)
+                o["nhom"].add(r.nhom)
+    except Exception as e:  # noqa: BLE001
+        log.warning("ban_lam_viec_xe: không đọc được chi phí kỳ các kỳ cũ: %s", e)
+
     diem = []
     for lui in range(SO_KY_DIEN_BIEN - 1, -1, -1):
         k = _ky_truoc(ky, lui)
@@ -303,10 +321,23 @@ def ban_lam_viec(db: Session, ky: str, quyen: dict | None = None) -> dict:
             log.warning("ban_lam_viec_xe: không đọc được kỳ %s: %s", k, e)
             tt = {}
         co_so = bool(tt.get("doanh_thu"))
+        o = cpk_theo_ky.get(k) or {"tong": 0.0, "nhom": set()}
+        # Lương tài xế là khoản có THẬT mọi tháng — 11 tài xế tháng nào cũng
+        # được trả. Thiếu dòng ấy là thiếu thật, không phải phỏng đoán.
+        thieu_luong = "luong_tai_xe" not in o["nhom"]
+        vi_sao_chua_du = None
+        if co_so and not o["nhom"]:
+            vi_sao_chua_du = "chưa nhập chi phí kỳ nào"
+        elif co_so and thieu_luong:
+            vi_sao_chua_du = "thiếu lương tài xế"
         diem.append({"ky": k, "co_so": co_so,
                      "loi_nhuan": int(tt.get("loi_nhuan") or 0) if co_so else None,
-                     "bien": tt.get("bien_loi_nhuan") if co_so else None})
+                     "bien": tt.get("bien_loi_nhuan") if co_so else None,
+                     "chi_phi_ky": round(o["tong"]), "so_nhom_chi_phi_ky": len(o["nhom"]),
+                     "du_chi_phi_ky": bool(co_so and not vi_sao_chua_du),
+                     "vi_sao_chua_du": vi_sao_chua_du})
     du_ve = sum(1 for d in diem if d["co_so"]) >= 2
+    so_ky_chua_du = sum(1 for d in diem if d["co_so"] and not d["du_chi_phi_ky"])
 
     return {
         "ky": ky,
@@ -341,6 +372,12 @@ def ban_lam_viec(db: Session, ky: str, quyen: dict | None = None) -> dict:
             "nguon": "xe_theo_sheet.bao_cao",
         },
         "dien_bien": {"diem": diem, "du_ve": du_ve,
+                      "so_ky_chua_du": so_ky_chua_du,
+                      # Câu này đi KÈM bảng, không phải chú thích cuối trang: ai đọc
+                      # cái dốc cũng phải đọc luôn lý do cái dốc có thể không thật.
+                      "luu_y": (f"{so_ky_chua_du} kỳ chưa nhập đủ chi phí kỳ nên biên "
+                                "đang đọc CAO hơn thực tế — không so thẳng được với kỳ "
+                                "đã nhập đủ." if so_ky_chua_du else None),
                       "vi_sao": None if du_ve else
                       "Cần ít nhất hai kỳ có số thì mới vẽ được đường — một điểm "
                       "đứng một mình không so với kỳ nào."},
