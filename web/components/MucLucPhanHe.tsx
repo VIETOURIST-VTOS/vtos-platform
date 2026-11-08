@@ -94,7 +94,7 @@ function khoaTheoQuyen(ds: MucCay[], an: string[]): MucKhoa[] {
   }));
 }
 
-export default function MucLucPhanHe({ khoa }: { khoa: string }) {
+export default function MucLucPhanHe({ khoa, khongChip }: { khoa: string; khongChip?: boolean }) {
   const { user } = useShell();
   const an = user?.hidden_menus || [];
   const goc = timPhanHe(khoa);
@@ -119,14 +119,16 @@ export default function MucLucPhanHe({ khoa }: { khoa: string }) {
           riêng (`/fit`, `/mice`, `/op`, `/xe`, `/guide`). Để nguyên `/phan-he/<khoá>` thì vẫn tới
           nơi nhờ lối chuyển tiếp, nhưng người dùng đi hai chặng và thấy đường dẫn nhảy một lần —
           chỗ nào biết đích thật thì đi thẳng. */}
-      <nav className="cay-chuyen" aria-label="Các phân hệ khác">
+      {/* `khongChip` — màn /xe gắn mục lục này vào chính nó, và màn ấy không được có
+          phòng ban khác (anh Tuấn 09/11/2026). */}
+      {!khongChip && <nav className="cay-chuyen" aria-label="Các phân hệ khác">
         {CHIP_PHAN_HE.map((p) => (
           <Link key={p.khoa} href={`${duongCuaPhong(p.khoa)}?xem=muc-luc`}
             className={"cay-chip" + (p.khoa === ph.khoa ? " on" : "")}>
             <b>{p.ma}</b> {p.ten}
           </Link>
         ))}
-      </nav>
+      </nav>}
 
       <header className="cay-dau">
         <div className="cay-dau-ma">{ph.ma}</div>

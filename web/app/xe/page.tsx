@@ -2,8 +2,10 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
-import { api, vnd, pct, soTien } from "@/lib/api";
+import { api, vnd, pct } from "@/lib/api";
 import { errMsg } from "@/components/ui";
+import ChiPhiKyPanel from "@/components/doixe/ChiPhiKyPanel";
+import MucLucPhanHe from "@/components/MucLucPhanHe";
 
 /** Bàn làm việc Giám đốc đội xe — màn `/xe`.
  *
@@ -55,139 +57,6 @@ const NGAN_KEO: Record<string, { ten: string; toi: string; nhan: string }> = {
   "de-xuat":    { ten: "Đề xuất chờ duyệt", toi: "/requests", nhan: "Mở màn đề xuất" },
 };
 
-/** Ngăn kéo CHI PHÍ KỲ — nhập và gỡ ngay tại chỗ, không rời trang.
- *
- *  Đây là bước 2 của ngăn kéo: bản đầu chỉ dẫn sang màn Lãi lỗ, nên giám đốc vẫn phải nhảy
- *  màn — trái đúng điều màn /xe sinh ra để tránh. Chọn nhóm này làm cái đầu tiên vì nó là
- *  việc lặp mỗi tháng và là chỗ tháng 10 từng thiếu 161,5 triệu.
- *
- *  Luật phạm vi do MÁY CHỦ giữ, không phải giao diện: nhóm «xe» bắt buộc chọn xe, nhóm «đội»
- *  cấm gắn xe. Giao diện chỉ hiện/ẩn ô chọn xe cho đỡ sai tay — nếu lệch thì máy chủ trả 422
- *  kèm câu giải thích, và câu ấy được hiện nguyên văn chứ không nuốt. */
-function NganKeoChiPhiKy({ ky, onXong }: { ky: string; onXong: () => void }) {
-  const { toast } = useShell();
-  const [d, setD] = useState<any>(null);
-  const [xe, setXe] = useState<any[]>([]);
-  const [f, setF] = useState<any>({ nhom: "", vehicle_id: "", so_tien: "", mo_ta: "", chung_tu: "" });
-  const [luu, setLuu] = useState(false);
-  const [goId, setGoId] = useState<number | null>(null);
-  const [lyDo, setLyDo] = useState("");
-
-  const doc = useCallback(async () => {
-    try {
-      setD(await api(`/fleet/chi-phi-ky?ky=${ky}`));
-      const r: any = await api("/fleet/xe");
-      setXe(r.rows || r || []);
-    } catch (e) { toast(errMsg(e), true); }
-  }, [ky, toast]);
-  useEffect(() => { doc(); }, [doc]);
-
-  const nhomDangChon = (d?.nhom || []).find((n: any) => n.ma === f.nhom);
-  const theoXe = nhomDangChon?.pham_vi === "xe";
-  const rows = (d?.rows || []).filter((r: any) => r.ky === ky);
-  const tong = rows.reduce((a: number, r: any) => a + (r.so_tien || 0), 0);
-
-  async function ghi() {
-    if (!f.nhom) { toast("Chọn nhóm chi phí", true); return; }
-    setLuu(true);
-    try {
-      const r: any = await api("/fleet/chi-phi-ky", {
-        method: "POST",
-        json: {
-          ky, nhom: f.nhom, so_tien: soTien(f.so_tien) || 0,
-          vehicle_id: theoXe ? Number(f.vehicle_id) || null : null,
-          mo_ta: f.mo_ta, chung_tu: f.chung_tu,
-        },
-      });
-      toast(r?.message || "Đã ghi.");
-      setF({ nhom: "", vehicle_id: "", so_tien: "", mo_ta: "", chung_tu: "" });
-      await doc(); onXong();
-    } catch (e) { toast(errMsg(e), true); }
-    finally { setLuu(false); }
-  }
-
-  async function go(id: number) {
-    // Lý do là BẮT BUỘC ở máy chủ. Hỏi ngay tại dòng chứ không bật hộp thoại trình duyệt:
-    // một khoản biến mất khỏi báo cáo mà không ai biết vì sao là cách nhanh nhất làm lãi lỗ
-    // tháng này không đối chiếu được với tháng trước.
-    if (!lyDo.trim()) { toast("Gỡ một khoản phải ghi lý do", true); return; }
-    try {
-      const r: any = await api(`/fleet/chi-phi-ky/${id}?ly_do=${encodeURIComponent(lyDo)}`,
-                               { method: "DELETE" });
-      toast(r?.message || "Đã gỡ.");
-      setGoId(null); setLyDo("");
-      await doc(); onXong();
-    } catch (e) { toast(errMsg(e), true); }
-  }
-
-  return (<>
-    <div style={{ border: "1px solid #dce3ec", borderRadius: 8, padding: 14, marginBottom: 16 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
-        <label style={{ flex: "1 1 240px" }}>
-          <span className="muted" style={{ display: "block", fontSize: 13 }}>Nhóm chi phí</span>
-          <select value={f.nhom} onChange={(e) => setF({ ...f, nhom: e.target.value, vehicle_id: "" })}
-                  style={{ width: "100%" }}>
-            <option value="">— chọn nhóm —</option>
-            {(d?.nhom || []).map((n: any) => (
-              <option key={n.ma} value={n.ma}>
-                {n.ten} ({n.pham_vi === "xe" ? "theo xe" : "cả đội"})
-              </option>))}
-          </select>
-        </label>
-        {/* Ô xe chỉ hiện với nhóm phạm vi «xe» — nhóm «đội» gắn xe là máy chủ từ chối. */}
-        {theoXe && <label style={{ flex: "1 1 200px" }}>
-          <span className="muted" style={{ display: "block", fontSize: 13 }}>Xe *</span>
-          <select value={f.vehicle_id} onChange={(e) => setF({ ...f, vehicle_id: e.target.value })}
-                  style={{ width: "100%" }}>
-            <option value="">— chọn xe —</option>
-            {xe.map((v: any) => <option key={v.id} value={v.id}>{v.plate}</option>)}
-          </select>
-        </label>}
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
-        <label style={{ flex: "1 1 150px" }}>
-          <span className="muted" style={{ display: "block", fontSize: 13 }}>Số tiền</span>
-          <input value={f.so_tien} onChange={(e) => setF({ ...f, so_tien: e.target.value })}
-                 style={{ width: "100%" }} inputMode="numeric" />
-        </label>
-        <label style={{ flex: "2 1 260px" }}>
-          <span className="muted" style={{ display: "block", fontSize: 13 }}>Diễn giải</span>
-          <input value={f.mo_ta} onChange={(e) => setF({ ...f, mo_ta: e.target.value })}
-                 style={{ width: "100%" }} placeholder="VD: Bảo dưỡng T11 – 50H-944.58" />
-        </label>
-        <label style={{ flex: "1 1 150px" }}>
-          <span className="muted" style={{ display: "block", fontSize: 13 }}>Chứng từ</span>
-          <input value={f.chung_tu} onChange={(e) => setF({ ...f, chung_tu: e.target.value })}
-                 style={{ width: "100%" }} />
-        </label>
-      </div>
-      <button type="button" onClick={ghi} disabled={luu}>{luu ? "Đang ghi…" : "Ghi vào kỳ"}</button>
-    </div>
-
-    <h3 style={{ margin: "0 0 8px" }}>
-      Đã ghi trong kỳ {rows.length ? <span className="muted">· {vnd(tong)} đ</span> : null}
-    </h3>
-    {rows.length === 0
-      ? <p className="muted">Kỳ này chưa ghi khoản nào. Đó là THIẾU SỐ, không phải bằng 0.</p>
-      : <table><thead><tr><th>Nhóm</th><th>Xe</th><th>Diễn giải</th>
-          <th style={{ textAlign: "right" }}>Số tiền</th><th></th></tr></thead>
-        <tbody>{rows.map((r: any) => (<tr key={r.id}>
-          <td>{r.nhom_ten}</td>
-          <td>{r.xe || <span className="muted">cả đội</span>}</td>
-          <td>{r.mo_ta}</td>
-          <td style={{ textAlign: "right" }}>{vnd(r.so_tien)}</td>
-          <td>{goId === r.id
-            ? <span style={{ display: "flex", gap: 6 }}>
-                <input value={lyDo} onChange={(e) => setLyDo(e.target.value)}
-                       placeholder="lý do gỡ" style={{ width: 160 }} />
-                <button type="button" onClick={() => go(r.id)}>Xác nhận</button>
-                <button type="button" onClick={() => { setGoId(null); setLyDo(""); }}>Thôi</button>
-              </span>
-            : <button type="button" onClick={() => { setGoId(r.id); setLyDo(""); }}>Gỡ</button>}
-          </td></tr>))}</tbody></table>}
-  </>);
-}
-
 function BanLamViecXe() {
   const { toast } = useShell();
   const [ky, setKy] = useState(() => new Date().toISOString().slice(0, 7));
@@ -226,6 +95,9 @@ function BanLamViecXe() {
       <Link href="/doi-xe/gia-dau" style={{ padding: "8px 12px" }}>Giá dầu &amp; định mức</Link>
       <Link href="/hieu-qua-doi-xe" style={{ padding: "8px 12px" }}>Hiệu quả khai thác</Link>
       <Link href="/lai-lo-doi-xe" style={{ padding: "8px 12px" }}>Lãi lỗ đội xe</Link>
+      {/* Lối ra. Màn này ẩn thanh dọc, nên nếu đây không có thì người dùng chỉ còn nút
+          Back của trình duyệt — trên máy bảng thì nhiều người không tìm ra nó. */}
+      <Link href="/" style={{ padding: "8px 12px", marginLeft: "auto" }}>Trang tổng CRM →</Link>
     </nav>
 
     {/* thanh trên — CHỈ đội xe */}
@@ -366,6 +238,17 @@ function BanLamViecXe() {
         : <p className="muted">{db.vi_sao}</p>}
     </section>}
 
+    {/* ⑤ CHỨC NĂNG ĐỘI XE — mục lục 4.9, trước nằm ở một TRANG RIÊNG (/phan-he/dhxe).
+        Anh Tuấn 09/11/2026: "2 màn hình này là 1". Gắn lại CHÍNH mục lục ấy chứ không
+        chép danh sách màn hình ra đây — chép là để hai danh sách trôi khỏi nhau, rồi một
+        hôm màn mới chỉ hiện ở một chỗ. `khongChip` bỏ dãy chip phân hệ phòng khác: đó là
+        thứ duy nhất trong mục lục không phải việc của đội xe.
+        Mục lục này KHÔNG gọi máy chủ và không hiện một con số nghiệp vụ nào (ranh giới
+        09/9/2026) — nó chỉ đọc cấu trúc từ lib/cay_phan_he.ts. */}
+    <section style={{ marginTop: 26, borderTop: "1px solid #e6eaf0", paddingTop: 18 }}>
+      <MucLucPhanHe khoa="dhxe" khongChip />
+    </section>
+
     {/* NGĂN KÉO */}
     {k && <>
       <div onClick={() => setKeo(null)}
@@ -391,7 +274,7 @@ function BanLamViecXe() {
         {/* BƯỚC 2 của ngăn kéo: nhóm nào đã có form thì làm NGAY TẠI ĐÂY, không rời trang.
             Nhóm chưa có thì vẫn dẫn sang màn cũ — dẫn sang còn hơn không đi được. */}
         {keo === "chi-phi-ky"
-          ? <NganKeoChiPhiKy ky={ky} onXong={() => doc(ky)} />
+          ? <ChiPhiKyPanel ky={ky} onDoiSo={() => doc(ky)} />
           : <p><Link href={k.toi}>{k.nhan} →</Link></p>}
         <p className="muted">Đóng ngăn kéo thì bàn tự đọc lại số.</p>
         <button type="button" onClick={() => { setKeo(null); doc(ky); }}>Xong — đọc lại số</button>
