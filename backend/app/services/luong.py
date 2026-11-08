@@ -108,7 +108,13 @@ def xac_dinh_theo_cong(e: Employee, cong_chuan: float, cong_thuc_te: float | Non
     if cong_thuc_te is None:
         return {"che_do": "cham_cong", "muc_hop_dong": (e.base_salary or 0), "muc_ky": round((e.base_salary or 0)),
                 "can_cu": {"cong_chuan": cong_chuan, "cong_thuc_te": None}, "thieu_du_lieu": True,
-                "giai_thich": f"CHƯA NHẬP CÔNG THỰC TẾ – tạm lấy đủ tháng {e.base_salary:,.0f}, HCNS phải nhập trước khi trình ký"}
+                # KS-LUONG · 08/11/2026 — `base_salary` RỖNG (chưa khai mức lương hợp đồng) làm phép
+                # định dạng `:,.0f` nổ TypeError → cả bảng lương kỳ trả 500 trên crm thật (mọi thẻ của
+                # trang Nhân sự). Rỗng khác 0: nói ra là chưa khai, không in «0».
+                "giai_thich": ("CHƯA NHẬP CÔNG THỰC TẾ – tạm lấy đủ tháng "
+                               + (f"{e.base_salary:,.0f}" if e.base_salary is not None
+                                  else "(chưa khai mức lương hợp đồng – HCNS nhập ở hồ sơ nhân sự)")
+                               + ", HCNS phải nhập trước khi trình ký")}
     muc = (e.base_salary or 0) / cong_chuan * cong_thuc_te if cong_chuan else 0
     return {"che_do": "cham_cong", "muc_hop_dong": (e.base_salary or 0), "muc_ky": round(muc),
             "can_cu": {"cong_chuan": cong_chuan, "cong_thuc_te": cong_thuc_te},
