@@ -706,6 +706,48 @@ def tach_ngay(van_ban: str) -> list[dict]:
     return ra
 
 
+_MUC_BAO = re.compile(r"^(gia\s*(tour\s*)?)?bao\s*gom\b")
+_MUC_KHONG = re.compile(r"^(gia\s*(tour\s*)?)?khong\s*bao\s*gom\b")
+_MUC_QD = re.compile(r"^(quy\s*dinh|dieu\s*kien|chinh\s*sach|luu\s*y|ghi\s*chu|thanh\s*toan|huy\s*tour|dieu\s*khoan|phu\s*thu\s*(chung|khac)?\s*:?$|"
+                     r"truong\s*hop\s*huy|hoan\s*huy)")
+_MUC_CT = re.compile(r"^(chuong\s*trinh|lich\s*trinh|hanh\s*trinh)\b")
+
+
+def tach_muc(van_ban: str) -> dict:
+    """P1-01 (Chủ tịch chọn «Tự tách đúng mục», 09/11/2026): ô «Chương trình» của sản phẩm trên crm hay chứa lẫn
+    «GIÁ TOUR BAO GỒM / KHÔNG BAO GỒM / quy định» và dòng lặp (tour 6591 Đà Lạt – Vĩnh Hy). Máy tách theo dòng tiêu đề
+    mục — chỉ dòng NGẮN (< 80 ký tự) mới là tiêu đề — thành {chuong_trinh, bao_gom, khong_bao_gom, quy_dinh}; mỗi mục bỏ
+    dòng lặp (so không dấu, không phân biệt hoa thường). Không sửa dữ liệu gốc; chỉ là cách HIỆN."""
+    muc = {"ct": [], "bao": [], "khong": [], "qd": []}
+    da: dict[str, set] = {k: set() for k in muc}
+    o = "ct"
+    for d in (van_ban or "").replace("\r", "").split("\n"):
+        t = _sach(_KHONG_RONG.sub("", d))
+        if not t:
+            if o == "ct" and muc["ct"] and muc["ct"][-1] != "":
+                muc["ct"].append("")
+            continue
+        kd = re.sub(r"^[^a-z0-9]+", "", _khong_dau(t))
+        if len(t) < 80:
+            if _MUC_KHONG.match(kd):
+                o = "khong"; continue                                         # noqa: E702
+            if _MUC_BAO.match(kd):
+                o = "bao"; continue                                           # noqa: E702
+            if _MUC_QD.match(kd) and (t.rstrip().endswith(":") or _la_tieu_de_hoa(t)):   # «Lưu ý: mang áo» trong ngày không phải tiêu đề
+                o = "qd"
+            elif _MUC_CT.match(kd) or (_NGAY_RE.match(t) and o != "ct"):
+                o = "ct"
+        dong = re.sub(r"^[-•·*✓✔+]\s*", "", t) if o in ("bao", "khong") else t
+        khoa = re.sub(r"\s+", " ", _khong_dau(dong))
+        if not dong or khoa in da[o]:
+            continue
+        da[o].add(khoa)
+        muc[o].append(dong[:300] if o in ("bao", "khong") else dong)
+    ct = "\n".join(muc["ct"]).strip()
+    return {"chuong_trinh": ct, "bao_gom": muc["bao"][:40], "khong_bao_gom": muc["khong"][:40],
+            "quy_dinh": "\n".join(muc["qd"]).strip()[:4000]}
+
+
 def lich_trinh(db: Session, p: Product, tour_id: int | None = None) -> dict:
     """Ưu tiên: chương trình của chuyến → lịch trình đọc từ web → chương trình sản phẩm có mốc ngày → nguyên văn."""
     from app.models.chuong_trinh import ChuongTrinhNgay
@@ -719,13 +761,14 @@ def lich_trinh(db: Session, p: Product, tour_id: int | None = None) -> dict:
     web = (p.noi_dung_web or {}).get("lich_trinh") or []
     if web:
         return {"nguon": "web", "ngay": [{**x, "bua": [], "khach_san": ""} for x in web], "van_ban": ""}
-    tn = tach_ngay(p.program or "")
+    ct = tach_muc(p.program or "")["chuong_trinh"]                     # P1-01: bỏ phần bao gồm / quy định lẫn vào
+    tn = tach_ngay(ct)
     if tn:
         return {"nguon": "san_pham", "ngay": [{**x, "bua": [], "khach_san": ""} for x in tn], "van_ban": ""}
     gt = ((p.noi_dung_web or {}).get("gioi_thieu") or "").strip()   # TR-1c: bài giới thiệu trên web trước văn bản sản phẩm
     if gt:
         return {"nguon": "web_gioi_thieu", "ngay": [], "van_ban": gt[:8000]}
-    return {"nguon": "van_ban", "ngay": [], "van_ban": (p.program or "").strip()[:8000]}
+    return {"nguon": "van_ban", "ngay": [], "van_ban": ct[:8000]}
 
 
 def chi_tiet(db: Session, pid: int, nguoi_lon: int = 2, tre_em: int = 0, hom_nay: date | None = None) -> dict:
@@ -740,10 +783,12 @@ def chi_tiet(db: Session, pid: int, nguoi_lon: int = 2, tre_em: int = 0, hom_nay
     chung = tt_chung(db)
     the = the_san_pham(p, ds, nl + te, hom_nay, chung)
     nd = p.noi_dung_web or {}
+    tm = tach_muc(p.program or "")                                      # P1-01: web trống thì lấy mục tách từ chương trình
     chuyen = [_chuyen_out(t, con, nl + te, hom_nay) for t, con in ds]
     return {**the, "chuyen": chuyen, "lich_trinh": lich_trinh(db, p, chuyen[0]["tour_id"] if chuyen else None),
-            "anh": list(nd.get("anh") or []), "bao_gom": list(nd.get("bao_gom") or []), "khong_bao_gom": list(nd.get("khong_bao_gom") or []),
-            "quy_dinh": nd.get("quy_dinh") or "", "bang_gia_web": list(nd.get("bang_gia") or []),
+            "anh": list(nd.get("anh") or []), "bao_gom": list(nd.get("bao_gom") or tm["bao_gom"]),
+            "khong_bao_gom": list(nd.get("khong_bao_gom") or tm["khong_bao_gom"]),
+            "quy_dinh": nd.get("quy_dinh") or tm["quy_dinh"], "bang_gia_web": list(nd.get("bang_gia") or []),
             "khoi_hanh_text": nd.get("khoi_hanh_text") or "", "link_web": p.link_web or "",
             "web_cap_nhat": nd.get("cap_nhat_luc"), "dich_vu": p.services or "",
             "coc_pt": float(p.deposit_pct or R.get_param(db, "coc_mac_dinh_pct")), "dong_so_truoc": int(p.days_to_close or 0),
@@ -1253,7 +1298,28 @@ def gui_yeu_cau_doan(db: Session, tk: TaiKhoanNgoai, d: dict, now: datetime | No
 
 # ══ 5 · VTOS — màn «Tour trên cổng khách» ═════════════════════════════════════════════════════════════════════════
 
-def _sp_vtos(db: Session, p: Product, so_chuyen: int) -> dict:
+THIEU_ND = {"anh": "Thiếu ảnh", "lich": "Chưa có lịch theo ngày", "bao_gom": "Thiếu giá bao gồm", "tre_em": "Thiếu giá trẻ em"}
+
+
+def thieu_noi_dung(p: Product, chuyen: list[tuple[Tour, int]], co_ct_chuyen: bool = False) -> list[str]:
+    """P1-01 (Chủ tịch duyệt 09/11/2026): khách đang thấy gì trên kh.vietourist.vn cho sản phẩm này — thiếu mục nào.
+    Cùng nguồn với chi_tiet(): ảnh web; lịch theo ngày (chương trình chuyến → web → chương trình sản phẩm đã tách mục);
+    bao gồm (web → mục tách từ chương trình → «dịch vụ»); giá trẻ em ở MỌI chuyến đang mở bán. Chỉ báo, không chặn."""
+    nd = p.noi_dung_web or {}
+    tm = tach_muc(p.program or "")
+    ra = []
+    if not nd.get("anh"):
+        ra.append("anh")
+    if not (co_ct_chuyen or nd.get("lich_trinh") or tach_ngay(tm["chuong_trinh"])):
+        ra.append("lich")
+    if not (nd.get("bao_gom") or tm["bao_gom"] or (p.services or "").strip()):
+        ra.append("bao_gom")
+    if any(not t.price_chd for t, _con in chuyen):
+        ra.append("tre_em")
+    return ra
+
+
+def _sp_vtos(db: Session, p: Product, so_chuyen: int, thieu: list[str] | None = None) -> dict:
     nd = p.noi_dung_web or {}
     return {"id": p.id, "ma": p.code, "ten": p.name, "tour_type": p.tour_type, "loai": loai(p), "nuoc_ngoai": la_nuoc_ngoai(p),
             "diem_den": p.diem_den or "", "diem_den_suy": diem_den(p), "noi_bat": p.noi_bat or [], "wellness": bool(p.wellness),
@@ -1262,14 +1328,19 @@ def _sp_vtos(db: Session, p: Product, so_chuyen: int) -> dict:
             "web": {"cap_nhat_luc": nd.get("cap_nhat_luc"), "loi": nd.get("loi") or "", "so_anh": len(nd.get("anh") or []),
                     "so_ngay": len(nd.get("lich_trinh") or []), "so_bao_gom": len(nd.get("bao_gom") or []), "ten": nd.get("ten") or "",
                     "anh_dau": (nd.get("anh") or [None])[0]},
-            "co_chuong_trinh": bool((p.program or "").strip())}
+            "co_chuong_trinh": bool((p.program or "").strip()), "thieu": thieu or []}
 
 
 def ds_vtos(db: Session, u: User) -> dict:
     _quyen(u, VAI_XEM)
     sps = _sp_hien(db)
     ch = _chuyen(db, sps, _hom_nay())
-    return {"san_pham": [_sp_vtos(db, p, len(ch.get(p.id, []))) for p in sps], "tt_chung": tt_chung(db),
+    from app.models.chuong_trinh import ChuongTrinhNgay                  # P1-01: chuyến nào đã có chương trình riêng
+    tids = [t.id for v in ch.values() for t, _ in v]
+    co_ct = set(db.execute(select(ChuongTrinhNgay.tour_id).where(ChuongTrinhNgay.tour_id.in_(tids or [0]))).scalars()) if tids else set()
+    return {"san_pham": [_sp_vtos(db, p, len(ch.get(p.id, [])),
+                                  thieu_noi_dung(p, ch.get(p.id, []), any(t.id in co_ct for t, _ in ch.get(p.id, [])))) for p in sps],
+            "thieu_nd": THIEU_ND, "tt_chung": tt_chung(db),
             "phuong_tien": PHUONG_TIEN_TOUR, "ma_tran": {k: list(v) for k, v in MA_TRAN.items()},
             "duoc": {"sua": _co(u, VAI_SUA_CONG), "ghep": _co(u, VAI_GHEP), "tt_chung": _co(u, VAI_TT_CHUNG),
                      "don": _co(u, VAI_XEM_DON), "vat": _co(u, VAI_VAT)}}

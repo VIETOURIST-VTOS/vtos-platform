@@ -36,7 +36,7 @@ function Trang() {
   const ds = useMemo(() => {
     const k = tim.trim().toLowerCase();
     return sps.filter((p) => (!k || `${p.ma} ${p.ten} ${p.diem_den_suy}`.toLowerCase().includes(k))
-      && (!loc || (loc === "chua_ghep" ? !p.link_web : loc === "loi" ? !!p.web.loi : loc === "mo_tt" ? p.mo_thanh_toan : loc === "co_chuyen" ? p.so_chuyen > 0 : true)));
+      && (!loc || (loc === "chua_ghep" ? !p.link_web : loc === "loi" ? !!p.web.loi : loc === "mo_tt" ? p.mo_thanh_toan : loc === "co_chuyen" ? p.so_chuyen > 0 : loc === "thieu" ? (p.thieu || []).length > 0 : true)));
   }, [sps, tim, loc]);
   if (!x) return <p>Đang tải…</p>;
   const duoc = x.duoc || {};
@@ -60,9 +60,10 @@ function Trang() {
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
         <input placeholder="Mã, tên, điểm đến…" value={tim} onChange={(e) => setTim(e.target.value)} style={{ minWidth: 220 }} />
         <select value={loc} onChange={(e) => setLoc(e.target.value)}><option value="">Tất cả</option><option value="co_chuyen">Có chuyến mở bán</option>
-          <option value="chua_ghep">Chưa ghép web</option><option value="loi">Đọc web lỗi</option><option value="mo_tt">Đang mở thanh toán</option></select>
+          <option value="chua_ghep">Chưa ghép web</option><option value="loi">Đọc web lỗi</option><option value="mo_tt">Đang mở thanh toán</option>
+          <option value="thieu">Thiếu nội dung ({sps.filter((p) => (p.thieu || []).length > 0).length})</option></select>
         <span className="muted">{ds.length} sản phẩm</span></div>
-      <div className="wrap"><table><thead><tr><th>Sản phẩm</th><th>Loại</th><th>Chuyến</th><th>Nội dung web</th><th>Hồ sơ cổng</th><th>Thanh toán</th><th /></tr></thead>
+      <div className="wrap"><table><thead><tr><th>Sản phẩm</th><th>Loại</th><th>Chuyến</th><th>Nội dung web</th><th>Nội dung trên cổng</th><th>Hồ sơ cổng</th><th>Thanh toán</th><th /></tr></thead>
         <tbody>{ds.map((p) => <tr key={p.id}>
           <td><b>{p.ma}</b><br />{p.ten}</td>
           <td>{p.loai === "doan" ? "Đoàn riêng" : "Ghép"} · {p.nuoc_ngoai ? "Nước ngoài" : "Trong nước"}</td>
@@ -71,6 +72,7 @@ function Trang() {
             <a href={p.link_web} target="_blank" rel="noopener noreferrer">{p.web.ten || "Trang tour"}</a><br />
             <small className="muted">{p.web.so_anh} ảnh · {p.web.so_ngay} ngày · {p.web.so_bao_gom} mục bao gồm · {luc(p.web.cap_nhat_luc)}</small>
             {p.web.loi && <><br /><Tag cls="red">Lỗi: {p.web.loi}</Tag></>}</> : <span className="muted">Chưa ghép</span>}</td>
+          <td style={{ maxWidth: 280 }}><NoiDungCong p={p} ten={x.thieu_nd || {}} /></td>
           <td><small>{p.diem_den || <i className="muted">{p.diem_den_suy} (máy suy)</i>}{p.wellness ? " · Wellness" : ""}<br />
             {(p.phuong_tien_ds.length ? p.phuong_tien_ds : p.phuong_tien_suy).map((k: string) => x.phuong_tien[k]).join(", ")}
             {p.noi_bat.length ? ` · ${p.noi_bat.length} điểm nổi bật` : ""}</small></td>
@@ -133,3 +135,16 @@ function Trang() {
 }
 
 export default function Page() { return <Shell><Trang /></Shell>; }
+
+/** P1-01 (Chủ tịch duyệt 09/11/2026): khách đang thấy gì trên kh.vietourist.vn — thiếu mục nào, nhập ở đâu. Chỉ báo, không chặn. */
+function NoiDungCong({ p, ten }: { p: any; ten: Record<string, string> }) {
+  const th: string[] = p.thieu || [];
+  if (!th.length) return <Tag cls="ok">Đủ nội dung</Tag>;
+  const goiY: string[] = [];
+  if (th.includes("anh") || th.includes("lich")) goiY.push(p.link_web
+    ? "Sửa bài trên web (ảnh, mốc «NGÀY 1:») rồi bấm «Đọc lại web»."
+    : "Ghép link web, hoặc nhập «NGÀY 1:… NGÀY 2:…» vào ô Chương trình của sản phẩm.");
+  if (th.includes("bao_gom")) goiY.push("Nhập mục «Giá tour bao gồm» trên web hoặc ô Dịch vụ của sản phẩm.");
+  if (th.includes("tre_em")) goiY.push("Nhập giá trẻ em ở chuyến đang mở bán (Điều hành).");
+  return <>{th.map((k) => <Tag key={k} cls="warn">{ten[k] || k}</Tag>)}<div className="muted" style={{ fontSize: 12 }}>{goiY.join(" ")}</div></>;
+}
