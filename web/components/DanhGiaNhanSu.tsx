@@ -102,7 +102,7 @@ export function BangChamDiem() {
     setLoi("");
     try {
       const r = await api<{ rows: Ban[] }>(
-        `/api/v1/danh-gia-ns?ky_loai=${kyLoai}&ky=${encodeURIComponent(ky)}`);
+        `/danh-gia-ns?ky_loai=${kyLoai}&ky=${encodeURIComponent(ky)}`);
       setRows(r.rows || []);
       setLech(await api(`/danh-gia-ns/do-lech?ky_loai=${kyLoai}&ky=${encodeURIComponent(ky)}`));
       if (kyLoai === "thang") {
