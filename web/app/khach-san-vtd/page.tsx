@@ -8,7 +8,7 @@ import VideoNoiBo from "@/components/VideoNoiBo";   // KS-16f
 import DanhGiaKsNoiBo from "@/components/khach-san-vtd/DanhGiaKsNoiBo";
 
 /** KS-13 · KHÁCH SẠN HỢP TÁC (CỔNG KHÁCH) — Chủ tịch duyệt bản demo 30/10/2026.
- *  NV / TP Điều hành nhập khách sạn, ảnh, loại phòng, gói giá và mùa giá (chỉ GIÁ BÁN, chưa thuế phí).
+ *  NV / TP Điều hành nhập khách sạn, ảnh, loại phòng, gói giá và mùa giá (chỉ GIÁ BÁN, đã gồm 8% VAT — KS-19 / P0-03).
  *  TP Điều hành duyệt giá — người nhập không tự duyệt (trừ Chủ tịch, TGĐ). Sửa gói đã duyệt → về Nháp, thôi hiện.
  *  KS-16c (Chủ tịch 31/10/2026): bỏ duyệt ảnh — tải là hiện; người tải tự xóa, TP Điều hành xóa mọi ảnh.
  *  TP Điều hành bật «Hiện trên cổng» khi đủ điều kiện; người vừa sửa hồ sơ không tự bật.
@@ -59,14 +59,14 @@ function Trang() {
     && (!locBan || (locBan === "thieu" ? banThieu(h) : banKhong(h))));
   return (<>
     <h1>Khách sạn (cổng khách)</h1>
-    <p className="muted">Khách sạn VTD có hợp đồng trực tiếp. Điều hành nhập khách sạn, ảnh, loại phòng và GIÁ BÁN theo mùa (chưa thuế phí); TP Điều hành duyệt
+    <p className="muted">Khách sạn VTD có hợp đồng trực tiếp. Điều hành nhập khách sạn, ảnh, loại phòng và GIÁ BÁN theo mùa (đã gồm 8% VAT); TP Điều hành duyệt
       ảnh, giá và bật «Hiện trên cổng». Người nhập không tự duyệt / tự bật (trừ Chủ tịch, TGĐ). Gói đã duyệt: khách đặt và trả ngay 100% (QR / thẻ),
       Điều hành chốt với khách sạn ở tab «Đơn đặt phòng»; chưa có giá thì khách gửi yêu cầu vào màn «Đơn khách sạn OTA › Yêu cầu của khách».
       Tiền phòng là tiền thu hộ khách sạn; hoa hồng Kế toán chốt ở tab «Tiền &amp; hoàn».</p>
     <div style={{ display: "flex", gap: 6, margin: "10px 0" }}>
       <button className={`act ${tab === "ds" ? "teal" : "grey"}`} onClick={() => setTab("ds")}>Khách sạn ({x.khach_san.length})</button>
       <button className={`act ${tab === "cd" ? "teal" : "grey"}`} onClick={() => setTab("cd")}>Chờ duyệt ({x.cho_duyet.goi} gói giá)</button>
-      <button className={`act ${tab === "don" ? "teal" : "grey"}`} onClick={() => setTab("don")}>Đơn đặt phòng{demDon.da_tra ? ` (${demDon.da_tra} chờ chốt)` : ""}</button>
+      <button className={`act ${tab === "don" ? "teal" : "grey"}`} onClick={() => setTab("don")}>Đơn đặt phòng{demDon.cho_chot ? ` (${demDon.cho_chot} chờ chốt)` : ""}</button>
       <button className={`act ${tab === "tien" ? "teal" : "grey"}`} onClick={() => setTab("tien")}>Tiền &amp; hoàn</button>
       <button className={`act ${tab === "dg" ? "teal" : "grey"}`} onClick={() => setTab("dg")}>Đánh giá</button></div>
     {tab === "cd" && <ChoDuyet toast={toast} onDoi={load} />}
@@ -337,7 +337,7 @@ function CsTre({ f, setF, x, nhap }: { f: any; setF: (v: any) => void; x: any; n
     <div className="grid">
       <label>Giá giường phụ<select value={f.cs_giuong_phu_kieu || "co_dinh"} disabled={!nhap} onChange={(e) => setF({ ...f, cs_giuong_phu_kieu: e.target.value })}>
         {Object.entries(x.kieu_gia || {}).map(([k2, v]: any) => <option key={k2} value={k2}>{v}</option>)}</select></label>
-      <label>{(f.cs_giuong_phu_kieu || "co_dinh") === "phan_tram" ? "Giường phụ (% giá phòng / đêm)" : "Giường phụ / đêm (chưa thuế phí)"}
+      <label>{(f.cs_giuong_phu_kieu || "co_dinh") === "phan_tram" ? "Giường phụ (% giá phòng / đêm)" : "Giường phụ / đêm (đã gồm 8% VAT)"}
         <input inputMode="numeric" value={(f.cs_giuong_phu_kieu || "co_dinh") === "phan_tram" ? (f.cs_phi_giuong_phu ?? "") : soTien(f.cs_phi_giuong_phu)}
           placeholder="trống = cần xác nhận" disabled={!nhap} onChange={(e) => setF({ ...f, cs_phi_giuong_phu: e.target.value.replace(/[^\d.]/g, "") })} /></label>
       <label>Nôi / cũi (khách yêu cầu khi nhận phòng)<input value={f.cs_noi ?? ""} placeholder="Miễn phí" disabled={!nhap} onChange={(e) => setF({ ...f, cs_noi: e.target.value })} /></label>
@@ -451,7 +451,7 @@ function Phong({ h, x, toast, goi, busy }: { h: any; x: any; toast: (m: string, 
           (p.can_xac_nhan || []).length ? `còn ${(p.can_xac_nhan || []).length} mục cần xác nhận` : ""].filter(Boolean).join(" · ")}</Tag>}<span style={{ flex: 1 }} />
         {nhap && <><button className="act grey" onClick={() => setLp({ ...p })}>Sửa phòng</button>
           <button className="act grey" onClick={() => setG({ lid: p.id, ten: "Chỉ phòng", bua_sang: false, huy_truoc_ngay: 2, dang_ban: true, mua: [{ ...MUA0 }] })}>+ Gói giá</button></>}</div>
-      <div style={{ overflowX: "auto" }}><table><thead><tr><th>Gói</th><th>Mùa giá (giá / đêm, chưa thuế phí)</th><th>Trạng thái</th><th></th></tr></thead>
+      <div style={{ overflowX: "auto" }}><table><thead><tr><th>Gói</th><th>Mùa giá (giá / đêm, đã gồm 8% VAT)</th><th>Trạng thái</th><th></th></tr></thead>
         <tbody>{p.goi.map((q: any) => <tr key={q.id} className="ksv-goi">
           <td><b>{q.ten}</b><div className="muted">{q.bua_sang ? "Có bữa sáng" : "Chỉ phòng"} · {q.huy_truoc_ngay === null ? "Không hoàn tiền" : `Miễn phí hủy trước ${q.huy_truoc_ngay} ngày${q.huy_gio_chot ? `, trước ${q.huy_gio_chot} (${x.mui_gio_huy?.[q.huy_mui_gio] || q.huy_mui_gio})` : ""}`}{q.cho_tra_sau === false ? " · không trả sau" : ""}{q.dang_ban ? "" : " · ngừng bán"}</div></td>
           <td>{q.mua.map((m: any) => <div key={m.id}>{m.tu_ngay.split("-").reverse().join("/")} – {m.den_ngay.split("-").reverse().join("/")}: <b>{tien(m.gia_thuong)}</b>{m.gia_cuoi_tuan ? ` · T6-T7 ${tien(m.gia_cuoi_tuan)}` : ""}{m.gia_niem_yet ? <span className="muted"> · niêm yết {tien(m.gia_niem_yet)}</span> : null}</div>)}</td>
@@ -618,11 +618,11 @@ function DonDat({ toast }: { toast: (m: string, l?: boolean) => void }) {
   const v = (id: number) => o[id] || { ma: "", ly: "" };
   return <section className="panel">
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-      {([["cho_chot", `Chờ chốt với khách sạn (${x.dem.da_tra || 0})`], ["da_xac_nhan", `Đã xác nhận (${x.dem.da_xac_nhan || 0})`], ["cho_tra", `Chờ thanh toán (${x.dem.cho_tra || 0})`],
+      {([["cho_chot", `Chờ chốt với khách sạn (${x.dem.cho_chot || 0})`], ["da_xac_nhan", `Đã xác nhận (${x.dem.da_xac_nhan || 0})`], ["cho_tra", `Chờ thanh toán (${x.dem.cho_tra || 0})`],
         ["da_huy", `Đã hủy (${x.dem.da_huy || 0})`], ["", "Tất cả"]] as const).map(([k, t]) =>
         <button key={k} className={`act ${loc === k ? "teal" : "grey"}`} onClick={() => setLoc(k)}>{t}</button>)}</div>
-    <p className="muted" style={{ margin: "0 0 8px" }}>Đơn khách đã trả 100%. Điều hành gọi khách sạn chốt phòng trong 2 giờ làm việc rồi nhập mã xác nhận của khách sạn — khách nhận phiếu ngay.
-      Khách sạn không giữ được phòng → bấm «KS hết phòng»: đơn hủy, hoàn 100% qua Sales → Kế toán.</p>
+    <p className="muted" style={{ margin: "0 0 8px" }}>Khách trả đủ là máy xác nhận và gửi phiếu ngay (phòng đã khóa lúc đặt). Điều hành báo khách sạn và ghi mã xác nhận của khách sạn trong 2 giờ làm việc.
+      Đơn có giường phụ hoặc trẻ em cần hỏi khách sạn thì chờ Điều hành chốt rồi khách mới nhận phiếu. Khách sạn không giữ được phòng → bấm «KS hết phòng»: đơn hủy, hoàn 100% qua Sales → Kế toán.</p>
     <div style={{ overflowX: "auto" }}><table><thead><tr><th>Mã · khách</th><th>Khách sạn · phòng</th><th>Ngày ở</th><th>Tiền</th><th>Trạng thái</th><th>Việc</th></tr></thead>
       <tbody>{x.don.map((d: any) => <tr key={d.id}><DongDon d={d} />
         <td><Tag cls={MAU_DON[d.trang_thai]}>{d.trang_thai_ten}</Tag>

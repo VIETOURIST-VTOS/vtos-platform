@@ -68,11 +68,11 @@ class KhachSanVtd(Base):
     cs_vat_nuoi: Mapped[str] = mapped_column(String(300), default="")
     cs_khac: Mapped[str] = mapped_column(Text, default="")
     # KS-16j: chính sách trẻ em có cấu trúc kiểu Agoda (Chủ tịch duyệt 01/11/2026). cs_tre_em / cs_giuong_phu ở trên
-    # giờ là «ghi chú thêm». Mốc tuổi: [{tu, den, cach: mien_phi|phu_thu|nguoi_lon, phu_thu, an_sang}] — tiền / đêm, chưa thuế phí.
+    # giờ là «ghi chú thêm». Mốc tuổi: [{tu, den, cach: mien_phi|phu_thu|nguoi_lon, phu_thu, an_sang}] — tiền / đêm, đã gồm 8% VAT (KS-19).
     cs_nhan_tre_em: Mapped[str] = mapped_column(String(14), default="chua_xac_nhan")   # NHAN_TRE_EM
     cs_tre_tu_tuoi: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cs_moc_tuoi: Mapped[list] = mapped_column(JSON, default=list)
-    cs_phi_giuong_phu: Mapped[float | None] = mapped_column(TIEN, nullable=True)       # / đêm, chưa thuế phí; None = chưa xác nhận
+    cs_phi_giuong_phu: Mapped[float | None] = mapped_column(TIEN, nullable=True)       # / đêm, đã gồm 8% VAT (KS-19); None = chưa xác nhận
     cs_giuong_phu_an_sang: Mapped[bool] = mapped_column(Boolean, default=False)
     cs_noi: Mapped[str] = mapped_column(String(120), default="")                       # «Miễn phí, theo yêu cầu»
     # KS-16k (Chủ tịch duyệt 01/11/2026 — theo cách Agoda YCS): cs_moc_tuoi giờ là GIÁ TRẺ EM MẶC ĐỊNH theo nhóm tuổi
@@ -81,8 +81,8 @@ class KhachSanVtd(Base):
     cs_so_tre_mien_phi: Mapped[int | None] = mapped_column(Integer, nullable=True)     # mỗi phòng; None = cần xác nhận
     cs_tre_mp_tinh_suc_chua: Mapped[bool] = mapped_column(Boolean, default=False)      # trẻ miễn phí có tính vào sức chứa
     cs_giuong_phu_kieu: Mapped[str] = mapped_column(String(10), default="co_dinh")     # co_dinh (đ) | phan_tram (% giá phòng)
-    # Giá Điều hành nhập là giá CHƯA gồm thuế phí; khách thấy «chưa gồm thuế và phí» và số thuế phí ở bước
-    # thanh toán. Mức % theo từng khách sạn (VAT + phí phục vụ) — Điều hành nhập theo hợp đồng.
+    # KS-19 (Chủ tịch 05/11/2026): giá Điều hành nhập ĐÃ GỒM 8% VAT; máy không cộng thuế phí, ô % này luôn lưu 0
+    # (giữ cột cho dữ liệu cũ). Trước KS-19: giá chưa gồm thuế phí, % theo từng khách sạn.
     thue_phi_pt: Mapped[float | None] = mapped_column(Float, default=0, nullable=True)
     # KS-17: 0% mặc định KHÔNG phải xác nhận «khách sạn không thu thuế». Chưa xác nhận thì không duyệt được gói giá
     # và không mở được thanh toán của khách sạn.
@@ -203,7 +203,7 @@ class MuaGiaVtd(Base):
     goi_id: Mapped[int] = mapped_column(ForeignKey("goi_gia_vtd.id"), index=True)
     tu_ngay: Mapped[date] = mapped_column(Date)
     den_ngay: Mapped[date] = mapped_column(Date)                         # GỒM ngày này (đêm cuối được tính)
-    gia_thuong: Mapped[float] = mapped_column(TIEN)                       # giá bán / phòng / đêm, chưa thuế phí
+    gia_thuong: Mapped[float] = mapped_column(TIEN)                       # giá bán / phòng / đêm, đã gồm 8% VAT (KS-19)
     gia_cuoi_tuan: Mapped[float | None] = mapped_column(TIEN, nullable=True)   # đêm thứ Sáu, thứ Bảy
     gia_niem_yet: Mapped[float | None] = mapped_column(TIEN, nullable=True)    # giá niêm yết của khách sạn (hiện gạch)
     ghi_chu: Mapped[str] = mapped_column(String(200), default="")

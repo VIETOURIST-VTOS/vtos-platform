@@ -63,7 +63,7 @@ def cac_dem(vao: date, ra: date) -> list[date]:
 
 
 def gia_luu(goi: GoiGiaVtd, mua: list[MuaGiaVtd], vao: date, ra: date) -> dict | None:
-    """Tiền MỘT phòng cho cả kỳ ở (chưa thuế phí). Đêm nào không có mùa giá phủ → None (gói không bán được kỳ này)."""
+    """Tiền MỘT phòng cho cả kỳ ở (đã gồm 8% VAT — KS-19, máy không cộng thuế phí). Đêm nào không có mùa giá phủ → None (gói không bán được kỳ này)."""
     tien, niem, co_niem = 0.0, 0.0, True
     for d in cac_dem(vao, ra):
         m = next((x for x in mua if x.tu_ngay <= d <= x.den_ngay), None)
