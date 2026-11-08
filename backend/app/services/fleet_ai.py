@@ -280,9 +280,11 @@ def hieu_qua_ky(db: Session, ky: str) -> dict:
     # màn Lãi lỗ đội xe mới là chỗ có cửa chọn tiêu thức.
     cp_doi = 0.0; chi_tiet_doi: dict[str, float] = {}
     trung_bao_duong: list[str] = []
+    cp_ky_theo_xe: list = []  # KS-42: giữ lại để chảy sang dòng tài xế, xem khối dưới
     for k in db.execute(select(FleetPeriodCost).where(FleetPeriodCost.ky == ky)).scalars():
         if k.pham_vi == "xe" and k.vehicle_id:
             x = _hang_xe(k.vehicle_id)
+            cp_ky_theo_xe.append(k)
             x["chi_phi"] += (k.so_tien or 0)
             x["chi_phi_ky"] += (k.so_tien or 0)
             x["chi_tiet_chi_phi_ky"][k.nhom] = x["chi_tiet_chi_phi_ky"].get(k.nhom, 0) + (k.so_tien or 0)
@@ -297,6 +299,51 @@ def hieu_qua_ky(db: Session, ky: str) -> dict:
         else:
             cp_doi += (k.so_tien or 0)
             chi_tiet_doi[k.nhom] = chi_tiet_doi.get(k.nhom, 0) + (k.so_tien or 0)
+
+    # KS-42 (08/11/2026) — CHI PHÍ KỲ CỦA XE PHẢI CHẢY SANG DÒNG TÀI XẾ.
+    #
+    # Đo thật sau khi nhập 77 triệu lương tháng 10: xe 50H-944.58 có chi_phi_ky
+    # 13.891.048 đ và lợi nhuận 19.451.314 đ, trong khi tài xế lái CHÍNH chiếc ấy
+    # cả 6 chuyến vẫn hiện chi_phi_ky 0 và lợi nhuận 33.342.362 đ. Cùng một tháng,
+    # cùng một chiếc xe, hai con số chênh 13,9 triệu — và bảng xếp hạng tài xế
+    # đang so trên lãi gộp CHƯA trừ lương, CHƯA trừ bảo dưỡng. Hai trường
+    # `chi_phi_ky` và `chi_tiet_chi_phi_ky` vốn đã có trong hàng tài xế, chỉ chưa
+    # ai đổ số vào.
+    #
+    # Vì sao khoản phạm vi "xe" chảy được mà khoản phạm vi "đội" thì không: khoản
+    # này ĐÃ gắn vào một chiếc xe cụ thể, và ai lái chiếc ấy trong kỳ là một SỰ
+    # THẬT ĐO ĐƯỢC, không phải tiêu thức phân bổ do người viết mã chọn hộ.
+    #   · Một tài xế cầm chiếc đó cả kỳ  -> gán nguyên, không chia, không tiêu thức.
+    #   · Nhiều tài xế                   -> chia theo SỐ NGÀY mỗi người cầm xe.
+    #     Chia LÀ một tiêu thức, nên nó không im lặng: tên xe được nêu ở `canh_bao`.
+    #
+    # KHÔNG cộng vào `sua_chua` của tài xế: bảo dưỡng định kỳ của chiếc xe không
+    # phải bằng chứng về cách người ta lái, mà `sua_chua_tren_km` lại là ô đọc
+    # đúng điều đó.
+    ngay_cam_xe: dict[int, dict[int, int]] = {}
+    for t in trips:
+        did_t = t.driver_id or (veh[t.vehicle_id].driver_id if t.vehicle_id in veh else None)
+        if not did_t or not t.vehicle_id:
+            continue
+        theo_xe = ngay_cam_xe.setdefault(t.vehicle_id, {})
+        theo_xe[did_t] = theo_xe.get(did_t, 0) + ((t.ngay_ve - t.ngay_di).days + 1)
+
+    chia_nhieu_tai_xe: list[str] = []
+    for k in cp_ky_theo_xe:
+        cam = ngay_cam_xe.get(k.vehicle_id) or {}
+        tong_ngay = sum(cam.values())
+        if not tong_ngay:
+            continue  # kỳ này không ai lái chiếc đó: khoản ở lại hàng xe, không ép vào ai
+        if len(cam) > 1:
+            chia_nhieu_tai_xe.append(veh[k.vehicle_id].plate if k.vehicle_id in veh else str(k.vehicle_id))
+        for did_k, ngay_k in cam.items():
+            r = tx_rows.get(did_k)
+            if r is None:
+                continue
+            phan = (k.so_tien or 0) * ngay_k / tong_ngay
+            r["chi_phi"] += phan
+            r["chi_phi_ky"] += phan
+            r["chi_tiet_chi_phi_ky"][k.nhom] = r["chi_tiet_chi_phi_ky"].get(k.nhom, 0) + phan
 
     def _hoan(r: dict) -> dict:
         ngay = len(r.pop("ngay_khai_thac"))
@@ -346,7 +393,10 @@ def hieu_qua_ky(db: Session, ky: str) -> dict:
                         + ([f"Xe {', '.join(sorted(set(trung_bao_duong)))} có cả phiếu bảo dưỡng lẫn dòng "
                           "\"Bảo dưỡng, sửa chữa\" trong sổ chi phí kỳ {ky}. Hai bảng không có khóa nối nên "
                           "hệ thống KHÔNG tự trừ bớt – người giữ sổ xem lại có phải một khoản ghi hai lần "
-                          "không.".replace("{ky}", ky)] if trung_bao_duong else []),
+                          "không.".replace("{ky}", ky)] if trung_bao_duong else [])
+                        + ([f"Chi phí kỳ của xe {', '.join(sorted(set(chia_nhieu_tai_xe)))} được CHIA cho "
+                          "nhiều tài xế theo số ngày mỗi người cầm xe. Chia là một tiêu thức, nên nói ra: "
+                          "thứ hạng tài xế có phụ thuộc vào tiêu thức này."] if chia_nhieu_tai_xe else []),
             "ghi_chu": f"Hạng tính trong tập {len(xes)} xe có phát sinh chuyến trong kỳ {ky}, theo bộ quy tắc "
                        f"{RULE_VERSION}. Hạng của kỳ này không so được với hạng của một tập xe khác hay một bộ "
                        "quy tắc khác. Ngày khai thác đếm theo NGÀY: hai chuyến cùng ngày là một ngày. Ô ghi "
