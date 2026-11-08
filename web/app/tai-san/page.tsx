@@ -51,7 +51,10 @@ function TaiSan() {
       const la = f.loai === "ts";
       const body: any = { code: f.code, name: f.name, kind: f.kind, department: f.department || "",
         start_date: f.start_date, quantity: Number(f.quantity) || 1, note: f.note || "" };
+      // ĐỢT TSCD-1 — `asset_account` CHỈ của tài sản cố định, nằm trong nhánh `if (la)`: chi phí
+      // trả trước có đường của nó (`242` → 2421/2422, Đợt TKC-5 suy theo số kỳ).
       if (la) Object.assign(body, { purchase_date: f.purchase_date || null, cost: soTien(f.cost),
+        asset_account: f.asset_account || "",
         depr_months: Number(f.depr_months) || 0, salvage: soTien(f.salvage) });
       else Object.assign(body, { amount: soTien(f.cost), months: Number(f.depr_months) || 1,
         // ĐỢT CPTT-1 — hai ô này CHỈ của chi phí trả trước, nên nằm trong nhánh `else` chứ không
@@ -87,7 +90,7 @@ function TaiSan() {
       {canGhi && !f && <button className="act" onClick={() => setF({ loai, code: "", name: "",
         kind: Object.keys((loai === "ts" ? meta?.asset_kinds : meta?.prepaid_kinds) || {})[0] || "",
         department: "", purchase_date: "", start_date: "", cost: "", depr_months: "", salvage: "",
-        expense_account: "", project_code: "", quantity: 1, note: "" })}>+ Thêm</button>}
+        asset_account: "", expense_account: "", project_code: "", quantity: 1, note: "" })}>+ Thêm</button>}
       {loai === "tt" && rows.some((a: any) => a.expense_account === CANH_BAO_TK_CU) &&
         <p className="muted small">
           <Tag cls="warn">{rows.filter((a: any) => a.expense_account === CANH_BAO_TK_CU).length} khoản đang phân bổ vào {CANH_BAO_TK_CU}</Tag>{" "}
@@ -157,7 +160,8 @@ function TaiSan() {
         <input type="month" value={ky} onChange={(e) => setKy(e.target.value)} /></label>
     </div>
 
-    {f && <div className="panel">
+    {f && (() => { const loaiTs = f.loai === "ts" ? (meta?.asset_kinds || {})[f.kind] : null; return (
+      <div className="panel">
       <h2>{f.loai === "ts" ? "Thêm tài sản cố định / công cụ" : "Thêm chi phí trả trước"}</h2>
       <div className="grid2">
         <label>Mã <input value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} /></label>
@@ -178,6 +182,28 @@ function TaiSan() {
         <label>{f.loai === "ts" ? "Nguyên giá" : "Số tiền"}
           <input type="number" step={100000} value={f.cost}
                  onChange={(e) => setF({ ...f, cost: e.target.value })} /></label>
+        {/* ĐỢT TSCD-1 08/11/2026 — Ô TK NGUYÊN GIÁ.
+            Đo trên hệ thống thật 08/11/2026: `ASSET_KINDS` mời chọn BỐN loại mà chỉ MỘT lưu được.
+            `211` là tài khoản CHA (2111 nhà cửa / 2112 máy móc / 2113 phương tiện); ba loại còn
+            lại trả 422 vì danh mục chưa có `2143` / `212` / `217`. Form phải biết điều đó TRƯỚC
+            khi người dùng bấm Lưu, và phải nói ra ĐÚNG số hiệu cần mở — ẩn loại ấy đi thì không
+            ai biết vì sao thiếu, và sẽ không ai mở hai tài khoản kia. */}
+        {f.loai === "ts" && (loaiTs?.dung_duoc === false
+          ? <label>TK nguyên giá
+              <div><Tag cls="red">chưa dùng được</Tag>{" "}
+                <span className="muted">Danh mục tài khoản chưa có <b>{(loaiTs.thieu || []).join(" và ")}</b> —
+                mở ở màn Danh mục tài khoản rồi quay lại, hoặc chọn loại tài sản khác.</span></div></label>
+          : (loaiTs?.tk_nguyen_gia_chon || []).length > 1
+            ? <label>TK nguyên giá
+                <select value={f.asset_account}
+                        onChange={(e) => setF({ ...f, asset_account: e.target.value })}>
+                  <option value="">— chọn tài khoản —</option>
+                  {(loaiTs?.tk_nguyen_gia_chon || []).map((t: any) =>
+                    <option key={t.ma} value={t.ma}>{t.ma} — {t.ten}</option>)}
+                </select></label>
+            : <label>TK nguyên giá
+                <input readOnly value={(loaiTs?.tk_nguyen_gia_chon || []).map((t: any) =>
+                  t.ma + " — " + t.ten).join("") || ""} /></label>)}
         {f.loai === "tt" && <label>TK chi phí nhận phân bổ
           <select value={f.expense_account}
                   onChange={(e) => setF({ ...f, expense_account: e.target.value })}>
@@ -192,10 +218,13 @@ function TaiSan() {
           <input type="number" value={f.depr_months}
                  onChange={(e) => setF({ ...f, depr_months: e.target.value })} /></label>
       </div>
-      <button className="act teal" disabled={luu || !f.code || !f.name || !f.start_date}
+      <button className="act teal"
+              disabled={luu || !f.code || !f.name || !f.start_date
+                        || (f.loai === "ts" && (loaiTs?.dung_duoc === false
+                            || ((loaiTs?.tk_nguyen_gia_chon || []).length > 1 && !f.asset_account)))}
               onClick={ghi}>{luu ? "Đang ghi…" : "Ghi"}</button>{" "}
       <button className="act grey" onClick={() => setF(null)}>Đóng</button>
-    </div>}
+      </div>); })()}
 
     {tab === "ts" && bang(ts, "Nguyên giá", "Số tháng KH", "ts")}
     {tab === "tt" && bang(tt, "Số tiền", "Số kỳ PB", "tt")}

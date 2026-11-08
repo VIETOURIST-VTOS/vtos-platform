@@ -26,7 +26,12 @@ def test_khau_hao_tscd():
     h = login("ketoan")
     # Xe 45 chỗ: nguyên giá 1,2 tỷ, khấu hao 6 năm = 72 tháng → 16.666.667 đ/tháng
     r = client.post("/api/v1/fixed-assets", headers=h, json={
+        # ĐỢT TSCD-1 08/11/2026 — `asset_account` là ô BẮT BUỘC khi gốc của loại tài sản là tài
+        # khoản cha. `211` có ba con, và một chiếc xe thuộc `2113` Phương tiện vận tải — không
+        # phải `2111` Nhà cửa. Phép thử cũ bỏ trống ô ấy nên thẻ rơi vào `211` (cha), đúng thứ
+        # đợt này bịt.
         "code": "TS-XE01", "name": "Xe khách 45 chỗ 51B-12345", "kind": "huu_hinh", "group": "Phương tiện vận tải",
+        "asset_account": "2113",
         "expense_account": "6424", "department": "doi_xe", "start_date": "2026-01-01",
         "cost": 1_200_000_000, "depr_months": 72})
     assert r.status_code == 201, r.text
@@ -36,6 +41,7 @@ def test_khau_hao_tscd():
     # Tài sản nạp từ số dư MISA: đã trích tới hết 2026-06 thì kỳ 06 KHÔNG trích lại
     r2 = client.post("/api/v1/fixed-assets", headers=h, json={
         "code": "TS-MAY01", "name": "Máy chủ phòng CNTT", "kind": "huu_hinh", "expense_account": "6424",
+        "asset_account": "2112",   # máy chủ là `2112` Máy móc, thiết bị — khác chiếc xe ở trên
         "department": "cntt", "start_date": "2025-01-01", "cost": 360_000_000, "depr_months": 36,
         "opening_accumulated": 180_000_000, "opening_period": "2026-06"})
     assert r2.status_code == 201, r2.text

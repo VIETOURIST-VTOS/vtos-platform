@@ -47,7 +47,16 @@ def meta(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db))
     ĐỢT CPTT-1 07/11/2026 thêm `tk_chi_phi`: bộ TK nhận phân bổ 242, ĐỌC THẲNG DANH MỤC chứ
     không gõ cứng một danh sách ngắn ở đây — danh mục đổi thì danh sách gõ cứng lệch, mà không
     ai biết. Chỉ tài khoản CHI TIẾT, xem `assets.tk_chi_phi_nhan_phan_bo`."""
-    return {"asset_kinds": ASSET_KINDS, "asset_status": ASSET_STATUS, "prepaid_kinds": PREPAID_KINDS,
+    # ĐỢT TSCD-1 08/11/2026 — mỗi loại tài sản kèm BỘ TK NGUYÊN GIÁ và lý do nếu không dùng được.
+    # Đo trên hệ thống thật: `ASSET_KINDS` mời chọn BỐN loại mà chỉ MỘT lưu được — ba loại kia trả
+    # 422 về một số hiệu tài khoản danh mục chưa có. Form phải biết điều đó TRƯỚC khi người dùng
+    # bấm Lưu, và phải nói ra ĐÚNG số hiệu cần mở.
+    loai_ts = {}
+    for k, v in ASSET_KINDS.items():
+        thieu = AS.thieu_tk_cua_loai(db, k)
+        loai_ts[k] = {**v, "tk_nguyen_gia_chon": AS.tk_nguyen_gia_cua_loai(db, k),
+                      "thieu": thieu, "dung_duoc": not thieu}
+    return {"asset_kinds": loai_ts, "asset_status": ASSET_STATUS, "prepaid_kinds": PREPAID_KINDS,
             "prepaid_status": PREPAID_STATUS, "tk_chi_phi": AS.tk_chi_phi_nhan_phan_bo(db)}
 
 

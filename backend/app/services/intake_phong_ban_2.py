@@ -792,6 +792,12 @@ def _ts_kiem(db: Session, r):
     loai = str(r.get("loai") or "huu_hinh").strip()
     if loai not in ASSET_KINDS:
         loi.append(f"Loại tài sản '{loai}' không hợp lệ ({', '.join(ASSET_KINDS)})")
+    else:
+        # MỘT BỘ LUẬT, HAI ĐƯỜNG NHẬP — cùng hàm với cửa nhập tay `assets.create_asset`.
+        from app.services.assets import kiem_tk_nguyen_gia
+        _l = kiem_tk_nguyen_gia(db, loai, str(r.get("tk_nguyen_gia") or "").strip())
+        if _l:
+            loi.append(_l)
     ng = _so(r.get("nguyen_gia"))
     if ng <= 0:
         loi.append("Nguyên giá phải lớn hơn 0")
@@ -814,13 +820,17 @@ def _ts_kiem(db: Session, r):
 
 def _ts_nap(db: Session, r, boi):
     from app.models.assets import FixedAsset, ASSET_KINDS
+    from app.services.assets import tk_nguyen_gia_chon
     from app.services.intake import _so, _ngay
     loai = str(r.get("loai") or "huu_hinh").strip()
     m = ASSET_KINDS[loai]
     a = FixedAsset(code=str(r.get("ma_ts") or "").strip().upper()[:30],
                    name=str(r.get("ten") or "").strip()[:200], kind=loai,
                    group=str(r.get("nhom") or "").strip()[:60],
-                   asset_account=m["tk_nguyen_gia"], depr_account=m["tk_hao_mon"],
+                   # ĐỢT TSCD-1: lấy TK nguyên giá người nạp khai, KHÔNG lấy mặc định `211` của
+                   # `ASSET_KINDS` — mặc định ấy là tài khoản cha.
+                   asset_account=tk_nguyen_gia_chon(db, loai, str(r.get("tk_nguyen_gia") or "").strip()),
+                   depr_account=m["tk_hao_mon"],
                    partner_code=str(r.get("nha_cung_cap") or "").strip()[:60],
                    department=str(r.get("bo_phan") or "").strip()[:20],
                    purchase_date=_ngay(r.get("ngay_mua")),
@@ -1517,6 +1527,11 @@ def bo_nap(_c) -> dict:
                     _c("loai", "Loại", kieu="chon", vi_du="huu_hinh",
                        chon={k: v["ten"] for k, v in ASSET_KINDS.items()}),
                     _c("nhom", "Nhóm", vi_du="Phương tiện vận tải"),
+                    # ĐỢT TSCD-1 08/11/2026 — cột có trong mẫu mà `_ts_nap` không đọc thì bằng
+                    # không có cột (bài học CPTT-2). Bắt buộc vì `211` là tài khoản CHA.
+                    _c("tk_nguyen_gia", "TK nguyên giá", True, vi_du="2113",
+                       ghi_chu="Tài khoản CHI TIẾT của loại tài sản: 2111 nhà cửa, 2112 máy móc, "
+                               "2113 phương tiện vận tải — không nhận tài khoản tổng hợp như 211"),
                     _c("nha_cung_cap", "Nhà cung cấp"),
                     _c("bo_phan", "Bộ phận sử dụng", vi_du="doi_xe"),
                     _c("ngay_mua", "Ngày mua", kieu="ngay"),
