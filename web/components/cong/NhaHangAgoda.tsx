@@ -206,7 +206,7 @@ export default function NhaHangAgoda({ ten = "", lienHe = "", coSdt = false, sdt
     <div className="ksv-steps"><span className="xong"><b>✓</b>Thông tin khách</span><hr /><span className="xong"><b>✓</b>Cách thanh toán</span><hr /><span className="on"><b>3</b>Đã gửi đặt bàn</span></div>
     <section className="ksv-panel nhv-xong">
       <div className="nhv-xong-dau"><div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
-        <span className="ksv-ok" style={{ alignSelf: "flex-start" }}><b>✓ Đã gửi đặt bàn {xong.ma}</b></span>
+        <span className="ksv-b out" style={{ alignSelf: "flex-start", whiteSpace: "normal", fontSize: 13 }}><b>Đã gửi · chờ nhà hàng nhận bàn {xong.ma}</b></span>
         <h2 style={{ margin: 0, fontSize: 24 }}>{xong.ten}</h2>
         <span>{ngayDep(xong.ngay)} · {xong.gio} · {xong.nguoi} khách · {xong.td}</span>
         <span className="ksv-muted">{xong.message}</span>
@@ -266,6 +266,8 @@ export default function NhaHangAgoda({ ten = "", lienHe = "", coSdt = false, sdt
         <div className="ksv-sum"><span>{td.ten} · NL × {q.nl}</span><span>₫ {vnd(td.gia_nguoi_lon * q.nl)}</span></div>
         {q.te > 0 && <div className="ksv-sum"><span>Trẻ em × {q.te}</span><span>₫ {vnd((td.gia_tre_em || 0) * q.te)}</span></div>}
         <div className="ksv-sum"><span>Tạm tính</span><span>₫ {vnd(tam)}</span></div>
+        {/* P0-05: nhắc lại điều kiện riêng của gói ngay trước nút gửi (bước chọn gói có thể đã bị lướt qua) */}
+        {(td.dieu_kien || td.dieu_kien_huy) && <small className="nhv-dk"><b>Điều kiện của gói:</b> {[td.dieu_kien, td.dieu_kien_huy].filter(Boolean).join(" · ")}</small>}
         <div className="ksv-sum" style={{ borderTop: "1px solid var(--ksv-line)", paddingTop: 8 }}><b>Trả trước {kh.cach === "du" ? "(toàn bộ)" : `(cọc ${pct}%)`}</b><b className="ksv-big" style={{ fontSize: 20 }}>₫ {vnd(traTruoc)}</b></div>
         <small className="ksv-muted">Trả tại nhà hàng ~₫ {vnd(Math.max(0, tam - traTruoc))} · đồ uống, món gọi thêm theo hóa đơn thực tế. Máy chủ tính lại số chính thức.</small>
       </aside>
@@ -488,6 +490,7 @@ const CSS = `
 .nhv-pay.on{border-color:var(--ksv-accent);background:var(--ksv-asoft)}.nhv-pay input,#vtd-access .nhv .nhv-pay input{width:18px;height:18px;min-height:0;flex:none;margin:3px 0 0;padding:0;accent-color:var(--ksv-accent)}
 .nhv-pay>span{flex:1;min-width:0}
 .nhv-tom{position:sticky;top:76px;gap:8px}.nhv-tom-anh{width:100%;height:140px;object-fit:cover;border-radius:8px}
+.nhv-dk{background:var(--ksv-soft);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.45}
 .nhv-tom-o{display:flex;gap:6px;flex-wrap:wrap}.nhv-tom-o span{background:var(--ksv-soft);border-radius:8px;padding:6px 10px;font-weight:600;font-size:13px}
 .nhv-xong{padding:22px;gap:14px}.nhv-xong-dau{display:flex;gap:18px;justify-content:space-between;flex-wrap:wrap}
 .nhv-qr{margin:0;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--ksv-muted)}
