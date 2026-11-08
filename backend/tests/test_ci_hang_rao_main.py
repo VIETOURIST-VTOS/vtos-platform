@@ -146,6 +146,10 @@ HANG_RAO = (
     # that canh ay la `1121` voi 20 tai khoan ngan hang. Luat 3 canh MOT bo luat cho HAI
     # duong nhap (bai hoc CPTT-1 -> CPTT-2).
     "tests/test_tscd1_tk_nguyen_gia_tai_san.py",
+    # ── VIEC B, them 08/11/2026 (Dot TGIA-1) ───────────────────────────────────────────────
+    # Luat 3 do HAI CHIEU: khong con GHI/IN bang hang so cap cha, VA bon hang so goc PHAI
+    # CON (chung la goc doc cay). Luat 4 canh dot nay khong dich mot dong tien nao.
+    "tests/test_tgia1_tach_ty_gia_tai_khoan_con.py",
 )
 
 
