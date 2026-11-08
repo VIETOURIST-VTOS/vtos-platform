@@ -1637,7 +1637,12 @@ def tim(db: Session, tinh: str, vao, ra, nguoi_lon: int = 2, tre_em: int = 0, so
             "mo_thanh_toan": mo_thanh_toan(db, k, chung)} for k in ks]
     # KS-19 (Chủ tịch 05/11/2026: «bỏ luôn» luồng gửi yêu cầu): chỉ hiện khách sạn còn đủ phòng đặt được cho ngày,
     # số khách và số phòng đã chọn — không còn thẻ «gửi yêu cầu / báo giá riêng».
-    the = [o for o in the if o["gia_tu"] is not None and o["goi_ban"] and du_phong(o["goi_ban"], sp)]   # KS-19b / KS-20d
+    dat_duoc = [o for o in the if o["gia_tu"] is not None and o["goi_ban"] and du_phong(o["goi_ban"], sp)]   # KS-19b / KS-20d
+    # P0-01 (Chủ tịch duyệt 09/11/2026 «Cho bật / tắt thật»): bỏ chọn «Còn phòng đặt được» thì cổng hiện thêm khách
+    # sạn KHÔNG đặt được cho kỳ này — thẻ mờ, có lý do, không giá, không gói (không đặt được từ thẻ này).
+    co = {o["id"] for o in dat_duoc}
+    khong_dat = sorted((_the_khong_dat(o) for o in the if o["id"] not in co), key=lambda o: o["ten"])
+    the = dat_duoc
     dem_tp = {}
     for o in the:
         dem_tp[o["tinh_thanh"]] = dem_tp.get(o["tinh_thanh"], 0) + 1
@@ -1645,7 +1650,18 @@ def tim(db: Session, tinh: str, vao, ra, nguoi_lon: int = 2, tre_em: int = 0, so
     return {"khach_san": the, "tong": len(the), "dem": (ra - vao).days, "vao": vao.isoformat(), "ra": ra.isoformat(),
             "nguoi_lon": nl, "tre_em": te, "so_phong": sp, "tuoi": tu or [],
             "thanh_pho": [{"ten": t, "so": dem_tp[t]} for t in sorted(dem_tp, key=lambda t: -dem_tp[t])],
-            "loai": LOAI_CHO_O}
+            "loai": LOAI_CHO_O, "khong_dat": khong_dat}
+
+
+def _the_khong_dat(o: dict) -> dict:
+    """P0-01: thẻ khách sạn không đặt được cho kỳ đã tìm — chỉ thông tin nhận diện + lý do; bỏ giá và gói.
+    Lý do: «het» = có giá nhưng hết phòng mọi gói; «khong_du» = có phòng nhưng không đủ số phòng / số khách đã chọn;
+    «chua_ban» = chưa có gói giá phủ đủ các đêm này."""
+    ly_do = "het" if o.get("het_phong") else ("khong_du" if o.get("dat_ngay") else "chua_ban")
+    giu = ("id", "ten", "sao", "loai", "loai_ten", "tinh_thanh", "khu_vuc", "km_trung_tam", "mien", "so_anh",
+           "tien_ich", "vi_do", "kinh_do", "danh_gia")
+    return {**{k: o.get(k) for k in giu}, "anh": (o.get("anh") or [])[:1], "ly_do": ly_do,
+            "het_phong": True, "gia_tu": None, "goi_ban": [], "dat_ngay": False}
 
 
 def chi_tiet_cong(db: Session, kid: int, vao, ra, nguoi_lon: int = 2, tre_em: int = 0, so_phong: int = 1,
