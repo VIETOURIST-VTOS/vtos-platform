@@ -1,11 +1,11 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, pct } from "@/lib/api";
 import { errMsg } from "@/components/ui";
 import ChiPhiKyPanel from "@/components/doixe/ChiPhiKyPanel";
-import MucLucPhanHe from "@/components/MucLucPhanHe";
+import TrangPhanHe from "@/components/TrangPhanHe";
 
 /** Bàn làm việc Giám đốc đội xe — màn `/xe`.
  *
@@ -238,15 +238,23 @@ function BanLamViecXe() {
         : <p className="muted">{db.vi_sao}</p>}
     </section>}
 
-    {/* ⑤ CHỨC NĂNG ĐỘI XE — mục lục 4.9, trước nằm ở một TRANG RIÊNG (/phan-he/dhxe).
-        Anh Tuấn 09/11/2026: "2 màn hình này là 1". Gắn lại CHÍNH mục lục ấy chứ không
-        chép danh sách màn hình ra đây — chép là để hai danh sách trôi khỏi nhau, rồi một
-        hôm màn mới chỉ hiện ở một chỗ. `khongChip` bỏ dãy chip phân hệ phòng khác: đó là
-        thứ duy nhất trong mục lục không phải việc của đội xe.
-        Mục lục này KHÔNG gọi máy chủ và không hiện một con số nghiệp vụ nào (ranh giới
-        09/9/2026) — nó chỉ đọc cấu trúc từ lib/cay_phan_he.ts. */}
+    {/* ⑤ TRANG PHÂN HỆ ĐIỀU HÀNH XE — trước là một TRANG RIÊNG (/phan-he/dhxe), nay nằm
+        ngay đây. Anh Tuấn 09/11/2026: "bỏ màn hình này, gộp qua chung 1 màn hình /xe".
+
+        GẮN LẠI CHÍNH thân trang ấy (`components/TrangPhanHe`) chứ không chép nội dung ra
+        đây. Nhờ thế không mất khối nào: vai xem được báo cáo vẫn có BÀN LÀM VIỆC PHÒNG và
+        BẢNG CHỈ TIÊU phòng đội xe, vai không xem được (gd_doi_xe) vẫn ra thẳng mục lục.
+        Luật "ai thấy bảng nào" vẫn do máy chủ trả lời, không viết lại ở đây.
+
+        `khongChip` bỏ dãy chip sang phòng khác — thứ duy nhất của trang cũ không phải việc
+        của đội xe, và cũng là thứ duy nhất không mang sang.
+
+        `Suspense` BẮT BUỘC: /xe là đường dẫn TĨNH, còn `TrangPhanHe` gọi `useSearchParams`
+        để đọc `?xem=muc-luc`. Thiếu lớp này thì `npm run build` chết ở đúng trang này. */}
     <section style={{ marginTop: 26, borderTop: "1px solid #e6eaf0", paddingTop: 18 }}>
-      <MucLucPhanHe khoa="dhxe" khongChip />
+      <Suspense fallback={<p className="muted">Đang tải…</p>}>
+        <TrangPhanHe khoa="dhxe" khongChip />
+      </Suspense>
     </section>
 
     {/* NGĂN KÉO */}
