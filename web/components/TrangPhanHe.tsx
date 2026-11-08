@@ -56,11 +56,11 @@ function LoiVaoMucLuc({ khoa, duoi }: { khoa: string; duoi?: boolean }) {
  *  nào cũng kéo theo một lượt hỏi `/bao-cao/pham-vi` — kể cả tài xế, người chắc chắn nhận 403 và
  *  sẽ thấy một dòng báo lỗi đỏ chỉ vì mở mục lục. Tách thành phần là cách để nhánh 1 thật sự
  *  không gọi gì. */
-function BangCuaPhong({ khoa, phamVi }: { khoa: string; phamVi: string }) {
+function BangCuaPhong({ khoa, phamVi, khongChip }: { khoa: string; phamVi: string; khongChip?: boolean }) {
   const { meta, xong } = usePhamViBaoCao();
   const ph = timPhanHe(khoa);
   if (!xong) return <p className="muted">Đang tải…</p>;
-  if (!meta?.pham_vi.some((p) => p.ma === phamVi)) return <MucLucPhanHe khoa={khoa} />;
+  if (!meta?.pham_vi.some((p) => p.ma === phamVi)) return <MucLucPhanHe khoa={khoa} khongChip={khongChip} />;
   return (<>
     <h1>{ph?.ten || khoa}</h1>
     <LoiVaoMucLuc khoa={khoa} />
@@ -73,13 +73,13 @@ function BangCuaPhong({ khoa, phamVi }: { khoa: string; phamVi: string }) {
   </>);
 }
 
-export default function TrangPhanHe({ khoa }: { khoa: string }) {
+export default function TrangPhanHe({ khoa, khongChip }: { khoa: string; khongChip?: boolean }) {
   const sp = useSearchParams();
   const { user } = useShell();
   const phamVi = PHONG_CUA_PHAN_HE[khoa];
   const an = user?.hidden_menus || [];
   if (sp?.get("xem") === "muc-luc" || !phamVi || an.includes("/bao-cao")) {
-    return <MucLucPhanHe khoa={khoa} />;
+    return <MucLucPhanHe khoa={khoa} khongChip={khongChip} />;
   }
-  return <BangCuaPhong khoa={khoa} phamVi={phamVi} />;
+  return <BangCuaPhong khoa={khoa} phamVi={phamVi} khongChip={khongChip} />;
 }
