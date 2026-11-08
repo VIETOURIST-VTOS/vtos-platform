@@ -13,14 +13,20 @@
  *  đúng ba màn ấy, không dời đi đâu cả. Giữ nguyên chỗ của chúng là giữ nguyên luôn phần khai
  *  phạm vi API trong `access.py` — đó là cái lợi lớn nhất của cách này.
  *
- *  ĐIỀU HÀNH XE CŨNG KHÔNG CÓ TRONG BẢNG, và đây là chỗ đợt này đã gần làm sai. Bản đầu khai
- *  `dhxe` trỏ sang `/xe`. Nhưng `/xe` đã có chủ: PR #744 (KS-46, 08/11/2026) dựng ở đó BÀN LÀM
- *  VIỆC của Giám đốc đội xe — màn riêng, không thanh dọc, có hàng đợi việc và ngăn kéo dẫn sang
- *  cửa nhập. Khai như thế nghĩa là bảng chỉ tiêu phòng sẽ ĐÈ LÊN bàn làm việc ấy. Nên `dhxe` ở
- *  lại `/phan-he/dhxe` và không chuyển hướng đi đâu; ngày nào đội xe muốn gộp hai thứ thì đó là
- *  một đợt riêng, có người quyết, chứ không phải một dòng trong bảng này.
+ *  ĐIỀU HÀNH XE VÀO BẢNG NGÀY 09/11/2026, và đây là một quyết định có người ký chứ không phải
+ *  một dòng thêm cho đủ. Đợt PH-1 (08/11) CỐ Ý để `dhxe` ở ngoài, vì `/xe` đã có chủ: PR #744
+ *  dựng ở đó BÀN LÀM VIỆC của Giám đốc đội xe, và khai vào bảng này lúc ấy nghĩa là bảng chỉ
+ *  tiêu phòng ĐÈ LÊN bàn làm việc. Ghi chú hôm ấy để ngỏ: "ngày nào đội xe muốn gộp hai thứ thì
+ *  đó là một đợt riêng, có người quyết".
  *
- *  Vậy bảng dưới đây có BỐN dòng, không phải năm và cũng không phải tám.
+ *  Anh Tuấn quyết 09/11/2026: "em bỏ màn hình này, để gộp qua chung 1 màn hình /xe".
+ *
+ *  Và lo ngại cũ KHÔNG còn đúng, vì KS-54/KS-56 đổi cách gắn: `/xe` gắn `TrangPhanHe` thành MỘT
+ *  VÙNG ở cuối màn, không thay thế bàn làm việc. Ai xem được bảng chỉ tiêu đội xe thì vẫn thấy
+ *  đủ bảng ấy — chỉ là thấy ở dưới bàn làm việc chứ không ở một trang riêng. Không ai mất gì,
+ *  nên dời chỗ ở là dời thật, không phải đánh đổi.
+ *
+ *  Vậy bảng dưới đây có NĂM dòng, không phải bốn và cũng không phải tám.
  */
 
 /** Khoá phân hệ → đường dẫn mới. CHỈ gồm những phòng đã DỜI khỏi `/phan-he/<khoá>`. */
@@ -28,6 +34,7 @@ export const DUONG_PHONG: Record<string, string> = {
   kdle: "/fit",
   kddoan: "/mice",
   dhtour: "/op",
+  dhxe: "/xe",
   hdv: "/guide",
 };
 

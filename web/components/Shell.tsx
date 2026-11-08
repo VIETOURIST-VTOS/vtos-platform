@@ -55,16 +55,11 @@ type Block = Item | Section;
  *  `href` vì thế thành TUỲ CHỌN. Nhóm có `phans` thì vẽ bằng <button> chứ không phải <Link>: một
  *  thẻ <a> không dẫn đi đâu là nói dối với bàn phím và với trình đọc màn hình, cả hai đều báo cho
  *  người dùng rằng đây là một đường dẫn. */
-/** `href` TUỲ CHỌN trên một phân hệ con (09/11/2026): mặc định chip hỏi `duongCuaPhong`, trừ khi
- *  phân hệ ấy khai một màn riêng ngay đây. Hiện chỉ "Điều hành xe" dùng — nó nhảy ra /xe, bàn làm
- *  việc toàn màn, không thanh dọc.
- *
- *  KHÁC `DUONG_PHONG`: bảng kia DỜI HẲN phòng đi, `/phan-he/<khoá>` chỉ còn lối chỉ sang chỗ mới.
- *  Trường này chỉ đổi đường của CHIP; mục lục /phan-he/dhxe ở lại, vẫn mở được bằng đường dẫn và
- *  từ chính màn /xe. Anh Tuấn 09/11/2026 dặn đúng thế.
- *
- *  Trường này bị BỎ ĐI cho vai không vào được màn ấy — xem chỗ lọc quyền trong `groups`. */
-type PhanCon = { khoa: string; label: string; href?: string };
+/** Đích của một phân hệ con KHÔNG khai ở đây mà hỏi `duongCuaPhong` (lib/duong_phong.ts) — một
+ *  bảng, một chỗ. KS-54 từng cho `PhanCon` một trường `href` riêng để "Điều hành xe" nhảy ra
+ *  /xe trong khi /phan-he/dhxe còn sống; 09/11/2026 anh Tuấn bỏ hẳn trang cũ nên `dhxe` vào
+ *  thẳng bảng ấy, và trường riêng đã gỡ. Hai lối tới cùng một đích là hai chỗ để sửa nhầm. */
+type PhanCon = { khoa: string; label: string };
 type Group = { key: string; label: string; label_ngan?: string; icon: string; blocks: Block[];
                href?: string; phans?: PhanCon[] };
 
@@ -269,7 +264,7 @@ function NhomXo({ g, thu, dangO, dongThanhDoc }:
           chuỗi `/phan-he/` tại chỗ — phòng chưa dời vẫn về chỗ cũ, và ngày dời thêm một
           phòng thì chỉ sửa bảng trong `lib/duong_phong.ts`, không ai phải nhớ dòng này. */}
       {g.phans!.map((p) => (
-        <Link key={p.khoa} href={p.href ?? duongCuaPhong(p.khoa)} className="xo-muc" role="menuitem"
+        <Link key={p.khoa} href={duongCuaPhong(p.khoa)} className="xo-muc" role="menuitem"
           onClick={() => { datMo(false); dongThanhDoc(); }}>{p.label}</Link>
       ))}
     </div>
@@ -476,7 +471,7 @@ export const GROUPS: Group[] = [
   // tải Vietrip, hướng dẫn viên hưởng lương ở công ty mẹ, còn điều hành tour chạy quanh CHUYẾN –
   // ba người quản khác nhau thì ba màn hình. /phan-he/vanhanh vẫn mở được bằng đường dẫn.
   { key: "vanhanh", label: "Điều hành", icon: "vanhanh",
-    phans: [{ khoa: "dhtour", label: "Điều hành tour" }, { khoa: "dhxe", label: "Điều hành xe", href: "/xe" },
+    phans: [{ khoa: "dhtour", label: "Điều hành tour" }, { khoa: "dhxe", label: "Điều hành xe" },
             { khoa: "hdv", label: "Hướng dẫn viên" }],
     blocks: [
     // ĐỢT PH-1 · 09/11/2026 — ba lối vào RIÊNG. `/op` và `/guide` là trang chỉ tiêu của
@@ -751,12 +746,7 @@ export default function Shell({ children, khongThanhBen = false }:
         })
         .filter((b): b is Block => b !== null);
       const dem = blocks.reduce((n, b) => n + (laMuc(b) ? 1 : b.items.length), 0);
-      // CỬA RIÊNG CỦA PHÂN HỆ CON đi qua đúng hàng rào quyền như mọi mục khác: vai nào không
-      // vào được /xe thì bỏ `href` ấy đi và chip "Điều hành xe" trả về mục lục /phan-he/dhxe.
-      // Để nguyên thì họ bấm vào rồi bị máy chủ đẩy về "/" — không phải trang lỗi, nhưng
-      // trông y như phần mềm hỏng, và họ mất luôn lối vào mục lục phòng xe.
-      const phans = g.phans?.map((p) => (p.href && !duoc(p.href) ? { ...p, href: undefined } : p));
-      return { ...g, blocks, dem, ...(g.phans ? { phans } : {}) };
+      return { ...g, blocks, dem };
       // GIỮ ĐỦ TÁM NHÓM CHO MỌI VAI TRÒ (anh Tuấn chốt 13/9/2026). Trước đó nhóm nào vai này không
       // có màn hình nào thì rụng khỏi menu; bỏ cách ấy vì nó khiến nhân viên không biết hệ thống có
       // những gì và không biết phải xin quyền ở đâu – cứ tưởng phần mềm chưa làm chức năng ấy.
