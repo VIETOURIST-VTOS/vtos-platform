@@ -137,8 +137,14 @@ def test_r4c4_3_nam_dong_khe_uoc_ghi_1121():
     assert FIN.TK_TIEN_GUI_CT == "1121"
 
     # Hai phép cộng số dư ở cấp CHA phải CÒN — xem đầu tệp.
-    assert than.count('("111", "112")') == 2, \
+    # KS-TC (#729, 08/11/2026): phép thứ hai — số dư đầu kỳ của dự báo 13 tuần — nay đọc QUA bộ
+    # nhớ số dư của bảng điều hành (`dashboard._so_du_no_vay_phai_thu`), nơi vẫn cộng đúng
+    # ("111", "112") ở cấp cha. Đếm cả hai nơi: tổng vẫn phải là hai phép cộng cấp cha.
+    than_db = _bo_chu_py((BE / "services" / "dashboard.py").read_text(encoding="utf-8"))
+    assert than.count('("111", "112")') == 1, \
         "đã đụng vào phép ĐỌC số dư tiền ở cấp cha — đọc cấp cha là ĐÚNG"
+    assert 'for c in ("111", "112"))' in than_db and "_so_du_no_vay_phai_thu(db" in than, \
+        "số dư đầu kỳ dự báo phải đọc qua phép cộng cấp cha của bảng điều hành"
 
     # Và hằng số ấy phải là một tài khoản CHI TIẾT CÓ THẬT trong danh mục. Đo cái này chứ không
     # chỉ đo chuỗi: một lần gõ nhầm `"1120"` vẫn qua được mọi phép soi chữ ở trên, rồi `post_entry`
