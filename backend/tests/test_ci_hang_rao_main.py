@@ -150,6 +150,10 @@ HANG_RAO = (
     # Luat 3 do HAI CHIEU: khong con GHI/IN bang hang so cap cha, VA bon hang so goc PHAI
     # CON (chung la goc doc cay). Luat 4 canh dot nay khong dich mot dong tien nao.
     "tests/test_tgia1_tach_ty_gia_tai_khoan_con.py",
+    # ── Dot NH-1, them 09/11/2026 ─────────────────────────────────────────────────────────
+    # Luat 1 do HANH VI: doc cung mot canh qua HAI bo cuc cot cua MISA (8 cot va 13 cot) roi
+    # so so tien lay ra. Luat 2 canh nguong cat hau to nam GIUA hai nhom da do tren so that.
+    "tests/test_nh1_bo_doc_so_tien_gui.py",
 )
 
 
