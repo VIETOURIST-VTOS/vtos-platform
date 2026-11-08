@@ -19,7 +19,7 @@ import dynamic from "next/dynamic";
 import { giaGon } from "./BanDoKs";
 const BanDoKs = dynamic(() => import("./BanDoKs"), { ssr: false, loading: () => <div className="ksv-bando" style={{ height: 320 }} /> });   // KS-16s
 import QRCode from "qrcode";
-import { diCongThe, duongRieng, goiCong, moNgoai, phienCong, xemCong } from "@/lib/cong";
+import { diCongThe, duongRieng, goiCong, layLuaChon, moNgoai, nhoLuaChon, phienCong, xemCong } from "@/lib/cong";
 import { DanhGiaKsCong, MUC_KS, OD, TomTatDg, VietDanhGiaKs, nhanDiem } from "./DanhGiaKs";
 
 type Q = { tinh: string; vao: string; ra: string; nl: number; te: number; phong: number; tuoi?: number[]; chia: Phong[] };
@@ -249,7 +249,17 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
       if (sang) { setDaTim(true); len(); }
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
   };
-  useEffect(() => { tim().then(() => { if (moId) moKs(moId); }); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // P0-06: vừa đăng nhập giữa chừng → trả lại điểm đến, ngày, số khách, khách sạn đang xem và phòng đã chọn.
+    const nho = layLuaChon<{ q: Q; ksId: number | null; chon: Record<number, number>; daTim: boolean }>("hotel");
+    if (nho?.q) {
+      setQ(nho.q); if (nho.daTim) setDaTim(true);
+      tim(nho.q).then(async () => { if (nho.ksId) { await moKs(nho.ksId, nho.q, false, true); setChon(nho.chon || {}); setBuoc("ks"); } });
+      return;
+    }
+    tim().then(() => { if (moId) moKs(moId); });
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { nhoLuaChon("hotel", { q, ksId: buoc === "ks" || buoc === "gui" ? ks?.id ?? null : null, chon, daTim }); }, [q, ks, chon, buoc, daTim]);   // P0-06
   // KS-14: quay về từ trang thẻ OnePay (?ks_vtd=…&the=ok|loi) → mở thẳng trang đơn.
   useEffect(() => {
     try {

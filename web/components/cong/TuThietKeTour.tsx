@@ -6,7 +6,7 @@
    Trình duyệt CHỈ gửi lựa chọn; mọi con số tiền do máy chủ tính (/khach/tour-doan/tinh). Mục chưa có nguồn giá hiện
    «Sales báo giá», không tính 0. Chỗ nào danh sách không có thì có «Khác…» để khách tự ghi. */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { goiCong } from "@/lib/cong";
+import { goiCong, layLuaChon, nhoLuaChon } from "@/lib/cong";
 import { DD, SB, XA, goiYPt, hangGoiY } from "./tuThietKeDuLieu";
 
 const vnd = (n?: number | null) => (n || n === 0 ? Math.round(n).toLocaleString("vi-VN") : "—");
@@ -55,6 +55,19 @@ export default function TuThietKeTour({ toi }: { toi?: any }) {
   const [cuaToi, setCuaToi] = useState<any[]>([]);
   const [dongY, setDongY] = useState<Record<number, boolean>>({});
   const [msgBg, setMsgBg] = useState(""); const [loiBg, setLoiBg] = useState("");
+  // P0-06: giữ nguyên bản thiết kế qua bước đăng nhập (trình duyệt của khách, 30 phút, đọc lại một lần).
+  useEffect(() => {
+    const b = layLuaChon<any>("tour-tk");
+    if (!b) return;
+    setPv(b.pv); setNhom(b.nhom); setNhip(b.nhip); setNganSach(b.nganSach); setUuTien(b.uuTien); setKh(b.kh); setKhKhac(b.khKhac);
+    setNgayDi(b.ngayDi); setK(b.k); setTuoi(b.tuoi); setTayPhong(b.tayPhong); setPh(b.ph); setHangKs(b.hangKs); setDiem(b.diem);
+    setDdKhac(b.ddKhac); setNgay(b.ngay); setChang(b.chang); setDv(b.dv); setGui((g) => ({ ...g, ...b.gui, dong_y: false }));
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (daGui) return;
+    nhoLuaChon("tour-tk", { pv, nhom, nhip, nganSach, uuTien, kh, khKhac, ngayDi, k, tuoi, ph, tayPhong, hangKs, diem, ddKhac, ngay, chang, dv,
+      gui: { ho_ten: gui.ho_ten, dien_thoai: gui.dien_thoai, ghi_chu: gui.ghi_chu } });
+  }, [pv, nhom, nhip, nganSach, uuTien, kh, khKhac, ngayDi, k, tuoi, ph, tayPhong, hangKs, diem, ddKhac, ngay, chang, dv, gui, daGui]);
   const taiCuaToi = () => goiCong("/khach/tour-doan/cua-toi").then((r) => setCuaToi(r.thiet_ke || [])).catch(() => null);
   useEffect(() => { taiCuaToi(); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
   const dongYBg = async (b: any) => {

@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import QRCode from "qrcode";
-import { goiCong, xemCong } from "@/lib/cong";
+import { goiCong, layLuaChon, nhoLuaChon, xemCong } from "@/lib/cong";
 import { CSS_KSV } from "./KhachSanVtd";
 import { giaGon, type Ghim } from "./BanDoKs";
 import { VideoO } from "./VideoCong";
@@ -99,8 +99,16 @@ export default function NhaHangAgoda({ ten = "", lienHe = "", coSdt = false, sdt
 
   useEffect(() => {
     goiCong("/mo/nha-hang/tat-ca").then(setDs).catch((x) => setLoi(x.message));
+    // P0-06: vừa đăng nhập giữa chừng → trả lại ngày, số khách, nhà hàng, gói / giờ và ghi chú đã gõ, đúng bước.
+    const nho = layLuaChon<{ q: Q; nhId: number | null; chon: { td: number | null; gio: string }; kh: typeof kh; buoc: string }>("restaurant");
+    if (nho?.q) {
+      setQ(nho.q);
+      if (nho.nhId) moNh(nho.nhId).then(() => { setChon(nho.chon); setKh({ ...nho.kh, dongy: false, dongy_khach: false }); if (nho.buoc === "dat") setBuoc("dat"); });
+      return;
+    }
     if (moId) moNh(moId);
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (buoc !== "xong") nhoLuaChon("restaurant", { q, nhId: buoc === "nh" || buoc === "dat" ? nh?.id ?? null : null, chon, kh, buoc }); }, [q, nh, chon, kh, buoc]);   // P0-06
 
   const moNh = async (id: number, toiThucDon = false) => {
     setLoi(""); setBusy(true);

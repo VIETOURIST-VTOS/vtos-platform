@@ -103,6 +103,27 @@ export async function xemCong(path: string): Promise<any> {
 
 /* Lệnh GHI bị 401 khi chưa có phiên → báo khung trang riêng hiện ô «Đăng nhập để tiếp tục». */
 export const SU_KIEN_CAN_DANG_NHAP = "vtd-can-dang-nhap";
+/* P0-06 (Chủ tịch duyệt 09/11/2026): giữ lựa chọn của khách qua bước đăng nhập. Mỗi trang ghi lựa chọn đang làm vào
+   sessionStorage (chỉ trình duyệt của khách, không gửi máy chủ, không có mật khẩu); trang đăng nhập đánh dấu «vừa đăng
+   nhập»; trang đích đọc lại ĐÚNG MỘT LẦN trong 30 phút rồi xóa. Không đánh dấu thì không khôi phục gì. */
+const NHO_DN = "vtd_nho_dn:", VUA_DN = "vtd_vua_dn", NHO_PHUT = 30;
+export function nhoLuaChon(trang: string, data: unknown): void {
+  try { sessionStorage.setItem(NHO_DN + trang, JSON.stringify({ luc: Date.now(), data })); } catch { /* bỏ qua */ }
+}
+export function danhDauVuaDangNhap(): void {
+  try { sessionStorage.setItem(VUA_DN, String(Date.now())); } catch { /* bỏ qua */ }
+}
+export function layLuaChon<T = any>(trang: string): T | null {
+  try {
+    const dau = Number(sessionStorage.getItem(VUA_DN) || 0);
+    if (!dau || Date.now() - dau > NHO_PHUT * 60_000) return null;
+    const v = sessionStorage.getItem(NHO_DN + trang);
+    if (!v) return null;
+    sessionStorage.removeItem(NHO_DN + trang); sessionStorage.removeItem(VUA_DN);
+    const o = JSON.parse(v);
+    return o && Date.now() - Number(o.luc || 0) <= NHO_PHUT * 60_000 ? (o.data as T) : null;
+  } catch { return null; }
+}
 export function duongDangNhap(): string {
   try { return `/login?ve=${encodeURIComponent(location.pathname + location.search)}`; } catch { return "/login"; }
 }
