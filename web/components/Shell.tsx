@@ -347,6 +347,11 @@ export const GROUPS: Group[] = [
     // anh Tuấn, người đặt làm nó, mở web mà không thấy; người trực lúc 2 giờ sáng càng không.
     // Một cửa báo động phải biết đường mới mò ra được thì nó không phải cửa báo động.
     ["Khủng hoảng & phản ứng nhanh", "/marketing?tab=thuonghieu"],
+    // ĐỢT MKT-1 · 09/11/2026 — hai bàn làm việc của phòng. Đứng ngay sau cửa khủng hoảng
+    // và trước các mục nghiệp vụ: người mở máy buổi sáng là để làm việc, còn kế hoạch và
+    // ngân sách thì xem một lần đầu kỳ là đủ. Hai bàn CHỈ ĐỌC, mọi ô dẫn về đúng tab dưới.
+    ["Bàn Phó TGĐ Marketing", "/ptgd-mkt"],
+    ["Bàn nhân viên Marketing", "/ban-mkt"],
     ["Kế hoạch & ngân sách", "/marketing?tab=ngansach"],
     ["Chiến dịch", "/marketing"],
     ["Nội dung & thương hiệu", "/noi-dung"],

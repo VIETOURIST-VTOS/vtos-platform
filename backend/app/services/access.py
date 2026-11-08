@@ -537,6 +537,13 @@ MAN_HINH_API = {
     # trên. Nó chỉ để người dùng không phải đoán vì sao màn hình đỏ.
     "/marketing": ("/api/v1/marketing", "/api/v1/products", "/api/v1/users",
                    "/api/v1/leads", "/api/v1/noi-dung"),
+    # ĐỢT MKT-1 (09/11/2026) — hai bàn làm việc của phòng Marketing. Chúng gắn vào ĐÚNG
+    # nhóm `/api/v1/marketing` mà màn `/marketing` ngay trên đã gọi, nên không vai nào
+    # được nới thêm một đường nào vì đợt này. Lập luận đầy đủ ở `api/v1/ban_mkt.py`, và
+    # `test_ban_mkt.py` đo đúng điều ấy: vai của hai bàn phải nằm gọn trong vai của
+    # `/marketing`, nếu không thì lập luận hết đúng và hàng rào đỏ.
+    "/ptgd-mkt": ("/api/v1/marketing",),
+    "/ban-mkt": ("/api/v1/marketing",),
     "/doc-chung-tu": ("/api/v1/doc-chung-tu", "/api/v1/nap-du-lieu", "/api/v1/tep"),
 
     "/nap-du-lieu": ("/api/v1/nap-du-lieu", "/api/v1/quyet-toan-tour"),
@@ -1079,6 +1086,12 @@ MENU_ROLES = {
     "/inbox": BASE_VIEW + SALES + OPERATIONS + MARKETING + ("ptgd_mkt", "cntt"),
     "/leads": BASE_VIEW + SALES + OPERATIONS + MARKETING + ("ptgd_mkt", "cntt"),
     "/marketing": BASE_VIEW + MARKETING + ("ptgd_mkt", "gd_kd", "ketoan", "cntt"),   # chiến dịch: Marketing lập, Kế toán đối chiếu chi phí
+    # ĐỢT MKT-1 (09/11/2026) — hai bàn Marketing. Mỗi dòng là TẬP CON của dòng ngay trên:
+    # bàn Phó TGĐ hẹp hơn cả `/marketing` (không có gd_kd, không có kế toán, không có
+    # nhân viên), bàn nhân viên thêm đúng `nv_mkt`. Phó TGĐ giữ cả hai vì người quản thấy
+    # bàn của nhân viên — Chủ tịch chốt 09/11/2026.
+    "/ptgd-mkt": BASE_VIEW + ("ptgd_mkt", "cntt"),
+    "/ban-mkt": BASE_VIEW + MARKETING + ("ptgd_mkt", "cntt"),
     # Nội dung & thương hiệu là SỔ DUYỆT, không phải thư viện ảnh: hanh_chinh có mặt vì pháp chế nằm ở khối
     # đó và là người ký thứ hai cho nội dung có cam kết với khách hoặc có số liệu tài chính.
     "/noi-dung": BASE_VIEW + MARKETING + ("ptgd_mkt", "hanh_chinh", "cntt"),

@@ -44,6 +44,10 @@ from app.api.v1.access import router as access_router
 from app.api.v1.ai_roles import router as ai_roles_router
 from app.api.v1.debts import router as debts_router
 from app.api.v1.marketing import router as marketing_router
+# MKT-1 (09/11/2026) — hai bàn làm việc của phòng Marketing. CÙNG tiền tố
+# `/api/v1/marketing` với dòng ngay trên, có chủ ý: mọi vai mở được hai bàn đều đã
+# gọi được nhóm ấy từ trước, nên không nới phạm vi của ai. Xem `api/v1/ban_mkt.py`.
+from app.api.v1.ban_mkt import router as ban_mkt_router
 from app.api.v1.suppliers import router as ncc_router
 from app.api.v1.intake import router as intake_router
 from app.api.v1.attachments import router as tep_router
@@ -351,6 +355,7 @@ app.include_router(phap_che_viec_router)
 app.include_router(gui_phap_che_router)
 app.include_router(nha_dau_tu_router)
 app.include_router(marketing_router)
+app.include_router(ban_mkt_router)
 app.include_router(ops_router)
 app.include_router(finance_router)
 app.include_router(vietrip_router)
