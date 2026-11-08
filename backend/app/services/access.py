@@ -489,6 +489,9 @@ MAN_HINH_API = {
     # thực hiện: so kế hoạch với thực hiện là việc của màn hình 01, và mở thêm /dashboard ở đây là
     # cấp cho Kế toán một đường vòng vào bảng điều hành của Chủ tịch.
     "/ke-hoach-thang": ("/api/v1/ke-hoach",),
+    # KS-46 (08/11/2026) — bàn làm việc một màn của Giám đốc đội xe. Chỉ gọi nhóm
+    # "/api/v1/fleet", đúng nhóm mà "/doi-xe" và "/lai-lo-doi-xe" đã gọi.
+    "/xe": ("/api/v1/fleet",),
     "/lai-lo-doi-xe": ("/api/v1/fleet",),
     "/leads": ("/api/v1/leads", "/api/v1/zalo", "/api/v1/dau-quang-cao"),
     "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers",
@@ -1100,6 +1103,12 @@ MENU_ROLES = {
     # Lãi lỗ đội xe gồm lãi vay và chi phí cố định của cả đội – đây là kết quả kinh doanh của một trung
     # tâm lợi nhuận, không phải bảng theo dõi vận hành. Điều hành và HCNS không xem.
     "/lai-lo-doi-xe": BASE_VIEW + FLEET_MGR + ("ketoan", "cntt"),
+    # KS-46 (08/11/2026) — "/xe": màn RIÊNG của đội xe, không cột dọc, không phân hệ
+    # phòng khác. HẸP HƠN "/lai-lo-doi-xe" một vai: kế toán không có việc gì trên bàn
+    # làm việc của giám đốc, họ đã có màn Lãi lỗ để đọc số. Chủ tịch nằm trong
+    # BASE_VIEW nên xem được; cửa GHI vẫn do từng endpoint chặn riêng, nên Chủ tịch
+    # mở màn này ra là chỉ xem — đo thật 08/11: vai chutich không có form nhập chi phí kỳ.
+    "/xe": BASE_VIEW + FLEET_MGR + ("cntt",),
 
     # --- Tài chính & Kế toán. Ba màn hình tiền thu về Kế toán; hai Phó TGĐ và CNTT không còn xem. ---
     "/collections": BASE_VIEW + SALES + OPERATIONS + ("ptgd_doan", "ketoan", "cntt"),

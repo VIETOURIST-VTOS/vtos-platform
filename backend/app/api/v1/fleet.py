@@ -48,6 +48,10 @@ def _vai_tro_cua_man(man: str) -> tuple:
 
 XEM_HIEU_QUA = _vai_tro_cua_man("/hieu-qua-doi-xe")
 XEM_LAI_LO = _vai_tro_cua_man("/lai-lo-doi-xe")
+# KS-46 (08/11/2026) — bàn làm việc một màn của Giám đốc đội xe. Suy từ ma trận
+# như hai dòng trên, KHÔNG chép tay danh sách vai: chép là để hai nơi trôi khỏi
+# nhau lần nữa.
+XEM_BAN_LAM_VIEC = _vai_tro_cua_man("/xe")
 # Sửa hồ sơ xe: người phụ trách đội xe và CNTT. Kế toán không sửa hồ sơ xe, BKS chỉ đọc.
 WRITE = ("cntt", "hcns", "tp_dh", "nv_dh", "gd_doi_xe")
 
@@ -1662,6 +1666,33 @@ def hieu_qua(ky: str, u: User = Depends(require_roles(*XEM_HIEU_QUA)), db: Sessi
                len(kq["xe"]) + len(kq["tai_xe"]), 0, u.username)
     db.commit()
     return kq
+
+
+@router.get("/ban-lam-viec")
+def ban_lam_viec(ky: str = "", u: User = Depends(require_roles(*XEM_BAN_LAM_VIEC)),
+                 db: Session = Depends(get_db)):
+    """MỘT cửa cho cả màn `/xe`: hàng đợi việc, số kỳ, xe hôm nay, diễn biến.
+
+    Vì sao một cửa chứ không bốn: bốn cửa thì bốn lần chờ, và bốn cơ hội để hai
+    vùng trên cùng một màn nói hai con số khác nhau.
+
+    `ky` phải đủ dạng YYYY-MM. Đây đúng chỗ đã gây lỗi trên màn Lãi lỗ: giao diện
+    gửi giá trị tháng gõ dở, máy chủ nhận bừa rồi trả số của một kỳ khác (gõ
+    «102026» ra kỳ 2026-01 với 796.985.460 đ). Nhận bừa một lần là người đọc tin
+    một con số không thuộc kỳ nào.
+    """
+    from app.services import ban_lam_viec_xe as BLV
+    ky = ky or date.today().strftime("%Y-%m")
+    try:
+        QT.ky_range(ky)
+    except Exception:
+        raise HTTPException(422, "Kỳ phải có dạng YYYY-MM")
+    # Quyền GHI vẫn do từng cửa chặn riêng; ở đây chỉ nói cho giao diện biết nút
+    # nào vẽ được. Ẩn nút KHÔNG phải là kiểm soát quyền — máy chủ vẫn chặn thật.
+    quyen = {"quyet_toan": u.role in QT_WRITE, "ghi_chi_phi_ky": u.role in QT_WRITE,
+             "ghi_bao_duong": u.role in WRITE, "duyet_de_xuat": False}
+    return BLV.ban_lam_viec(db, ky, quyen) | {"vai": u.role, "quyen": quyen,
+                                              "chi_xem": not quyen["ghi_chi_phi_ky"]}
 
 
 class KhuyenNghiBanIn(BaseModel):
