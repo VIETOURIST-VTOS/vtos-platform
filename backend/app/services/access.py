@@ -1526,7 +1526,15 @@ RESTRICTED_ROLE_MENUS = {
     # /su-co-tour thêm 10/9/2026 cho cả hai: xe hỏng giữa đèo là việc của GĐ Đội xe, hướng dẫn viên
     # bỏ đoàn là việc của TP Hướng dẫn – bắt họ nghe lại qua Điều hành là mất đúng mười lăm phút đầu.
     # Màn hình không mang theo dữ liệu khách: xem ghi chú ở dòng "/su-co-tour" của MENU_ROLES.
-    "gd_doi_xe": ("/doi-xe", "/tai-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe", "/lai-lo-doi-xe",
+    # KS-55 · 09/11/2026 — "/xe" PHẢI có mặt Ở ĐÂY, không chỉ ở MENU_ROLES.
+    # `gd_doi_xe` dùng DANH SÁCH CHO PHÉP, nên dòng `"/xe": ... + FLEET_MGR` thêm ở KS-46
+    # không có hiệu lực với chính ông: `hidden_menus_for` đọc danh sách này chứ không đọc
+    # MENU_ROLES. Đo thật tối 09/11 trên crm.vietourist.vn, tài khoản nguyenhonghuan: mở
+    # được /xe, nhưng mục lục ngay trên màn ấy ghi 4.9.11 «Không có quyền», và chip "Điều
+    # hành xe" bị hàng rào quyền đẩy về /phan-he/dhxe — đúng ngược điều anh Tuấn dặn.
+    # Đây đúng cái bẫy mà ghi chú ở MENU_ROLES đã cảnh báo: "thiếu chỗ đó thì dòng này chỉ
+    # nới quyền API mà họ vẫn không thấy màn hình".
+    "gd_doi_xe": ("/xe", "/doi-xe", "/tai-xe", "/lenh-dieu-xe", "/hieu-qua-doi-xe", "/lai-lo-doi-xe",
                   "/xe-hdv", "/nap-du-lieu", "/tep", "/doc-chung-tu", "/su-co-tour",
                   "/doi-mat-khau", "/nhan-vien-phong-toi") + MAN_CON_LENH_DIEU_XE + MAN_CON_DOI_XE,
     # CUA-1 22/10/2026: Trưởng phòng Hướng dẫn là một trong năm VAI_DUNG_DAU, và đây là
