@@ -116,6 +116,20 @@ BAN_LAM_VIEC = {
                      # chứa (25/9/2026) nằm trong `tours.create_booking`; một cửa đặt thứ hai ở
                      # đây là một chỗ nữa phải nhớ gọi hàng rào ấy.
                      "POST /api/v1/requests"),
+    # DOT PH-1 (09/11/2026) -- dong THU TU, va la dong dau tien KHONG thuoc phong Kinh doanh Doan.
+    # Vi sao no o day chu khong o mot nhom moi: no hoi DUNG cau cua nhom nay ("cua ghi cua vai nay
+    # nam o dau"), nen tach nhom chi de khoi nang tran se la tach gia. Xem tran o phep thu duoi.
+    "/xe": ("Bàn làm việc Giám đốc đội xe: hàng đợi việc của chính ông, số đội xe trong kỳ, xe "
+            "đang đi hôm nay và diễn biến lợi nhuận đội. Không sở hữu con số nào của riêng mình — "
+            "mọi số đọc từ một cửa duy nhất, vốn gom lại từ nhật trình chuyến, chi phí kỳ và hồ "
+            "sơ xe.",
+            ("/fleet/ban-lam-viec",),
+            # Cửa ghi của vai này nằm ở các màn hình nghiệp vụ, và NGĂN KÉO trên bàn dẫn thẳng tới
+            # đúng cửa ấy thay vì dựng bản sao thứ hai tại chỗ: quyết toán chuyến và hồ sơ xe ở
+            # `/doi-xe`, chi phí kỳ ở `/lai-lo-doi-xe`, đề nghị chờ duyệt ở `/requests`. Cùng một
+            # lẽ với ba dòng trên: duyệt một đề nghị là việc phải ĐỌC đề nghị ấy, và một nút duyệt
+            # cạnh một dòng tóm tắt là lời mời duyệt mà chưa mở ra xem.
+            "POST qua /doi-xe (quyết toán, hồ sơ xe) · /lai-lo-doi-xe (chi phí kỳ) · /requests"),
 }
 
 # ── NHẬT KÝ MÁY GHI — nhóm ĐẾM RIÊNG, mở ngày 16/10/2026 ───────────────────────────────────────
@@ -187,14 +201,73 @@ HO_SO_NGUOI = {
         "điểm là số máy tính từ các lượt đã duyệt."),
 }
 
-# Bốn nhóm gộp lại mới là toàn bộ màn hình không có cửa ghi. Khoá tên riêng để không nhóm nào lặng
+# ==============================================================================================
+# NHOM THU NAM -- TRANG PHONG (Dot PH-1, Chu tich chot 08/11/2026)
+# ==============================================================================================
+#
+# VI SAO TACH NHOM, KHONG MUON HAI CHO TRONG CUA `CHI_XEM`. `CHI_XEM` con dung hai cho ma dot nay
+# can nam, nen cau "muon hay tach" tu no da co loi dap. Nhung ke ca con du cho thi van phai tach,
+# vi CAU HOI KHAC NHAU. `CHI_XEM` hoi <<con so nay vao he thong bang cua nao>>. Nam trang duoi day
+# khong co con so nao cua rieng chung de hoi cau ay: chung KHONG doc mot bang nghiep vu nao, chung
+# gom lai nhung con so man hinh khac da tinh va ve them muc luc chuc nang. Cau dung cho nhom nay
+# la <<trang nay gom so cua phong nao, va so ay sinh ra o dau>>.
+#
+# Day la lan thu tu kho nay tach nhom thay vi nang tran -- sau `BAN_LAM_VIEC`, `NHAT_KY_MAY_GHI`
+# va `HO_SO_NGUOI`. Nang tran thi re mot lan roi mat luon cau hoi; tach nhom thi moi danh sach
+# van tra loi dung mot cau.
+#
+# TRAN 4, VA CHI 4. VTOS co tam phong ban. Ba phong -- Marketing, HC-NS, Tai chinh - Ke toan --
+# DUNG DUNG MAN HINH LAM VIEC DANG CO (`/marketing`, `/hr`, `/finance`) va nhung man ay co cua ghi
+# that, nen chung khong bao gio thuoc nhom nay.
+#
+# PHONG THU TAM -- DIEU HANH XE -- CUNG KHONG THUOC NHOM NAY, va day la chuyen moi. Dot PH-1 ban
+# dau khai `/xe` o nhom nay. Nhung PR #744 (KS-46, 08/11/2026) da dung `/xe` thanh BAN LAM VIEC
+# cua Giam doc doi xe: mot man that, co hang doi viec, co ngan keo dan tay sang cua nhap, va da
+# tu khai quyen trong `access.py`. Nghia la `/xe` KHONG con la mot trang chi-xem, va dua no vao
+# day la khai sai mot man hinh dang lam viec. Bon la con so dong, khong phai con so tam.
+#
+# DUONG DOC KHAI LA `/bao-cao`, VA BAN DAU DA KHAI SAI. Em viet `("/bao-cao/pham-vi",
+# "/bao-cao/chi-tieu")` -- chuoi thu hai KHONG TON TAI trong kho, em bia ra ma khong mo ma xem.
+# `test_duong_doc_da_khai_van_con_tren_man_hinh` do dung vao do. Khai `/bao-cao` la dung va du: no
+# la nhom cua that, `TrangPhanHe` co chuoi ay ngay trong than (`an.includes("/bao-cao")`), va no
+# khop dung cach man `/bao-cao` tu khai o `CHI_XEM` phia tren.
+#
+# PHAN TU THU BA la CUA NHAP THAT -- nguoi dung di dau de sua con so ay. Voi nhom nay cau tra loi
+# luon la "o man hinh nghiep vu cua phong", va viet ra de khong ai tuong trang phong la noi nhap.
+TRANG_PHONG = {
+    "/fit": (
+        "Trang phòng Kinh doanh lẻ: bảng chỉ tiêu của phòng cộng mục lục chức năng. Không đọc "
+        "bảng nghiệp vụ nào — số lấy từ `/api/v1/bao-cao` đã tính sẵn ở `bao_cao_phong`.",
+        ("/bao-cao",),
+        "Số bán hàng nhập ở Booking, Yêu cầu và Báo giá; chỉ tiêu tháng nhập ở /ke-hoach-thang."),
+    "/mice": (
+        "Trang phòng Kinh doanh đoàn: bảng chỉ tiêu của phòng cộng mục lục chức năng. Cùng "
+        "khuôn với /fit, khác phạm vi báo cáo — số lấy từ `/api/v1/bao-cao` đã tính sẵn.",
+        ("/bao-cao",),
+        "Số đoàn nhập ở Booking đoàn, Hợp đồng và Báo giá đoàn; chỉ tiêu ở /ke-hoach-thang."),
+    "/op": (
+        "Trang phòng Điều hành tour: bảng chỉ tiêu của phòng cộng mục lục chức năng, phạm vi "
+        "`dieu_hanh`. Không đọc bảng nghiệp vụ nào của riêng nó.",
+        ("/bao-cao",),
+        "Số điều hành nhập ở Sản phẩm, Chuyến & quyết toán, Sự cố tour và Nhà cung cấp & đặt "
+        "dịch vụ."),
+    "/guide": (
+        "Trang phòng Hướng dẫn: bảng chỉ tiêu của phòng cộng mục lục chức năng, phạm vi "
+        "`huong_dan`. Hồ sơ và phân chuyến hướng dẫn viên vẫn ở màn hình của chúng.",
+        ("/bao-cao",),
+        "Số hướng dẫn nhập ở Phòng Hướng dẫn và Việc của tài xế & HDV; đơn giá và phân chuyến "
+        "nhập ở chính màn hình Phòng Hướng dẫn."),
+}
+
+# Năm nhóm gộp lại mới là toàn bộ màn hình không có cửa ghi. Khoá tên riêng để không nhóm nào lặng
 # lẽ nuốt nhóm kia.
 KHONG_CUA_GHI = {**{k: v[:2] for k, v in BAN_LAM_VIEC.items()},
                  **{k: v[:2] for k, v in NHAT_KY_MAY_GHI.items()},
-                 **{k: v[:2] for k, v in HO_SO_NGUOI.items()}, **CHI_XEM}
+                 **{k: v[:2] for k, v in HO_SO_NGUOI.items()},
+                 **{k: v[:2] for k, v in TRANG_PHONG.items()}, **CHI_XEM}
 assert len(KHONG_CUA_GHI) == (len(CHI_XEM) + len(BAN_LAM_VIEC) + len(NHAT_KY_MAY_GHI)
-                              + len(HO_SO_NGUOI)), \
-    "bốn nhóm không được trùng tên màn hình"
+                              + len(HO_SO_NGUOI) + len(TRANG_PHONG)), \
+    "năm nhóm không được trùng tên màn hình"
 
 
 def _ma(src: str) -> str:
@@ -383,8 +456,27 @@ def test_ban_lam_viec_co_tran_rieng_va_chi_duoc_cua_ghi_cua_minh():
     Trần 3: phòng Kinh doanh Đoàn có ba vai (P.TGĐ, Sale Admin, NV Sales đoàn). Vai thứ ba lập dự
     toán nên màn hình của họ CÓ cửa ghi thật và sẽ không vào nhóm này — nhưng để trần ở 3 thì dòng
     thứ tư phải dừng lại giải thích vì sao lại có thêm một vai chỉ đọc nữa, thay vì trôi qua.
+
+    → 4 (09/11/2026, `/xe` — bàn làm việc Giám đốc đội xe, PR #744). ĐÂY LÀ CHỖ DỪNG LẠI ẤY, nên
+    trả lời cho đủ.
+
+    Lý do cũ của trần 3 là ĐẾM VAI CỦA MỘT PHÒNG: ba vai của phòng Kinh doanh Đoàn. `/xe` không
+    thuộc phòng ấy — nó là vai đầu của một phòng khác, nên cách đếm cũ không với tới nó, và nâng
+    trần ở đây KHÔNG phải là kéo dài một lý do đã thành thói quen. Vì sao vai này chỉ đọc: Giám
+    đốc đội xe không nhập số nào của riêng mình; số đội xe sinh ra ở nhật trình chuyến, chi phí kỳ
+    và hồ sơ xe, cả ba đều đã có cửa, và bàn này dẫn sang đúng ba cửa ấy bằng ngăn kéo.
+
+    VÌ SAO KHÔNG TÁCH NHÓM MỚI, dù kho này quen tách hơn quen nâng: tách nhóm chỉ đúng khi nhóm
+    mới hỏi một CÂU KHÁC — `BAN_LAM_VIEC` tách khỏi `CHI_XEM` vì nó hỏi thêm "cửa ghi của vai này
+    ở đâu", `TRANG_PHONG` tách ra vì nó hỏi "trang gom số của phòng nào". `/xe` hỏi đúng câu của
+    nhóm này và trả lời được đúng câu ấy. Tách một nhóm chỉ để khỏi chạm vào con số trần là tách
+    giả, và nó làm hỏng chính cái mà thói quen tách sinh ra để giữ.
+
+    MỐC CHO LẦN SAU: dòng thứ NĂM phải là một phòng thứ ba nữa, và phải chỉ ra được cửa ghi của
+    vai ấy y như bốn dòng trên. Chỉ không ra thì đó là cửa còn thiếu, và việc phải làm là dựng
+    cửa chứ không phải thêm một dòng ở đây.
     """
-    assert len(BAN_LAM_VIEC) <= 3, (
+    assert len(BAN_LAM_VIEC) <= 4, (
         f"Đang khai {len(BAN_LAM_VIEC)} bàn làm việc chỉ đọc. Mỗi dòng thêm vào đây là một vai được "
         "cho một màn hình mà không có việc nào bấm được trên đó – hỏi lại xem vai ấy làm gì.")
     thieu = [d for d, x in BAN_LAM_VIEC.items() if len(x) < 3 or not str(x[2]).strip()]
@@ -441,3 +533,19 @@ def test_ho_so_nguoi_phai_chi_ra_cua_nhap_that():
     assert not thieu, (
         f"Màn khai trong HO_SO_NGUOI mà không nói cửa nhập thật nằm ở đâu: {thieu}. "
         "Viết ra chỗ người dùng phải đi để sửa con số ấy.")
+
+
+def test_tran_cua_nhom_trang_phong():
+    """TRẦN 4. Mỗi dòng thêm vào đây là một màn hình nữa KHÔNG có cửa nhập mà vẫn được cho qua.
+
+    VTOS có tám phòng. Bốn phòng còn lại có màn hình làm việc đã có cửa ghi thật — Marketing,
+    HC–NS, Tài chính – Kế toán, và Điều hành xe (`/xe`, bàn làm việc Giám đốc đội xe, PR #744) —
+    nên chúng không thuộc nhóm này. Bốn là con số đóng.
+    """
+    assert len(TRANG_PHONG) <= 4, (
+        f"Đang khai {len(TRANG_PHONG)} trang phòng. VTOS có bốn phòng dùng trang chỉ tiêu riêng; "
+        "bốn phòng kia dùng màn hình làm việc đã có cửa ghi. Thêm dòng ở đây là nới một ngoại lệ.")
+    thieu = [d for d, x in TRANG_PHONG.items() if len(x) < 3 or not str(x[2]).strip()]
+    assert not thieu, (
+        f"Trang phòng thiếu lời khai CỬA NHẬP THẬT: {thieu}. Một nhóm «chỉ xem» mà không chỉ "
+        "được chỗ sửa thì nó chỉ là một lời khai, không phải một câu trả lời.")
