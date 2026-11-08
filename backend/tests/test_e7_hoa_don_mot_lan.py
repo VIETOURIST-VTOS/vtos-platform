@@ -53,6 +53,11 @@ Base.metadata.create_all(engine)
 with SessionLocal() as _s:
     for _ma, _ten, _loai in (("131", "Phải thu khách hàng", "TS"),
                              ("511", "Doanh thu bán hàng và cung cấp dịch vụ", "DT"),
+                             # TKC-5 (08/11/2026): hóa đơn KHÔNG gắn chuyến ghi doanh thu vào tài
+                             # khoản chi tiết 5118 (tham số `tk_hd_doanh_thu_khong_tour`), không còn
+                             # vào 511 tổng hợp.
+                             ("5118", "Doanh thu khác", "DT"),
+                             ("33311", "Thuế GTGT đầu ra", "NV"),
                              ("3331", "Thuế GTGT phải nộp", "NV")):
         if not _s.get(Account, _ma):
             _s.add(Account(code=_ma, name=_ten, kind=_loai, is_detail=True))

@@ -198,7 +198,9 @@ def test_payroll_flow_roles_and_journal():
     # của người lao động (BHXH 3383, đoàn phí 3382), nên số chứng từ nhiều hơn ba.
     js = [e for e in client.get("/api/v1/journal", headers=login("ketoan")).json() if e["source_ref"].startswith(f"payroll:{P}")]
     acc = {(l["account"]) for e in js for l in e["lines"]}
-    assert {"642", "334", "632", "338", "3335"} <= acc
+    # TKC-3/4 (08/11/2026): lương ghi vào tài khoản CHI TIẾT — 6421 (bộ phận quản lý), 3341 (phải trả người lao động), 6326
+    # (thù lao HDV/CTV), 3388 (phải trả khác), không còn vào 642 / 334 / 632 / 338 tổng hợp.
+    assert {"6421", "3341", "6326", "3388", "3335"} <= acc
     assert "3383" in acc, "BHXH phần người lao động phải được ghi sổ"
     phap_nhan = {e["source_ref"].split(":")[-1] for e in js}
     assert phap_nhan, "mỗi pháp nhân một bộ chứng từ, ghi rõ ở source_ref"
