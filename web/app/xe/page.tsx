@@ -192,9 +192,14 @@ function BanLamViecXe() {
     {/* ④ DIỄN BIẾN — kỳ chưa có số thì nói «chưa đủ dữ liệu», KHÔNG vẽ cột bằng 0. */}
     {db && <section>
       <h2>Diễn biến lợi nhuận đội xe</h2>
+      {/* Câu lưu ý đi KÈM bảng, đặt NGAY TRÊN nó. Ai đọc cái dốc cũng phải đọc luôn lý do
+          cái dốc có thể không thật: kỳ thiếu lương, thiếu bảo dưỡng thì biên luôn cao hơn
+          kỳ đã nhập đủ. Đo 09/11/2026: kỳ 07 biên 46,2% với 0 dòng chi phí kỳ, kỳ 10 biên
+          15,1% với 23 dòng. */}
+      {db.luu_y && <p style={{ color: "#a66a00" }}><strong>Lưu ý:</strong> {db.luu_y}</p>}
       {db.du_ve
         ? <table><thead><tr><th>Kỳ</th><th style={{ textAlign: "right" }}>Lợi nhuận</th>
-            <th style={{ textAlign: "right" }}>Biên</th></tr></thead>
+            <th style={{ textAlign: "right" }}>Biên</th><th>Chi phí kỳ</th></tr></thead>
             <tbody>{db.diem.map((p: any) => (
               <tr key={p.ky}>
                 <td>{kyDoc(p.ky)}</td>
@@ -202,6 +207,14 @@ function BanLamViecXe() {
                   {p.co_so ? vnd(p.loi_nhuan) : <span className="muted">chưa đủ dữ liệu</span>}</td>
                 <td style={{ textAlign: "right" }}>
                   {p.co_so ? pct(p.bien) : <span className="muted">—</span>}</td>
+                <td>{!p.co_so ? <span className="muted">—</span>
+                   : p.du_chi_phi_ky
+                     ? <span className="muted">{vnd(p.chi_phi_ky)} đ · {p.so_nhom_chi_phi_ky} nhóm</span>
+                     : <span className="tag" style={{ background: "#fdf6e7", color: "#a66a00",
+                                                      fontWeight: 700 }}
+                             title={`Biên kỳ này đang đọc cao hơn thực tế — ${p.vi_sao_chua_du}`}>
+                         SỐ CHƯA ĐỦ · {p.vi_sao_chua_du}
+                       </span>}</td>
               </tr>))}</tbody></table>
         : <p className="muted">{db.vi_sao}</p>}
     </section>}
