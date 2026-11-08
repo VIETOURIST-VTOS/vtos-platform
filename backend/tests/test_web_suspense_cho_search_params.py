@@ -103,3 +103,71 @@ def test_khong_co_generateStaticParams_nao_lam_nhanh_dong_bi_dung_san():
         "Các nhánh động sau nay CÓ `generateStaticParams`, nghĩa là bị dựng sẵn, mà vẫn gọi "
         "`useSearchParams` không bọc `Suspense`: " + ", ".join(co) + ". Bọc lại, hoặc bỏ "
         "`generateStaticParams` đi.")
+
+
+# ── Đợt PH-1 · 09/11/2026 — BỊT MỘT LỖ THỦNG CHÍNH ĐỢT NÀY TẠO RA ────────────────────────────
+#
+# Phép thử đầu tệp chỉ soi TỆP TRANG: nó tìm chữ `useSearchParams` ngay trong `page.tsx`. Lời
+# giải thích đi kèm nói rõ vì sao — `Suspense` phải bọc ở nơi dựng cây màn hình, nên trang là chỗ
+# đúng để hỏi. Câu ấy vẫn đúng. Nhưng nó ngầm giả định một điều khác: rằng trang nào cần bọc thì
+# chính trang ấy gọi hook.
+#
+# Đợt PH-1 làm giả định đó sai. Năm trang `/fit`, `/mice`, `/op`, `/xe`, `/guide` không gọi
+# `useSearchParams` dòng nào — chúng gọi `components/TrangPhanHe`, và HOOK NẰM TRONG ĐÓ. Phép thử
+# đầu tệp bỏ qua cả năm, và nó XANH mà không hề kiểm bài. Nếu em quên bọc một trang trong năm
+# trang ấy thì không có gì đỏ, chỉ có `npm run build` chết — mà build thì chạy muộn hơn nhiều.
+#
+# Phép thử dưới đây đi THEO MỘT BƯỚC NHẬP: trang nhập thành phần nào thì đọc luôn mã thành phần
+# ấy. Đúng khuôn `test_man_hinh_co_cua_nhap._ma_cua_man_hinh` đã làm từ 11/10/2026, và cùng một
+# lý do: "một màn hình dọn mã sang thành phần sẽ TRÔNG NHƯ không đọc, không ghi gì cả".
+#
+# MỘT BƯỚC LÀ ĐỦ, không đệ quy: đi sâu nữa thì gần như mọi trang đều chạm tới một thành phần nào
+# đó có hook, và phép thử hoá ra bắt cả những trang không liên quan. Một bước bắt đúng hình mà
+# đợt này tạo ra — trang mỏng gọi thẳng một thành phần mang hook.
+
+
+def _thanh_phan_nhap(src: str) -> list[Path]:
+    """Các tệp `@/components/...` mà một trang nhập vào. Chỉ một bước, không đi tiếp."""
+    ra = []
+    for ten in re.findall(r'from\s+"@/components/([A-Za-z0-9_/]+)"', src):
+        for duoi in (".tsx", ".ts"):
+            f = WEB / "components" / (ten + duoi)
+            if f.exists():
+                ra.append(f)
+                break
+    return ra
+
+
+def test_trang_TINH_goi_hook_QUA_THANH_PHAN_cung_phai_boc_Suspense():
+    """Trang không tự gọi hook, nhưng thành phần nó nhập thì có — vẫn phải bọc.
+
+    Bẻ ngược: bỏ `Suspense` khỏi `web/app/fit/page.tsx` thì phép thử này ĐỎ, trong khi phép thử
+    đầu tệp vẫn xanh. Đó chính là lỗ thủng nó bịt.
+    """
+    thieu = []
+    for p in sorted(WEB.glob("app/**/page.tsx")):
+        src = _ma(p.read_text(encoding="utf-8"))
+        if _la_duong_dan_dong(p) or "useSearchParams" in src or "Suspense" in src:
+            continue
+        for tp in _thanh_phan_nhap(src):
+            if "useSearchParams" in _ma(tp.read_text(encoding="utf-8")):
+                thieu.append(f"{p.relative_to(WEB)} (qua {tp.name})".replace("\\", "/"))
+                break
+    assert not thieu, (
+        "Các trang sau KHÔNG tự gọi `useSearchParams`, nhưng thành phần chúng nhập thì có — và "
+        "chúng không bọc `Suspense`: " + ", ".join(thieu) + ". Next dựng sẵn trang tĩnh, nên "
+        "`npm run build` sẽ chết ở đúng những trang này. Bọc như năm trang phân hệ: "
+        "`<Shell><Suspense fallback={...}><X /></Suspense></Shell>`.")
+
+
+def test_hang_rao_theo_thanh_phan_that_su_nhin_thay_gi_do():
+    """Tự kiểm, cùng hình với `test_hang_rao_nay_bat_duoc_ban_thieu` ở trên.
+
+    Nếu cách đọc nhập hỏng thì `_thanh_phan_nhap` trả về rỗng ở mọi trang, phép thử trên không
+    bao giờ đỏ, và cả hai cùng xanh suốt đời. Chốt một sàn để chỗ ấy không im lặng.
+    """
+    co = [p for p in WEB.glob("app/**/page.tsx")
+          if _thanh_phan_nhap(_ma(p.read_text(encoding="utf-8")))]
+    assert len(co) >= 20, (
+        f"chỉ thấy {len(co)} trang nhập thành phần dùng chung — nghi là cách đọc dòng `import` "
+        "đã hỏng, chứ không phải kho chỉ có bằng ấy.")

@@ -7,6 +7,7 @@ import { getUser, clearSession, type User } from "@/lib/api";
 import { laTenMienCong, phienCong } from "@/lib/cong";
 import ChonDonVi from "@/components/ChonDonVi";
 import ChonGiaoDien from "@/components/ChonGiaoDien";
+import { duongCuaPhong } from "@/lib/duong_phong";
 
 /** Mục v1.1 §I.2 có tên nhưng CHƯA có trang. TC-2 yêu cầu ẩn chức năng "sắp có", nên chúng không vào
  *  menu – nhưng cũng không bị xoá khỏi mã, vì lộ trình còn nợ phải có chỗ đọc được. Phép thử test_menu
@@ -254,8 +255,12 @@ function NhomXo({ g, thu, dangO, dongThanhDoc }:
           THÔNG TIN KHÔNG MẤT: `aria-label={g.label}` ngay trên thẻ này vẫn xướng đúng tên nhóm
           cho trình đọc màn hình — bỏ chữ VẼ RA chứ không bỏ chữ NÓI RA. Đây cùng một nếp với
           TC-69 lúc rút "Nhân sự – Hành chính" thành "HC – NS". */}
+      {/* ĐỢT PH-1 · 09/11/2026 — phòng nào đã có đường dẫn riêng thì chip con trỏ thẳng
+          vào đó: `/fit`, `/mice`, `/op`, `/guide`. Hỏi `duongCuaPhong` chứ không ghép
+          chuỗi `/phan-he/` tại chỗ — phòng chưa dời vẫn về chỗ cũ, và ngày dời thêm một
+          phòng thì chỉ sửa bảng trong `lib/duong_phong.ts`, không ai phải nhớ dòng này. */}
       {g.phans!.map((p) => (
-        <Link key={p.khoa} href={`/phan-he/${p.khoa}`} className="xo-muc" role="menuitem"
+        <Link key={p.khoa} href={duongCuaPhong(p.khoa)} className="xo-muc" role="menuitem"
           onClick={() => { datMo(false); dongThanhDoc(); }}>{p.label}</Link>
       ))}
     </div>
@@ -379,6 +384,10 @@ export const GROUPS: Group[] = [
   { key: "khachhang", label: "Kinh doanh", icon: "khachhang",
     phans: [{ khoa: "kdle", label: "Kinh doanh lẻ" }, { khoa: "kddoan", label: "Kinh doanh đoàn" }],
     blocks: [
+    // ĐỢT PH-1 · 09/11/2026 — hai phòng có lối vào RIÊNG, đứng đầu nhóm. Chủ tịch chốt
+    // 08/11/2026: bấm vào phân hệ nào thì ra đúng trang của phòng ấy.
+    ["Kinh doanh lẻ", "/fit"],
+    ["Kinh doanh đoàn", "/mice"],
     // 24/9/2026 · Bàn làm việc của Phó TGĐ tour đoàn — hàng đợi dự toán đoàn chờ chính ông ký
     // (Điều 4 Văn bản đính chính). ĐỨNG ĐẦU NHÓM, và ba chỗ đặt em đã cân rồi mới chọn chỗ này:
     //
@@ -461,6 +470,14 @@ export const GROUPS: Group[] = [
     phans: [{ khoa: "dhtour", label: "Điều hành tour" }, { khoa: "dhxe", label: "Điều hành xe" },
             { khoa: "hdv", label: "Hướng dẫn viên" }],
     blocks: [
+    // ĐỢT PH-1 · 09/11/2026 — ba lối vào RIÊNG. `/op` và `/guide` là trang chỉ tiêu của
+    // hai phòng. `/xe` thì khác hẳn: nó là BÀN LÀM VIỆC Giám đốc đội xe (PR #744), và nó
+    // đã được khai quyền trong `access.py` mà chưa có mục menu nào — `test_menu` đỏ với
+    // đúng câu «khai một cánh cửa không có đường đi». Dòng giữa dưới đây là đường đi ấy.
+    // `dhxe` KHÔNG đổi chỗ: nó vẫn ở `/phan-he/dhxe`, vào bằng chip `Điều hành xe` ở trên.
+    ["Điều hành tour", "/op"],
+    ["Bàn làm việc đội xe", "/xe"],
+    ["Hướng dẫn", "/guide"],
     ["Sản phẩm tour", "/products"],
     ["Yêu cầu chờ xử lý", "/requests"],
     ["Chuyến & quyết toán", "/tours"],
