@@ -1036,7 +1036,47 @@ def _goi_cua(db: Session, lids: list[int]) -> dict[int, list[GoiGiaVtd]]:
     return ra
 
 
-def ds_vtos(db: Session, u: User) -> dict:
+def _khoi_gia(mua: list, hom_nay: date) -> list[tuple[date, date]]:
+    """Các khoảng ngày liền nhau có mùa giá của MỘT gói (đã gộp), bỏ phần trước hôm nay."""
+    ra: list[list[date]] = []
+    for m in sorted(mua, key=lambda x: x.tu_ngay):
+        if m.den_ngay < hom_nay:
+            continue
+        tu = max(m.tu_ngay, hom_nay)
+        if ra and tu <= ra[-1][1] + timedelta(days=1):
+            ra[-1][1] = max(ra[-1][1], m.den_ngay)
+        else:
+            ra.append([tu, m.den_ngay])
+    return [(x[0], x[1]) for x in ra]
+
+
+BAN_CONG_NGAY_CANH_BAO = 30
+
+
+def ban_cong(k: KhachSanVtd, lps: list, goi: dict, mua: dict, hom_nay: date | None = None) -> dict:
+    """P0-02 (Chủ tịch duyệt 09/11/2026): khách sạn bán được trên cổng đến ngày nào, chỉ xét GIÁ.
+    Mỗi gói đã duyệt, đang bán của loại phòng đang bán tự phủ đêm (giống gia_luu — không ghép đêm của gói này với
+    gói khác). `den` = ngày xa nhất bán liền được từ hôm nay; chưa phủ hôm nay thì `tu` = ngày sớm nhất bắt đầu có giá.
+    ma: ngung | chua_hien | chua_goi | het_gia | tu_ngay | den. `thieu_30` = không bán liền đủ 30 ngày tới."""
+    hn = hom_nay or date.today()
+    gs = [g for x in lps if x.dang_ban for g in goi.get(x.id, []) if g.trang_thai == "da_duyet" and g.dang_ban]
+    den, tu = None, None
+    for g in gs:
+        for a, b in _khoi_gia(mua.get(g.id, []), hn):
+            if a <= hn:
+                den = b if den is None or b > den else den
+            elif tu is None or a < tu:
+                tu = a
+    if den is not None:
+        tu = None
+    thieu = den is None or den < hn + timedelta(days=BAN_CONG_NGAY_CANH_BAO - 1)
+    ma = ("ngung" if k.ngung else "chua_hien" if not k.hien_cong else "chua_goi" if not gs
+          else "den" if den is not None else "tu_ngay" if tu is not None else "het_gia")
+    return {"ma": ma, "den": den.isoformat() if den else None, "tu": tu.isoformat() if tu else None,
+            "dem": (den - hn).days + 1 if den else 0, "thieu_30": bool(thieu and not k.ngung)}
+
+
+def ds_vtos(db: Session, u: User, hom_nay: date | None = None) -> dict:
     _quyen(u, VAI_XEM, "Không có quyền")
     ks = db.execute(select(KhachSanVtd).order_by(KhachSanVtd.tinh_thanh, KhachSanVtd.ten)).scalars().all()
     ids = [k.id for k in ks]
@@ -1048,6 +1088,7 @@ def ds_vtos(db: Session, u: User) -> dict:
         for x in db.execute(select(LoaiPhongVtd).where(LoaiPhongVtd.khach_san_id.in_(ids))).scalars():
             lp.setdefault(x.khach_san_id, []).append(x)
     goi = _goi_cua(db, [x.id for v in lp.values() for x in v])
+    mua = _mua_cua(db, [g.id for v in goi.values() for g in v])   # P0-02
     dong = []
     for k in ks:
         gs = [g for x in lp.get(k.id, []) for g in goi.get(x.id, [])]
@@ -1056,7 +1097,8 @@ def ds_vtos(db: Session, u: User) -> dict:
         dong.append({**_ks_noi_bo(k), "so_anh": len(a), "anh_duyet": sum(x.trang_thai == "da_duyet" for x in a),
                      "anh_cho": sum(x.trang_thai == "cho_duyet" for x in a), "so_loai_phong": len(lp.get(k.id, [])),
                      "goi_duyet": sum(g.trang_thai == "da_duyet" for g in gs), "goi_cho": sum(g.trang_thai == "cho_duyet" for g in gs),
-                     "bia": _anh_out(bia)["nho"] if bia else None, "thieu_anh": max(0, ANH_CHUAN - len(a))})
+                     "bia": _anh_out(bia)["nho"] if bia else None, "thieu_anh": max(0, ANH_CHUAN - len(a)),
+                     "ban_cong": ban_cong(k, lp.get(k.id, []), goi, mua, hom_nay)})
     return {"khach_san": dong, "thanh_pho": [{"ten": t, "mien": MIEN[m]} for t, (m, _k) in THANH_PHO.items()],
             "loai": LOAI_CHO_O, "tien_ich": TIEN_ICH, "nhom_anh": NHOM_ANH_KS,
             "nhan_tre_em": NHAN_TRE_EM, "cach_tinh_tre": CACH_TINH_TRE, "tien_nghi_phong": TIEN_NGHI_PHONG, "phu_hop": PHU_HOP, "vat_pt": VAT_PT,   # KS-16j · KS-19
