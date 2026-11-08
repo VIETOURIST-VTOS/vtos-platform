@@ -160,6 +160,14 @@ jobs:
     # số đo được nhiều lần, vì hạn giờ chật biến một lượt chậm-nhưng-đúng thành đỏ, và đỏ-vì-hạ-tầng
     # là thứ dạy người ta tắt hàng rào. Đợt CI-1, 25/10/2026.
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        phan: [0, 1, 2, 3]
+    env:
+      VTOS_PHAN: ${{ matrix.phan }}
+      VTOS_SO_PHAN: 4
+      
     defaults: { run: { working-directory: backend } }
     steps:
       - uses: actions/checkout@v4
