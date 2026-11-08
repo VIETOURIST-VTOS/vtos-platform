@@ -116,20 +116,30 @@ BAN_LAM_VIEC = {
                      # chứa (25/9/2026) nằm trong `tours.create_booking`; một cửa đặt thứ hai ở
                      # đây là một chỗ nữa phải nhớ gọi hàng rào ấy.
                      "POST /api/v1/requests"),
-    # DOT PH-1 (09/11/2026) -- dong THU TU, va la dong dau tien KHONG thuoc phong Kinh doanh Doan.
-    # Vi sao no o day chu khong o mot nhom moi: no hoi DUNG cau cua nhom nay ("cua ghi cua vai nay
-    # nam o dau"), nen tach nhom chi de khoi nang tran se la tach gia. Xem tran o phep thu duoi.
-    "/xe": ("Bàn làm việc Giám đốc đội xe: hàng đợi việc của chính ông, số đội xe trong kỳ, xe "
-            "đang đi hôm nay và diễn biến lợi nhuận đội. Không sở hữu con số nào của riêng mình — "
-            "mọi số đọc từ một cửa duy nhất, vốn gom lại từ nhật trình chuyến, chi phí kỳ và hồ "
-            "sơ xe.",
-            ("/fleet/ban-lam-viec",),
-            # Cửa ghi của vai này nằm ở các màn hình nghiệp vụ, và NGĂN KÉO trên bàn dẫn thẳng tới
-            # đúng cửa ấy thay vì dựng bản sao thứ hai tại chỗ: quyết toán chuyến và hồ sơ xe ở
-            # `/doi-xe`, chi phí kỳ ở `/lai-lo-doi-xe`, đề nghị chờ duyệt ở `/requests`. Cùng một
-            # lẽ với ba dòng trên: duyệt một đề nghị là việc phải ĐỌC đề nghị ấy, và một nút duyệt
-            # cạnh một dòng tóm tắt là lời mời duyệt mà chưa mở ra xem.
-            "POST qua /doi-xe (quyết toán, hồ sơ xe) · /lai-lo-doi-xe (chi phí kỳ) · /requests"),
+    # `/xe` ĐÃ RỜI NHÓM NÀY, cùng ngày nó vào — 09/11/2026. Sáng nay nó khai "chỉ đọc" và
+    # lời khai ấy đúng với bản lúc ấy. Chiều, PR #753 (ks54) cho ngăn kéo chi phí kỳ LÀM
+    # VIỆC THẬT: màn `/xe` nhập `components/doixe/ChiPhiKyPanel`, tệp có cả POST lẫn DELETE.
+    # Nó có cửa ghi thật thì nó không còn thuộc nhóm ngoại lệ này — và hàng rào
+    # `test_man_hinh_chi_xem_van_dung_la_chi_xem` reo đúng chỗ ấy. Thêm cửa nhập là việc
+    # TỐT; việc phải làm khi nó xảy ra là bỏ lời khai cũ đi, không phải giữ nó nằm đó.
+    #
+    # ĐỢT MKT-1 (09/11/2026) -- hai ban cua phong Marketing. Chung hoi DUNG cau cua nhom nay
+    # ("cua ghi cua vai nay nam o dau") va tra loi duoc tung cai mot, nen chung o day chu
+    # khong o mot nhom moi. Xem tran o phep thu duoi.
+    "/ptgd-mkt": ("Bàn làm việc Phó TGĐ Marketing: PR quá hạn phản hồi, nội dung chờ duyệt, chiến dịch chờ đưa vào chạy và kỳ chưa chốt số. Không sở hữu con số nào của riêng mình — bốn ô đều đếm trên bảng gốc mà màn Marketing đang dùng.",
+                  ("/marketing/ban-ptgd",),
+                  # Cửa ghi của vai này nằm trên bảy tab của màn `/marketing`, và bàn dẫn
+                  # thẳng tới đúng tab thay vì dựng bản sao thứ hai. Cùng một lẽ với ba
+                  # dòng trên: duyệt một nội dung hay phát một thông cáo là việc phải ĐỌC
+                  # thứ mình đang duyệt, và một nút duyệt cạnh một dòng tóm tắt là lời mời
+                  # duyệt mà chưa mở ra xem.
+                  "POST qua /marketing: tab Nội dung · Ngân sách & chiến dịch · Khủng hoảng, PR & thương hiệu · Đối soát dữ liệu"),
+    "/ban-mkt": ("Bàn làm việc nhân viên Marketing: lead nằm im quá hạn do CHÍNH NGƯỜI ẤY giữ, và lead chưa gắn chiến dịch của cả phòng. Không sở hữu con số nào của riêng mình.",
+                 ("/marketing/ban-nhan-vien",),
+                 # Cửa ghi: chăm lead ở tab Khách tiềm năng & Sales, gắn chiến dịch ở tab
+                 # Đối soát dữ liệu. Không dựng ô ghi trên bàn — chăm một lead là việc
+                 # phải mở lead ấy ra đọc, không phải việc gạch một dòng trong danh sách.
+                 "POST qua /marketing: tab Khách tiềm năng & Sales · tab Đối soát dữ liệu"),
 }
 
 # ── NHẬT KÝ MÁY GHI — nhóm ĐẾM RIÊNG, mở ngày 16/10/2026 ───────────────────────────────────────
@@ -314,13 +324,22 @@ def _ma_cua_man_hinh(duong: str) -> list[str] | None:
     Chỉ đi MỘT TẦNG, cố ý: thành phần của thành phần chưa có trong kho, và một phép thử đi sâu
     hơn thứ nó cần là một phép thử khó đọc mà không canh thêm được gì. Ngày nào có tầng thứ hai
     thật thì mở rộng ở đúng đây, một chỗ.
+
+    THƯ MỤC CON — 09/11/2026. Vẫn MỘT tầng, nhưng đường dẫn nhập có thể có thư mục con:
+    `@/components/doixe/ChiPhiKyPanel`. Bản cũ chỉ khớp chữ, số và gạch dưới — không nhận
+    dấu gạch chéo — nên những thành phần ấy bị bỏ qua IM LẶNG. Chuyện lộ ra khi PR #753 dọn
+    ô nhập chi phí kỳ của `/lai-lo-doi-xe` sang đúng một tệp như thế: cửa ghi vẫn còn, có
+    cả POST lẫn DELETE, nhưng hàng rào không đọc tới và báo màn hình «không có lời gọi ghi
+    nào». Lỗi của phép thử, không phải của mã — y như lần `BangChiTieuPhong` ngày
+    11/10/2026, và cách sửa cũng y như thế. Phép thử ngay dưới canh đúng điều này, để nó là
+    thứ đo được chứ không phải một câu hứa.
     """
     p = WEB / "app" / duong.strip("/") / "page.tsx" if duong != "/" else WEB / "app" / "page.tsx"
     if not p.exists():
         return None
     src = _ma(p.read_text(encoding="utf-8"))
     tep = [src]
-    for m in re.findall(r'from "@/components/(\w+)"', src):
+    for m in re.findall(r'from "@/components/([\w/]+)"', src):
         if m == "Shell":
             continue
         q = WEB / "components" / (m + ".tsx")
@@ -462,21 +481,34 @@ def test_ban_lam_viec_co_tran_rieng_va_chi_duoc_cua_ghi_cua_minh():
 
     Lý do cũ của trần 3 là ĐẾM VAI CỦA MỘT PHÒNG: ba vai của phòng Kinh doanh Đoàn. `/xe` không
     thuộc phòng ấy — nó là vai đầu của một phòng khác, nên cách đếm cũ không với tới nó, và nâng
-    trần ở đây KHÔNG phải là kéo dài một lý do đã thành thói quen. Vì sao vai này chỉ đọc: Giám
-    đốc đội xe không nhập số nào của riêng mình; số đội xe sinh ra ở nhật trình chuyến, chi phí kỳ
-    và hồ sơ xe, cả ba đều đã có cửa, và bàn này dẫn sang đúng ba cửa ấy bằng ngăn kéo.
+    trần ở đây KHÔNG phải là kéo dài một lý do đã thành thói quen.
 
     VÌ SAO KHÔNG TÁCH NHÓM MỚI, dù kho này quen tách hơn quen nâng: tách nhóm chỉ đúng khi nhóm
     mới hỏi một CÂU KHÁC — `BAN_LAM_VIEC` tách khỏi `CHI_XEM` vì nó hỏi thêm "cửa ghi của vai này
-    ở đâu", `TRANG_PHONG` tách ra vì nó hỏi "trang gom số của phòng nào". `/xe` hỏi đúng câu của
-    nhóm này và trả lời được đúng câu ấy. Tách một nhóm chỉ để khỏi chạm vào con số trần là tách
-    giả, và nó làm hỏng chính cái mà thói quen tách sinh ra để giữ.
+    ở đâu", `TRANG_PHONG` tách ra vì nó hỏi "trang gom số của phòng nào". Tách một nhóm chỉ để
+    khỏi chạm vào con số trần là tách giả, và nó làm hỏng chính cái mà thói quen tách sinh ra
+    để giữ.
 
-    MỐC CHO LẦN SAU: dòng thứ NĂM phải là một phòng thứ ba nữa, và phải chỉ ra được cửa ghi của
-    vai ấy y như bốn dòng trên. Chỉ không ra thì đó là cửa còn thiếu, và việc phải làm là dựng
-    cửa chứ không phải thêm một dòng ở đây.
+    → 5 (09/11/2026, CÙNG NGÀY, và con số đi theo hai hướng ngược nhau trong một buổi chiều):
+    `/xe` RA, hai bàn phòng Marketing VÀO.
+
+    `/xe` ra vì nó đã có CỬA GHI THẬT. Sáng nay nó không có, và lời khai lúc ấy đúng. Chiều,
+    PR #753 cho ngăn kéo chi phí kỳ làm việc thật: màn ấy nhập `components/doixe/ChiPhiKyPanel`,
+    tệp có cả POST lẫn DELETE. Ngoại lệ sinh ra vì thiếu cửa, nên cửa dựng xong thì ngoại lệ
+    phải đi — giữ nó nằm lại là để một lời khai sai nằm trong tệp canh lời khai.
+
+    Hai dòng Marketing VÀO thì trả lời đúng mốc trên: Marketing là một phòng nữa, và cửa ghi
+    của hai vai ấy chỉ ra được từng cái một — bảy tab của màn `/marketing`, viết rõ trong hai
+    dòng khai. Vì sao HAI dòng chứ không một: phòng này có hai vai làm hai việc ngược chiều
+    nhau, một người duyệt và phát ngôn, một người chạy nội dung và giữ lead. Gộp lại thì mỗi
+    người phải bỏ qua nửa số ô, và một bàn mà người ngồi phải bỏ qua nửa số ô thì nó đã thôi
+    là bàn làm việc.
+
+    MỐC MỚI: dòng thứ SÁU. Nếu nó lại là một vai nữa của một phòng ĐÃ CÓ bàn ở đây thì câu hỏi
+    phải đổi — không phải «vai này có cửa ghi ở đâu» nữa, mà «vì sao phòng ấy cần thêm một bàn
+    thứ ba» — và lúc ấy việc phải làm là xem lại cách chia bàn, không phải nâng tiếp con số này.
     """
-    assert len(BAN_LAM_VIEC) <= 4, (
+    assert len(BAN_LAM_VIEC) <= 5, (
         f"Đang khai {len(BAN_LAM_VIEC)} bàn làm việc chỉ đọc. Mỗi dòng thêm vào đây là một vai được "
         "cho một màn hình mà không có việc nào bấm được trên đó – hỏi lại xem vai ấy làm gì.")
     thieu = [d for d, x in BAN_LAM_VIEC.items() if len(x) < 3 or not str(x[2]).strip()]
@@ -533,6 +565,28 @@ def test_ho_so_nguoi_phai_chi_ra_cua_nhap_that():
     assert not thieu, (
         f"Màn khai trong HO_SO_NGUOI mà không nói cửa nhập thật nằm ở đâu: {thieu}. "
         "Viết ra chỗ người dùng phải đi để sửa con số ấy.")
+
+
+def test_bo_doc_thay_duoc_thanh_phan_trong_thu_muc_con():
+    """Tự kiểm bộ đọc thành phần: nó phải thấy cả tệp nằm trong thư mục con.
+
+    Không có dòng này thì bản sửa 09/11/2026 có thể bị thu lại về bản chỉ khớp chữ và số mà
+    mọi phép thử vẫn xanh — một hàng rào quét THIẾU tệp thì nó canh được ít hơn, chứ không đỏ.
+    """
+    co = sorted(p.relative_to(WEB / "components").as_posix()
+                for p in (WEB / "components").glob("*/*.tsx"))
+    assert co, ("kho không còn thành phần nào nằm trong thư mục con — nếu đúng thế thật thì "
+                "bỏ phép thử này đi, đừng để nó xanh vì không có gì để kiểm")
+    nhap = set()
+    for p in WEB.glob("app/**/page.tsx"):
+        nhap |= set(re.findall(r'from "@/components/([\w/]+)"',
+                               _ma(p.read_text(encoding="utf-8"))))
+    sau = sorted(x for x in nhap if "/" in x)
+    assert sau, (
+        f"Không trang nào nhập thành phần trong thư mục con, dù kho có {len(co)} tệp như thế: "
+        + ", ".join(co[:5]) +
+        ". Nghi là cách đọc dòng `import` đã bị thu lại và bộ đọc thành phần đang mù với cả "
+        "một thư mục.")
 
 
 def test_tran_cua_nhom_trang_phong():
