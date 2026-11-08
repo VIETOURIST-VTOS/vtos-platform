@@ -48,11 +48,15 @@ function Trang() {
   useEffect(() => { api<any>("/khach-san-vtd/don?loc=cho_chot").then((r) => setDemDon(r.dem || {})).catch(() => {}); }, [tab]);
   const [mo, setMo] = useState<number | "moi" | null>(null);
   const [tim, setTim] = useState("");
+  const [locBan, setLocBan] = useState<"" | "thieu" | "khong">("");   // P0-02
   const load = useCallback(() => { api("/khach-san-vtd").then(setX).catch((e) => toast(errMsg(e), true)); }, [toast]);
   useEffect(() => { load(); }, [load]);
   if (!x) return <p className="muted">Đang tải…</p>;
   const k = (s: string) => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/gi, "d").toLowerCase();
-  const ds = x.khach_san.filter((h: any) => !tim || k(`${h.ten} ${h.ma} ${h.tinh_thanh} ${h.khu_vuc}`).includes(k(tim)));
+  const banKhong = (h: any) => !!h.ban_cong && h.ban_cong.ma !== "den" && h.ban_cong.ma !== "ngung";   // P0-02
+  const banThieu = (h: any) => !!h.ban_cong?.thieu_30;
+  const ds = x.khach_san.filter((h: any) => (!tim || k(`${h.ten} ${h.ma} ${h.tinh_thanh} ${h.khu_vuc}`).includes(k(tim)))
+    && (!locBan || (locBan === "thieu" ? banThieu(h) : banKhong(h))));
   return (<>
     <h1>Khách sạn (cổng khách)</h1>
     <p className="muted">Khách sạn VTD có hợp đồng trực tiếp. Điều hành nhập khách sạn, ảnh, loại phòng và GIÁ BÁN theo mùa (chưa thuế phí); TP Điều hành duyệt
@@ -78,13 +82,18 @@ function Trang() {
         {x.duoc_duyet && <button className="act grey" onClick={async () => { toast("Đang lấy tọa độ — mỗi khách sạn khoảng 1 giây…"); try { const r = await api<any>("/khach-san-vtd/toa-do-loat", { method: "POST", json: {} }); toast(r.message); load(); } catch (e) { toast(errMsg(e), true); } }}
           title="KS-16s: máy tra địa chỉ (OpenStreetMap) cho khách sạn chưa có tọa độ; ghim Điều hành dán tay không bị ghi đè">Lấy tọa độ cho tất cả khách sạn</button>}
         {x.duoc_nhap && <button className="act teal" onClick={() => setMo("moi")}>+ Thêm khách sạn</button>}</div>
+      {/* P0-02: lọc nhanh hồ sơ thiếu giá — chỉ xét gói giá đã duyệt, đang bán */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+        {([["", `Tất cả (${x.khach_san.length})`], ["thieu", `Thiếu giá ${BAN_NGAY} ngày tới (${x.khach_san.filter(banThieu).length})`],
+          ["khong", `Chưa bán được (${x.khach_san.filter(banKhong).length})`]] as const).map(([v, t]) =>
+          <button key={v} className={`act ${locBan === v ? "teal" : "grey"}`} aria-pressed={locBan === v} onClick={() => setLocBan(v)}>{t}</button>)}</div>
       {/* KS-16s: công tắc chung mở thanh toán trực tuyến — khách chỉ trả được khi công tắc chung VÀ công tắc của khách sạn đều bật */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", margin: "8px 0", borderRadius: 8, border: `1px solid ${x.tt_chung ? "#2bb39a" : "#d99a2b"}` }}>
         <b>Thanh toán trực tuyến cổng khách sạn:</b><Tag cls={x.tt_chung ? "ok" : "warn"}>{x.tt_chung ? "Đang MỞ" : "Đang ĐÓNG"}</Tag>
         <span className="muted" style={{ flex: 1, minWidth: 220 }}>Đóng: khách vẫn tìm, xem, chọn phòng, điền thông tin; bước thanh toán cuối bị khóa. Mở chung rồi bật từng khách sạn ở tab «Hiện trên cổng».</span>
         {x.duoc_duyet && <button className={`act ${x.tt_chung ? "grey" : "teal"}`} onClick={async () => { try { const r = await api<any>("/khach-san-vtd/thanh-toan-chung", { method: "POST", json: { bat: !x.tt_chung } }); toast(r.message); load(); } catch (e) { toast(errMsg(e), true); } }}>
           {x.tt_chung ? "Đóng thanh toán toàn cổng" : "Mở thanh toán toàn cổng"}</button>}</div>
-      <div style={{ overflowX: "auto" }}><table><thead><tr><th></th><th>Khách sạn</th><th>Thành phố</th><th>Ảnh</th><th>Loại phòng</th><th>Gói giá</th><th>Cổng khách</th><th></th></tr></thead>
+      <div style={{ overflowX: "auto" }}><table><thead><tr><th></th><th>Khách sạn</th><th>Thành phố</th><th>Ảnh</th><th>Loại phòng</th><th>Gói giá</th><th>Cổng khách</th><th>Bán được trên cổng</th><th></th></tr></thead>
         <tbody>{ds.map((h: any) => <tr key={h.id} className="ksv-dong">
           <td style={{ width: 72 }}>{h.bia ? <AnhNoiBo src={h.bia} alt={h.ten} style={{ width: 64, height: 48, borderRadius: 6 }} /> : <span className="muted">—</span>}</td>
           <td><b>{h.ten}</b><div className="muted">{h.ma} · {"★".repeat(h.sao) || "chưa xếp sao"}</div></td>
@@ -93,11 +102,28 @@ function Trang() {
           <td>{h.so_loai_phong}</td>
           <td>{h.goi_duyet} duyệt{h.goi_cho ? <> · <Tag cls="warn">{h.goi_cho} chờ</Tag></> : null}</td>
           <td>{h.ngung ? <Tag cls="bad">Ngừng hợp tác</Tag> : h.hien_cong ? <Tag cls="ok">Đang hiện</Tag> : <Tag cls="warn">Chưa hiện</Tag>}</td>
+          <td><BanCong b={h.ban_cong} /></td>
           <td><button className="act grey" onClick={() => setMo(h.id)}>{x.duoc_nhap ? "Mở" : "Xem"}</button></td></tr>)}
-          {!ds.length && <tr><td colSpan={8} className="muted">{x.khach_san.length ? "Không có khách sạn khớp." : "Chưa có khách sạn hợp tác. Bấm «+ Thêm khách sạn»."}</td></tr>}</tbody></table></div>
+          {!ds.length && <tr><td colSpan={9} className="muted">{x.khach_san.length ? "Không có khách sạn khớp." : "Chưa có khách sạn hợp tác. Bấm «+ Thêm khách sạn»."}</td></tr>}</tbody></table></div>
     </section>}
     {tab === "ds" && mo !== null && <HoSo x={x} kid={mo} toast={toast} onDong={() => { setMo(null); load(); }} onMoi={(id) => { setMo(id); load(); }} onDoi={load} />}
   </>);
+}
+
+const BAN_NGAY = 30;   // P0-02: khớp BAN_CONG_NGAY_CANH_BAO ở máy chủ
+const dmY = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "");
+
+/** P0-02 (Chủ tịch duyệt 09/11/2026): khách sạn bán được trên cổng đến ngày nào — chỉ xét giá; phòng trống xem tab «Phòng trống». */
+function BanCong({ b }: { b: any }) {
+  if (!b) return <span className="muted">—</span>;
+  const [cls, nhan, ghi] =
+    b.ma === "ngung" ? ["bad", "Ngừng hợp tác", ""]
+    : b.ma === "chua_hien" ? ["bad", "Chưa hiện trên cổng", b.den ? `Có giá đến ${dmY(b.den)}` : b.tu ? `Có giá từ ${dmY(b.tu)}` : "Chưa có mùa giá"]
+    : b.ma === "chua_goi" ? ["bad", "Chưa bán được", "Chưa có gói đã duyệt đang bán"]
+    : b.ma === "het_gia" ? ["bad", "Chưa bán được", "Mùa giá đã hết, chưa nhập mùa mới"]
+    : b.ma === "tu_ngay" ? ["warn", `Từ ${dmY(b.tu)}`, "Từ hôm nay đến trước ngày này chưa có mùa giá"]
+    : [b.thieu_30 ? "warn" : "ok", `Đến ${dmY(b.den)}`, b.thieu_30 ? `Chỉ còn ${b.dem} đêm có giá` : `Liền ${b.dem} đêm từ hôm nay`];
+  return <><Tag cls={cls}>{nhan}</Tag>{ghi && <div className="muted">{ghi}</div>}</>;
 }
 
 function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "moi"; toast: (m: string, l?: boolean) => void; onDong: () => void; onMoi: (id: number) => void; onDoi: () => void }) {
