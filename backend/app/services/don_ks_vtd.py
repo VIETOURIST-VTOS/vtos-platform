@@ -302,7 +302,7 @@ def _dong_dat(db: Session, k: KhachSanVtd, vao: date, ra: date, chon: list[dict]
                      "huy_gio_chot": g.huy_gio_chot or "", "huy_mui_gio": g.huy_mui_gio or "Asia/Ho_Chi_Minh",   # KS-17
                      "cho_tra_sau": bool(g.cho_tra_sau),
                      "_lp": lp, "_g": g})
-    # KS-16j/16k: phụ thu trẻ em / ăn sáng trẻ / giường phụ máy tự cộng vào dòng (chưa thuế phí, cùng tỷ lệ thuế phí)
+    # KS-16j/16k: phụ thu trẻ em / ăn sáng trẻ / giường phụ máy tự cộng vào dòng (đã gồm 8% VAT như giá phòng — KS-19)
     try:
         pts = S.phu_thu_dong(k, dong, {x["loai_phong_id"]: x["_lp"] for x in dong}, {x["goi_id"]: x["_g"] for x in dong},
                              nl, te, tuoi, (ra - vao).days, chia, xep)
@@ -790,6 +790,13 @@ def _dnc(db: Session, pid: int | None) -> dict | None:
     return {"id": r.id, "code": r.code, "status": r.status, "so_tien": int(r.amount or 0)} if r else None
 
 
+def _cho_chot():
+    """Đơn Điều hành còn phải chốt / báo khách sạn: «Đã thanh toán» chờ xác nhận, hoặc máy đã tự xác nhận (KS-19) mà
+    chưa ghi mã xác nhận của khách sạn."""
+    return or_(DonKsVtd.trang_thai == "da_tra",
+               (DonKsVtd.trang_thai == "da_xac_nhan") & (func.coalesce(DonKsVtd.ma_xac_nhan_ks, "") == ""))
+
+
 def ds_vtos(db: Session, u: User, loc: str = "", kid: int | None = None, now: datetime | None = None) -> dict:
     _quyen(u, VAI_XEM_DON, "xem đơn đặt phòng")
     now = now or datetime.now()
@@ -799,14 +806,15 @@ def ds_vtos(db: Session, u: User, loc: str = "", kid: int | None = None, now: da
     if kid:
         q = q.where(DonKsVtd.khach_san_id == kid)
     if loc == "cho_chot":
-        q = q.where(or_(DonKsVtd.trang_thai == "da_tra",                        # KS-19: máy tự xác nhận — còn phải
-                        (DonKsVtd.trang_thai == "da_xac_nhan") & (func.coalesce(DonKsVtd.ma_xac_nhan_ks, "") == "")))   # báo KS
+        q = q.where(_cho_chot())
     elif loc in TRANG_THAI_DON:
         q = q.where(DonKsVtd.trang_thai == loc)
     else:
         q = q.where(DonKsVtd.trang_thai != "het_han")
     ds = db.execute(q.order_by(DonKsVtd.id.desc()).limit(300)).scalars().all()
     dem = dict(db.execute(select(DonKsVtd.trang_thai, func.count(DonKsVtd.id)).group_by(DonKsVtd.trang_thai)).all())
+    # P0-04: «Chờ chốt» đếm đúng như bộ lọc cho_chot — gồm cả đơn máy đã tự xác nhận (KS-19) mà chưa ghi mã khách sạn.
+    dem["cho_chot"] = int(db.execute(select(func.count(DonKsVtd.id)).where(_cho_chot())).scalar() or 0)
     return {"don": [ra_vtos(db, d, now) for d in ds], "dem": dem, "trang_thai": TRANG_THAI_DON,
             "vai": {"dh": u.role in VAI_DH, "kt": u.role in VAI_KE_TOAN, "sales": u.role in VAI_SALES + VAI_MIEN_PHAT,
                     "mien_phat": u.role in VAI_MIEN_PHAT}}
