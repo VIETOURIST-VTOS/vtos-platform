@@ -15,8 +15,22 @@
 cd "$(dirname "$0")/.."
 rm -f test_*.db
 
-DO=()
+# CI-4 · 08/11/2026 — CHIA PHẦN. CI chạy bốn máy song song, mỗi máy đặt VTOS_PHAN (0..3) và
+# VTOS_SO_PHAN (4); tệp thứ i (theo thứ tự tên) thuộc phần i % VTOS_SO_PHAN. Không đặt hai biến ấy
+# (máy người, hộp cát) thì chạy HẾT như cũ. Cách chia theo thứ tự tên nên mỗi tệp thuộc đúng một
+# phần — không tệp nào bị bỏ, không tệp nào chạy hai lần.
+SO_PHAN="${VTOS_SO_PHAN:-1}"
+PHAN="${VTOS_PHAN:-0}"
+TEP=()
+i=0
 for f in tests/test_*.py; do
+  if [ $((i % SO_PHAN)) -eq "$PHAN" ]; then TEP+=("$f"); fi
+  i=$((i + 1))
+done
+echo "--- phần $PHAN / $SO_PHAN: ${#TEP[@]} trên $i tệp ---"
+
+DO=()
+for f in "${TEP[@]}"; do
   if ! python -m pytest -q "$f"; then
     DO+=("$f")
   fi
@@ -26,10 +40,10 @@ rm -f test_*.db
 echo
 echo "=============================================================================="
 if [ ${#DO[@]} -eq 0 ]; then
-  echo "TẤT CẢ $(ls tests/test_*.py | wc -l) TỆP PHÉP THỬ XANH"
+  echo "TẤT CẢ ${#TEP[@]} TỆP PHÉP THỬ CỦA PHẦN $PHAN / $SO_PHAN XANH (tổng $i tệp)"
   exit 0
 fi
-echo "${#DO[@]} TỆP ĐỎ trên tổng $(ls tests/test_*.py | wc -l) tệp:"
+echo "${#DO[@]} TỆP ĐỎ trên ${#TEP[@]} tệp của phần $PHAN / $SO_PHAN (tổng $i tệp):"
 for f in "${DO[@]}"; do echo "  · $f"; done
 echo "Cuộn lên để đọc chi tiết từng tệp."
 echo "=============================================================================="

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import TaiKhiThay from "@/components/TaiKhiThay";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
@@ -33,10 +34,14 @@ function KetSo() {
   const [pl, setPl] = useState<Record<number, any>>({});
   const [dang, setDang] = useState(false);
   const ghiDuoc = user?.role === "ketoan";
+  // KS-KS2 · ba khung trên cùng đã trả lời chưa (được hay lỗi đều tính). Bốn khung dưới CHỜ cờ này
+  // rồi mới canh cuộn — trước đó trang còn ngắn, khung dưới nằm ngay trong màn hình và sẽ tải luôn.
+  const [xongTren, setXongTren] = useState({ tt: false, tg: false, gt: false });
 
   const load = useCallback(async () => {
     try { setTt(await api<any>(`/ket-so/tinh-trang?ky=${ky}`)); }
     catch (e) { toast(errMsg(e), true); }
+    setXongTren((x) => (x.tt ? x : { ...x, tt: true }));
   }, [ky, toast]);
   useEffect(() => { load(); setSk(null); setKc(null); setPl({}); }, [load]);
 
@@ -64,7 +69,8 @@ function KetSo() {
   // cũng đọc sổ như bốn bước kia.
   const [tg, setTg] = useState<any>(null);
   const taiTg = useCallback(() => {
-    api<any>(`/ket-so/tach-ty-gia/xem-truoc?ky=${ky}`).then(setTg).catch(() => setTg(null));
+    api<any>(`/ket-so/tach-ty-gia/xem-truoc?ky=${ky}`).then(setTg).catch(() => setTg(null))
+      .finally(() => setXongTren((x) => (x.tg ? x : { ...x, tg: true })));
   }, [ky]);
   useEffect(taiTg, [taiTg]);
   const tachTg = async () => {
@@ -82,7 +88,8 @@ function KetSo() {
   // chuyển, và sẽ đi tìm nó trong danh sách bước.
   const [gt, setGt] = useState<any>(null);
   const taiGt = useCallback(() => {
-    api<any>(`/ket-so/bu-tru-gtgt/xem-truoc?ky=${ky}`).then(setGt).catch(() => setGt(null));
+    api<any>(`/ket-so/bu-tru-gtgt/xem-truoc?ky=${ky}`).then(setGt).catch(() => setGt(null))
+      .finally(() => setXongTren((x) => (x.gt ? x : { ...x, gt: true })));
   }, [ky]);
   useEffect(taiGt, [taiGt]);
   const buTruGt = async () => {
@@ -305,10 +312,13 @@ function KetSo() {
         </div>
       ) : null}
 
-      <MucDoChan />
-      <TachNhiem />
-      <TienCapCha />
-      <DoiChieuLaiLo />
+      {/* KS-KS2 · bốn khung dưới chỉ tải khi cuộn tới — xem components/TaiKhiThay.tsx. */}
+      {(() => { const san = xongTren.tt && xongTren.tg && xongTren.gt; return (<>
+      <TaiKhiThay san={san} ten="Mức độ chặn của từng phép kiểm"><MucDoChan /></TaiKhiThay>
+      <TaiKhiThay san={san} ten="Sổ tách bạch trách nhiệm"><TachNhiem /></TaiKhiThay>
+      <TaiKhiThay san={san} ten="Bút toán đã ghi vào tài khoản cha"><TienCapCha /></TaiKhiThay>
+      <TaiKhiThay san={san} ten="Đối chiếu lãi lỗ tour — SỔ ↔ BẢNG TÍNH"><DoiChieuLaiLo /></TaiKhiThay>
+      </>); })()}
 
       <style jsx>{`
         .wrap { padding: 16px; max-width: 1000px; }
