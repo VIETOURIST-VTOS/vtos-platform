@@ -54,11 +54,27 @@ from app.models.lop3_tour import (KhachChiPhi, TourDoanhThuDong, TourHdvChi, Tou
 from app.models.core import Tour
 from app.models.ty_gia import TyGia
 
+# ĐỢT TGIA-1 08/11/2026 — BỐN HẰNG SỐ NÀY LÀ TÀI KHOẢN TỔNG HỢP.
+#
+# `413`, `632`, `635`, `515` đều có tài khoản con trong danh mục thật, và `post_entry` NHẬN bút
+# toán vào tài khoản cha mà không chặn — nên việc này im lặng suốt. Đo trên hệ thống thật
+# 08/11/2026: mốc tách ĐÃ BẬT (`tach_ty_gia_tu_ngay` = 2026-10-09) nhưng chưa dòng nào phát sinh
+# sau mốc, nên chưa có bút toán nào rơi vào cha — đây là lúc RẺ NHẤT để nắn.
+#
+# BỐN HẰNG SỐ GIỮ NGUYÊN làm GỐC ĐỌC CÂY và làm nhãn của bộ dò; số hiệu đem GHI SỔ lấy ở bảng
+# khai `services/tk_chi_tiet.py`. Cùng cách Đợt TKC-4 giữ `TK_CHI_PHI_DO_DANG = "154"` cho phép
+# đọc cây còn hai dòng ghi thì đổi sang tài khoản chi tiết.
 TK_CHENH_LECH_DANH_GIA_LAI = "413"
 TK_GIA_VON = "632"
 TU_NGAY_KEY = "tach_ty_gia_tu_ngay"
 TK_LO_TY_GIA = "635"
 TK_LAI_TY_GIA = "515"
+
+
+def _tk(db: Session, khoa: str) -> str:
+    """Số hiệu tài khoản đem GHI SỔ, lấy ở bảng khai chung — không gõ cứng ở tệp này."""
+    from app.services.tk_chi_tiet import chon
+    return chon(db, khoa)
 
 # Bảng nào mang ngoại tệ. KHAI RA chứ không dò động, và có phép thử bắt khai đủ: thêm một bảng mang
 # cặp cột `tien_te` + `ty_gia` mà quên khai ở đây thì chênh lệch của bảng ấy không ai đếm — và vì
@@ -282,8 +298,8 @@ def tong_hop(db: Session, tour_id: int | None = None) -> dict:
         "so_dong_thieu_ngay": len(dc["thieu_ngay_ty_gia"]),
         "bang_duoc_quet": [{"bang": k, "ten": v["ten"], "uoc_tinh_duoc_tien": goc_ro_rang(k)}
                            for k, v in BANG_NGOAI_TE.items()],
-        "tai_khoan": {"danh_gia_lai": TK_CHENH_LECH_DANH_GIA_LAI,
-                      "lo": TK_LO_TY_GIA, "lai": TK_LAI_TY_GIA},
+        "tai_khoan": {"danh_gia_lai": _tk(db, "ty_gia_danh_gia_lai"),
+                      "lo": _tk(db, "ty_gia_lo"), "lai": _tk(db, "ty_gia_lai")},
         "ghi_chu": (
             "ĐÂY LÀ BẢN ĐO, KHÔNG PHẢI BẢN GHI SỔ — Chủ tịch quyết 09/10/2026 'đo trước, ghi sổ sau'. "
             "Chênh lệch tỷ giá đã thực hiện hiện NẰM TRONG giá vốn chuyến; tách nó ra 635 (lỗ) / 515 "
@@ -399,10 +415,10 @@ def tinh_tach(db: Session, ky: str | None = None) -> dict:
         "truoc_moc": truoc_moc, "so_truoc_moc": len(truoc_moc),
         "thieu_ty_gia_so": thieu_so, "so_thieu_ty_gia_so": len(thieu_so),
         "khong_ro_nguyen_te": khong_ro, "so_khong_ro": len(khong_ro),
-        "but_toan": ([{"account": TK_LO_TY_GIA, "debit": round(lo)}] if lo >= 1 else [])
-                    + ([{"account": TK_GIA_VON, "credit": round(lo)}] if lo >= 1 else [])
-                    + ([{"account": TK_GIA_VON, "debit": round(lai)}] if lai >= 1 else [])
-                    + ([{"account": TK_LAI_TY_GIA, "credit": round(lai)}] if lai >= 1 else []),
+        "but_toan": ([{"account": _tk(db, "ty_gia_lo"), "debit": round(lo)}] if lo >= 1 else [])
+                    + ([{"account": _tk(db, "ty_gia_gia_von"), "credit": round(lo)}] if lo >= 1 else [])
+                    + ([{"account": _tk(db, "ty_gia_gia_von"), "debit": round(lai)}] if lai >= 1 else [])
+                    + ([{"account": _tk(db, "ty_gia_lai"), "credit": round(lai)}] if lai >= 1 else []),
         "ghi_chu": (
             f"Tách từ ngày {moc} về sau (Chủ tịch quyết 09/10/2026). Lỗ tỷ giá: Nợ 635 / Có 632. "
             "Lãi tỷ giá: Nợ 632 / Có 515. Bản này KHÔNG đổi hoa hồng và quỹ thưởng – chúng tính "

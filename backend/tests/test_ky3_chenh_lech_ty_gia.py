@@ -270,7 +270,10 @@ def test_cua_tra_loi_va_noi_ra_minh_chi_la_ban_do(db):
         assert k in d, f"cửa thiếu khóa {k}"
     assert "ĐO" in d["ghi_chu"] and "635" in d["ghi_chu"] and "413" in d["ghi_chu"], \
         "cửa phải nói rõ đây là bản đo, chênh lệch sẽ đi đâu nếu được ký, và vì sao 413 trống"
-    assert d["tai_khoan"] == {"danh_gia_lai": "413", "lo": "635", "lai": "515"}
+    # ĐỢT TGIA-1 08/11/2026 — `413` / `635` / `515` đều là tài khoản TỔNG HỢP. Thẻ nay in tài
+    # khoản CHI TIẾT theo bảng khai `services/tk_chi_tiet.py`: `4131` đánh giá lại, `6352` lỗ tỷ
+    # giá, `5154` lãi tỷ giá — ba cái tên trùng khít tên tài khoản trong danh mục thật.
+    assert d["tai_khoan"] == {"danh_gia_lai": "4131", "lo": "6352", "lai": "5154"}
 
 
 def test_cua_khong_doi_ma_tran_quyen():
@@ -340,15 +343,19 @@ def test_chieu_but_toan_lo_va_lai_khong_duoc_nguoc(db, tour):
     kq = CL.tinh_tach(db, "2026-11")
     assert kq["lo"] == 10_000 and kq["lai"] == 0
     bt = {(l["account"], "no" if "debit" in l else "co"): list(l.values())[1] for l in kq["but_toan"]}
-    assert bt.get(("635", "no")) == 10_000, "lỗ tỷ giá phải ghi NỢ 635"
-    assert bt.get(("632", "co")) == 10_000, "lỗ phải được lấy RA khỏi giá vốn (ghi CÓ 632)"
+    # ĐỢT TGIA-1 08/11/2026 — `635` và `632` là tài khoản TỔNG HỢP; bút toán nay đi vào tài
+    # khoản CHI TIẾT theo bảng khai `services/tk_chi_tiet.py`: `6352` Lỗ tỷ giá, `6326` Giá vốn
+    # dịch vụ khác (Chủ tịch chốt 08/11/2026: MỘT dòng giá vốn cho cả kỳ, giữ đúng quyết định
+    # «không thuộc riêng chuyến nào» đã ghi trong `ket_so`).
+    assert bt.get(("6352", "no")) == 10_000, "lỗ tỷ giá phải ghi NỢ 6352"
+    assert bt.get(("6326", "co")) == 10_000, "lỗ phải được lấy RA khỏi giá vốn (ghi CÓ 6326)"
 
     _pt(db, tour.id, "THB", 690, ng, goc=1000)    # trả thấp hơn → lãi 10.000, bù trừ
     db.flush()
     kq2 = CL.tinh_tach(db, "2026-11")
     assert kq2["lo"] == 10_000 and kq2["lai"] == 10_000, "lãi và lỗ phải đứng riêng, không tự bù"
     bt2 = {(l["account"], "no" if "debit" in l else "co") for l in kq2["but_toan"]}
-    assert ("515", "co") in bt2 and ("632", "no") in bt2, "lãi tỷ giá phải ghi CÓ 515 và NỢ 632"
+    assert ("5154", "co") in bt2 and ("6326", "no") in bt2, "lãi tỷ giá phải ghi CÓ 5154 và NỢ 6326"
 
 
 def test_nhieu_nguon_cung_ngay_thi_lay_nguon_GAN_NHAT(db, tour):
@@ -402,8 +409,8 @@ def test_ghi_so_mot_lan_va_khong_ghi_lan_hai(db):
     for l in e.lines:
         o = tk.setdefault(l.account_code, [0.0, 0.0])
         o[0] += l.debit or 0; o[1] += l.credit or 0
-    assert tk["635"][0] == 600_000 and tk["515"][1] == 200_000, "lỗ và lãi không đứng đúng vế"
-    assert round(tk["632"][1] - tk["632"][0]) == 400_000, "632 phải giảm ròng đúng phần chênh"
+    assert tk["6352"][0] == 600_000 and tk["5154"][1] == 200_000, "lỗ và lãi không đứng đúng vế"
+    assert round(tk["6326"][1] - tk["6326"][0]) == 400_000, "6326 phải giảm ròng đúng phần chênh"
     assert round(sum(v[0] for v in tk.values())) == round(sum(v[1] for v in tk.values())), "bút toán không cân"
 
     lan2 = KS.tach_ty_gia(db, ke_toan, ky)
