@@ -341,6 +341,13 @@ MAN_HINH_MOI_NGUOI = ("/", "/doi-mat-khau", "/alerts", "/reports", "/payroll", "
 
 # Màn hình → nhóm API nó gọi. Đo từ mã giao diện ngày 08/9/2026.
 MAN_HINH_API = {
+    # ĐỢT PH-1 (09/11/2026) — bốn trang phòng mới. Chúng chỉ đọc `/api/v1/bao-cao`, đúng
+    # nhóm mà màn `/bao-cao` đã gọi; không mở thêm cửa API nào, nên không vai trò nào được
+    # nới phạm vi vì đợt này. Điều hành xe không có dòng ở đây: `/xe` tự khai từ PR #744.
+    "/fit":   ("/api/v1/bao-cao",),
+    "/mice":  ("/api/v1/bao-cao",),
+    "/op":    ("/api/v1/bao-cao",),
+    "/guide": ("/api/v1/bao-cao",),
     "/": ("/api/v1/dashboard",),
     "/access": ("/api/v1/access", "/api/v1/users", "/api/v1/he-thong"),
     "/accounting": ("/api/v1/accounts", "/api/v1/collections", "/api/v1/invoices", "/api/v1/journal",
@@ -903,6 +910,14 @@ def che_gia_von(v: dict, u: User, tour, db=None) -> dict:
 # Menu giao diện web theo vai trò (đường dẫn trang → vai trò được thấy). Trang không liệt kê = mọi vai trò đã đăng nhập.
 MENU_ROLES = {
     # Mỗi dòng = BASE_VIEW (Chủ tịch, TGĐ, Ban Kiểm soát) + đúng những vai trò có việc trên màn hình đó.
+    # ĐỢT PH-1 (09/11/2026) — bốn trang phòng. Mỗi dòng HẸP đúng bằng phạm vi phòng ấy
+    # đã có ở `bao_cao_phong.PHONG[...]["xem"]`, nên so với trước đợt này không vai nào
+    # xem thêm được gì. Hàng rào `test_p2_pham_vi_vai_tro` đã đỏ một lần vì bản đầu khai
+    # rộng hơn thế (nv_dh 77→78, nv_kd 60→61, …) — bốn dòng dưới là bản đã thu lại.
+    "/fit":   BASE_VIEW + ("gd_kd", "tp_kd", "ptgd_mkt"),
+    "/mice":  BASE_VIEW + ("ptgd_doan",),
+    "/op":    BASE_VIEW + ("tp_dh", "ptgd_doan"),
+    "/guide": BASE_VIEW + ("tp_hd",),
     # Viết thẳng tên vai trò thay vì cộng các nhóm lớn: nhóm lớn là thứ đã làm bảy vai trò tự động nhìn
     # thấy mọi màn hình mới mà không ai quyết định. Dài hơn, nhưng đọc là biết ai xem được gì.
 

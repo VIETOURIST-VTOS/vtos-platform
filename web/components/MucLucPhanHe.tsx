@@ -26,6 +26,7 @@
 import Link from "next/link";
 import { useShell } from "@/components/Shell";
 import { CAY_PHAN_HE, PHAN_HE_CON, timPhanHe, demMuc, laNhan, type MucCay } from "@/lib/cay_phan_he";
+import { duongCuaPhong } from "@/lib/duong_phong";
 
 /** TC-70 · 18/9/2026 — DANH SÁCH CHIP CHUYỂN NHANH phải khớp với thanh dọc, không phải với
  *  CAY_PHAN_HE. Từ 18/9 Kinh doanh và Điều hành không còn là một màn hình: chúng xổ ra 2 và 3 phân
@@ -112,10 +113,15 @@ export default function MucLucPhanHe({ khoa }: { khoa: string }) {
     <>
       {/* Chuyển nhanh sang phân hệ khác mà không phải quay lên menu dọc. Giữ `?xem=muc-luc` để
           người đang đọc mục lục của phòng này bấm sang phòng kia vẫn ở trong mục lục, chứ không
-          bị quăng sang bảng chỉ tiêu giữa chừng. */}
+          bị quăng sang bảng chỉ tiêu giữa chừng.
+
+          ĐỢT PH-1 · 08/11/2026 — đích hỏi `duongCuaPhong`, vì năm phòng con đã dời sang đường dẫn
+          riêng (`/fit`, `/mice`, `/op`, `/xe`, `/guide`). Để nguyên `/phan-he/<khoá>` thì vẫn tới
+          nơi nhờ lối chuyển tiếp, nhưng người dùng đi hai chặng và thấy đường dẫn nhảy một lần —
+          chỗ nào biết đích thật thì đi thẳng. */}
       <nav className="cay-chuyen" aria-label="Các phân hệ khác">
         {CHIP_PHAN_HE.map((p) => (
-          <Link key={p.khoa} href={`/phan-he/${p.khoa}?xem=muc-luc`}
+          <Link key={p.khoa} href={`${duongCuaPhong(p.khoa)}?xem=muc-luc`}
             className={"cay-chip" + (p.khoa === ph.khoa ? " on" : "")}>
             <b>{p.ma}</b> {p.ten}
           </Link>

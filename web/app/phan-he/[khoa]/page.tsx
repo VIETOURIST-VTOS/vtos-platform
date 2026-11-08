@@ -1,92 +1,41 @@
 "use client";
-/** TRANG PHÂN HỆ — từ 11/10/2026 mở ra MÀN HÌNH CHÍNH CỦA PHÒNG, không còn mở ra mục lục.
+/** TRANG PHÂN HỆ — đường dẫn ĐỘNG, còn phục vụ những phân hệ chưa dời.
  *
- *  ─────────────────────────────────────────────────────────────────────────────────────────────
- *  CHỦ TỊCH CHỐT 11/10/2026
- *  ─────────────────────────────────────────────────────────────────────────────────────────────
+ *  Thân trang đã chuyển sang `components/TrangPhanHe.tsx` ngày 08/11/2026 (Đợt PH-1), vì năm
+ *  phòng được tách ra đường dẫn riêng và sáu lối vào phải dùng CHUNG một thân — chép ra sáu bản
+ *  thì sớm muộn chúng lệch nhau. Mọi luật của trang nằm trong tệp ấy, đọc ở đó.
  *
- *  "Vào phân hệ của từng phòng ban thì phải thấy được giao diện chính của các giám đốc và trưởng
- *  phòng, thay vì mục lục như hiện tại."
+ *  ───────────────────────────────────────────────────────────────────────────────────────────
+ *  LỐI CHUYỂN TIẾP CHO NĂM ĐƯỜNG DẪN CŨ
+ *  ───────────────────────────────────────────────────────────────────────────────────────────
  *
- *  Đây là LẬT LẠI phương án B mà chính Chủ tịch chốt ngày 13/9/2026, và lật có ý thức. Thứ đã có
- *  sẵn và đúng nghĩa "màn hình chính của trưởng phòng" là BẢNG CHỈ TIÊU TỰ ĐỘNG của phòng — bảng
- *  vốn sống ở `/bao-cao`, nơi Chủ tịch phải tự đổi ô chọn phòng mới tới được. Vòng này không dựng
- *  màn hình mới: nó mở đúng CÁNH CỬA còn thiếu.
+ *  `/phan-he/kdle` và bốn bạn của nó KHÔNG còn là chỗ ở của năm phòng ấy nữa — Chủ tịch chốt
+ *  08/11/2026 là bỏ, thay bằng `/fit`, `/mice`, `/op`, `/xe`, `/guide`.
  *
- *  MỤC LỤC KHÔNG BỊ BỎ. Nó lùi về `?xem=muc-luc`, có lối vào ở cả đầu lẫn cuối trang (Chủ tịch
- *  chọn "cả hai" khi em hỏi 11/10). Giữ nó là giữ chỗ duy nhất đọc được hệ thống CÒN NỢ những gì:
- *  bản vẽ v1.3 có 184 mục, VTOS thật có ngót 80 trang. Bỏ mục lục đi thì phần nợ ấy không biến
- *  mất, nó chỉ thành vô hình.
+ *  "Bỏ" ở đây là bỏ CHỖ Ở, không phải đập cửa. Đường cũ giữ lại đúng một việc: chỉ sang chỗ mới.
+ *  Lý do không đập thẳng: năm đường ấy đã sống hơn một tháng, nằm trong dấu trang của người dùng
+ *  và trong các tin nhắn đã gửi nhau. Đập thẳng thì sáng hôm sau có người báo hỏng, mà cái hỏng
+ *  ấy không nói cho họ biết phải đi đâu.
  *
- *  ─────────────────────────────────────────────────────────────────────────────────────────────
- *  BA NHÁNH, VÀ VÌ SAO KHÔNG NỚI MỘT QUYỀN NÀO
- *  ─────────────────────────────────────────────────────────────────────────────────────────────
+ *  Dùng `replace` chứ không `push`: người bấm Quay lại phải về chỗ họ vừa rời, không phải rơi
+ *  ngược vào đường cũ rồi bị đẩy sang lần nữa — một vòng lặp mà người dùng không thoát được bằng
+ *  nút Quay lại.
  *
- *    1. `?xem=muc-luc`, hoặc phân hệ KHÔNG có phòng tương ứng → mục lục, y như trước.
- *       Không có phòng: Tổng quan (bảng điều hành `/` đã là toàn công ty rồi — trỏ vào đây nữa là
- *       đặt một con số ở hai nơi), Báo cáo – Phân tích (trỏ vào chính nó là vòng tròn), Quản trị
- *       hệ thống (không phải phòng ban), và hai khoá gộp cũ `khachhang` · `vanhanh` còn sống cho
- *       ai đã lưu dấu trang.
- *    2. Có phòng, nhưng người đang xem không được xem bảng ấy → mục lục. Chủ tịch chốt "mọi
- *       người, theo quyền sẵn có": ai có quyền thì thấy bảng, ai không thì thấy mục lục như cũ.
- *    3. Còn lại → bảng chỉ tiêu của phòng.
- *
- *  Câu "được xem hay không" KHÔNG trả lời ở đây. Hai mốc đều là câu trả lời của máy chủ: danh
- *  sách `hidden_menus` của phiên (chặn sớm, khỏi gọi một cửa chắc chắn 403), và danh sách phạm vi
- *  do `/bao-cao/pham-vi` trả về. Bảng vai trò vẫn nằm đúng một chỗ ở `bao_cao_phong.PHONG`; mở
- *  thêm một cửa vào không nới một quyền nào, và máy chủ siết lúc nào thì cửa này siết theo.
+ *  Giữ nguyên phần sau dấu hỏi: `?xem=muc-luc` là một lối vào thật, mất nó thì người theo dấu
+ *  trang cũ tới mục lục sẽ rơi vào bảng chỉ tiêu và tưởng mục lục đã bị bỏ.
  */
-import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
-import Shell, { useShell } from "@/components/Shell";
-import BangChiTieuPhong, { usePhamViBaoCao } from "@/components/BangChiTieuPhong";
-import BanLamViecPhong from "@/components/BanLamViecPhong";
-import MucLucPhanHe from "@/components/MucLucPhanHe";
-import { PHONG_CUA_PHAN_HE, timPhanHe } from "@/lib/cay_phan_he";
+import { useEffect } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Shell from "@/components/Shell";
+import TrangPhanHe from "@/components/TrangPhanHe";
+import { DUONG_PHONG } from "@/lib/duong_phong";
 
-function LoiVaoMucLuc({ khoa, duoi }: { khoa: string; duoi?: boolean }) {
-  return (
-    <p className={duoi ? "muted cay-cuoi" : "cay-chu"}>
-      {duoi
-        ? <>Phần hệ thống <b>còn nợ</b> của phân hệ này — những mục bản vẽ v1.3 có mà VTOS chưa
-            dựng — nằm ở mục lục chức năng. </>
-        : <>Đây là bảng chỉ tiêu của phòng. </>}
-      <Link href={`/phan-he/${khoa}?xem=muc-luc`}>Xem mục lục chức năng →</Link>
-    </p>
-  );
-}
-
-/** Nhánh 2 và 3 nằm riêng một thành phần vì nó phải GỌI MÁY CHỦ, mà nhánh 1 thì không được gọi.
- *  React không cho gọi hook có điều kiện, nên nếu nhập chung thì mọi vai trò mở bất kỳ phân hệ
- *  nào cũng kéo theo một lượt hỏi `/bao-cao/pham-vi` — kể cả tài xế, người chắc chắn nhận 403 và
- *  sẽ thấy một dòng báo lỗi đỏ chỉ vì mở mục lục. Tách thành phần là cách để nhánh 1 thật sự
- *  không gọi gì. */
-function BangCuaPhong({ khoa, phamVi }: { khoa: string; phamVi: string }) {
-  const { meta, xong } = usePhamViBaoCao();
-  const ph = timPhanHe(khoa);
-  if (!xong) return <p className="muted">Đang tải…</p>;
-  if (!meta?.pham_vi.some((p) => p.ma === phamVi)) return <MucLucPhanHe khoa={khoa} />;
-  return (<>
-    <h1>{ph?.ten || khoa}</h1>
-    <LoiVaoMucLuc khoa={khoa} />
-    {/* BD-1 · 12/10/2026 — VIỆC CẦN LÀM ĐỨNG TRÊN CHỈ TIÊU. Chủ tịch chốt sau khi xem bản dựng
-        thử: người mở máy buổi sáng là để làm việc; chỉ tiêu tháng xem một lần đầu ngày là đủ.
-        Bàn tự ẩn với phòng chưa khai hàng đợi, nên bảy phòng còn lại thấy y như trước. */}
-    <BanLamViecPhong phong={phamVi} />
-    <BangChiTieuPhong meta={meta} phamViCoDinh={phamVi} />
-    <LoiVaoMucLuc khoa={khoa} duoi />
-  </>);
-}
-
-function Trang({ khoa }: { khoa: string }) {
+function ChiSangChoMoi({ duong }: { duong: string }) {
+  const r = useRouter();
   const sp = useSearchParams();
-  const { user } = useShell();
-  const phamVi = PHONG_CUA_PHAN_HE[khoa];
-  const an = user?.hidden_menus || [];
-  if (sp?.get("xem") === "muc-luc" || !phamVi || an.includes("/bao-cao")) {
-    return <MucLucPhanHe khoa={khoa} />;
-  }
-  return <BangCuaPhong khoa={khoa} phamVi={phamVi} />;
+  const q = sp?.toString();
+  useEffect(() => { r.replace(q ? `${duong}?${q}` : duong); }, [r, duong, q]);
+  return <p className="muted">Phòng này đã chuyển sang <b>{duong}</b> — đang mở…</p>;
 }
 
 /** KHÔNG bọc `Suspense`, và đó là kết quả của một phép đo chứ không phải quên.
@@ -100,10 +49,16 @@ function Trang({ khoa }: { khoa: string }) {
  *  `generateStaticParams` cho nhánh này thì luật đổi — và `test_web_suspense_cho_search_params`
  *  đỏ đúng ngày đó, nên không phải nhớ.
  *
+ *  NĂM TRANG MỚI THÌ NGƯỢC LẠI: `/fit` và bốn bạn của nó là đường dẫn TĨNH, nên mỗi trang ấy tự
+ *  bọc một lớp `Suspense`. Cùng một thân trang, hai luật khác nhau, vì hai loại đường dẫn khác
+ *  nhau — không phải vì ai đó quên.
+ *
  *  Lấy khoá bằng useParams chứ không nhận qua tham số `params`: Next 15 đổi `params` thành
  *  Promise còn Next 14 thì không, và trang này là client component nên useParams chạy đúng ở cả
  *  hai. */
 export default function Page() {
   const p = useParams<{ khoa: string }>();
-  return <Shell><Trang khoa={String(p?.khoa || "")} /></Shell>;
+  const khoa = String(p?.khoa || "");
+  const moi = DUONG_PHONG[khoa];
+  return <Shell>{moi ? <ChiSangChoMoi duong={moi} /> : <TrangPhanHe khoa={khoa} />}</Shell>;
 }
