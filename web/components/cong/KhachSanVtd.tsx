@@ -82,6 +82,7 @@ const ngay = (s: string) => { const d = new Date(s + "T00:00:00"); return `${THU
 const ngayDai = (s: string) => { const d = new Date(s + "T00:00:00"); return `${d.getDate()} Th${d.getMonth() + 1} ${d.getFullYear()}`; };
 const thuDai = (s: string) => THU_DAI[new Date(s + "T00:00:00").getDay()];
 const thuNgan = (s: string) => THU[new Date(s + "T00:00:00").getDay()];
+const LY_DO_KD: Record<string, string> = { het: "Hết phòng", khong_du: "Không đủ phòng cho số khách đã chọn ·", chua_ban: "Chưa mở bán" };   // P0-01
 export const dmy = (s?: string | null) => (s ? String(s).slice(0, 10).split("-").reverse().join("/") : "");
 const MAU: Record<string, string> = { bac: "#1f4e5f", trung: "#7a4a22", tay_nguyen: "#5b4a2e", nam: "#2f5d3a" };
 const khongDau = (s: string) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
@@ -199,6 +200,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
   const [gNhap, setGNhap] = useState<{ a: number; b: number } | null>(null);   // KS-19b: khoảng giá đang kéo, chưa áp
   const [loi, setLoi] = useState("");
   const [loc, setLoc] = useState<Loc>(LOC0);
+  const [conPhong, setConPhong] = useState(true);   // P0-01: bỏ chọn thì hiện thêm khách sạn không đặt được kỳ này
   const [sx, setSx] = useState("phu_hop");
   const [pop, setPop] = useState(false);
   const [moLoc, setMoLoc] = useState(false);
@@ -300,6 +302,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
     return [...r].sort(f[sx]);
   }, [ds, loc, sx, q.tinh]);
   const trongTp = (ds?.khach_san || []).filter((k: any) => !q.tinh || k.tinh_thanh === q.tinh);
+  const khongDat = (ds?.khong_dat || []).filter((k: any) => !q.tinh || k.tinh_thanh === q.tinh);   // P0-01
   // KS-19b: số cạnh lựa chọn = số KHÁCH SẠN (không đếm gói) còn khớp nếu thêm lựa chọn đó vào các điều kiện đang chọn.
   const soNeu = (them: Partial<Loc>) => { const L2 = { ...loc, ...them }; return trongTp.filter((k: any) => goiKhop(k, L2).length > 0).length; };
   const coTrongTp = (f: (k: any) => boolean) => trongTp.some(f);
@@ -783,12 +786,12 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
     <div className="ksv-layout">
       <aside className={`ksv-loc ${moLoc ? "open" : ""}`} aria-label="Bộ lọc">
         {moLoc && <div className="ksv13-mhead"><button type="button" className="ksv13-x" aria-label="Đóng bộ lọc" onClick={() => setMoLoc(false)}>✕</button><b>Lọc khách sạn</b>
-          <button type="button" className="ksv-link" onClick={() => { setLoc(LOC0); setGNhap(null); }}>Bỏ tất cả</button></div>}
+          <button type="button" className="ksv-link" onClick={() => { setLoc(LOC0); setGNhap(null); setConPhong(true); }}>Bỏ tất cả</button></div>}
         {moLoc && chipDang}
         {!moLoc && <div className="ksv13-map"><button type="button" className="ksv13-mapo" onClick={() => { setBanDo(true); setKhung(null); }}><Ico d={P.ghim} s={18} fill /><span>Bản đồ khu vực {q.tinh || "các điểm đến"}</span></button>
           <a href={ggMap(`khách sạn ${q.tinh || "Việt Nam"}`)} target="_blank" rel="noopener noreferrer">Xem trên Google Maps</a></div>}
         <div className="ksv-panel ksv-fbox">
-          {!moLoc && <div className="ksv13-fh"><b>Bộ lọc</b><button type="button" className="ksv-link" onClick={() => { setLoc(LOC0); setGNhap(null); }}>Bỏ tất cả</button></div>}
+          {!moLoc && <div className="ksv13-fh"><b>Bộ lọc</b><button type="button" className="ksv-link" onClick={() => { setLoc(LOC0); setGNhap(null); setConPhong(true); }}>Bỏ tất cả</button></div>}
           <div className="fsec"><label className="ksv-pill"><Ico d={P.kinh} s={18} /><input placeholder="Tên khách sạn hoặc khu vực" value={L.ten} list="ksv-goi-y" onChange={(e) => setLoc({ ...L, ten: e.target.value })} aria-label="Tìm theo tên khách sạn hoặc khu vực" /></label>
             <datalist id="ksv-goi-y">{goiY.map((t) => <option key={t} value={t} />)}</datalist></div>
           {nhomG("Ngân sách mỗi đêm", L.min || L.max ? 1 : 0, <><small className="ksv-muted">VND · 1 phòng / 1 đêm · đã gồm 8% VAT</small>
@@ -799,7 +802,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
             {gA > gB && <small style={{ color: "var(--ksv-price)" }}>Tối thiểu đang lớn hơn tối đa — máy sẽ đổi chỗ hai số khi áp.</small>}
             <button type="button" className="ksv-btn line wide" disabled={!gNhap} onClick={apGia}>Áp dụng giá</button>
             <small className="ksv-muted">Miền giá ₫ {vnd(giaMin0)} – {vnd(giaMax)} lấy từ các gói còn phòng của tìm kiếm này.</small></>, true)}
-          {nhomG("Khả năng đặt", L.huy ? 1 : 0, <>{ck(true, () => {}, "Còn phòng đặt được", trongTp.length, "con")}
+          {nhomG("Khả năng đặt", (L.huy ? 1 : 0) + (conPhong ? 0 : 1), <>{ck(conPhong, setConPhong, "Còn phòng đặt được", trongTp.length, "con")}
             {coGoi((o) => o.mien_phi_huy) && ck(L.huy, (v) => setLoc({ ...L, huy: v }), "Miễn phí hủy", soNeu({ huy: true }), "huy")}</>)}
           {nhomLoc("Thanh toán", LOC_TT, "tt")}
           {nhomLoc("Bữa ăn & quyền lợi trong gói", LOC_AN, "an")}
@@ -821,7 +824,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
           {nhomG("Điểm khách đánh giá", L.dk ? 1 : 0, coDiem ? ([[9, "9+ Xuất sắc"], [8, "8+ Rất tốt"], [7, "7+ Tốt"]] as const).map(([d, t]) =>
             ck(L.dk === d, (v) => setLoc({ ...L, dk: v ? d : 0 }), t, soNeu({ dk: d }), `dk${d}`))
             : <small className="ksv-muted">Khóa — chưa đủ đánh giá thật của khách VTD.</small>)}
-          {!moLoc && <div className="fsec"><button type="button" className="ksv-btn line wide" onClick={() => { setLoc(LOC0); setGNhap(null); }}>Bỏ tất cả bộ lọc</button></div>}</div>
+          {!moLoc && <div className="fsec"><button type="button" className="ksv-btn line wide" onClick={() => { setLoc(LOC0); setGNhap(null); setConPhong(true); }}>Bỏ tất cả bộ lọc</button></div>}</div>
         {moLoc && <div className="ksv13-mfoot"><button type="button" className="ksv-btn big wide" onClick={() => setMoLoc(false)}>Xem {loc2.length} kết quả</button></div>}
       </aside>
       <main className="ksv-col" style={{ minWidth: 0 }}>
@@ -830,7 +833,7 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
           <button key={k} type="button" role="tab" aria-selected={sx === k} className={sx === k ? "on" : ""} onClick={() => setSx(k)}>{t}</button>)}</div>
         <div className="ksv13-dau"><b>{loc2.length} khách sạn{q.tinh ? ` tại ${q.tinh}` : ""}</b>
           {chipDang}
-          {the_.length > 0 && <button type="button" className="ksv-link" onClick={() => { setLoc(LOC0); setGNhap(null); }}>Bỏ tất cả</button>}
+          {the_.length > 0 && <button type="button" className="ksv-link" onClick={() => { setLoc(LOC0); setGNhap(null); setConPhong(true); }}>Bỏ tất cả</button>}
           <span className="ksv13-dnut"><button type="button" className="ksv-btn line ksv-fbtn" onClick={() => setMoLoc(true)}>Bộ lọc{the_.length ? ` · ${the_.length}` : ""}</button>
             <button type="button" className={`ksv-btn ${banDo ? "" : "line"}`} style={{ display: "inline-flex", flexDirection: "row", gap: 6, alignItems: "center" }} aria-pressed={banDo} onClick={() => { setBanDo(!banDo); setKhung(null); }}><Ico d={P.ghim} s={15} fill /> {banDo ? "Danh sách" : "Bản đồ"}</button></span></div>
         {loiBox}
@@ -874,7 +877,20 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
                   <button type="button" className="ksv-btn wide" onClick={() => moThe(k)}>Chọn phòng</button></div>
                   : <div className="ksv-pblk"><span className="ksv-hetb">Hết phòng ngày bạn chọn</span><small className="ksv-muted">Đổi ngày để xem phòng trống</small></div>}</div>
             </div></article>; })}
-        {loc2.length > 0 && <p className="ksv13-note">Khách sạn không còn đủ phòng cho ngày và số phòng đã chọn sẽ không hiện. Không thấy khách sạn mong muốn → bỏ bớt bộ lọc hoặc đổi ngày.</p>}
+        {!conPhong && !banDo && khongDat.length > 0 && <section className="ksv13-kd" aria-label="Khách sạn không đặt được cho ngày đã chọn">
+          <b className="ksv-muted">Không đặt được {dmy(q.vao)} – {dmy(q.ra)} · {khongDat.length} khách sạn</b>
+          {khongDat.map((k: any) => <article key={k.id} className="ksv-card ksv13-card ksv13-het">
+            <div className="ksv-crow">
+              <div className="ksv-ph">{k.anh?.[0] ? <img src={k.anh[0].nho} alt={k.anh[0].mo_ta_thay_the || k.ten} loading="lazy" /> : <AnhTrong k={k} />}</div>
+              <div className="ksv-info">
+                <span className="ksv13-sao">{k.sao > 0 && <span aria-label={`${k.sao} sao`}>{"★".repeat(k.sao)}</span>}{k.sao > 0 && " · "}{k.loai_ten || "Khách sạn"}</span>
+                <h3>{k.ten}</h3>
+                <span className="ksv13-dc">{[k.khu_vuc, k.tinh_thanh].filter(Boolean).join(", ")}</span></div>
+              <div className="ksv-side"><div className="ksv-pblk">
+                <span className="ksv-hetb">{LY_DO_KD[k.ly_do] || LY_DO_KD.het} {dmy(q.vao)} – {dmy(q.ra)}</span>
+                <button type="button" className="ksv-btn line wide" onClick={() => moKs(k.id, q, true)}>Xem ngày khác</button></div></div>
+            </div></article>)}</section>}
+        {loc2.length > 0 && conPhong && <p className="ksv13-note">Đang chỉ hiện khách sạn còn đủ phòng cho ngày và số phòng đã chọn. Bỏ chọn «Còn phòng đặt được» để xem cả khách sạn không đặt được ngày này.</p>}
       </main></div></div>;
 }
 
@@ -1409,6 +1425,7 @@ const CSS = `
 .ksv-score>b{background:var(--ksv-ink);color:#fff;padding:3px 7px;border-radius:6px 6px 6px 0;font-size:14px}
 .ksv-pblk{margin-top:auto;display:flex;flex-direction:column;align-items:inherit;gap:3px;width:100%}
 .ksv-vp{background:var(--ksv-redsoft);color:var(--ksv-price);font-size:12px;font-weight:700;border-radius:6px;padding:3px 8px;align-self:flex-end}
+.ksv13-kd{display:grid;gap:10px;margin-top:6px}.ksv13-het{opacity:.62}.ksv13-het:hover{opacity:.85}
 .ksv-hetb{background:var(--ksv-line2);border-radius:8px;padding:8px 12px;font-weight:600}
 .ksv-big{font-weight:800;font-size:24px}
 /* trang khách sạn */
