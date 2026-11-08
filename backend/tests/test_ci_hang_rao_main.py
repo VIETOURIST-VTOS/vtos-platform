@@ -141,6 +141,11 @@ HANG_RAO = (
     # Luat 1 canh cua `PATCH /bank-accounts/{code}` KHONG con mo coi — lan thu TU trong lan
     # nay. Luat 4 canh dot nay KHONG ghi mot dong so nao: so du cay `112` truoc va sau y nguyen.
     "tests/test_a1_o_nhan_dien_ngan_hang.py",
+    # ── VIEC C, them 08/11/2026 (Dot TSCD-1) ───────────────────────────────────────────────
+    # Luat 1 do bo loc tai khoan cha tren mot cay BA TANG dung san trong phep thu — tren so
+    # that canh ay la `1121` voi 20 tai khoan ngan hang. Luat 3 canh MOT bo luat cho HAI
+    # duong nhap (bai hoc CPTT-1 -> CPTT-2).
+    "tests/test_tscd1_tk_nguyen_gia_tai_san.py",
 )
 
 

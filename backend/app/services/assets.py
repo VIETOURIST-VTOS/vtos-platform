@@ -191,6 +191,97 @@ def tk_chi_phi_nhan_phan_bo(db: Session) -> list[dict]:
             if a.code.startswith(TK_PHAN_BO_NHOM) and a.code not in lam_cha]
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# ĐỢT TSCD-1 08/11/2026 — TK NGUYÊN GIÁ TÀI SẢN CỐ ĐỊNH
+#
+# ĐO ĐƯỢC TRÊN HỆ THỐNG THẬT 08/11/2026, gọi thẳng `POST /fixed-assets` bốn lần:
+#
+#     huu_hinh  -> 201, nhưng vào `211` — TÀI KHOẢN CHA (2111 nhà cửa / 2112 máy móc / 2113 phương tiện)
+#     vo_hinh   -> 422 «Tài khoản 2143 không có trong danh mục»
+#     thue_tc   -> 422 «Tài khoản 212 không có trong danh mục»
+#     bds_dt    -> 422 «Tài khoản 217 không có trong danh mục»
+#
+# Tức `ASSET_KINDS` mời người dùng chọn BỐN loại mà chỉ MỘT loại lưu được, và lỗi trả về nói về
+# một số hiệu tài khoản — thứ người nhập tài sản không có cách nào hiểu là phải làm gì.
+#
+# Hai hàm dưới đây đọc THẲNG DANH MỤC chứ không tin `ASSET_KINDS`: bảng ấy khai mặc định theo
+# MISA, còn danh mục thật của từng công ty mở tới đâu thì chỉ danh mục mới biết.
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+
+def tk_nguyen_gia_cua_loai(db: Session, loai: str) -> list[dict]:
+    """TK nguyên giá CHI TIẾT dùng được cho một loại tài sản — đọc thẳng danh mục.
+
+    Gốc là tài khoản chi tiết (`213` chỉ có một con thì trả về chính con ấy; gốc không có con
+    nào thì trả về gốc) — nên nơi gọi không phải biết trước cây sâu mấy tầng.
+    """
+    goc = (ASSET_KINDS.get(loai) or {}).get("tk_nguyen_gia", "")
+    if not goc:
+        return []
+    cac = {a.code: a for a in db.execute(select(Account)).scalars()}
+    if goc not in cac:
+        return []
+    lam_cha = {a.parent for a in cac.values() if a.parent}
+    if goc not in lam_cha:
+        return [{"ma": cac[goc].code, "ten": cac[goc].name}]
+    return [{"ma": a.code, "ten": a.name} for a in sorted(cac.values(), key=lambda x: x.code)
+            if a.code.startswith(goc) and a.code != goc and a.code not in lam_cha]
+
+
+def thieu_tk_cua_loai(db: Session, loai: str) -> list[str]:
+    """Số hiệu tài khoản mà loại tài sản này CẦN nhưng danh mục CHƯA CÓ.
+
+    Trả về danh sách rỗng nghĩa là loại ấy dùng được. Nói ra ĐÚNG số hiệu cần mở, chứ không chỉ
+    nói «không dùng được»: người đọc phải biết mở cái gì thì câu báo mới có ích.
+    """
+    m = ASSET_KINDS.get(loai) or {}
+    thieu = []
+    for ma in (m.get("tk_nguyen_gia", ""), m.get("tk_hao_mon", "")):
+        if ma and not db.get(Account, ma):
+            thieu.append(ma)
+    if m.get("tk_nguyen_gia") and not thieu and not tk_nguyen_gia_cua_loai(db, loai):
+        thieu.append(m["tk_nguyen_gia"])
+    return thieu
+
+
+def kiem_tk_nguyen_gia(db: Session, loai: str, tk: str) -> str:
+    """"" nếu dùng được; ngược lại là câu nói rõ SAI GÌ.
+
+    MỘT HÀM CHO CẢ HAI ĐƯỜNG NHẬP — cửa nhập tay (`create_asset`) và cửa nạp Excel
+    (`intake_phong_ban_2._ts_kiem` / `_ts_nap`). Đúng bài học Đợt CPTT-1 → CPTT-2: nắn một đường
+    còn đường kia gán thẳng mặc định thì bằng không nắn.
+    """
+    tk = (tk or "").strip()
+    thieu = thieu_tk_cua_loai(db, loai)
+    if thieu:
+        return ("Danh mục tài khoản chưa có " + " và ".join(thieu) + " – mở ở màn Danh mục tài "
+                "khoản rồi quay lại, hoặc chọn loại tài sản khác")
+    cho_phep = tk_nguyen_gia_cua_loai(db, loai)
+    ma = [x["ma"] for x in cho_phep]
+    if not tk:
+        if len(ma) == 1:
+            return ""      # đúng một lựa chọn thì không bắt người dùng chọn cái duy nhất
+        return "Chưa chọn TK nguyên giá – loại này có " + str(len(ma)) + " tài khoản: " + ", ".join(ma)
+    if tk not in ma:
+        if db.get(Account, tk) is None:
+            return "Tài khoản " + tk + " không có trong danh mục"
+        return ("Tài khoản " + tk + " không dùng được cho loại tài sản này – chọn một trong: "
+                + ", ".join(ma))
+    return ""
+
+
+def tk_nguyen_gia_chon(db: Session, loai: str, tk: str) -> str:
+    """Tài khoản sẽ ghi vào thẻ: người nhập chọn gì giữ nấy; bỏ trống mà chỉ có MỘT lựa chọn thì lấy nó.
+
+    KHÔNG tự chọn hộ khi có nhiều hơn một — `kiem_tk_nguyen_gia` đã từ chối trước đó, và đoán hộ
+    ở đây là dựng lại đúng chỗ đợt này đang bịt.
+    """
+    tk = (tk or "").strip()
+    if tk:
+        return tk
+    cho_phep = tk_nguyen_gia_cua_loai(db, loai)
+    return cho_phep[0]["ma"] if len(cho_phep) == 1 else ""
+
+
 def kiem_tk_chi_phi(db: Session, tk: str) -> str:
     """Câu TỪ CHỐI nếu TK chi phí nhận phân bổ không hợp lệ; chuỗi RỖNG nếu hợp lệ.
 
@@ -365,10 +456,17 @@ def allocation_xlsx(tab: dict) -> bytes:
 def create_asset(db: Session, u: User, data: dict) -> FixedAsset:
     kind = data.get("kind") or "huu_hinh"
     default = ASSET_KINDS.get(kind, ASSET_KINDS["huu_hinh"])
+    # ĐỢT TSCD-1 08/11/2026 — TK NGUYÊN GIÁ QUA BỘ LUẬT CHUNG, KHÔNG LẤY MẶC ĐỊNH CỦA `ASSET_KINDS`.
+    # Mặc định của bảng ấy là `211` — tài khoản CHA (2111 / 2112 / 2113). Chủ tịch chốt 08/11/2026:
+    # bắt buộc chọn ngay, vì hệ thống đang có 0 tài sản nên siết lúc này không làm ai đứng việc và
+    # không có bản ghi cũ nào phải sửa (đúng lập luận Đợt DL-7 16/10/2026).
+    _loi_tk = kiem_tk_nguyen_gia(db, kind, data.get("asset_account") or "")
+    if _loi_tk:
+        raise ValueError(_loi_tk)
     a = FixedAsset(
         code=(data.get("code") or _next_code(db, FixedAsset, "TS")).strip()[:30],
         name=(data.get("name") or "").strip()[:200], kind=kind, group=(data.get("group") or "")[:60],
-        asset_account=data.get("asset_account") or default["tk_nguyen_gia"],
+        asset_account=tk_nguyen_gia_chon(db, kind, data.get("asset_account") or ""),
         depr_account=data.get("depr_account") or default["tk_hao_mon"],
         expense_account=data.get("expense_account") or "6424",
         partner_code=(data.get("partner_code") or "")[:60], project_code=(data.get("project_code") or "")[:40],
