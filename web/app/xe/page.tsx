@@ -4,6 +4,7 @@ import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, pct } from "@/lib/api";
 import { errMsg } from "@/components/ui";
+import ChiPhiKyPanel from "@/components/doixe/ChiPhiKyPanel";
 
 /** Bàn làm việc Giám đốc đội xe — màn `/xe`.
  *
@@ -45,6 +46,17 @@ const ChuaNhap = () => (
     CHƯA NHẬP
   </span>
 );
+
+/** Thanh lối đi của đội xe — lấy ĐÚNG mấy mục «Xe & tài xế» của thanh dọc chung.
+ *
+ *  Không màn nào mới, không đường dẫn nào đổi: chỉ chép lại lối đi, vì màn này ẩn thanh dọc
+ *  nên lối đi phải nằm trên chính màn. Thêm một mục ở đây mà thanh dọc không có là bắt đầu hai
+ *  danh sách — lần sửa sau sẽ lệch. */
+const THANH: [string, string][] = [
+  ["Hồ sơ xe", "/doi-xe"], ["Hồ sơ tài xế", "/tai-xe"], ["Lệnh điều xe", "/lenh-dieu-xe"],
+  ["Bảng giá & lệnh", "/ops?tab=fleet"], ["Hiệu quả khai thác", "/hieu-qua-doi-xe"],
+  ["Lãi lỗ đội xe", "/lai-lo-doi-xe"], ["Việc của tài xế & HDV", "/xe-hdv"],
+];
 
 /** Ngăn kéo: xử lý tại chỗ, đóng lại là bàn tự đọc lại số. */
 const NGAN_KEO: Record<string, { ten: string; toi: string; nhan: string }> = {
@@ -97,6 +109,15 @@ function BanLamViecXe() {
         <button type="button" aria-label="Kỳ sau" onClick={() => setKy(doiKy(ky, 1))}>›</button>
       </div>
     </div>
+
+    {/* LỐI RA phải nằm ngay đây: màn này không có thanh dọc. Phải có cả lối về trang tổng
+        CRM — anh Tuấn 09/11/2026: trang tổng vẫn là trang tổng, /xe là chỗ nhảy ra. */}
+    <nav style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center",
+                  padding: "0 0 14px", borderBottom: "1px solid #e6eaf0", marginBottom: 18 }}>
+      {THANH.map(([l, h]) => <Link key={h} href={h}>{l}</Link>)}
+      <Link href="/phan-he/dhxe" style={{ marginLeft: "auto" }}>Mục lục Điều hành xe →</Link>
+      <Link href="/">Trang tổng CRM →</Link>
+    </nav>
 
     {dang && !d && <p className="muted">Đang đọc số…</p>}
 
@@ -235,13 +256,17 @@ function BanLamViecXe() {
           </div>
           <button type="button" aria-label="Đóng ngăn kéo" onClick={() => setKeo(null)}>✕</button>
         </div>
-        {/* BƯỚC 1/2: ngăn kéo hiện việc và đưa thẳng tới cửa nhập đang chạy. Bước 2 nhúng chính
-            form ấy vào đây để giám đốc không rời trang — làm sau khi bàn này chạy thật vài ngày,
-            để biết ngăn kéo nào thực sự được mở. */}
+        {/* NGĂN KÉO GẮN LẠI CHÍNH KHỐI CỦA MÀN CÓ SẴN, không dựng form thứ hai.
+            `ChiPhiKyPanel` là tab «Chi phí kỳ» của /lai-lo-doi-xe chuyển nguyên văn ra. Ghi hay
+            gỡ xong nó gọi `onDoiSo` để bàn đọc lại số của mình — ghi mà bàn chưa đổi thì giám
+            đốc tưởng ghi trượt rồi ghi lần thứ hai.
+            Ngăn kéo nào CHƯA có khối dùng chung thì vẫn đưa thẳng sang màn đang chạy. */}
         {hd?.viec.filter((v: any) => v.ngan_keo === keo).map((v: any) => (
           <p key={v.ma}><strong>{v.tieu_de}</strong><br /><span className="muted">{v.mo_ta}</span></p>
         ))}
-        <p><Link href={k.toi}>{k.nhan} →</Link></p>
+        {keo === "chi-phi-ky"
+          ? <ChiPhiKyPanel ky={ky} onDoiSo={() => doc(ky)} />
+          : <p><Link href={k.toi}>{k.nhan} →</Link></p>}
         <p className="muted">Đóng ngăn kéo thì bàn tự đọc lại số.</p>
         <button type="button" onClick={() => { setKeo(null); doc(ky); }}>Xong — đọc lại số</button>
       </aside>

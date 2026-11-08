@@ -311,7 +311,12 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "4.9.9", ten: "Lãi lỗ đội xe", href: "/lai-lo-doi-xe", them: true },
           // Cửa BÁO HƯ HỎNG XE (Chủ tịch chọn 06/10/2026, đã chạy thật từ PR #200). Chạy được từ
           // ngày ấy mà KHÔNG có mục nào trong cây, nên không ai tìm ra nó từ mục lục.
-          { ma: "4.9.10", ten: "Báo hư hỏng xe", href: "/doi-xe?tab=bao-hong", them: true }
+          { ma: "4.9.10", ten: "Báo hư hỏng xe", href: "/doi-xe?tab=bao-hong", them: true },
+          // Cửa /xe — BÀN LÀM VIỆC Giám đốc đội xe (anh Tuấn chốt 08/11/2026, chạy thật từ
+          // PR #743). Bấm "Điều hành xe" trên thanh dọc nay nhảy ra chính màn này; mục lục
+          // vẫn còn, và chính màn ấy có lối về đây. Phải có mặt trong cây, nếu không nó là
+          // trang chạy thật mà không ai dò ra lối vào từ mục lục phòng mình.
+          { ma: "4.9.11", ten: "Bàn làm việc Giám đốc đội xe", href: "/xe", them: true }
         ] },
       { ma: "4.10", ten: "Hướng dẫn viên",
         con: [
