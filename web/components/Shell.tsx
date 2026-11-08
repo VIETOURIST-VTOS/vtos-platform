@@ -654,7 +654,13 @@ export const useShell = () => useContext(Ctx);
 // ghim mở) đã bỏ cùng lối ghim mở, khi bấm thanh phân hệ chuyển thành đi tới trang phân hệ (13/9).
 const KHOA_THU = "vtos_menu_thu";
 
-export default function Shell({ children }: { children: React.ReactNode }) {
+// KS-49 (09/11/2026) — `khongThanhBen`: ẩn thanh dọc, giữ nguyên mọi thứ khác của
+// Shell (canh đăng nhập, mật khẩu tạm, toast, Ctx). Dành cho màn hình là MỘT bàn
+// làm việc trọn vẹn của một bộ phận, nơi thanh phân hệ của phòng khác chỉ là nhiễu
+// — màn /xe của Giám đốc đội xe là trường hợp đầu tiên. Mặc định false: mọi màn
+// đang có không đổi gì.
+export default function Shell({ children, khongThanhBen = false }:
+                              { children: React.ReactNode; khongThanhBen?: boolean }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
   const [t, setT] = useState<Toast>(null);
@@ -853,7 +859,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         </span>
       </div>
       <div className="shell">
-        <aside className={"side" + (side ? "" : " hide") + (thu ? " thu" : "")}>
+        {!khongThanhBen && <aside className={"side" + (side ? "" : " hide") + (thu ? " thu" : "")}>
           {/* Nút thu/bung. §I.2: rộng 224–240px, thu còn 56–64px. Ẩn trên màn hình nhỏ vì ở đó thanh
               dọc đã đóng mở bằng nút ☰ – hai cách thu cùng lúc là hai cách mâu thuẫn nhau. */}
           <button type="button" className="thu-nut" onClick={doiThu}
@@ -887,7 +893,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                   </Link>}
             </div>
           ))}
-        </aside>
+        </aside>}
         <main>{children}</main>
       </div>
       {t && <div className={"toast" + (t.err ? " err" : "")} role="status">{t.msg}</div>}

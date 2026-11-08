@@ -41,7 +41,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.fleet import FleetPeriodCost, Maintenance, NHOM_CHI_PHI_KY
+from app.models.fleet import FleetPeriodCost, Maintenance, Trip, NHOM_CHI_PHI_KY
 from app.models.hr import Vehicle
 from app.services import fleet as FL
 from app.services import fleet_ai as AI
@@ -179,8 +179,16 @@ def _thieu_link(ctx) -> list:
     nên nó không được tính vào số «việc của tôi».
     """
     s = ctx["sheet"]
+    vtos_dang_chay = ctx.get("vtos_dang_chay") or 0
+    sheet_dang_di = s.get("dang_di")
     if not s.get("co_link"):
         mo_ta = "Chưa có link bảng xe — ô «đang đi» không có nguồn"
+    elif vtos_dang_chay and not sheet_dang_di:
+        # PHÉP SO, KHÔNG PHẢI CỜ. Bản đầu neo vào `ban_cu`, mà cờ ấy false ngay
+        # cả khi thiếu link tab tháng mới — bộ dò im lặng đúng lúc cần kêu.
+        mo_ta = (f"VTOS biết có {vtos_dang_chay} chuyến đang chạy hôm nay, "
+                 f"nhưng bảng xe báo 0 — bảng mới đọc {s.get('so_chuyen') or 0} "
+                 "chuyến, thiếu link tab tháng này")
     elif s.get("ban_cu"):
         mo_ta = (f"Mới đọc {s.get('so_chuyen') or 0} chuyến từ tab cũ — "
                  "tab tháng này chưa công bố")
@@ -269,8 +277,21 @@ def ban_lam_viec(db: Session, ky: str, quyen: dict | None = None) -> dict:
         log.warning("ban_lam_viec_xe: không đọc được bảng xe: %s", e)
         sheet = {"co_link": False, "loi": str(e)}
 
+    # Chuyến VTOS TỰ BIẾT là đang chạy hôm nay. Đây là vế đối chứng của bảng xe:
+    # hai nguồn nói khác nhau thì nói ra, đừng im lặng lấy nguồn nào cũng được.
+    hom_nay = date.today()
+    try:
+        vtos_dang_chay = sum(
+            1 for t in db.execute(
+                select(Trip).where(Trip.ngay_di <= hom_nay, Trip.ngay_ve >= hom_nay,
+                                   Trip.status.not_in(("nhap", "huy")))).scalars())
+    except Exception as e:  # noqa: BLE001
+        log.warning("ban_lam_viec_xe: không đếm được chuyến đang chạy: %s", e)
+        vtos_dang_chay = 0
+
     ctx = {"ky": ky, "hieu_qua": hq, "cpk_rows": cpk_rows,
-           "nhom_thieu": nhom_thieu, "sheet": sheet, "xe_dem": _dem_xe(db)}
+           "nhom_thieu": nhom_thieu, "sheet": sheet, "xe_dem": _dem_xe(db),
+           "vtos_dang_chay": vtos_dang_chay}
 
     # ④ Kỳ nào chưa có số thì để None, KHÔNG thay bằng 0.
     diem = []
@@ -309,9 +330,14 @@ def ban_lam_viec(db: Session, ky: str, quyen: dict | None = None) -> dict:
             "o_bai": sheet.get("o_bai"), "khong_khop": sheet.get("khong_khop"),
             "so_chuyen_doc_duoc": sheet.get("so_chuyen"),
             "danh_sach": sheet.get("danh_sach") or [],
+            "vtos_dang_chay": vtos_dang_chay,
             "canh_bao": (sheet.get("loi") or
-                         ("Mới đọc được tab cũ — thiếu link CSV tab tháng này, nên "
-                          "«đang đi» chưa phải số thật." if sheet.get("ban_cu") else None)),
+                         (f"VTOS biết có {vtos_dang_chay} chuyến đang chạy hôm nay mà "
+                          "bảng xe báo 0 — thiếu link CSV tab tháng này, nên «đang đi» "
+                          "CHƯA phải số thật."
+                          if (vtos_dang_chay and not sheet.get("dang_di")) else
+                          ("Mới đọc được tab cũ — thiếu link CSV tab tháng này, nên "
+                           "«đang đi» chưa phải số thật." if sheet.get("ban_cu") else None))),
             "nguon": "xe_theo_sheet.bao_cao",
         },
         "dien_bien": {"diem": diem, "du_ve": du_ve,
