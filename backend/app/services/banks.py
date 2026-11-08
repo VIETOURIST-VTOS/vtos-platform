@@ -180,15 +180,19 @@ def _match(banks: list[BankAccount], entry_code: str, description: str, parent: 
        nên dựa vào nếu đã có file Sổ tiền gửi.
     """
     by_code = {b.code: b for b in banks}
-    doc = _doc_of(entry_code)
-    if exact and side:
-        bc = exact.get((doc, round(amount, 0), side))
-        if bc and bc in by_code:
-            return by_code[bc], "khớp Sổ tiền gửi MISA (chứng từ + số tiền + thu/chi)"
-    if single:
-        bc = single.get(doc)
-        if bc and bc in by_code:
-            return by_code[bc], "khớp Sổ tiền gửi MISA (số chứng từ chỉ thuộc 1 ngân hàng)"
+    # ĐỢT NH-1 09/11/2026 — thử LẦN LƯỢT từng dạng số chứng từ, dạng đầy đủ trước. Xem `_doc_thu`:
+    # mã VTOS đôi khi mang thêm hậu tố ngày mà sổ MISA không có, nhưng cắt hậu tố là một phép
+    # NỚI LỎNG nên nó chỉ được chạy sau khi dạng đầy đủ đã hụt cả hai lớp.
+    for doc, rut_gon in _doc_thu(entry_code):
+        them = " (mã rút gọn)" if rut_gon else ""
+        if exact and side:
+            bc = exact.get((doc, round(amount, 0), side))
+            if bc and bc in by_code:
+                return by_code[bc], "khớp Sổ tiền gửi MISA (chứng từ + số tiền + thu/chi)" + them
+        if single:
+            bc = single.get(doc)
+            if bc and bc in by_code:
+                return by_code[bc], "khớp Sổ tiền gửi MISA (số chứng từ chỉ thuộc 1 ngân hàng)" + them
     code_u = re.sub(r"^MISA-", "", (entry_code or "").upper())
     for b in banks:
         if b.parent_account != parent:
@@ -384,18 +388,61 @@ def _sheet_rows(data: bytes):
         yield tuple(row)
 
 
+def _chuan_o(x) -> str:
+    """Chuẩn hóa một ô tiêu đề để so tên cột: bỏ khoảng trắng thừa, hạ chữ thường."""
+    return re.sub(r"\s+", " ", str(x if x is not None else "")).strip().lower()
+
+
+TEN_COT = {"doc": "số chứng từ", "thu": "thu", "chi": "chi"}
+
+
+def tim_cot(rows) -> dict[str, int]:
+    """Vị trí ba cột cần đọc, tìm BẰNG TÊN CỘT chứ không bằng số thứ tự cột.
+
+    ĐỢT NH-1 09/11/2026 — VÌ SAO KHÔNG ĐẾM CỘT NỮA. Cùng một báo cáo «Sổ tiền gửi ngân hàng»,
+    MISA in ra hai bố cục khác nhau:
+
+      · bản gọn  –  8 cột:  Thu ở cột F (số 5), Chi ở cột G (số 6)
+      · bản đầy đủ – 13 cột: có tiêu đề chi nhánh và «Mẫu số: S08-DN», ô gộp;
+                             Thu ở cột I (số 8), Chi ở cột K (số 10)
+
+    Bản cũ gõ cứng `row[5]` / `row[6]`. Với bố cục 13 cột, số 6 rơi đúng vào cột TK ĐỐI ỨNG, nên
+    MỌI số tiền nạp vào bản đồ đều là MÃ TÀI KHOẢN chứ không phải tiền — đo trên sổ thật
+    08/11/2026: chứng từ `FT26167686276948` được ghi là («chi», 3388.0), `FT26105764354821` là
+    («chi», 1121.0). Sổ không sai vì lớp khớp theo số tiền im lặng không khớp được gì, và lớp
+    «chứng từ chỉ thuộc 1 ngân hàng» gánh thay — nhưng 434 chứng từ chuyển tiền nội bộ có mặt ở
+    hai ngân hàng thì VĨNH VIỄN không phân giải được, vì chỉ lớp có số tiền mới tách được chúng.
+
+    Hỏng kiểu này không bao giờ báo lỗi; nó chỉ lặng lẽ ghi sai số. Nên từ đợt này, cột được hỏi
+    theo TÊN, và không thấy đủ ba tên thì DỪNG LẠI với một câu nói rõ thiếu gì.
+    """
+    for row in rows[:80]:
+        o = [_chuan_o(c) for c in row]
+        if all(t in o for t in TEN_COT.values()):
+            return {k: o.index(t) for k, t in TEN_COT.items()}
+    raise ValueError(
+        'Không đọc được file: thiếu hàng tiêu đề có đủ ba cột "Số chứng từ", "Thu", "Chi", hoặc '
+        'thiếu dòng "Tài khoản ngân hàng:" mở đầu mỗi đoạn. Đây có phải báo cáo Sổ tiền gửi ngân '
+        "hàng xuất từ MISA không? Cần bản in THEO TỪNG TÀI KHOẢN NGÂN HÀNG.")
+
+
 def parse_bank_book(data: bytes) -> dict:
     """Đọc file "Sổ tiền gửi ngân hàng" xuất từ MISA.
 
     Nhận cả .xlsx lẫn .csv.
     Bố cục: các dòng phát sinh được chia thành từng đoạn, mở đầu mỗi đoạn là ô "Tài khoản ngân hàng:
-    <số tài khoản> - <tên ngân hàng>". Các cột: Ngày hạch toán, Ngày chứng từ, Số chứng từ, Diễn giải,
-    TK đối ứng, Thu, Chi, Tồn. Dòng không có số chứng từ là dòng số dư đầu kỳ / cộng phát sinh – bỏ qua.
+    <số tài khoản> - <tên ngân hàng>". Ba cột đem dùng – Số chứng từ, Thu, Chi – được tìm theo TÊN
+    (xem `tim_cot`), vì MISA in cùng báo cáo này ra nhiều bố cục cột khác nhau. Dòng không có số
+    chứng từ là dòng số dư đầu kỳ / cộng phát sinh – bỏ qua.
     """
     accounts: dict[str, str] = {}
     entries: list[dict] = []
     cur = ""
-    for row in _sheet_rows(data):
+    rows = list(_sheet_rows(data))
+    cot = tim_cot(rows)
+    i_doc, i_thu, i_chi = cot["doc"], cot["thu"], cot["chi"]
+    rong = max(i_doc, i_thu, i_chi)
+    for row in rows:
         if not row:
             continue
         a0 = str(row[0] or "").strip()
@@ -406,9 +453,9 @@ def parse_bank_book(data: bytes) -> dict:
             if cur:
                 accounts.setdefault(cur, name.strip()[:120] or "Ngân hàng")
             continue
-        if not cur or len(row) < 7 or not row[2]:
+        if not cur or len(row) <= rong or not row[i_doc]:
             continue
-        doc = str(row[2]).strip()
+        doc = str(row[i_doc]).strip()
         if not doc or doc.lower().startswith(("số dư", "cộng", "tổng")):
             continue
 
@@ -417,7 +464,7 @@ def parse_bank_book(data: bytes) -> dict:
                 return round(float(x or 0), 0)
             except (TypeError, ValueError):
                 return 0.0
-        thu, chi = num(row[5]), num(row[6])
+        thu, chi = num(row[i_thu]), num(row[i_chi])
         if thu > 0:
             entries.append({"bank_code": cur, "doc_no": doc[:60], "amount": thu, "side": "thu"})
         if chi > 0:
@@ -483,6 +530,35 @@ def import_bank_book(db: Session, u: User, data: bytes, filename: str = "") -> d
 def _doc_of(entry_code: str) -> str:
     """Số chứng từ MISA nằm trong mã chứng từ VTOS dưới dạng "MISA-<số chứng từ>"."""
     return re.sub(r"^MISA-", "", (entry_code or "").strip())
+
+
+HAU_TO_NGAY = re.compile(r"-\d{4}$")
+
+# Chỉ cắt hậu tố khi PHẦN GỐC còn lại dài hơn mức này. Đo trên sổ thật 08/11/2026 (29.549 chứng
+# từ của hai năm): 7.860 chứng từ mang hậu tố `-NNNN` THẬT, và phần gốc của CHÚNG dài 2–6 ký tự
+# (`PT08`, `PC07`, `TPB1`, `UNC`…) — không một cái nào dài tới 10. Còn mã giao dịch liên ngân hàng
+# bị VTOS gắn thêm hậu tố thì gốc dài 16 (`FT26167686276948`). Ngưỡng 10 nằm gọn giữa hai nhóm,
+# cách nhóm phải 4 ký tự, nên phép nới lỏng này KHÔNG chạm được vào 7.860 chứng từ kia.
+GOC_TOI_THIEU = 10
+
+
+def _doc_thu(entry_code: str) -> list[tuple[str, bool]]:
+    """Các dạng số chứng từ đem đi dò bản đồ, chặt trước – lỏng sau.
+
+    ĐỢT NH-1 09/11/2026. Đo trên sổ thật: dòng `MISA-FT26167686276948-0617` không khớp được
+    dòng nào, vì trong Sổ tiền gửi MISA chứng từ ấy tên là `FT26167686276948` — hậu tố `-0617`
+    do VTOS gắn thêm. Nhưng KHÔNG ĐƯỢC cắt bừa: trong chính file ấy có 7.860 chứng từ mang hậu
+    tố `-NNNN` THẬT (`PT08-1063`, `PC07-1705`, `PT07-0115`…), cắt đi là biến chúng thành một mã
+    khác và khớp nhầm sang ngân hàng khác. Nên dạng ĐẦY ĐỦ luôn được thử trước; bản cắt hậu tố
+    chỉ chạy khi dạng đầy đủ đã hụt, và khi khớp thì lý do ghi rõ «mã rút gọn» để người đọc sổ
+    biết dòng này khớp bằng một phép nới lỏng.
+    """
+    d = _doc_of(entry_code)
+    ra = [(d, False)]
+    cat = HAU_TO_NGAY.sub("", d)
+    if cat != d and len(cat) >= GOC_TOI_THIEU:
+        ra.append((cat, True))
+    return ra
 
 
 def load_doc_map(db: Session) -> tuple[dict, dict]:
