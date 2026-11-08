@@ -47,7 +47,7 @@ export default function KhungRieng({ dang, toi, xong, children }: { dang: TrangR
     </div>
     {hoi && <div className="kr-modal" role="dialog" aria-modal="true" aria-labelledby="kr-hoi-t" onClick={(e) => { if (e.target === e.currentTarget) setHoi(false); }}>
       <div className="kr-box"><b id="kr-hoi-t">Đăng nhập để tiếp tục</b>
-        <p>Đặt dịch vụ và gửi yêu cầu cần tài khoản Vietourist để giữ đơn, thanh toán và tích điểm. Đăng nhập bằng mã gửi qua Zalo hoặc email, không cần mật khẩu. Xong sẽ quay lại đúng trang này.</p>
+        <p>Đặt dịch vụ và gửi yêu cầu cần tài khoản Vietourist để giữ đơn, thanh toán và tích điểm. Đăng nhập bằng số điện thoại hoặc email và mật khẩu; lần đầu trên máy mới, Vietourist gửi thêm mã xác minh qua Zalo hoặc email. Chưa có tài khoản thì tạo ngay ở bước đăng nhập. Những gì bạn đang chọn được giữ nguyên, xong sẽ quay lại đúng bước này.</p>
         <div className="kr-act"><button type="button" className="kr-btn ghost" onClick={() => setHoi(false)}>Xem tiếp</button>
           <a className="kr-btn" href={duongDangNhap()}>Đăng nhập</a></div></div></div>}
   </>;

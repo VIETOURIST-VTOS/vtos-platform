@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { login, getUser, clearSession } from "@/lib/api";
 import { THANH_TREN, TRANG_MO_DAU, KHUNG_HO_TRO, CAU_CHUYEN } from "@/components/cong/manh";
 import { ThuVien } from "@/components/cong/co-dong/CoDong";
-import { goiCong as goi, luuPhienCong, laTenMienCong, VTOS_GOC, dauMay, luuDauMay, xoaDauMay } from "@/lib/cong";
+import { goiCong as goi, luuPhienCong, laTenMienCong, VTOS_GOC, dauMay, luuDauMay, xoaDauMay, danhDauVuaDangNhap } from "@/lib/cong";
 
 /* CG-1 · CỔNG KẾT NỐI VTD thay màn đăng nhập VTOS — Chủ tịch duyệt bản xem thử 26/10/2026, dựng từ đúng
    bộ giao diện v3.2 (logo, biểu tượng, địa cầu có máy bay bay quanh). Bốn ô:
@@ -96,7 +96,7 @@ function Ngoai({ man }: { man: Exclude<Man, "cong" | "noi"> }) {
   useEffect(() => { if (!gui) return; const t = setInterval(() => setCon((c) => Math.max(0, c - 1)), 1000); return () => clearInterval(t); }, [gui]);
   const k = kenh || {};
   const sang = (b: Buoc) => { setBuoc(b); setErr(""); setTin(""); setMa(""); window.scrollTo(0, 0); };
-  const xong = (r: any) => { luuPhienCong(r.phien); location.replace(veSauDangNhap()); };
+  const xong = (r: any) => { luuPhienCong(r.phien); danhDauVuaDangNhap(); location.replace(veSauDangNhap()); };   // P0-06
   const chay = async (f: () => Promise<void>) => {
     setBusy(true); setErr("");
     try { await f(); } catch (x: any) { setErr(x.message); } finally { setBusy(false); }

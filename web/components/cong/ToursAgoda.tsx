@@ -10,7 +10,7 @@
    (Sales gọi lại, không giữ chỗ, không thu tiền) — máy chủ cũng chặn đặt online bằng 409. */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import QRCode from "qrcode";
-import { diCongThe, duongRieng, emailThat, goiCong, phienCong } from "@/lib/cong";
+import { diCongThe, duongRieng, emailThat, goiCong, layLuaChon, nhoLuaChon, phienCong } from "@/lib/cong";
 import { CSS_KSV } from "./KhachSanVtd";
 import QrThanhToan from "./khach/QrThanhToan";
 import TuThietKeTour from "./TuThietKeTour";   // TK-1: khách tự thiết kế tour đoàn
@@ -166,7 +166,22 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
       setChon(dau ? dau.tour_id : null);
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
   };
-  useEffect(() => { if (!moDon) { tim(); if (moId) moSp(moId); } }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (moDon) return;
+    // P0-06: vừa đăng nhập giữa chừng → trả lại tìm kiếm, tour đang xem, ngày khởi hành, số khách; màn tự thiết kế tự đọc bản của nó.
+    const nho = layLuaChon<{ q: Q; spId: number | null; chon: number | null; buoc: string; yc: any }>("tours");
+    if (nho?.q) {
+      setQ(nho.q); tim(nho.q); if (nho.yc) setYc({ ...nho.yc, dong_y: false });
+      if (nho.buoc === "doan" && !nho.spId) { setBuoc("doan"); return; }
+      if (nho.spId) moSp(nho.spId).then(() => { if (nho.chon) setChon(nho.chon); if (nho.buoc === "doan") setBuoc("doan"); });
+      return;
+    }
+    tim(); if (moId) moSp(moId);
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (buoc === "don" || buoc === "da_gui") return;
+    nhoLuaChon("tours", { q, spId: buoc === "sp" || buoc === "dat" || buoc === "doan" ? sp?.id ?? null : null, chon, buoc, yc });
+  }, [q, sp, chon, buoc, yc]);   // P0-06
   useEffect(() => {      // đổi ngày → lịch trình của đúng chuyến (chuyến có chương trình riêng thì hiện chương trình ấy)
     if (!sp || !chon) return;
     goiCong(`/mo/tour-online/san-pham/${sp.id}/lich-trinh/${chon}`).then(setLt).catch(() => { /* giữ lịch trình đang hiện */ });
