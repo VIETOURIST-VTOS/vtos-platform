@@ -46,7 +46,7 @@ from app.models.hr import Vehicle
 from app.services import fleet as FL
 from app.services import fleet_ai as AI
 from app.services import fleet_settlement as QT
-from app.services import hieu_qua_xe as HQ
+from app.services import xe_hom_nay as XHN
 from app.services import xe_theo_sheet as XS
 
 log = logging.getLogger(__name__)
@@ -259,6 +259,15 @@ def _dem_xe(db: Session) -> dict:
             "chua_co_bao_duong": sum(1 for v in xes if v.id not in co_bd)}
 
 
+def _xe_lenh(db: Session) -> dict | None:
+    """Bộ đếm lệnh điều xe hôm nay. Hỏng thì trả None — mất một ô, không mất cả bàn."""
+    try:
+        return XHN.dem(db, date.today())
+    except Exception:  # noqa: BLE001
+        log.warning("ban_lam_viec: khong dem duoc lenh dieu xe hom nay", exc_info=True)
+        return None
+
+
 def ban_lam_viec(db: Session, ky: str, quyen: dict | None = None) -> dict:
     """Một cửa cho cả màn `/xe`."""
     QT.ky_range(ky)  # ném nếu kỳ sai dạng — router đổi thành 422
@@ -341,24 +350,6 @@ def ban_lam_viec(db: Session, ky: str, quyen: dict | None = None) -> dict:
     du_ve = sum(1 for d in diem if d["co_so"]) >= 2
     so_ky_chua_du = sum(1 for d in diem if d["co_so"] and not d["du_chi_phi_ky"])
 
-    # CÔNG SUẤT — lấy từ `hieu_qua_xe.chi_so`, không tính lại. Phần trăm nên nó KHÔNG
-    # vào biểu đồ tiền (v3.3 §8: "công suất phần trăm tách chỉ số riêng, không đặt chung
-    # một trục tiền"); màn hình in nó thành một dòng riêng ở khối số.
-    cs = None
-    try:
-        h = HQ.chi_so(db, ky)
-        thieu = h.get("cong_suat_thieu") or {}
-        cs = {"ty_le": h.get("cong_suat_khai_thac"),
-              "den_ngay": h.get("cong_suat_den_ngay"),
-              "tieu_hao": h.get("tieu_hao_l100"),
-              # Thiếu thì NÓI ĐANG CHỜ AI, không in một dấu gạch ngang câm: ô công suất
-              # từng hiện đúng MỘT dấu gạch mà không một chữ nào nói vì sao (HQ-1b).
-              "vi_sao_thieu": (f"còn {len(thieu.get('thieu') or [])} xe chưa khai ngày khai thác "
-                               f"— cửa nhập ở {thieu.get('cua_nhap')}" if thieu else None),
-              "nguon": "hieu_qua_xe.chi_so — cùng hàm với màn Hiệu quả khai thác"}
-    except Exception:  # noqa: BLE001 — hỏng một dòng, không được hỏng cả bàn
-        log.warning("ban_lam_viec: khong doc duoc cong suat ky %s", ky, exc_info=True)
-
     return {
         "ky": ky,
         "hang_doi": dung_hang_doi(ctx, quyen),
@@ -374,9 +365,13 @@ def ban_lam_viec(db: Session, ky: str, quyen: dict | None = None) -> dict:
             "tong_xe": ctx["xe_dem"]["tong"],
             # «chưa nhập» nêu TÊN nhóm, không hiện 0.
             "chua_nhap": [{"ma": m, "ten": NHOM_CHI_PHI_KY[m][0]} for m in nhom_thieu],
-            "cong_suat": cs,
             "nguon": "fleet_ai.hieu_qua_ky — cùng hàm với màn Hiệu quả và màn Lãi lỗ",
         },
+        # Bộ đếm LỆNH điều xe hôm nay, đúng khuôn `XeHomNay` của KhoiV14. Khác `xe_hom_nay`
+        # ở trên: khối kia đọc BẢNG XE theo sheet quyết toán, khối này đọc BẢNG LỆNH. Hai
+        # nguồn khác nhau cho cùng một câu hỏi, nên giao diện phải có cả hai mới nói được
+        # chúng có khớp nhau không.
+        "xe_lenh": _xe_lenh(db),
         "xe_hom_nay": {
             "doc_luc": sheet.get("doc_luc"), "dang_di": sheet.get("dang_di"),
             "o_bai": sheet.get("o_bai"), "khong_khop": sheet.get("khong_khop"),
