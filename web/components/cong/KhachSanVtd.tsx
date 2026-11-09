@@ -655,13 +655,13 @@ export default function KhachSanVtd({ lienHe = "", ten = "", rieng = false, moId
         {locP.length > 0 && anGoi > 0 && <div className="ksv-panel ksv-an">{phongHien.length ? `${anGoi} gói khác bị ẩn vì không thỏa đồng thời các điều kiện.` : "Không có gói nào thỏa đồng thời các điều kiện đã chọn."}
           <span style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>{locP.map((m) => <button key={m} type="button" className="ksv-link" onClick={() => setLocP(locP.filter((x) => x !== m))}>Bỏ «{dkLoc(m)[0]}»</button>)}</span></div>}
         <div className={q.phong > 1 ? "ksv13-pg" : ""}><div className="ksv13-main">
-        {phongHien.map((p: any, iP: number) => { const aP = anh.filter((a) => a.loai_phong_id === p.id); const rieng = p.anh?.[0] || aP[0];
+        {phongHien.map((p: any, iP: number) => { const aP = anh.filter((a) => a.loai_phong_id === p.id); const rieng = p.anh_dai_dien ? null : (p.anh?.[0] || aP[0]);   // P1-02: ảnh đại diện thay chỗ thì hiện nhãn
           const anhP = rieng || anhTamPhong(anh, iP), tam = !rieng && !!anhP;
           return <div key={p.id} className="ksv-room">
           <div className="ksv-rl">
             <button type="button" className="ksv-rph" onClick={() => setAlbum(aP.length ? { lp: p.id } : { nhom: anh.some((a) => a.nhom === "phong") ? "phong" : "" })} aria-label={`Xem ảnh ${p.ten}`}>
               {anhP ? <img src={anhP.nho} alt={tam ? `${ks.ten} — ảnh khách sạn` : (anhP.mo_ta_thay_the || p.ten)} loading="lazy" /> : <AnhTrong k={ks} cao={150} />}
-              {tam && <span className="ksv-ct ksv-tam">Ảnh khách sạn</span>}
+              {tam && <span className="ksv-ct ksv-tam">Ảnh khách sạn · chưa có ảnh riêng của phòng</span>}
               {(p.con ?? 9) > 0 && (p.con ?? 9) <= 3 && p.goi.length > 0 && <span className="ksv-b aw" style={{ background: "#fff", color: "var(--ksv-price)" }}>Còn {p.con} phòng!</span>}
               {aP.length > 0 && <span className="ksv-ct">1/{aP.length}</span>}</button>
             {p.video?.[0] && <div style={{ aspectRatio: "16 / 9", maxWidth: "100%" }}><VideoO v={p.video[0]} ten={p.ten} nhan="VIDEO PHÒNG" /></div>}

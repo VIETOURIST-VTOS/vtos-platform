@@ -98,7 +98,11 @@ function Trang() {
           <td style={{ width: 72 }}>{h.bia ? <AnhNoiBo src={h.bia} alt={h.ten} style={{ width: 64, height: 48, borderRadius: 6 }} /> : <span className="muted">—</span>}</td>
           <td><b>{h.ten}</b><div className="muted">{h.ma} · {"★".repeat(h.sao) || "chưa xếp sao"}</div></td>
           <td>{h.tinh_thanh}<div className="muted">{h.khu_vuc}</div></td>
-          <td>{h.anh_duyet} duyệt{h.anh_cho ? <> · <Tag cls="warn">{h.anh_cho} chờ</Tag></> : null}<div className="muted">{h.so_anh} ảnh{h.thieu_anh ? ` · thiếu ${h.thieu_anh}` : ""}</div></td>
+          <td>{h.anh_duyet} duyệt{h.anh_cho ? <> · <Tag cls="warn">{h.anh_cho} chờ</Tag></> : null}<div className="muted">{h.so_anh} ảnh{h.thieu_anh ? ` · thiếu ${h.thieu_anh}` : ""}</div>
+            {/* P1-02: phòng chưa có ảnh riêng (cổng đang lấy ảnh khách sạn thay, có nhãn) và ảnh chưa phân nhóm */}
+            {h.lp_chua_anh > 0 && <div><Tag cls="warn">{h.lp_chua_anh}/{h.lp_ban} loại phòng chưa có ảnh</Tag></div>}
+            {h.anh_khac > 0 && <div><Tag cls="warn">{h.anh_khac} ảnh nhóm «Khác»</Tag></div>}
+            {!h.lp_chua_anh && h.lp_ban > 0 && <div><Tag cls="ok">Ảnh phòng đủ</Tag></div>}</td>
           <td>{h.so_loai_phong}</td>
           <td>{h.goi_duyet} duyệt{h.goi_cho ? <> · <Tag cls="warn">{h.goi_cho} chờ</Tag></> : null}</td>
           <td>{h.ngung ? <Tag cls="bad">Ngừng hợp tác</Tag> : h.hien_cong ? <Tag cls="ok">Đang hiện</Tag> : <Tag cls="warn">Chưa hiện</Tag>}</td>

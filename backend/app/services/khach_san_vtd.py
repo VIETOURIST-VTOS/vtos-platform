@@ -1098,6 +1098,11 @@ def ds_vtos(db: Session, u: User, hom_nay: date | None = None) -> dict:
                      "anh_cho": sum(x.trang_thai == "cho_duyet" for x in a), "so_loai_phong": len(lp.get(k.id, [])),
                      "goi_duyet": sum(g.trang_thai == "da_duyet" for g in gs), "goi_cho": sum(g.trang_thai == "cho_duyet" for g in gs),
                      "bia": _anh_out(bia)["nho"] if bia else None, "thieu_anh": max(0, ANH_CHUAN - len(a)),
+                     # P1-02: loại phòng đang bán chưa có ảnh riêng đã duyệt; ảnh đã duyệt còn ở nhóm «Khác»
+                     "lp_ban": sum(1 for x in lp.get(k.id, []) if x.dang_ban),
+                     "lp_chua_anh": sum(1 for x in lp.get(k.id, []) if x.dang_ban and not any(
+                         y.loai_phong_id == x.id and y.trang_thai == "da_duyet" for y in a)),
+                     "anh_khac": sum(1 for y in a if y.trang_thai == "da_duyet" and (y.nhom or "khac") == "khac"),
                      "ban_cong": ban_cong(k, lp.get(k.id, []), goi, mua, hom_nay)})
     return {"khach_san": dong, "thanh_pho": [{"ten": t, "mien": MIEN[m]} for t, (m, _k) in THANH_PHO.items()],
             "loai": LOAI_CHO_O, "tien_ich": TIEN_ICH, "nhom_anh": NHOM_ANH_KS,
