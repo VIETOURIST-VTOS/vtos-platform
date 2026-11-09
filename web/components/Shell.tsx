@@ -805,7 +805,9 @@ export default function Shell({ children, khongThanhBen = false }:
         {/* Dấu hiệu nhận biết: logo Vietourist Holdings v2, nền TRONG SUỐT (không đặt ảnh nền trắng lên
             thanh navy). alt RỖNG vì liên kết đã mang aria-label – đọc tên hai lần là thừa.
             width/height khai đúng tỉ lệ tệp (1107×269) để trang không giật khi ảnh tải xong. */}
-        <Link href="/" className="brand" aria-label="Vietourist Holdings – Hệ thống điều hành, về bảng điều hành">
+        {/* Màn ẩn thanh dọc (/xe) thì «về tổng quan» là về chính màn ấy, không phải trang chủ:
+            thanh của nó chỉ có năm mục nghiệp vụ, và lối về nằm ở đây (bản vẽ v3.3). */}
+        <Link href={khongThanhBen ? "/xe" : "/"} className="brand" aria-label="Vietourist Holdings – Hệ thống điều hành, về bảng điều hành">
           {/* LOGO v2 (anh Tuấn duyệt 07/11/2026, bản xem thử «Logo v2 trên VTOS và VTD»): chỉ dùng
               logo Vietourist Holdings, bỏ dấu VTOS. Bản nền tối của bộ v2 (#5A9BD4 · #FF6F96 ·
               #5FAE66 + chữ trắng), đã bỏ ô nền #0B2545 để nằm thẳng trên thanh navy #14538D.
