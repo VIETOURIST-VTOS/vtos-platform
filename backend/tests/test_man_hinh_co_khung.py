@@ -9,6 +9,7 @@ biết là do quyền hay do lỗi.
 Phép thử này đọc thẳng mã nguồn giao diện. Nó không cần trình duyệt, chạy trong một giây, và
 canh đúng cái chỗ đã hỏng sáu lần liên tiếp.
 """
+import re
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parents[2] / "web" / "app"
@@ -36,7 +37,9 @@ def test_moi_man_hinh_deu_nam_trong_shell():
         if ten in NGOAI_LE:
             continue
         src = p.read_text(encoding="utf-8")
-        if "<Shell>" not in src:
+        # `<Shell khongThanhBen>` (màn /xe, /marketing ẩn thanh dọc) vẫn là bọc Shell — trước 10/11/2026
+        # phép thử chỉ nhận đúng chữ `<Shell>` nên báo nhầm hai màn ấy đứng ngoài khung.
+        if not re.search(r"<Shell[\s>]", src):
             thieu.append(ten)
     assert not thieu, (
         "Màn hình chạy ngoài khung Shell (mất thanh điều hướng, useShell() trả user rỗng nên nút "

@@ -532,6 +532,9 @@ MISA_PURCHASE_COLS = ["Phương thức thanh toán", "Nhận kèm hóa đơn", "
 # Cuối kỳ 627 kết chuyển về 154 – bước 0 trong `services/ket_so.py`, trước ba bước đóng về 911.
 CATEGORY_ACCOUNT = {"chi_tour": "1541", "marketing": "6417", "hanh_chinh": "6428", "hoan_tien": "131",
                     "tam_ung": "141", "tam_ung_tai_xe": "141", "sua_chua_xe": "627",
+                    # Đội xe v3.3 (Chủ tịch 10/11/2026): theo NHÓM KHOẢN, khóa trên phiếu (`doi_xe.tk`) —
+                    # 627 chi phí, 141 tạm ứng / nạp quỹ, 331 quyết toán chủ xe. Ô này là mặc định khi phiếu thiếu.
+                    "chi_doi_xe": "627",
                     # Hoa hồng D06 trả đại lý / CTV bán hàng – Chủ tịch chốt 26/10/2026: 6417 dịch vụ mua ngoài.
                     "hoa_hong": "6417",
                     # KS-16d (Chủ tịch 31/10/2026): trả khách sạn / nhà hàng phần tiền Vietourist thu hộ.
@@ -558,7 +561,7 @@ def export_purchases(db: Session, date_from: date, date_to: date) -> bytes:
                     "Ngày hạch toán (*)": f"{d:%d/%m/%Y}", "Ngày chứng từ (*)": f"{d:%d/%m/%Y}", "Số chứng từ (*)": r.code,
                     "Nhà cung cấp": r.supplier_tax_code or "NCCLE", "Tên nhà cung cấp": r.supplier_name, "Diễn giải/Lý do chi/Nội dung thanh toán": r.description,
                     "Loại tiền": "VND", "Mã dịch vụ (*)": "Landtour" if r.category == "chi_tour" else "CPQL", "Tên dịch vụ": r.description[:100],
-                    "TK kho/TK chi phí (*)": CATEGORY_ACCOUNT[r.category], "TK công nợ/TK tiền (*)": "331" if r.status == "cho_chi" else ("1111" if r.paid_method == "tien_mat" else "1121"),
+                    "TK kho/TK chi phí (*)": ((r.doi_xe or {}).get("tk") or CATEGORY_ACCOUNT[r.category]) if r.category == "chi_doi_xe" else CATEGORY_ACCOUNT[r.category], "TK công nợ/TK tiền (*)": "331" if r.status == "cho_chi" else ("1111" if r.paid_method == "tien_mat" else "1121"),
                     "Mã đối tượng": r.supplier_tax_code or "NCCLE", "Số lượng": 1, "Đơn giá": r.amount, "Thành tiền": r.amount, "Thành tiền quy đổi": r.amount,
                     "Mã công trình": t.code if t else "", "Số hóa đơn": r.document_ref if r.has_invoice else None,
                     "Mã NCC": r.supplier_tax_code or "NCCLE", "Tên NCC": r.supplier_name, "Mã số thuế NCC": r.supplier_tax_code})

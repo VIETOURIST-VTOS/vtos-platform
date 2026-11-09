@@ -186,8 +186,15 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
     # gọi tên từng chuyến bên dưới — "chưa nhập" không phải "bằng 0", mà cũng không phải "cộng
     # vào như thể đã xong".
     chua_qt, dt_chua_qt, ds_chua_qt = 0, 0.0, []
+    # Đội xe v3.3 (Chủ tịch chốt 10/11/2026): CÔNG SUẤT đếm ngày xe của MỌI chuyến đã ghi nhận, kể cả chưa
+    # quyết toán — xe đã chạy là đã khai thác, dù tiền chưa chốt (tài liệu v3.3 mục 8). Tiền thì vẫn chỉ
+    # chuyến đã quyết toán (KS-65); hai luật khác nhau vì hai câu hỏi khác nhau.
+    ngay_ghi_nhan: dict[int, set] = {}
     for c in theo_chuyen(db, ky):
         t = db.get(Trip, c["trip_id"])
+        if t.vehicle_id and t.ngay_di and t.ngay_ve:
+            ngay_ghi_nhan.setdefault(t.vehicle_id, set()).update(
+                t.ngay_di + timedelta(days=i) for i in range((t.ngay_ve - t.ngay_di).days + 1))
         if not t.quyet_toan:
             chua_qt += 1
             dt_chua_qt += (c["doanh_thu"] or 0)
@@ -298,6 +305,7 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
             "doanh_thu_chua_quyet_toan": round(dt_chua_qt),
             "so_xe_khai_thac": len([x for x in ds if x["ngay_khai_thac"]]),
             "ngay_khai_thac": tong_ngay,
+            "ngay_khai_thac_ghi_nhan": sum(len(v) for v in ngay_ghi_nhan.values()),   # v3.3: mẫu công suất
             # Công suất tính trên số xe CÓ trong đội, không phải số xe có chạy: mẫu số bằng số xe chạy
             # thì một chiếc nằm bãi cả tháng biến mất khỏi phép tính, và công suất luôn đẹp.
             # HQ-1 (13/10/2026) — Ý ĐỊNH TRÊN ĐÚNG, PHÉP TÍNH CŨ SAI. Bản cũ lấy mẫu là

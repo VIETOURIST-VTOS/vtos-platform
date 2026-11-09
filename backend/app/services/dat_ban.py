@@ -751,7 +751,7 @@ def ra_ncc(db: Session, d: DonDatBan, now: datetime | None = None) -> dict:
     return {"ma_don": d.ma, "tt_don": d.trang_thai, "tt_don_ten": TRANG_THAI[d.trang_thai], "la_doan": d.la_doan,
             "cach_tt_ten": f"{CACH_TT[d.cach_tt]} {d.ty_le_coc}%" if d.cach_tt == "coc" else CACH_TT[d.cach_tt],
             "phai_tra_truoc": int(d.phai_tra_truoc) + vc_con_giu(db, d), "da_tra_vtd": tra + vc_con_giu(db, d),
-            "phu_thu": d.phu_thu or [], "tuoi_tre": d.tuoi_tre or [],                                  # P1-03
+            "phu_thu": d.phu_thu or [], "tuoi_tre": d.tuoi_tre or [],                                  # gói P1.03
             "han_phan_hoi": d.han_phan_hoi.isoformat(timespec="minutes") if d.han_phan_hoi else None,
             "thu_tai_ban_du_kien": max(0, int(d.tam_tinh) - tra - vc_con_giu(db, d)),
             "bill_thuc_te": d.bill_thuc_te, "thu_tai_ban": d.thu_tai_ban, "so_giu": d.so_giu,
