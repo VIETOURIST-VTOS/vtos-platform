@@ -1,7 +1,7 @@
 """API nhân sự – lương: hồ sơ, visa, HDV & phân chuyến, đội xe & lệnh điều xe, sự vụ, bảng lương (robot R6)."""
 import json
 from datetime import date, datetime
-from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select, desc
 from sqlalchemy.orm import Session
@@ -2024,7 +2024,7 @@ def dispatch_create(data: DispatchIn,
     db.commit()
     canh_bao = [i["msg"] for i in kt["items"]]
     if ly_do: canh_bao.append(ly_do)      # cấu hình người lập lệnh sai thì nói ra, không im lặng bỏ qua
-    return {"message": f"Đã lập lệnh điều xe {v.plate} cho {t.code} – Đội xe xác nhận trong 4 giờ",
+    return {"id": d.id, "message": f"Đã lập lệnh điều xe {v.plate} cho {t.code} – Đội xe xác nhận trong 4 giờ",
             "kiem_tra": {"muc": kt["muc"], "muc_ten": kt["muc_ten"], "canh_bao": canh_bao},
             "theo_goi_y": v.id in top_ids, "kem_hon_de_xuat": bool(kem_hon), "goi_y": gy["phuong_an"]}
 
@@ -2323,6 +2323,84 @@ def tu_choi_nhan_lenh(did: int, data: LyDoNhanIn, u: User = Depends(require_role
     # hôm sau không ra bến.
     return {"message": ("Đã gửi lý do cho Giám đốc đội xe. Lệnh VẪN CÒN HIỆU LỰC cho tới khi ông "
                         "quyết – anh đừng tự bỏ chuyến.")}
+
+
+# ─── TÀI XẾ GHI CHUYẾN TRÊN ĐIỆN THOẠI (Chủ tịch duyệt 10/11/2026) ─────────────────────────────────────
+# Cùng tiền tố `/nhan-lenh` và cùng lớp chặn `_lenh_cua_toi`: tài xế chỉ chạm phiếu của LỆNH GHI TÊN MÌNH,
+# và không cần mở thêm tiền tố nào trong bảng quyền. Luật nằm ở `services/tai_xe_ghi_chuyen.py`.
+def _anh(db: Session, u: User, tid: int, tep: UploadFile | None, data: bytes | None, mo_ta: str):
+    if tep is None or not data:
+        return None
+    from app.services import attachments as AT
+    a, _ = AT.dinh_kem(db, "chuyen_xe", str(tid), tep.filename or "anh.jpg", data,
+                       kieu=tep.content_type or "", loai="hoa_don" if mo_ta.startswith("khoan:") else "chung_tu",
+                       mo_ta=mo_ta, boi=u.username)
+    return a
+
+
+@router.get("/nhan-lenh/{did}/chuyen")
+def tai_xe_xem_chuyen(did: int, u: User = Depends(require_roles(*_NHAN)), db: Session = Depends(get_db)):
+    from app.services import tai_xe_ghi_chuyen as TX
+    return TX.ra(db, _lenh_cua_toi(db, u, did))
+
+
+@router.post("/nhan-lenh/{did}/chuyen/bat-dau")
+async def tai_xe_bat_dau(did: int, km_dau: int = Form(...), tep: UploadFile | None = File(None),
+                         u: User = Depends(require_roles(*_NHAN)), db: Session = Depends(get_db)):
+    from app.services import tai_xe_ghi_chuyen as TX
+    d = _lenh_cua_toi(db, u, did)
+    data = await tep.read() if tep else None
+    try:
+        t = TX.bat_dau(db, u, d, km_dau)
+        _anh(db, u, t.id, tep, data, "dong_ho_dau")
+    except ValueError as ex:
+        db.rollback(); raise HTTPException(422, str(ex))
+    db.commit()
+    return {"message": "Đã mở phiếu chuyến. Đổ dầu, qua trạm, gửi xe thì ghi ngay ở đây.", **TX.ra(db, d)}
+
+
+@router.post("/nhan-lenh/{did}/chuyen/khoan")
+async def tai_xe_ghi_khoan(did: int, kind: str = Form(...), so_tien: float = Form(...), lit: float = Form(0),
+                           so_hoa_don: str = Form(""), tra_bang: str = Form("tai_xe_tien_mat"),
+                           tep: UploadFile | None = File(None),
+                           u: User = Depends(require_roles(*_NHAN)), db: Session = Depends(get_db)):
+    from app.services import tai_xe_ghi_chuyen as TX
+    d = _lenh_cua_toi(db, u, did)
+    data = await tep.read() if tep else None
+    try:
+        c = TX.them_khoan(db, u, d, kind, so_tien, lit, so_hoa_don, tra_bang, co_anh=bool(data))
+        _anh(db, u, c.trip_id, tep, data, f"khoan:{c.id}")
+    except ValueError as ex:
+        db.rollback(); raise HTTPException(422, str(ex))
+    db.commit()
+    return {"message": "Đã ghi", **TX.ra(db, d)}
+
+
+@router.delete("/nhan-lenh/{did}/chuyen/khoan/{cid}")
+def tai_xe_xoa_khoan(did: int, cid: int, u: User = Depends(require_roles(*_NHAN)), db: Session = Depends(get_db)):
+    from app.services import tai_xe_ghi_chuyen as TX
+    d = _lenh_cua_toi(db, u, did)
+    try:
+        TX.xoa_khoan(db, u, d, cid)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    return {"message": "Đã xoá dòng", **TX.ra(db, d)}
+
+
+@router.post("/nhan-lenh/{did}/chuyen/ket-thuc")
+async def tai_xe_ket_thuc(did: int, km_cuoi: int = Form(...), tep: UploadFile | None = File(None),
+                          u: User = Depends(require_roles(*_NHAN)), db: Session = Depends(get_db)):
+    from app.services import tai_xe_ghi_chuyen as TX
+    d = _lenh_cua_toi(db, u, did)
+    data = await tep.read() if tep else None
+    try:
+        t = TX.ket_thuc(db, u, d, km_cuoi)
+        _anh(db, u, t.id, tep, data, "dong_ho_cuoi")
+    except ValueError as ex:
+        db.rollback(); raise HTTPException(422, str(ex))
+    db.commit()
+    return {"message": "Đã gửi cho Giám đốc đội xe. Phiếu khoá với tài xế; cần sửa thì báo đội xe.", **TX.ra(db, d)}
 
 
 @router.get("/nhan-lenh/can-biet")

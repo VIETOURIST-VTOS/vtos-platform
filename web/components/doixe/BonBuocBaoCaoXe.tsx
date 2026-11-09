@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DinhKem from "@/components/DinhKem";
 import QuyetToanChuyen from "@/components/QuyetToanChuyen";
 import { api, soTien } from "@/lib/api";
@@ -53,6 +53,8 @@ const rong = () => ({
   km_dau: "" as any, km_cuoi: "" as any, km_gps: "" as any, km_nguon: "",
   doanh_thu: "" as any, dau: "" as any, lit: "" as any, cau_duong: "" as any,
   cong_tac_phi: "" as any, giu_xe: "" as any, chung_tu: "", note: "", hen_bo_sung: "", ok: false,
+  // Vào vận hành (Chủ tịch duyệt 10/11/2026): phiếu gắn lệnh điều xe — tour, tài xế, ngày theo lệnh.
+  dispatch_id: "" as any, driver_id: "" as any, tour_id: "" as any, phieu: null as any,
 });
 
 const n = (v: any): number | null => (v === "" || v === null || v === undefined ? null : Number(v));
@@ -66,6 +68,30 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
   const [dang, setDang] = useState(false);
   const [daLuu, setDaLuu] = useState<{ id: number; ma_phieu?: string } | null>(null);
   const dat = (k: string, v: any) => setData({ ...d, [k]: v });
+  /** Lệnh điều xe của xe đang chọn, kèm phiếu chuyến đã có (phiếu tài xế ghi trên điện thoại). */
+  const [lenhDs, setLenhDs] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!d.vehicle_id) { setLenhDs(null); return; }
+    api<any>(`/fleet/lenh-cho-bao-cao?xe_id=${d.vehicle_id}`).then((r) => setLenhDs(r.rows || [])).catch(() => setLenhDs([]));
+  }, [d.vehicle_id]);
+  /** Khoản tài xế đã ghi (theo loại): không nhập lại, không ghi dòng thứ hai. */
+  const daTX: Record<string, { tien: number; lit: number }> = {};
+  for (const k of (d.phieu?.tai_xe_da_gui ? d.phieu.khoan : []) || [])
+    daTX[k.kind] = { tien: (daTX[k.kind]?.tien || 0) + (k.so_tien || 0), lit: (daTX[k.kind]?.lit || 0) + (k.lit || 0) };
+  const chonLenh = (id: string) => {
+    const l = (lenhDs || []).find((x) => String(x.id) === id);
+    if (!l) { setData({ ...d, dispatch_id: "", driver_id: "", tour_id: "", phieu: null }); return; }
+    const p = l.phieu;
+    const tx: any = {};
+    if (p?.tai_xe_da_gui) {
+      for (const k of p.khoan) tx[k.kind] = (tx[k.kind] || 0) + (k.so_tien || 0);
+      tx.lit = p.khoan.filter((k: any) => k.kind === "dau").reduce((a: number, k: any) => a + (k.lit || 0), 0) || "";
+    }
+    setData({ ...d, dispatch_id: l.id, driver_id: l.driver_id || "", tour_id: l.tour_id || "", phieu: p,
+      ten_tour: l.tour || d.ten_tour, ngay_di: String(l.date_from).slice(0, 10), ngay_ve: String(l.date_to).slice(0, 10),
+      ...(p?.tai_xe_da_gui ? { km_dau: p.km_dau ?? "", km_cuoi: p.km_cuoi ?? "", km_nguon: d.km_nguon || "anh_dong_ho",
+        dau: tx.dau ?? d.dau, lit: tx.lit || d.lit, cau_duong: tx.cau_duong ?? d.cau_duong, giu_xe: tx.giu_xe ?? d.giu_xe } : {}) });
+  };
 
   const kd = n(d.km_dau), kc = n(d.km_cuoi), gps = n(d.km_gps);
   const kmDongHo = kd !== null && kc !== null ? kc - kd : null;
@@ -100,6 +126,9 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
       if (!d.ngay_di) t.push("Chọn ngày đi.");
       if (!d.ngay_ve) t.push("Chọn ngày về.");
       if (d.ngay_di && d.ngay_ve && d.ngay_ve < d.ngay_di) t.push("Ngày về trước ngày đi – kiểm lại.");
+      if (d.phieu && !d.phieu.tai_xe_da_gui) t.push(d.phieu.tu_tai_xe
+        ? `Tài xế đang ghi phiếu #${d.phieu.id} trên điện thoại, chưa gửi – chờ tài xế bấm «Kết thúc chuyến».`
+        : `Lệnh này đã có báo cáo xe #${d.phieu.id} – mở phiếu ấy ở «Báo cáo từng xe», không lập phiếu thứ hai.`);
     }
     if (b >= 1) {
       if (!d.km_nguon) t.push("Chọn nguồn số km dùng cho báo cáo.");
@@ -118,19 +147,30 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
   const gui = async () => {
     setDang(true);
     try {
-      const r = await api<any>("/fleet/chuyen", { method: "POST", json: {
+      const ghiChu = [d.note.trim(), d.hen_bo_sung.trim() ? `Hẹn bổ sung chứng từ: ${d.hen_bo_sung.trim()}` : ""]
+        .filter(Boolean).join(" | ");
+      // Phiếu tài xế đã gửi: SỬA đúng phiếu ấy (thêm doanh thu, kiểm km) — không lập phiếu thứ hai.
+      const r = d.phieu?.tai_xe_da_gui
+        ? { ...(await api<any>(`/fleet/chuyen/${d.phieu.id}`, { method: "PUT", json: {
+            phien_ban: d.phieu.phien_ban, ten_tour: d.ten_tour.trim(), ngay_di: d.ngay_di, ngay_ve: d.ngay_ve,
+            km_dau: kd, km_cuoi: kc, km_gps: gps, km_nguon: d.km_nguon || "anh_dong_ho", doanh_thu: dt,
+            ...(ghiChu ? { note: ghiChu } : {}) } })), id: d.phieu.id }
+        : await api<any>("/fleet/chuyen", { method: "POST", json: {
         vehicle_id: Number(d.vehicle_id), ten_tour: d.ten_tour.trim(),
         ngay_di: d.ngay_di, ngay_ve: d.ngay_ve,
         km_dau: kd, km_cuoi: kc, km_gps: gps, km_nguon: d.km_nguon || "nhap_tay",
         doanh_thu: dt, quyet_toan: false,   // v3.3: vào lợi nhuận khi Chủ tịch duyệt tờ
-        note: [d.note.trim(), d.hen_bo_sung.trim() ? `Hẹn bổ sung chứng từ: ${d.hen_bo_sung.trim()}` : ""]
-          .filter(Boolean).join(" | ") } });
+        ...(d.dispatch_id ? { dispatch_id: Number(d.dispatch_id) } : {}),
+        ...(d.driver_id ? { driver_id: Number(d.driver_id) } : {}),
+        ...(d.tour_id ? { tour_id: Number(d.tour_id) } : {}),
+        note: ghiChu } });
       // Bốn khoản ghi thành bốn dòng riêng — mỗi dòng phải trả lời được loại gì, ai chịu, chứng
       // từ đâu. Khoản để TRỐNG thì không ghi dòng nào: xem luật 1 ở đầu tệp.
       const loi: string[] = [];
       for (const [k] of KHOAN) {
         const v = soTien((d as any)[k]);
         if (!v || v <= 0) continue;
+        if (daTX[k]) continue;            // tài xế đã ghi khoản này kèm ảnh hoá đơn — không ghi lần hai
         try {
           await api(`/fleet/chuyen/${r.id}/chi-phi`, { method: "POST", json: {
             kind: k, amount: v, lit: k === "dau" ? soTien(d.lit) : null, chung_tu: d.chung_tu.trim() } });
@@ -182,6 +222,14 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
             <option value="">— chọn xe —</option>
             {xe.map((v: any) => <option key={v.id} value={v.id}>{v.plate}{v.code ? ` · ${v.code}` : ""}</option>)}
           </select></label>
+        <label>Lệnh điều xe
+          <select value={d.dispatch_id} disabled={!d.vehicle_id} onChange={(e) => chonLenh(e.target.value)}>
+            <option value="">{!d.vehicle_id ? "— chọn xe trước —" : lenhDs?.length ? "— không qua lệnh (chuyến ngoài, thuê lẻ) —" : "— xe này chưa có lệnh gần đây —"}</option>
+            {(lenhDs || []).map((l) => <option key={l.id} value={l.id}>
+              {`#${l.id} · ${l.tour || "?"} · ${String(l.date_from).slice(5, 10)}→${String(l.date_to).slice(5, 10)} · ${l.tai_xe || "chưa có tài xế"}`}
+              {l.phieu ? (l.phieu.tai_xe_da_gui ? " · tài xế đã gửi số" : l.phieu.tu_tai_xe ? " · tài xế đang ghi" : ` · đã có báo cáo #${l.phieu.id}`) : ""}
+            </option>)}
+          </select></label>
         <label>Tour / khách hàng <span aria-hidden="true">*</span>
           <input value={d.ten_tour} onChange={(e) => dat("ten_tour", e.target.value)} placeholder="Đà Lạt (lẻ)" /></label>
         <label>Ngày đi <span aria-hidden="true">*</span>
@@ -189,6 +237,9 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
         <label>Ngày về <span aria-hidden="true">*</span>
           <input type="date" value={d.ngay_ve} onChange={(e) => dat("ngay_ve", e.target.value)} /></label>
       </div>
+      {d.phieu?.tai_xe_da_gui && <p className="muted">Tài xế đã gửi phiếu #{d.phieu.id}: km {d.phieu.km_dau ?? "?"} → {d.phieu.km_cuoi ?? "?"},
+        {" "}{d.phieu.khoan.length} khoản kèm ảnh hoá đơn. Anh kiểm số và thêm doanh thu — không nhập lại các khoản tài xế đã ghi.</p>}
+      {!d.dispatch_id && d.vehicle_id && <p className="muted">Không chọn lệnh thì phiếu ghi là <b>không qua lệnh</b>: không đối chiếu được với lệnh, tài xế và tour.</p>}
       <label style={{ display: "block", marginTop: 8 }}>Ghi chú chuyến
         <input value={d.note} onChange={(e) => dat("note", e.target.value)} /></label>
       <p className="muted">Biển số đối chiếu theo <b>ngày chuyến</b>: mã xe theo chiếc xe suốt vòng đời, đổi biển
@@ -229,11 +280,11 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
       <p className="muted">Quy tắc chốt 07/9/2026. Để trống khoản nào thì <b>không ghi dòng đó</b> — khác với ghi 0 đ,
         vì 0 đ đọc ra là «đã xác nhận không phát sinh».</p>
       <div className="grid2">
-        <label>Tiền dầu (đ)<input type="number" value={d.dau ?? ""} onChange={(e) => dat("dau", e.target.value)} /></label>
-        <label>Số lít<input type="number" step="0.001" value={d.lit ?? ""} onChange={(e) => dat("lit", e.target.value)} /></label>
-        <label>Phí cầu đường (đ)<input type="number" value={d.cau_duong ?? ""} onChange={(e) => dat("cau_duong", e.target.value)} /></label>
+        <label>Tiền dầu (đ){daTX.dau ? " · tài xế đã ghi" : ""}<input type="number" disabled={!!daTX.dau} value={d.dau ?? ""} onChange={(e) => dat("dau", e.target.value)} /></label>
+        <label>Số lít{daTX.dau ? " · tài xế đã ghi" : ""}<input type="number" step="0.001" disabled={!!daTX.dau} value={d.lit ?? ""} onChange={(e) => dat("lit", e.target.value)} /></label>
+        <label>Phí cầu đường (đ){daTX.cau_duong ? " · tài xế đã ghi" : ""}<input type="number" disabled={!!daTX.cau_duong} value={d.cau_duong ?? ""} onChange={(e) => dat("cau_duong", e.target.value)} /></label>
         <label>Công tác phí tài xế (đ)<input type="number" value={d.cong_tac_phi ?? ""} onChange={(e) => dat("cong_tac_phi", e.target.value)} /></label>
-        <label>Phí gửi xe (đ)<input type="number" value={d.giu_xe ?? ""} onChange={(e) => dat("giu_xe", e.target.value)} /></label>
+        <label>Phí gửi xe (đ){daTX.giu_xe ? " · tài xế đã ghi" : ""}<input type="number" disabled={!!daTX.giu_xe} value={d.giu_xe ?? ""} onChange={(e) => dat("giu_xe", e.target.value)} /></label>
         <label>Số chứng từ<input value={d.chung_tu} onChange={(e) => dat("chung_tu", e.target.value)} /></label>
       </div>
       <KhoiXem>

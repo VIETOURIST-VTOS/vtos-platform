@@ -4,8 +4,15 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, fmtDT, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import DonNghiPhep from "@/components/DonNghiPhep";
+import TaiXeGhiChuyen from "@/components/doixe/TaiXeGhiChuyen";
 
-/** Xe Vietrip & HDV – màn hình của chính người ở hiện trường (chỉ đạo 07/9/2026).
+/** Xe & lệnh của tôi — màn hình của chính TÀI XẾ (chỉ đạo 07/9/2026; Chủ tịch tách HDV ra 10/11/2026).
+ *
+ *  10/11/2026: Chủ tịch chốt «tài xế thấy lệnh điều xe bấm nhận, bỏ HDV ra — HDV sẽ đi một phòng khác».
+ *  Mọi khối của hướng dẫn viên (thẻ HDV, chào chuyến, báo cáo sau tour, tiền đang giữ) đã gỡ khỏi màn
+ *  này; cửa máy chủ `/api/v1/xe-hdv/...` của HDV GIỮ NGUYÊN để màn của phòng Hướng dẫn dùng lại.
+ *
+ *  Ghi chú cũ:
  *  Tài xế và hướng dẫn viên được cấp tài khoản nhưng chỉ thấy việc của mình: xe mình đứng tên, lệnh điều
  *  xe của mình, chuyến mình dẫn và hạn thẻ HDV. Không thấy giá xe nội bộ, không thấy hàng đợi của cả đội.
  *
@@ -30,11 +37,6 @@ function XeHdv() {
   /** Báo hư hỏng của CHÍNH mình. Máy chủ lọc theo người báo; màn hình không gửi bộ lọc nào. */
   const [hong, setHong] = useState<any>(null);
   const [formHong, setFormHong] = useState<any>({ mo: false, vehicle_id: "", hien_tuong: "", muc_do: "con_chay_duoc", odo_km: "", noi_xay_ra: "" });
-  /** Báo cáo sau tour của CHÍNH mình (Đợt 2 phòng HDV, 06/10/2026). Soạn ở đây rồi gửi; gửi rồi thì
-   *  khoá, muốn sửa phải lập bản mới — bản cũ vẫn còn để đọc lại. Màn hình KHÔNG tự quyết chỗ nào:
-   *  nó in lại đúng trạng thái máy chủ trả về. */
-  const [bc, setBc] = useState<any>({ mo: 0, chuong_trinh_thuc_hien: "", so_khach_thuc_te: "",
-    danh_gia_ncc: "", su_co: "", khoan_chi_thu_ho: "", viec_chua_xong: "" });
   /** Đơn nghỉ / ốm / vắng việc nay là MỘT thành phần dùng chung `components/DonNghiPhep` — cùng
    *  thành phần ấy đứng trên màn hình /cham-cong của cả mười một phòng. Khung này trước nằm thẳng ở
    *  đây, nên chín phòng không có ô nào để bấm dù cửa máy chủ nhận đơn của bất kỳ ai đăng nhập.
@@ -46,21 +48,6 @@ function XeHdv() {
   };
   useEffect(() => { tai(); }, []); // eslint-disable-line
 
-  /** Lưu nháp hoặc lập bản mới cho báo cáo sau tour. Bản đã gửi thì máy chủ từ chối sửa đè —
-   *  màn hình gọi cửa "bản mới" thay vì cố ghi đè, và nói rõ cho người dùng vì sao. */
-  const luuBaoCao = async (aid: number, banMoi: boolean) => {
-    const than: any = {
-      chuong_trinh_thuc_hien: bc.chuong_trinh_thuc_hien || "",
-      // Số khách để TRỐNG thì gửi null, không gửi 0: "chưa đếm" khác "đi 0 khách".
-      so_khach_thuc_te: String(bc.so_khach_thuc_te).trim() === "" ? null : Number(bc.so_khach_thuc_te),
-      danh_gia_ncc: bc.danh_gia_ncc || "", su_co: bc.su_co || "",
-      khoan_chi_thu_ho: bc.khoan_chi_thu_ho || "", viec_chua_xong: bc.viec_chua_xong || "" };
-    try {
-      const duong = banMoi ? `/xe-hdv/bao-cao/${aid}/ban-moi` : `/xe-hdv/bao-cao/${aid}`;
-      const r = await api<any>(duong, { method: "POST", json: than });
-      toast(r.message); setBc({ ...bc, mo: 0 }); tai();
-    } catch (e) { toast(errMsg(e), true); }
-  };
 
   // ─── DL-1b: MẮT THỨ BA của chuỗi điều xe — tài xế NHẬN lệnh.
   // Hai nút nằm NGAY TRÊN khối "Lệnh điều xe của tôi" đã có, không dựng màn hình mới: tài xế mở
@@ -84,13 +71,6 @@ function XeHdv() {
     } catch (e) { toast(errMsg(e), true); }
   };
 
-  const guiBaoCao = async (aid: number, pb: number | null) => {
-    try {
-      const r = await api<any>(`/xe-hdv/bao-cao/${aid}/gui`,
-        { method: "POST", json: { phien_ban: pb } });
-      toast(r.message + (r.tre_han ? " (nộp trễ hạn)" : "")); tai();
-    } catch (e) { toast(errMsg(e), true); }
-  };
 
   /** Lập đề nghị tạm ứng. Người thụ hưởng là chính mình, nên màn hình KHÔNG hỏi nhà cung cấp —
    *  máy chủ điền tên người đăng nhập. Hỏi một ô mà câu trả lời luôn giống nhau là cách chắc chắn
@@ -110,23 +90,6 @@ function XeHdv() {
     } catch (e) { toast(errMsg(e), true); }
   };
 
-  /** Nhận hoặc từ chối một lời chào chuyến.
-   *  Từ chối KHÔNG kèm hệ quả gì: hướng dẫn viên là cộng tác viên, và từ chối một lời chào là quyền của
-   *  người cung cấp dịch vụ. Nút này nói rõ điều đó để không ai ngại bấm. */
-  const traLoi = async (id: number, nhan: boolean) => {
-    let ly_do = "";
-    if (!nhan) {
-      const v = window.prompt("Từ chối chuyến này. Ghi lý do nếu muốn (không bắt buộc).\n\n" +
-        "Từ chối không ảnh hưởng gì đến việc được chào chuyến sau.");
-      if (v === null) return;
-      ly_do = v;
-    }
-    try {
-      const d2 = await api<any>(`/xe-hdv/chao-chuyen/${id}/${nhan ? "nhan" : "tu-choi"}`,
-                                { method: "POST", json: nhan ? {} : { ly_do } });
-      toast(d2.message); await tai();
-    } catch (e) { toast(errMsg(e), true); }
-  };
 
   /** Báo một chiếc xe đang hỏng. Màn hình KHÔNG hỏi số tiền và KHÔNG hỏi garage: lúc đứng cạnh
    *  chiếc xe thì tài xế chưa biết hai con số ấy, và một ô bắt buộc mà người gõ không biết câu trả
@@ -147,19 +110,21 @@ function XeHdv() {
     } catch (e) { toast(errMsg(e), true); }
   };
 
-  if (err) return <><h1>Xe Vietrip &amp; HDV</h1><p className="muted">{err}</p></>;
+  // HDV đã tách sang phòng Hướng dẫn (10/11/2026). Vai khác vào đây chỉ thấy một dòng nói rõ, không thấy
+  // một màn hình rỗng như hỏng.
+  if (!laTaiXe) return <><h1>Xe &amp; lệnh của tôi</h1>
+    <div className="panel"><p>Màn hình này dành cho <b>tài xế</b>. Việc của hướng dẫn viên (chào chuyến,
+      báo cáo sau tour, thẻ HDV) chuyển sang màn của <b>phòng Hướng dẫn</b>.</p></div>
+    <DonNghiPhep guiDuoc={laHienTruong} /></>;
+  if (err) return <><h1>Xe &amp; lệnh của tôi</h1><p className="muted">{err}</p></>;
   if (!d) return <p className="muted">Đang tải…</p>;
   const st = (s: string) => s === "hoan_thanh" ? <Tag cls="ok">Hoàn thành</Tag> : s === "da_xac_nhan" ? <Tag cls="navy">Đã nhận</Tag> : s === "huy" ? <Tag cls="red">Hủy</Tag> : s === "tu_choi" ? <Tag>Đã từ chối</Tag> : s === "het_han" ? <Tag>Lời chào hết hạn</Tag> : <Tag cls="warn">Đang chờ trả lời</Tag>;
 
   return (<>
-    <h1>Xe Vietrip &amp; HDV</h1>
+    <h1>Xe &amp; lệnh của tôi</h1>
     <div className="panel"><h2>{d.ho_so.full_name} <span className="muted">· mã {d.ho_so.code}</span></h2>
       <p className="muted">{d.ho_so.department_name} · {d.ho_so.position_name}{d.ho_so.phone ? ` · ${d.ho_so.phone}` : ""}</p></div>
 
-    {d.the_hdv && <div className="panel"><h2>Thẻ hướng dẫn viên</h2>
-      <p>Số thẻ <b className="mono">{d.the_hdv.card_no || "—"}</b> · hạn <b>{fmtD(d.the_hdv.card_expiry)}</b>{" "}
-        {d.the_hdv.du_dieu_kien ? <Tag cls="ok">Đủ điều kiện dẫn đoàn</Tag> : <Tag cls="red">Chưa đủ điều kiện</Tag>}</p>
-      {!d.the_hdv.du_dieu_kien && <p className="muted">{d.the_hdv.vi_sao} – liên hệ Điều hành hoặc HCNS để cập nhật hồ sơ trước khi nhận chuyến.</p>}</div>}
 
     {d.xe.length > 0 && <div className="panel wrap"><h2>Xe tôi đứng tên</h2>
       <table><thead><tr><th>Biển số</th><th className="num">Chỗ</th><th>Loại</th><th>Pháp nhân sở hữu</th><th>Trạng thái</th></tr></thead>
@@ -192,6 +157,12 @@ function XeHdv() {
           </td>
           <td className="muted">{x.incident_note}</td></tr>)}</tbody></table></div>}
 
+    {/* GHI CHUYẾN TRÊN ĐIỆN THOẠI (Chủ tịch duyệt 10/11/2026): một thẻ cho mỗi lệnh đã nhận còn đang chạy
+        hoặc vừa về trong 7 ngày. */}
+    {(d.lenh_dieu_xe || []).filter((x: any) => x.trang_thai_nhan === "da_nhan" && x.status !== "huy"
+        && new Date(x.date_to).getTime() >= Date.now() - 7 * 86400000)
+      .map((x: any) => <TaiXeGhiChuyen key={`gc${x.id}`} lenh={x} toast={toast} />)}
+
     {/* Ô lý do. BẮT BUỘC: đây là thứ duy nhất trả lời được câu hỏi của tháng sau — vì sao chuyến ấy
         phải đổi xe, hoặc phải thuê xe ngoài. */}
     {tuChoi && <div className="panel"><h2>Vì sao anh không nhận được lệnh này?</h2>
@@ -203,96 +174,6 @@ function XeHdv() {
       <button className="act orange" disabled={!lyDoTuChoi.trim()} onClick={guiTuChoi}>Gửi lý do</button>{" "}
       <button className="act grey" onClick={() => { setTuChoi(null); setLyDoTuChoi(""); }}>Thôi, để tôi nhận</button>
     </div>}
-
-    {d.phan_chuyen.length > 0 && <div className="panel wrap"><h2>Chuyến được chào cho tôi</h2>
-      <p className="muted">Mỗi dòng là một <b>lời chào</b>: nhận hoặc từ chối đều được. Từ chối không kèm
-        hệ quả gì và không ghi vào hồ sơ — quá hạn trả lời thì lời chào hết hiệu lực, chuyến được chào
-        cho người khác.</p>
-      <table><thead><tr><th>Tour</th><th>Khởi hành</th><th className="num">Số ngày</th><th className="num">Thù lao</th><th>Trạng thái</th><th>Báo cáo</th><th>Tạm ứng</th><th></th></tr></thead>
-        <tbody>{d.phan_chuyen.map((x: any) => <tr key={x.id}><td><b>{x.tour_code}</b><div className="muted">{x.tour_name}</div></td><td>{fmtD(x.start_date)}</td>
-          <td className="num">{x.days}{x.holiday && <Tag cls="warn">lễ ×2</Tag>}</td><td className="num">{vnd(x.amount)}</td><td>{st(x.status)}</td>
-          {/* Ba tình trạng, KHÔNG gộp thành một ô đúng/sai: chưa viết gì · đang chờ Trưởng phòng kiểm ·
-              bị trả lại. Ba cái ấy đòi ba việc khác nhau từ chính người này. */}
-          <td>{!x.bao_cao ? <Tag cls="warn">Chưa viết</Tag>
-             : x.bao_cao.trang_thai === "da_xac_nhan" ? <Tag cls="ok">Đã xác nhận</Tag>
-             : x.bao_cao.trang_thai === "da_gui" ? <Tag>Chờ TP kiểm · bản {x.bao_cao.ban_so}</Tag>
-             : x.bao_cao.trang_thai === "can_bo_sung" ? <Tag cls="red">Trả lại</Tag>
-             : <Tag cls="warn">Nháp</Tag>}
-            {x.bao_cao?.tre_han && <div className="muted" style={{ color: "var(--red)" }}>quá hạn nộp</div>}
-            {x.bao_cao?.han_nop && !x.bao_cao?.tre_han && <div className="muted">hạn {fmtD(x.bao_cao.han_nop)}</div>}</td>
-          <td>{x.advance_settled ? <Tag cls="ok">Đã quyết toán</Tag> : <Tag cls="warn">Chưa</Tag>}</td>
-          <td style={{ whiteSpace: "nowrap" }}>{x.con_tra_loi_duoc ? <>
-            <button className="act teal" style={{ margin: 0 }} onClick={() => traLoi(x.id, true)}>Nhận</button>{" "}
-            <button className="act grey" style={{ margin: 0 }} onClick={() => traLoi(x.id, false)}>Từ chối</button>
-            <div className="muted">trả lời trước {fmtDT(x.han_tra_loi)}</div>
-          </> : x.ly_do ? <span className="muted">{x.ly_do}</span> : null}</td></tr>)}</tbody></table></div>}
-
-    {/* BÁO CÁO SAU TOUR — cửa ghi của chính hướng dẫn viên (Đợt 2 phòng HDV, Chủ tịch chốt 06/10/2026).
-        Hạn 3 ngày kể từ ngày tour kết thúc. Chưa nộp thì treo chào chuyến mới và treo thù lao —
-        luật ấy đã có từ trước, màn hình này chỉ cho người ta chỗ để nộp. */}
-    {!laTaiXe && d.phan_chuyen.some((x: any) => x.status === "da_xac_nhan") &&
-      <div className="panel"><h2>Báo cáo sau tour của tôi</h2>
-      <p className="muted">Nộp trong <b>3 ngày</b> kể từ ngày tour kết thúc. Gửi rồi thì khoá lại —
-        muốn sửa thì lập <b>bản mới</b>, bản cũ vẫn còn để đọc lại. Trưởng phòng kiểm rồi mới tính là xong.</p>
-      <table><thead><tr><th>Tour</th><th>Tình trạng</th><th></th></tr></thead>
-        <tbody>{d.phan_chuyen.filter((x: any) => x.status === "da_xac_nhan").map((x: any) => (
-          <tr key={x.id}><td><b>{x.tour_code}</b><div className="muted">{x.tour_name}</div></td>
-            <td>{!x.bao_cao ? <span className="muted">chưa viết gì</span>
-               : <>{x.bao_cao.trang_thai === "can_bo_sung"
-                     ? <span><Tag cls="red">Trả lại</Tag><div className="muted">{x.bao_cao.y_kien_kiem}</div></span>
-                     : <Tag cls={x.bao_cao.trang_thai === "da_xac_nhan" ? "ok" : "warn"}>
-                         bản {x.bao_cao.ban_so} · {x.bao_cao.trang_thai}</Tag>}</>}</td>
-            <td style={{ whiteSpace: "nowrap" }}>
-              {x.bao_cao?.trang_thai !== "da_xac_nhan" &&
-                <button className="act" style={{ margin: 0 }}
-                        onClick={() => setBc({ ...bc, mo: bc.mo === x.id ? 0 : x.id })}>
-                  {bc.mo === x.id ? "Đóng" : (x.bao_cao?.da_khoa ? "Lập bản mới" : "Viết báo cáo")}
-                </button>}
-              {x.bao_cao && !x.bao_cao.da_khoa &&
-                <> <button className="act teal" style={{ margin: 0 }}
-                           onClick={() => guiBaoCao(x.id, x.bao_cao.phien_ban)}>Gửi</button></>}
-            </td></tr>))}</tbody></table>
-
-      {bc.mo > 0 && <div className="wrap" style={{ marginTop: 12 }}>
-        <label>Chương trình thực hiện <span className="muted">(bắt buộc — đây là phần Trưởng phòng đối chiếu với chương trình đã bán)</span><br />
-          <textarea value={bc.chuong_trinh_thuc_hien}
-                    onChange={(e) => setBc({ ...bc, chuong_trinh_thuc_hien: e.target.value })} /></label>
-        <label>Số khách thực tế <span className="muted">(để trống nếu chưa đếm — trống khác 0)</span><br />
-          <input value={bc.so_khach_thuc_te} inputMode="numeric"
-                 onChange={(e) => setBc({ ...bc, so_khach_thuc_te: e.target.value })} /></label>
-        <label>Đánh giá nhà cung cấp<br />
-          <textarea value={bc.danh_gia_ncc} onChange={(e) => setBc({ ...bc, danh_gia_ncc: e.target.value })} /></label>
-        <label>Sự cố trong tour<br />
-          <textarea value={bc.su_co} onChange={(e) => setBc({ ...bc, su_co: e.target.value })} /></label>
-        <label>Khoản chi và thu hộ<br />
-          <textarea value={bc.khoan_chi_thu_ho} onChange={(e) => setBc({ ...bc, khoan_chi_thu_ho: e.target.value })} /></label>
-        <label>Việc chưa xong<br />
-          <textarea value={bc.viec_chua_xong} onChange={(e) => setBc({ ...bc, viec_chua_xong: e.target.value })} /></label>
-        <div>
-          <button className="act teal" onClick={() => {
-            const x = d.phan_chuyen.find((y: any) => y.id === bc.mo);
-            luuBaoCao(bc.mo, !!x?.bao_cao?.da_khoa);
-          }}>Lưu nháp</button>{" "}
-          <button className="act grey" onClick={() => setBc({ ...bc, mo: 0 })}>Thôi</button>
-        </div>
-      </div>}
-    </div>}
-
-    {/* SỐ DƯ TẠM ỨNG CỦA TÔI — tách theo từng túi (Đợt 3 phòng HDV).
-        Không gộp khác chủ tiền, khác loại tiền: 5 triệu đồng của công ty và 300 đô của đối tác cộng
-        lại thành một con số không ai trả được. Tiền thu hộ khách là túi riêng, không bù trừ. */}
-    {(d.tui_ung || []).length > 0 && <div className="panel wrap"><h2>Tiền tôi đang giữ</h2>
-      <table><thead><tr><th>Chủ tiền</th><th>Loại tiền</th><th className="num">Đã nhận</th>
-        <th className="num">Chi hộ được duyệt</th><th className="num">Đã nộp lại</th><th className="num">Số dư</th><th></th></tr></thead>
-        <tbody>{d.tui_ung.map((t: any, i: number) => <tr key={i}>
-          <td>{t.chu_tien === "khach" ? "Thu hộ khách" : t.chu_tien === "doi_tac" ? "Đối tác" : "Vietourist"}</td>
-          <td>{t.loai_tien}</td><td className="num">{vnd(t.da_nhan)}</td>
-          <td className="num">{vnd(t.chi_ho_duyet)}</td><td className="num">{vnd(t.da_nop_lai)}</td>
-          <td className="num"><b>{vnd(t.so_du)}</b></td>
-          <td>{t.khong_bu_tru ? <Tag>không bù trừ</Tag>
-             : t.cong_ty_no_lai ? <Tag cls="warn">công ty nợ lại</Tag> : null}</td></tr>)}</tbody></table>
-      <p className="muted">Số dư âm nghĩa là <b>công ty nợ lại bạn</b> — Kế toán xem xét trả, hệ thống
-        không tự trả. Tiền thu hộ khách để riêng, không trừ sang tiền công ty.</p></div>}
 
     {/* ĐỀ NGHỊ TẠM ỨNG — cửa GHI đầu tiên của người ở hiện trường (Chủ tịch quyết 05/10/2026).
         Khối này KHÔNG tự đặt tuyến ký và không in tên người duyệt từ màn hình: câu trả lời nằm ở
@@ -377,10 +258,10 @@ function XeHdv() {
       {!hong?.rows?.length && !formHong.mo && <p className="muted">Bạn chưa báo hỏng xe nào.</p>}
     </div>}
 
-    <DonNghiPhep guiDuoc={laHienTruong} />
+    <DonNghiPhep guiDuoc={laTaiXe} />
 
-    {d.xe.length === 0 && d.lenh_dieu_xe.length === 0 && d.phan_chuyen.length === 0 &&
-      <p className="muted">Chưa có xe, lệnh điều xe hay chuyến nào gắn với hồ sơ của bạn. Nếu sai, báo Điều hành hoặc HCNS.</p>}
+    {d.xe.length === 0 && d.lenh_dieu_xe.length === 0 &&
+      <p className="muted">Chưa có xe hay lệnh điều xe nào gắn với hồ sơ của bạn. Nếu sai, báo Giám đốc đội xe hoặc HCNS.</p>}
   </>);
 }
 

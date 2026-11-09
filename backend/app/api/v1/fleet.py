@@ -8,7 +8,8 @@ router Nhân sự; router này chỉ nhận các đường sâu hơn (/fleet/xe,
 nhận thẳng một cột trạng thái. Lý do: đổi biển không phải sửa một ô chữ, nó phải đóng dòng lịch sử cũ và mở
 dòng mới trong cùng một giao dịch – để giữa chừng có lỗi thì không còn chiếc xe nào mang hai biển hiệu lực.
 """
-from datetime import date
+import re
+from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select, func
@@ -389,8 +390,11 @@ class ChuyenIn(BaseModel):
 from app.models.fleet import QT_TRANG_THAI as _QT_TEN  # noqa: E402
 
 
-def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict) -> dict:
+def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict, kg: dict | None = None) -> dict:
     cps = list(db.execute(select(TripCost).where(TripCost.trip_id == t.id)).scalars())
+    if kg is None:
+        from app.services import ops as _O
+        kg = _O.de_nghi_theo_khoan_goc(db)
     return {"id": t.id, "vehicle_id": t.vehicle_id, "xe": veh.get(t.vehicle_id, ""),
             "tai_xe": emps.get(t.driver_id, ""), "ten_tour": t.ten_tour, "ngay_di": t.ngay_di,
             "ngay_ve": t.ngay_ve, "so_ngay": (t.ngay_ve - t.ngay_di).days + 1,
@@ -416,7 +420,9 @@ def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict) -> dict:
                          # "TONG TAI XE CHI" voi "TONG CONG TY CHI" theo cau hoi THU HAI.
                          "tra_bang": c.tra_bang or "",
                          "tra_bang_ten": TRA_BANG.get(c.tra_bang or "", ""),
-                         "nguon": c.nguon} for c in cps],
+                         "nguon": c.nguon,
+                         # Chống ghi hai lần (10/11/2026): khoản này đã là khoản gốc của đề nghị chi nào.
+                         "de_nghi_chi": kg.get(f"tc:{c.id}")} for c in cps],
             "tong_chi_vietourist": sum((c.amount or 0) for c in cps if c.ben_chiu == "vietourist_tam_ung"),
             "tong_chi_chu_xe": sum((c.amount or 0) for c in cps if c.ben_chiu == "chu_xe")}
 
@@ -431,7 +437,9 @@ def danh_sach_chuyen(vehicle_id: int | None = None, tu: date | None = None, den:
     if den: q = q.where(Trip.ngay_di <= den)
     veh = {v.id: v.plate for v in db.execute(select(Vehicle)).scalars()}
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
-    return [_chuyen_out(db, t, veh, emps) for t in db.execute(q.limit(500)).scalars()]
+    from app.services import ops as _O
+    kg = _O.de_nghi_theo_khoan_goc(db)
+    return [_chuyen_out(db, t, veh, emps, kg) for t in db.execute(q.limit(500)).scalars()]
 
 
 @router.post("/chuyen", status_code=201)
@@ -451,6 +459,18 @@ def tao_chuyen(data: ChuyenIn, u: User = Depends(require_roles(*WRITE, *KETOAN))
     if data.km_gps and not data.km_nguon:
         raise HTTPException(422, "Có số km theo GPS nhưng chưa ghi nguồn số km – chọn cổng GPS đã lấy số "
                                  "(gps_ttc / gps_tcd / gps_vietmap) hoặc nguồn của số đồng hồ")
+    # Vào vận hành (Chủ tịch duyệt 10/11/2026): phiếu gắn lệnh điều xe thì lệnh phải đúng xe, và MỘT lệnh MỘT
+    # phiếu — lệnh đã có phiếu (kể cả phiếu tài xế ghi trên điện thoại) thì mở phiếu ấy, không lập phiếu thứ hai.
+    if data.dispatch_id:
+        from app.models.hr import DispatchOrder
+        ld = db.get(DispatchOrder, data.dispatch_id)
+        if ld is None or ld.status == "huy":
+            raise HTTPException(422, "Lệnh điều xe không có hoặc đã huỷ")
+        if ld.vehicle_id != data.vehicle_id:
+            raise HTTPException(422, "Lệnh điều xe này của xe khác – chọn đúng xe của lệnh")
+        cu = db.execute(select(Trip).where(Trip.dispatch_id == ld.id, Trip.status != "huy")).scalars().first()
+        if cu is not None:
+            raise HTTPException(422, f"Lệnh này đã có phiếu chuyến #{cu.id} – mở phiếu ấy, không lập phiếu thứ hai")
     t = Trip(**data.model_dump(), created_by=u.username)
     db.add(t); db.flush()
     kt = FL.kiem_chuyen(db, t)
@@ -473,6 +493,45 @@ class ChiPhiIn(BaseModel):
     note: str = ""
     # Khai khi dòng này CHÍNH LÀ phiếu bảo dưỡng kia, để báo cáo không cộng một khoản hai lần.
     maintenance_id: int | None = None
+
+
+@router.get("/san-sang-van-hanh")
+def san_sang_van_hanh(ky: str | None = None, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Bảng sẵn sàng vận hành đội xe (Chủ tịch duyệt 10/11/2026) — luật ở `services/san_sang_doi_xe.py`."""
+    from app.services import san_sang_doi_xe as SS
+    if ky and not re.fullmatch(r"\d{4}-\d{2}", ky):
+        raise HTTPException(422, "Kỳ phải dạng YYYY-MM")
+    return SS.bang(db, ky)
+
+
+@router.get("/lenh-cho-bao-cao")
+def lenh_cho_bao_cao(xe_id: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Lệnh điều xe của MỘT xe để gắn vào báo cáo xe (bước 1 của cửa bốn bước — Chủ tịch duyệt 10/11/2026).
+
+    Mỗi lệnh kèm phiếu chuyến đã có: phiếu tài xế đã gửi thì Giám đốc đội xe mở đúng phiếu ấy để kiểm và thêm
+    doanh thu; phiếu đội xe đã lập thì không lập lại. Không trả giá thuê nội bộ — màn này không cần."""
+    from app.models.hr import DispatchOrder
+    from app.models.core import Tour
+    hom = date.today()
+    emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
+    ra = []
+    for ld in db.execute(select(DispatchOrder).where(DispatchOrder.vehicle_id == xe_id, DispatchOrder.status != "huy",
+                                                     DispatchOrder.date_from >= hom - timedelta(days=75),
+                                                     DispatchOrder.date_from <= hom + timedelta(days=7))
+                         .order_by(DispatchOrder.date_from.desc())).scalars():
+        t = db.get(Tour, ld.tour_id) if ld.tour_id else None
+        p = db.execute(select(Trip).where(Trip.dispatch_id == ld.id, Trip.status != "huy")).scalars().first()
+        cps = list(db.execute(select(TripCost).where(TripCost.trip_id == p.id)).scalars()) if p else []
+        ra.append({"id": ld.id, "tour_id": ld.tour_id, "tour": f"{t.code} · {t.name}" if t else "",
+                   "driver_id": ld.driver_id, "tai_xe": emps.get(ld.driver_id, ""),
+                   "date_from": ld.date_from, "date_to": ld.date_to, "da_nhan": ld.nhan_luc is not None,
+                   "phieu": None if p is None else {
+                       "id": p.id, "status": p.status, "tu_tai_xe": p.nguon == "tai_xe",
+                       "tai_xe_da_gui": p.nguon == "tai_xe" and p.status != "nhap",
+                       "km_dau": p.km_dau, "km_cuoi": p.km_cuoi, "doanh_thu": p.doanh_thu,
+                       "phien_ban": p.phien_ban,
+                       "khoan": [{"kind": c.kind, "so_tien": c.amount, "lit": c.lit} for c in cps]}})
+    return {"rows": ra}
 
 
 @router.post("/chuyen/{tid}/chi-phi", status_code=201)
@@ -2107,8 +2166,34 @@ def lap_de_nghi_chi_xe(data: DeNghiChiXeIn, u: User = Depends(require_roles("gd_
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     ai = O.cap_duyet(db, r)["ai"]
-    return {"id": r.id, "code": r.code, "status": r.status,
-            "message": f"Đã gửi {r.code} — chờ {ai} duyệt, rồi Kế toán kiểm chứng từ và chi"}
+    # Chống ghi hai lần (10/11/2026): cùng số chứng từ ở đề nghị chi khác → CẢNH BÁO (không chặn).
+    trung = O.chung_tu_trung(db, r.document_ref, r.id)
+    return {"id": r.id, "code": r.code, "status": r.status, "chung_tu_trung": trung,
+            "message": f"Đã gửi {r.code} — chờ {ai} duyệt, rồi Kế toán kiểm chứng từ và chi"
+                       + (f". Lưu ý: số chứng từ {r.document_ref} đã có ở {', '.join(trung)}" if trung else "")}
+
+
+@router.get("/khoan-goc")
+def ds_khoan_goc(xe_id: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Danh sách khoản đã ghi của MỘT xe để chọn làm «khoản gốc» của đề xuất chi (Chủ tịch duyệt 10/11/2026):
+    dòng chi phí chuyến và phiếu bảo dưỡng / sửa chữa, kèm đề nghị chi đã gắn — khoản đã có đề nghị chi thì
+    màn hình hiện mã DC và không cho chọn lại."""
+    from app.services import ops as O
+    da = O.de_nghi_theo_khoan_goc(db)
+    ra = []
+    for c, t in db.execute(select(TripCost, Trip).join(Trip, Trip.id == TripCost.trip_id)
+                           .where(Trip.vehicle_id == xe_id).order_by(Trip.ngay_di.desc(), TripCost.id.desc())
+                           .limit(120)).all():
+        ma = f"tc:{c.id}"
+        ra.append({"ma": ma, "loai": "Chi phí chuyến", "ngay": t.ngay_di,
+                   "ten": f"{t.ma_phieu or 'Chuyến ' + str(t.id)} · {COST_KINDS.get(c.kind, c.kind)}",
+                   "so_tien": c.amount, "chung_tu": c.chung_tu or "", "de_nghi_chi": da.get(ma)})
+    for b in db.execute(select(Maintenance).where(Maintenance.vehicle_id == xe_id)
+                        .order_by(Maintenance.ngay.desc()).limit(60)).scalars():
+        ma = f"bd:{b.id}"
+        ra.append({"ma": ma, "loai": "Bảo dưỡng / sửa chữa", "ngay": b.ngay, "ten": (b.noi_dung or b.kind)[:80],
+                   "so_tien": b.so_tien, "chung_tu": b.chung_tu or "", "de_nghi_chi": da.get(ma)})
+    return {"rows": ra}
 
 
 @router.get("/de-nghi-chi")
@@ -2118,7 +2203,8 @@ def ds_de_nghi_chi_xe(u: User = Depends(require_roles(*READ)), db: Session = Dep
     from app.models.ops import PaymentRequest
     from app.services import ops as O
     BUOC = {"cho_tp": "Chờ bộ phận xác nhận", "cho_kt": "Kế toán kiểm", "cho_duyet": "Chờ ký lệnh chi",
-            "cho_chi": "Chờ Kế toán chi", "da_chi": "Đã chi", "tu_choi": "Từ chối"}
+            "cho_chi": "Chờ Kế toán chi", "da_chi": "Đã chi", "tu_choi": "Từ chối",
+            "tra_bo_sung": "Trả bổ sung — sửa rồi gửi lại"}
     ds = db.execute(select(PaymentRequest).where(PaymentRequest.category.in_(LOAI_CHI_XE))
                     .order_by(PaymentRequest.id.desc()).limit(200)).scalars().all()
     ra = []
@@ -2127,12 +2213,49 @@ def ds_de_nghi_chi_xe(u: User = Depends(require_roles(*READ)), db: Session = Dep
         buoc = BUOC.get(r.status, r.status)
         if r.status == "cho_duyet":
             buoc = f"Chờ {O.cap_duyet(db, r)['ai'] or 'chốt mốc'} ký"
+        if r.status == "cho_chi" and (r.da_chi_tien or 0) > 0:
+            buoc = f"Đã chi một phần {float(r.da_chi_tien or 0):,.0f} đ"
         ra.append({"id": r.id, "code": r.code, "loai_chi": r.category, "ngay": r.created_at.date().isoformat() if r.created_at else None,
                    "noi_dung": r.description, "ben_nhan": r.supplier_name, "so_tien": r.amount,
                    "bien_so": x.get("bien_so") or "", "pham_vi": x.get("pham_vi") or "", "nhom": x.get("nhom") or "",
                    "loai": O.LOAI_DOI_XE.get(x.get("loai") or "", ""), "trang_thai": r.status, "buoc": buoc,
-                   "ly_do_tu_choi": r.reject_reason or "", "nguoi_lap": r.created_by})
+                   "ly_do_tu_choi": r.reject_reason or "", "nguoi_lap": r.created_by,
+                   "da_chi_tien": float(r.da_chi_tien or 0), "ma_so_thue": r.supplier_tax_code or "",
+                   "can_cu": x.get("can_cu") or ""})
     return {"de_nghi": ra}
+
+
+class GuiLaiXeIn(BaseModel):
+    so_tien: float | None = None
+    noi_dung: str | None = None
+    nguoi_thu_huong: str | None = None
+    ma_so_thue: str | None = None
+    can_cu: str | None = None
+    hen_bo_sung: str | None = None
+
+
+@router.post("/de-nghi-chi/{rid}/gui-lai")
+def gui_lai_de_nghi_chi_xe(rid: int, data: GuiLaiXeIn, u: User = Depends(require_roles("gd_doi_xe", "cntt")),
+                           db: Session = Depends(get_db)):
+    """GĐ đội xe sửa đề nghị chi bị «Trả bổ sung» rồi gửi lại (Chủ tịch duyệt 10/11/2026). Cửa riêng của đội
+    xe vì vai đội xe không có màn Đề nghị chi chung; luật nằm MỘT chỗ ở `services/ops.py::gui_lai`."""
+    from app.models.ops import PaymentRequest
+    from app.services import ops as O
+    r = db.get(PaymentRequest, rid)
+    if not r or r.category not in LOAI_CHI_XE:
+        raise HTTPException(404, "Không có đề nghị chi của đội xe")
+    d = data.model_dump(exclude_unset=True)
+    vao = {k2: d[k1] for k1, k2 in (("so_tien", "amount"), ("noi_dung", "description"),
+                                     ("nguoi_thu_huong", "supplier_name"), ("ma_so_thue", "supplier_tax_code"))
+           if k1 in d}
+    dx = {k: d[k] for k in ("can_cu", "hen_bo_sung") if k in d}
+    if dx:
+        vao["doi_xe"] = dx
+    try:
+        msg = O.gui_lai(db, u, r, vao)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    return {"message": msg + " — chờ Chủ tịch duyệt", "id": r.id, "status": r.status}
 
 
 @router.post("/de-xuat-chi", status_code=201)

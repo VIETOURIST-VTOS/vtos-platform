@@ -173,7 +173,8 @@ def _nap_de_nghi_chi(db: Session, dem: list[int], hom_nay: date, cham: set) -> i
         nhom = NHOM_THEO_PR.get(pr.category, "van_hanh_khac")
         if co_anh_tra and nhom == "tra_ncc":
             continue
-        tong = float(pr.amount or 0)
+        # Chi một phần (10/11/2026): phần đã chi không còn là nghĩa vụ — chỉ phần còn phải chi.
+        tong = float((pr.amount or 0) - (pr.da_chi_tien or 0))
         t = tours.get(pr.tour_id) if pr.tour_id else None
         du_kien = pr.ngay_den_han
         ghi_chu = ""

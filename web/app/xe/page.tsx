@@ -8,6 +8,7 @@ import { KhoiHieuQuaXe } from "@/components/KhoiV14";
 import ChiPhiKyPanel from "@/components/doixe/ChiPhiKyPanel";
 import DeXuatChiTaiCho from "@/components/doixe/DeXuatChiTaiCho";
 import * as G from "@/components/doixe/TrangGon";
+import SanSangVanHanh from "@/components/doixe/SanSangVanHanh";
 
 /** Bàn làm việc Giám đốc đội xe — màn `/xe`. Bố cục v3.3, bản vẽ anh Tuấn gửi 09/11/2026.
  *
@@ -332,6 +333,12 @@ function BanLamViecXe() {
     {/* ④ TỔNG QUAN */}
     {!nhomMo && <>
       {dang && !d && <p className="muted">Đang đọc số…</p>}
+
+      {/* SẴN SÀNG VẬN HÀNH (Chủ tịch duyệt 10/11/2026): còn thiếu gì, mỗi dòng mở đúng trang con. */}
+      <SanSangVanHanh ky={ky} mo={(ma) => {
+        const n = NHOM.find((g) => g.trang.some((t) => t.ma === ma));
+        if (n) { setNhom(n.ma); setTrang(ma); setMoSan(""); setChiTiet(null); }
+      }} />
 
       {/* HAI CỬA NHẬP — chỉ xuất hiện MỘT lần trên cả màn (v3.3). */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center",
