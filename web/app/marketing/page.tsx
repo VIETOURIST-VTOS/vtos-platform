@@ -53,10 +53,31 @@ const RONG = { name: "", objective: "ra_lead", product_id: "", mang: "le", chann
 const TABS: [string, string, string][] = [
   ["tongquan",   "Tổng quan",                "Nhìn kết quả, nhận biết tồn đọng, mở đúng hồ sơ cần xử lý."],
   ["khach",      "Khách tiềm năng & Sales",  "Một hồ sơ khách, nhiều nhu cầu; tiếp nhận và phối hợp trên cùng dữ liệu."],
-  ["chuyendoi",  "Chuyển đổi & doanh thu",   "Tách tháng phát sinh lead, tháng chốt booking và tháng khởi hành."],
+  // MKT-5 · 09/11/2026 — tên cũ «Chuyển đổi & doanh thu» đụng CẢ HAI màn hình riêng của
+  // phòng cùng lúc: «Chuyển đổi & phối hợp Sales» (/chuyen-doi-lead) và «Đóng góp doanh
+  // thu» (/dong-gop-marketing). Việc thật của tab này hẹp hơn hai màn ấy, và tên mới nói
+  // đúng cái việc hẹp ấy: tách ba cái tháng hay bị lẫn rồi ra tỷ lệ chốt theo quy tắc
+  // overview-v1 Chủ tịch ký 14/9/2026.
+  ["chuyendoi",  "Tỷ lệ chốt theo kỳ",
+   "Tách tháng phát sinh lead, tháng chốt booking và tháng khởi hành."],
   ["chiendich",  "Ngân sách & chiến dịch",   "Theo dõi kế hoạch, chi phí và kết quả trên cùng chiến dịch."],
-  ["doisoat",    "Đối soát dữ liệu",         "Xử lý trùng, thiếu nguồn và sai liên kết trước khi xác nhận báo cáo."],
-  ["noidung",    "Nội dung & kênh",          "Tổ chức nội dung theo lịch, người phụ trách và trạng thái duyệt."],
+  // MKT-5 · 09/11/2026 — tên cũ TRÙNG Y HỆT màn hình «Đối soát dữ liệu Marketing»
+  // (/doi-soat-marketing), mà hai chỗ làm hai việc khác nhau: ở ĐÂY là cửa KHAI số lead và
+  // chi phí theo kênh, kèm nút CHẠY đối chiếu lead ↔ booking; còn ĐỌC kết quả — đối chiếu
+  // ba sổ, trùng & thiếu nguồn, chuẩn kỳ & độ trôi — là ở màn hình kia. Một cái tên trỏ hai
+  // nơi thì người bấm phải đoán, và đoán sai thì họ tưởng màn hình hỏng.
+  //
+  // ĐỔI NHÃN, KHÔNG ĐỔI KHOÁ: khoá `doisoat` giữ nguyên từng ký tự, nên mọi `?tab=doisoat`
+  // đã gửi nhau, mọi dấu trang, và mọi ô trên hai bàn làm việc vẫn mở đúng chỗ cũ.
+  ["doisoat",    "Khai kênh & chạy đối chiếu",
+   "Khai số lead và chi phí theo kênh, rồi chạy đối chiếu lead ↔ booking."],
+  // MKT-5 · 09/11/2026 — tên cũ «Nội dung & kênh» gần trùng màn hình «Nội dung & thương
+  // hiệu» (/noi-dung). Tên mới không nghĩ ra gì cả, nó chép lại đúng câu mà CHÍNH TAB NÀY
+  // đang tự viết ra cho người dùng đọc: «Soạn bài, đính tệp và chuyển trạng thái nằm ở màn
+  // hình Nội dung & thương hiệu. Ở đây là hàng đợi của phòng: cái gì đang chờ ai.»
+  // Trang đã biết nó là hàng đợi từ lâu; đợt này chỉ làm cái tên nói đúng điều ấy.
+  ["noidung",    "Hàng đợi duyệt nội dung",
+   "Nội dung nào đang chờ ai duyệt. Soạn bài ở màn hình Nội dung & thương hiệu."],
   // Tên cũ là "Thương hiệu & PR". Đổi 19/9/2026 vì tab này giữ HÀNG ĐỢI KHỦNG HOẢNG và sổ PR
   // kèm đồng hồ hai giờ — thứ người ta cần tìm lúc gấp nhất. Tên cũ không gợi gì tới việc ấy.
   ["thuonghieu", "Khủng hoảng, PR & thương hiệu",
