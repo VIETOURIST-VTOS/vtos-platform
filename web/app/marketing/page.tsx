@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import Shell, { useShell } from "@/components/Shell";
+import Link from "next/link";
+// MKT-3 · 09/11/2026 — `GROUPS` là bảng menu mà THANH DỌC đọc. Thanh chức năng ngang ở
+// dưới đọc đúng bảng ấy, nên hai chỗ không bao giờ lệch nhau được.
+import Shell, { useShell, GROUPS } from "@/components/Shell";
 import { api, vnd, fmtD, fmtDT, pct, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import BaoCaoChuyenDoi, { tyLe } from "@/components/BaoCaoChuyenDoi";
@@ -65,6 +68,16 @@ const TABS: [string, string, string][] = [
   ["muc-luc", "Mục lục chức năng",
    "Toàn bộ mục của phân hệ theo bản vẽ V1.3, ghi rõ mục nào đã có trang và mục nào còn nợ."],
 ];
+
+/** MƯỜI HAI MỤC CỦA PHÒNG MARKETING — đọc THẲNG từ bảng menu, không chép tay.
+ *
+ *  Chép tay thì ngày thêm một màn hình, một trong hai chỗ sẽ quên — và mục bị quên là mục
+ *  không ai tới được. Đo được đúng chuyện ấy ngày 09/11/2026: mười hai mục này ĐÃ ĐƯỢC KHAI
+ *  trong `GROUPS` từ lâu, nhưng thanh dọc của crm chỉ vẽ tám phân hệ và các phòng con, nên
+ *  không mục nào trong số chúng có mặt trong DOM. Chúng chỉ tới được bằng cách gõ đường dẫn.
+ */
+const MUC_PHONG: [string, string][] =
+  ((((GROUPS as any[]).find((g) => g.key === "marketing") || {}).blocks) || []) as [string, string][];
 
 /** Một THẺ SỐ của Tổng quan. Bốn phần, và phần thứ tư không được bỏ:
  *      nhãn · số · số ấy đọc từ đâu · CỬA để đi tới chỗ sửa nó.
@@ -322,6 +335,25 @@ function Marketing() {
   const lechLon = (rep?.by_channel_month || []).filter((a: any) => a.lech_khai_bao).length;
 
   return (<>
+    {/* THANH CHỨC NĂNG — MKT-3 · 09/11/2026, khuôn lấy từ màn `/xe`. Thay cho thanh dọc đã
+        ẩn: người của phòng vẫn đi được tới MỌI màn của chính phân hệ mình, nhưng không thấy
+        phân hệ của phòng khác — đúng điều Chủ tịch chốt 08/11 cho trang riêng từng phòng.
+
+        KHÔNG LỌC THEO QUYỀN Ở ĐÂY, cùng lẽ với `/xe`: hàng rào nằm ở máy chủ và ở chính màn
+        hình đích. Giấu một mục đi thì người thiếu quyền không biết là mình thiếu quyền, và
+        họ sẽ đi hỏi người khác thay vì xin quyền ở Quản trị hệ thống.
+
+        LỐI RA PHẢI CÓ: ẩn thanh dọc là lấy mất đường sang phân hệ khác, nên «Trang tổng CRM»
+        đứng cuối hàng. Thiếu nó thì màn này thành một ngõ cụt đẹp. */}
+    <nav aria-label="Màn hình phòng Marketing"
+         style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center",
+                  marginBottom: 14, paddingBottom: 8, borderBottom: "1px solid #e6eaf0" }}>
+      {MUC_PHONG.map(([ten, duong]) => (
+        <Link key={duong + ten} href={duong} className="act grey" style={{ margin: 0 }}>{ten}</Link>
+      ))}
+      <Link href="/" style={{ marginLeft: "auto" }}>Trang tổng CRM →</Link>
+    </nav>
+
     <h1>Marketing &amp; PR</h1>
 
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
@@ -924,4 +956,7 @@ function Marketing() {
     </>}
   </>);
 }
-export default function Page() { return <Shell><Marketing /></Shell>; }
+// MKT-3 · 09/11/2026 — `khongThanhBen`: Chủ tịch chốt «bỏ màn hình dọc giống bên đội xe».
+// Màn `/xe` đã làm đúng thế từ 08/11, và lý do giống nhau: đây là trang RIÊNG của một phòng,
+// không phải một chỗ đứng để nhìn sang phòng khác. Thanh chức năng ngang ở trên thay chỗ nó.
+export default function Page() { return <Shell khongThanhBen><Marketing /></Shell>; }
