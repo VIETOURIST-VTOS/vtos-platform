@@ -180,7 +180,7 @@ def forecast_13w(db: Session, start: date | None = None, opening: float | None =
         put(max(date.today(), start_date - timedelta(days=7)), "in", "thu_booking", float(due))
     # Chi tour: lệnh chi chờ (tuần này) và đề nghị đang trình (tuần sau); chi dự toán còn lại của tour sắp chạy
     for pr in db.execute(select(PaymentRequest).where(PaymentRequest.status.in_(["cho_chi", "cho_tp", "cho_kt", "cho_duyet"]))).scalars():
-        put(date.today() if pr.status == "cho_chi" else date.today() + timedelta(days=7), "out", "chi_ncc", (pr.amount or 0))
+        put(date.today() if pr.status == "cho_chi" else date.today() + timedelta(days=7), "out", "chi_ncc", (pr.amount or 0) - (pr.da_chi_tien or 0))
     # Chi dự toán còn lại của tour sắp chạy. Bản cũ gọi tour_cashflow() cho TỪNG tour đã duyệt: mỗi lần
     # là ba chuyến đi–về tới cơ sở dữ liệu ở Singapore cộng một lần nạp lười danh sách booking. Với vài
     # trăm tour đang mở, riêng vòng lặp này đã là hàng nghìn chuyến đi–về, mà kết quả chỉ cần đúng MỘT

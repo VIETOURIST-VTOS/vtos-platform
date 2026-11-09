@@ -205,6 +205,8 @@ CHI_DOC_TRANG_THAI = {
                                "thật, không phán quyết.",
     "ops.pr_out":              "Trả trạng thái chữ ký của đề nghị chi ra màn hình; còn CẤP DUYỆT "
                                "thì nó hỏi `cap_duyet`, không tự suy.",
+    "ops._tra_bo_sung":        "Trả bổ sung (10/11/2026): CHỤP các ô chữ ký vào lịch sử rồi XOÁ "
+                               "chúng — không đọc chữ ký để quyết ai được ký; hồ sơ gửi lại ký từ đầu.",
     "hach_toan.bang":          "Bảng quy tắc hạch toán; cột 'đã ký' là hiển thị trạng thái, "
                                "không quyết định gì.",
     "tours.tour_view":         "Màn hình chuyến; cột chữ ký là hiển thị trạng thái, còn ai "
@@ -391,6 +393,10 @@ def con_thieu_cua(loai: str, da_ky: dict[str, str]) -> list[str]:
 # gọi `kiem_tra_nguoi_ky`. Cửa nào cố ý không gọi thì phải có tên ở đây — không có tên là ĐỎ.
 # Nhờ vậy cửa ký thứ bảy mai sau không lặng lẽ mọc ra thiếu lớp kiểm soát.
 KHONG_GOI_KIEM_TRA = {
+    "ops._tra_bo_sung": (
+        "KHÔNG PHẢI CỬA KÝ — Trả bổ sung (Chủ tịch duyệt 10/11/2026) XOÁ chữ ký đã có, không đặt chữ ký "
+        "nào. Ai được trả thì `_ai_tra_duoc` hỏi đúng người giữ bước; chữ ký mới chỉ có lại khi hồ sơ "
+        "gửi lại đi qua `step` — nơi đã gọi `kiem_tra_mot_nguoi_hai_vai`."),
     "tours.approve": (
         "CHUYẾN DƯỚI BIÊN 10%. Chủ tịch quyết 11/10/2026: BIẾT VÀ CHẤP NHẬN, không bịt ở đợt này. "
         "Lỗ đo được: cửa này chỉ chặn 'vai này đã ký rồi', nên một người giữ CẢ hai tài khoản "

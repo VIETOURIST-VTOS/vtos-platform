@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DinhKem from "@/components/DinhKem";
 import { api } from "@/lib/api";
 import { errMsg } from "@/components/ui";
@@ -58,6 +58,13 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
 }) {
   const { data: d, setData, xoaNhap, coNhapCu } = useNhap("vtos.doixe.de-xuat-chi.nhap", rong);
   const [buoc, setBuoc] = useState(0);
+  // Chống ghi chi phí hai lần (Chủ tịch duyệt 10/11/2026): khoản gốc CHỌN từ sổ của chính xe, không gõ tay.
+  const xeChon = xe.find((v) => v.plate === d.bien_so);
+  const [kg, setKg] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (d.pham_vi !== "xe" || !xeChon) { setKg(null); return; }
+    api<any>(`/fleet/khoan-goc?xe_id=${xeChon.id}`).then((r) => setKg(r.rows || [])).catch(() => setKg([]));
+  }, [d.pham_vi, xeChon?.id]); // eslint-disable-line
   const [dang, setDang] = useState(false);
   const [daLuu, setDaLuu] = useState<{ ma_gd: string } | null>(null);   // ma_gd = mã đề nghị chi DC…
   const [choTrung, setChoTrung] = useState(false);
@@ -198,9 +205,14 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
             <option value="">— chọn căn cứ —</option>
             {CAN_CU.map((c) => <option key={c} value={c}>{c}</option>)}
           </select></label>
-        <label>Mã khoản chi đã ghi nhận
-          <input value={d.ma_khoan_goc} onChange={(e) => dat("ma_khoan_goc", e.target.value)}
-            placeholder="Mã phiếu chuyến / khoản gốc, nếu đã có" /></label>
+        <label>Khoản gốc đã ghi nhận (nếu có)
+          <select value={d.ma_khoan_goc} onChange={(e) => dat("ma_khoan_goc", e.target.value)}
+            disabled={d.pham_vi !== "xe" || !xeChon}>
+            <option value="">{d.pham_vi !== "xe" ? "— chi phí toàn đội: không gắn —" : !xeChon ? "— chọn xe trước —" : "— không gắn khoản gốc —"}</option>
+            {(kg || []).map((k) => <option key={k.ma} value={k.ma} disabled={!!k.de_nghi_chi}>
+              {`${k.loai} · ${k.ten} · ${k.so_tien != null ? tien(k.so_tien) : "chưa có số"}`}{k.de_nghi_chi ? ` — đã có ${k.de_nghi_chi}` : ""}
+            </option>)}
+          </select></label>
         <label>Số chứng từ
           <input value={d.chung_tu} onChange={(e) => dat("chung_tu", e.target.value)} placeholder="HĐ 0000xxxx" /></label>
         {hienNganHang && <label>Số tài khoản bên nhận
@@ -240,7 +252,8 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
         {hienNganHang && <Cap nhan="Tài khoản bên nhận" value={[d.so_tai_khoan.trim(), d.ngan_hang.trim()].filter(Boolean).join(" · ")} />}
         <Cap nhan="Chứng từ" value={d.chung_tu.trim()} />
         {!d.chung_tu.trim() && <Cap nhan="Hẹn bổ sung" value={d.hen_bo_sung.trim()} />}
-        <Cap nhan="Liên kết khoản gốc" value={d.ma_khoan_goc.trim()} />
+        <Cap nhan="Liên kết khoản gốc" value={d.ma_khoan_goc.trim()
+          ? ((kg || []).find((k) => k.ma === d.ma_khoan_goc)?.ten || d.ma_khoan_goc) : ""} />
       </KhoiXem>
       {buoc === 2 && <>
         <p className="muted">Đề nghị chi <b>chưa phải chi phí đã ghi sổ</b>, cũng chưa phải tiền đã thanh toán.
