@@ -123,13 +123,18 @@ const NGAN_KEO: Record<string, { ten: string; toi: string; nhan: string }> = {
 };
 
 function BanLamViecXe() {
-  const { toast } = useShell();
+  const { user, toast } = useShell();
   const [ky, setKy] = useState(() => new Date().toISOString().slice(0, 7));
   const [d, setD] = useState<any>(null);
   const [dang, setDang] = useState(true);
   const [keo, setKeo] = useState<string | null>(null);
   /** `null` = đang ở TỔNG QUAN. Khác null = mã nhóm nghiệp vụ đang mở. */
   const [nhom, setNhom] = useState<string | null>(null);
+
+  /** Vai này có được vào màn /xe không — hỏi `hidden_menus` của phiên, tức lời của chính
+   *  ma trận quyền ở access.py. Không dựng danh sách vai thứ hai ở web, và không thêm một
+   *  cửa hỏi quyền nữa: câu trả lời đã nằm sẵn trong trình duyệt từ lúc đăng nhập. */
+  const khongCoQuyen = (user?.hidden_menus || []).includes("/xe");
 
   const doc = useCallback(async (k: string) => {
     setDang(true);
@@ -138,7 +143,7 @@ function BanLamViecXe() {
     finally { setDang(false); }
   }, [toast]);
 
-  useEffect(() => { doc(ky); }, [ky, doc]);
+  useEffect(() => { if (!khongCoQuyen) doc(ky); }, [ky, doc, khongCoQuyen]);
   useEffect(() => {
     if (!keo) return;
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setKeo(null); };
@@ -158,6 +163,19 @@ function BanLamViecXe() {
     nhan: kyNgan(p.ky), gt: p.co_so ? (p[truong] ?? null) : null,
   }));
   const kyChuaDu = diemDB.filter((p: any) => p.co_so && !p.du_chi_phi_ky);
+
+  // THIẾU QUYỀN: nói rõ, và dừng ở đây. Không vẽ thanh nghiệp vụ, không vẽ hai nút nhập —
+  // một cái khung đầy đủ mà rỗng ruột đọc ra như phần mềm hỏng.
+  if (khongCoQuyen) return (
+    <div className="panel">
+      <h1 style={{ marginTop: 0 }}>Điều hành đội xe</h1>
+      <p><b>Màn hình này của Công ty TNHH Vận tải Vietrip.</b> Vai trò của bạn chưa được mở
+        quyền vào đây, nên VTOS không tải số liệu đội xe.</p>
+      <p className="muted">Nếu bạn cần xem, xin quyền ở <b>Quản trị hệ thống → Tài khoản &amp;
+        phân quyền</b>. Đây không phải lỗi hệ thống, và cũng không phải màn hình chưa dựng.</p>
+      <p><Link href="/">← Về trang tổng CRM</Link></p>
+    </div>
+  );
 
   return (<>
     {/* ① NĂM MỤC NGHIỆP VỤ — một hàng ngang, không có mục "Bàn làm việc" (v3.3).
