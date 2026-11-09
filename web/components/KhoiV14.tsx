@@ -98,6 +98,16 @@ export type HieuQuaXe = {
   doanh_thu?: number | null;
   loi_nhuan?: number | null;
   ty_le_loi_nhuan?: number | null;        // phân số, 0–1
+  /** KS-65 · 09/11/2026 — phần ĐỂ RA NGOÀI ba con số trên.
+   *
+   *  `doanh_thu` và `loi_nhuan` chỉ gồm chuyến ĐÃ quyết toán. Chuyến chưa quyết toán chưa có một
+   *  dòng chi phí nào (chi phí chỉ nhập lúc quyết toán), nên cộng doanh thu của chúng vào là làm
+   *  biên lợi nhuận đẹp hơn sự thật — đo kỳ 2026-11 ngày 09/11: biên in ra 74,4% thay vì 36,9%.
+   *
+   *  Nhưng TRỪ ĐI MÀ KHÔNG NÓI cũng là một kiểu nói dối: Chủ tịch thấy doanh thu nhỏ đi mà không
+   *  biết vì sao. Hai ô này là câu trả lời, và chúng in ngay dưới ba ô chủ. */
+  so_chuyen_chua_quyet_toan?: number | null;
+  doanh_thu_chua_quyet_toan?: number | null;
   tieu_hao_l100?: number | null;
   tieu_hao_nguong_thieu?: { bo_phan: string; cua_nhap: string } | null;
   tieu_hao_vuot?: { xe: string; so_cho: number; tieu_hao: number; nguong: number }[] | null;
@@ -534,6 +544,19 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet }: {
           </div>
         ))}
       </div>
+
+      {/* KS-65 — DOANH THU ĐANG TREO. In ngay dưới ba ô chủ, không đẩy xuống cuối màn: nó là chú
+          thích của chính ba con số trên, và một chú thích đặt xa con số nó giải thích thì không ai
+          đọc. Chỉ hiện khi CÓ chuyến đang treo — kỳ nào quyết toán xong thì dòng này biến mất. */}
+      {!!o.so_chuyen_chua_quyet_toan && (
+        <p className="muted" style={{ margin: "8px 0 0", lineHeight: 1.45 }}>
+          Ba con số trên <b>chỉ gồm chuyến đã quyết toán</b>. Còn{" "}
+          <b>{o.so_chuyen_chua_quyet_toan} chuyến chưa quyết toán</b>, doanh thu đang treo{" "}
+          <b>{vnd(o.doanh_thu_chua_quyet_toan)} đ</b> — chi phí của chúng chỉ được nhập lúc quyết
+          toán, nên cộng vào bây giờ là làm biên lợi nhuận đọc ra cao hơn sự thật.{" "}
+          <Link className="the-cua" href="/lai-lo-doi-xe">Xem từng chuyến →</Link>
+        </p>
+      )}
 
       {/* ── TẦNG VẬN HÀNH ── XS-3 (anh Tuấn duyệt bản xem thử 25/10/2026): năm ô BẰNG NHAU — mỗi ô
           tên · con số · MỘT dòng 4–5 chữ kèm số cụ thể · nút «Xem chi tiết» nằm ở đáy, thẳng hàng

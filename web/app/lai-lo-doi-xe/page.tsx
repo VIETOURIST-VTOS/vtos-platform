@@ -80,6 +80,29 @@ function LaiLo() {
               <td className="num"><b style={{ color: t.ket_qua_sau_tai_chinh < 0 ? "var(--red)" : undefined }}>
                 {vnd(t.ket_qua_sau_tai_chinh)}</b></td></tr>
           </tbody></table></div>
+        {/* KS-65 · 09/11/2026 — CHUYẾN CHƯA QUYẾT TOÁN, ĐỂ RA NGOÀI LỢI NHUẬN VÀ GỌI TÊN TỪNG CÁI.
+            Trước bản này doanh thu của chúng được cộng vào kỳ trong khi chi phí chưa nhập, nên
+            biên lợi nhuận đọc ra cao hơn sự thật (kỳ 2026-11 đo ngày 09/11: 74,4% thay vì 36,9%).
+            Nay để riêng — nhưng để riêng mà im lặng thì người đọc tưởng doanh thu kỳ này ít đi,
+            nên khối này phải nói ra bao nhiêu đang treo và treo ở những chuyến nào. */}
+        {t.so_chuyen_chua_quyet_toan > 0 && <div className="panel" style={{ borderColor: "var(--orange)" }}>
+          <h2>{t.so_chuyen_chua_quyet_toan} chuyến chưa quyết toán — doanh thu đang treo {vnd(t.doanh_thu_chua_quyet_toan)}</h2>
+          <p className="muted">Các chuyến này <b>không nằm trong lợi nhuận ở trên</b>. Chi phí của một
+            chuyến chỉ được nhập lúc quyết toán, nên cộng doanh thu của chúng vào bây giờ là làm biên
+            lợi nhuận đọc ra cao hơn sự thật. Quyết toán xong chuyến nào thì chuyến ấy tự vào bảng trên.</p>
+          <table><thead><tr><th>Phiếu</th><th>Xe</th><th>Tour</th><th>Đi → về</th>
+            <th className="num">Doanh thu</th><th className="num">Dòng chi phí</th></tr></thead>
+            <tbody>{(d.chuyen_chua_quyet_toan || []).map((c: any) => <tr key={c.ma_phieu}>
+              <td className="muted">{c.ma_phieu}</td><td>{c.xe}</td>
+              <td>{c.ten_tour || <span className="muted">—</span>}</td>
+              <td>{fmtD(c.ngay_di)} → {fmtD(c.ngay_ve)}</td>
+              <td className="num">{vnd(c.doanh_thu)}</td>
+              {/* Số dòng chi phí là chỗ nhìn ra chuyến nào mới chỉ có doanh thu: 0 dòng nghĩa là
+                  chưa ai nhập một khoản nào cho chuyến ấy. */}
+              <td className="num">{c.so_dong_chi_phi === 0
+                ? <span style={{ color: "var(--orange)" }}>chưa có dòng nào</span>
+                : c.so_dong_chi_phi}</td></tr>)}</tbody></table>
+        </div>}
         {d.nhom_tai_chinh_chua_nhap?.length > 0 && <p className="muted">
           <Tag cls="warn">chưa nhập</Tag> {d.nhom_tai_chinh_chua_nhap.join(" · ")} — kỳ này chưa có số,
           nên dòng <b>kết quả sau lãi vay</b> đang bằng lợi nhuận đội xe. Đó là THIẾU SỐ, không phải

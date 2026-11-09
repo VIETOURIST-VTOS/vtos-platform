@@ -77,6 +77,11 @@ def theo_chuyen(db: Session, ky: str) -> list[dict]:
         did = t.driver_id or (v.driver_id if v else None)
         out.append({
             "trip_id": t.id, "ma_phieu": t.ma_phieu, "xe": v.plate if v else "",
+            # KS-65 · 09/11/2026 — nói ra chuyến này đã quyết toán chưa. Bảng theo chuyến vẫn in
+            # ĐỦ mọi chuyến (người điều hành cần thấy chuyến đang chạy), nhưng dòng nào chưa quyết
+            # toán thì phải tự khai, vì lãi gộp của nó là doanh thu TRỪ một tập chi phí chưa nhập
+            # xong — một con số đẹp hơn sự thật.
+            "quyet_toan": bool(t.quyet_toan),
             "tai_xe": emps.get(did, ""), "ten_tour": t.ten_tour,
             "ngay_di": t.ngay_di, "ngay_ve": t.ngay_ve,
             "so_ngay": (t.ngay_ve - t.ngay_di).days + 1,
@@ -162,8 +167,35 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
     rows: dict[int, dict] = {}
 
     # --- Tầng 1: chuyến ---
+    #
+    # KS-65 · 09/11/2026 — CHỈ CỘNG CHUYẾN ĐÃ QUYẾT TOÁN. Đây là chỗ sửa của KS-62.
+    #
+    # Trước bản này vòng lặp lấy mọi chuyến `status not in ("nhap","huy")`, nên nó cộng DOANH THU
+    # của chuyến chưa quyết toán vào kỳ, trong khi chi phí của chính chuyến ấy CHƯA ĐƯỢC NHẬP —
+    # chi phí chỉ vào lúc quyết toán. Doanh thu vào trước, chi phí vào sau, và chỉ cộng nửa đầu
+    # thì ra một con số đẹp gấp đôi sự thật.
+    #
+    # Đo thật trên hệ ngày 09/11/2026, kỳ 2026-11: 17 chuyến, 7 đã quyết toán (64.000.000 đ doanh
+    # thu, 26 dòng chi phí) và 10 CHƯA (94.000.000 đ doanh thu, KHÔNG MỘT DÒNG chi phí nào). Màn
+    # Chủ tịch vì thế in biên lợi nhuận đội xe tháng 11 là 74,4%, trong khi phần đã quyết toán là
+    # 36,9%. Sai theo hướng ĐẸP LÊN, nên không ai nghi — và nó nằm trên màn hình dùng để quyết.
+    #
+    # Nay cùng một luật với `fleet_ai.hieu_qua_ky` (dòng `if not t.quyet_toan: … continue`), và
+    # hai màn hình cùng gọi con số của mình là "lợi nhuận đội xe" thì phải đếm cùng một luật.
+    # Phần bị để ra ngoài KHÔNG biến mất: nó thành `chua_quyet_toan` ở `tong` và một danh sách
+    # gọi tên từng chuyến bên dưới — "chưa nhập" không phải "bằng 0", mà cũng không phải "cộng
+    # vào như thể đã xong".
+    chua_qt, dt_chua_qt, ds_chua_qt = 0, 0.0, []
     for c in theo_chuyen(db, ky):
         t = db.get(Trip, c["trip_id"])
+        if not t.quyet_toan:
+            chua_qt += 1
+            dt_chua_qt += (c["doanh_thu"] or 0)
+            ds_chua_qt.append({"ma_phieu": c["ma_phieu"], "xe": c["xe"], "ten_tour": c["ten_tour"],
+                               "ngay_di": c["ngay_di"], "ngay_ve": c["ngay_ve"],
+                               "doanh_thu": c["doanh_thu"],
+                               "so_dong_chi_phi": len(c["chi_tiet"] or {})})
+            continue
         r = rows.setdefault(t.vehicle_id, _rong(veh.get(t.vehicle_id), t.vehicle_id))
         did = t.driver_id or (veh[t.vehicle_id].driver_id if t.vehicle_id in veh else None)
         if did and not r["tai_xe"]: r["tai_xe"] = emps.get(did, "")
@@ -260,6 +292,10 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
             # Ngoài giá vốn — in thành dòng riêng bên dưới lợi nhuận, không trộn vào trên.
             "chi_phi_tai_chinh": cp_tai_chinh,
             "ket_qua_sau_tai_chinh": tong_dt - tong_cp_chuyen - tong_cp_xe - cp_doi - cp_tai_chinh,
+            # KS-65: phần ĐỂ RA NGOÀI lợi nhuận ở trên. Cùng tên trường với `fleet_ai.hieu_qua_ky`
+            # để hai màn hình không đặt hai cái tên cho cùng một con số.
+            "so_chuyen_chua_quyet_toan": chua_qt,
+            "doanh_thu_chua_quyet_toan": round(dt_chua_qt),
             "so_xe_khai_thac": len([x for x in ds if x["ngay_khai_thac"]]),
             "ngay_khai_thac": tong_ngay,
             # Công suất tính trên số xe CÓ trong đội, không phải số xe có chạy: mẫu số bằng số xe chạy
@@ -288,7 +324,14 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
         # Phần nằm NGOÀI ba tầng – xem ngoai_so(). In ra ngay cạnh lợi nhuận, không để ở cuối.
         "ngoai_so": ngoai_so(db, d1, d2),
         "nhom_chi_phi_doi_chua_nhap": thieu,
-        "ghi_chu": ("Ba tầng chi phí để riêng: chi phí chuyến, chi phí của xe, chi phí của đội. "
+        # Gọi tên từng chuyến bị để ra ngoài. Một con số "10 chuyến đang treo" mà không nói chuyến
+        # nào thì người đọc phải đi dò, và việc đi dò ấy sẽ không ai làm.
+        "chuyen_chua_quyet_toan": ds_chua_qt,
+        "ghi_chu": ("Lợi nhuận kỳ CHỈ gồm chuyến đã quyết toán. Chuyến chưa quyết toán để riêng ở "
+                    "dòng «doanh thu đang treo»: chi phí của chúng chỉ được nhập lúc quyết toán, "
+                    "nên cộng doanh thu vào mà chưa có chi phí là làm biên lợi nhuận đẹp hơn sự "
+                    "thật. "
+                    "Ba tầng chi phí để riêng: chi phí chuyến, chi phí của xe, chi phí của đội. "
                     "Chi phí đội mặc định KHÔNG chia về từng xe – chia theo tiêu thức nào cũng ra một "
                     "con số khác, mà người đọc lại nhớ nó như kết quả thật của chiếc xe. "
                     "Lãi vay KHÔNG nằm trong giá vốn (Chủ tịch quyết 11/10/2026) – nó là chi phí tài "
