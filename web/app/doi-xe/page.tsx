@@ -2,6 +2,8 @@
 import { useEffect, useState, useCallback } from "react";
 import DinhKem from "@/components/DinhKem";
 import QuyetToanChuyen from "@/components/QuyetToanChuyen";
+import BonBuocBaoCaoXe from "@/components/doixe/BonBuocBaoCaoXe";
+import BonBuocDeXuatChi from "@/components/doixe/BonBuocDeXuatChi";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, fmtDT, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
@@ -189,30 +191,20 @@ function DoiXe() {
 
   const mo = async (id: number) => { try { setChon(await api(`/fleet/xe/${id}`)); } catch (e) { toast(errMsg(e), true); } };
 
+  /** SỬA một phiếu đã có. KS-64 · 09/11/2026 — hàm này KHÔNG còn đường tạo phiếu mới:
+   *  nhập mới đi qua cửa bốn bước `BonBuocBaoCaoXe` (bản v3.3). Để lại cả hai đường tạo là để
+   *  ngày nào đó một bên thêm ô kiểm tra mà bên kia không, rồi cùng một phiếu lại hợp lệ hay
+   *  không tuỳ người nhập bấm vào nút nào. */
   const luuChuyen = async () => {
-    if (!form.vehicle_id) return toast("Chọn xe trước đã", true);
+    if (!form?.id) return;
     if (!form.ngay_di || !form.ngay_ve) return toast("Nhập ngày đi và ngày về", true);
     setDangLuu(true);
     try {
-      if (form.id) {
-        await api(`/fleet/chuyen/${form.id}`, { method: "PUT", json: {
-          ten_tour: form.ten_tour, ngay_di: form.ngay_di, ngay_ve: form.ngay_ve,
-          km_dau: form.km_dau, km_cuoi: form.km_cuoi, km_gps: form.km_gps,
-          km_nguon: form.km_nguon || "", doanh_thu: form.doanh_thu, note: form.note } });
-        toast("Đã cập nhật phiếu chuyến");
-      } else {
-        const r = await api<any>("/fleet/chuyen", { method: "POST", json: {
-          vehicle_id: form.vehicle_id, ten_tour: form.ten_tour, ngay_di: form.ngay_di, ngay_ve: form.ngay_ve,
-          km_dau: form.km_dau, km_cuoi: form.km_cuoi, km_gps: form.km_gps,
-          km_nguon: form.km_nguon || "nhap_tay", doanh_thu: form.doanh_thu, note: form.note } });
-        // Bốn khoản chi phí ghi thành bốn dòng riêng: mỗi dòng phải trả lời được loại gì, ai chịu, chứng từ đâu.
-        for (const k of ["dau", "cau_duong", "cong_tac_phi", "giu_xe"]) {
-          const tien = soTien(form[k]);
-          if (tien && tien > 0) await api(`/fleet/chuyen/${r.id}/chi-phi`, { method: "POST", json: {
-            kind: k, amount: tien, lit: k === "dau" ? soTien(form.lit) : null, chung_tu: form.chung_tu || "" } });
-        }
-        toast("Đã ghi phiếu chi phí xe");
-      }
+      await api(`/fleet/chuyen/${form.id}`, { method: "PUT", json: {
+        ten_tour: form.ten_tour, ngay_di: form.ngay_di, ngay_ve: form.ngay_ve,
+        km_dau: form.km_dau, km_cuoi: form.km_cuoi, km_gps: form.km_gps,
+        km_nguon: form.km_nguon || "", doanh_thu: form.doanh_thu, note: form.note } });
+      toast("Đã cập nhật phiếu chuyến");
       setForm(null); load();
     } catch (e) { toast(errMsg(e), true); } finally { setDangLuu(false); }
   };
@@ -290,8 +282,13 @@ function DoiXe() {
           nhập cầm tờ giấy trong tay, đính ảnh rồi khai luôn ai trả, không phải đi tìm sang tab khác.
           Chỉ hiện với phiếu ĐÃ CÓ số: chưa lưu phiếu thì chưa có gì để quyết toán. */}
       {form?.id && <QuyetToanChuyen tripId={form.id} toast={toast} />}
-      {form && <div className="panel">
-        <h2>{form.id ? `Sửa phiếu chuyến #${form.id}` : "Phiếu chi phí xe – nhập mới"}</h2>
+      {/* KS-64 · NHẬP MỚI đi qua cửa bốn bước của bản v3.3. SỬA một phiếu đã có thì vẫn là
+          bảng một trang ngay dưới: sửa là xem lại đúng vài ô, bắt đi lại bốn bước cho một lần
+          đổi tên tour là một cách phạt vô cớ. */}
+      {form && !form.id && <BonBuocBaoCaoXe xe={xe} kmNguon={(dm2?.km_nguon || {}) as Record<string, string>}
+        toast={toast} onXong={load} onDong={() => setForm(null)} />}
+      {form?.id && <div className="panel">
+        <h2>{`Sửa phiếu chuyến #${form.id}`}</h2>
         <p className="muted">Đúng bộ trường của phiếu trên Vietrip. Ô để trống nghĩa là <b>chưa có số</b>, không phải bằng 0 –
           hệ thống không tự điền 0 và không tính ra quãng đường âm.</p>
         <div className="grid2">
@@ -318,18 +315,11 @@ function DoiXe() {
           <label>Doanh thu (đ)<input type="number" value={form.doanh_thu ?? ""} onChange={(e) => setForm({ ...form, doanh_thu: soTien(e.target.value) })} /></label>
           <label>Ghi chú<input value={form.note || ""} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
         </div>
-        {!form.id && <>
-          <h3>Chi phí chuyến</h3>
-          <p className="muted">Bốn khoản này Vietourist tạm ứng theo quy tắc chốt 07/9/2026. Để trống khoản nào thì không ghi dòng đó.</p>
-          <div className="grid2">
-            <label>Tiền dầu (đ)<input type="number" value={form.dau ?? ""} onChange={(e) => setForm({ ...form, dau: soTien(e.target.value) })} /></label>
-            <label>Số lít<input type="number" step="0.001" value={form.lit ?? ""} onChange={(e) => setForm({ ...form, lit: soTien(e.target.value) })} /></label>
-            <label>Phí cầu đường (đ)<input type="number" value={form.cau_duong ?? ""} onChange={(e) => setForm({ ...form, cau_duong: soTien(e.target.value) })} /></label>
-            <label>Công tác phí tài xế (đ)<input type="number" value={form.cong_tac_phi ?? ""} onChange={(e) => setForm({ ...form, cong_tac_phi: soTien(e.target.value) })} /></label>
-            <label>Phí gửi xe (đ)<input type="number" value={form.giu_xe ?? ""} onChange={(e) => setForm({ ...form, giu_xe: soTien(e.target.value) })} /></label>
-            <label>Số chứng từ<input value={form.chung_tu || ""} onChange={(e) => setForm({ ...form, chung_tu: e.target.value })} /></label>
-          </div>
-        </>}
+        {/* KS-64: sáu ô chi phí từng ở đây đã BỎ. Bảng này chỉ còn dùng để SỬA phiếu đã có, và
+            sửa chi phí của phiếu đã có KHÔNG đi qua `POST /chuyen/{id}/chi-phi` được — cửa ấy
+            THÊM một dòng mới. Đúng hai lỗi nhân đôi chi phí (19/10 thừa 105.984.428 đ; 02/11
+            thừa 26 dòng trên 7 chuyến) đều sinh ra từ việc thêm dòng vào phiếu đã có dòng.
+            Chi phí của phiếu đã có sửa ở khối quyết toán phía trên. */}
         <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
           <button className="act teal" disabled={dangLuu} onClick={luuChuyen}>{dangLuu ? "Đang lưu…" : "Lưu phiếu"}</button>
           <button className="act grey" onClick={() => setForm(null)}>Đóng</button>
@@ -409,47 +399,9 @@ function DoiXe() {
       </div>
     </div>}
 
-    {tab === "giaodich" && formDX && <div className="panel">
-      <h2>Lập đề xuất chi</h2>
-      <p className="muted">Cùng bộ trường với phiếu đề xuất chi trên Vietrip. Bắt buộc chọn <b>nhóm</b>: &quot;nạp thẻ dầu&quot;
-        và &quot;sửa xe&quot; nhìn giống nhau lúc lập phiếu, nhưng một cái là nạp quỹ còn một cái là chi phí — không phân loại
-        ngay thì cuối tháng phải đọc lại từng phiếu để đoán.</p>
-      <div className="grid2">
-        <label>Ngày đề xuất<input type="date" value={formDX.ngay || ""} onChange={(e) => setFormDX({ ...formDX, ngay: e.target.value })} /></label>
-        <label>Số tiền (đ)<input type="number" value={formDX.so_tien ?? ""} onChange={(e) => setFormDX({ ...formDX, so_tien: soTien(e.target.value) })} /></label>
-        <label>Xe (để trống = đề xuất chung)
-          <select value={formDX.bien_so || ""} onChange={(e) => setFormDX({ ...formDX, bien_so: e.target.value })}>
-            <option value="">— đề xuất chung, không thuộc xe nào —</option>
-            {xe.map((v: any) => <option key={v.id} value={v.plate}>{v.plate}</option>)}
-          </select></label>
-        <label>Nhóm khoản chi
-          <select value={formDX.nhom || ""} onChange={(e) => {
-            const n = e.target.value;
-            setFormDX({ ...formDX, nhom: n, khong_phai_chi_phi: n.startsWith("Nạp quỹ") || n.startsWith("Điều chuyển") });
-          }}>
-            <option value="">— chọn nhóm —</option>
-            <option>Chi phí riêng của xe</option>
-            <option>Chi phí chung phân bổ</option>
-            <option>Sửa chữa – bảo dưỡng</option>
-            <option>Tài xế (công tác phí, lương)</option>
-            <option>Quyết toán chủ xe / đối tác</option>
-            <option>Nạp quỹ / tạm ứng (không phải chi phí)</option>
-            <option>Điều chuyển tiền nội bộ (không phải chi phí)</option>
-          </select></label>
-        <label>Số chứng từ<input value={formDX.chung_tu || ""} onChange={(e) => setFormDX({ ...formDX, chung_tu: e.target.value })} placeholder="HĐ 0000xxxx" /></label>
-        <label>Người / đơn vị thụ hưởng<input value={formDX.nguoi_thu_huong || ""} onChange={(e) => setFormDX({ ...formDX, nguoi_thu_huong: e.target.value })} /></label>
-        <label>Số tài khoản<input value={formDX.so_tai_khoan || ""} onChange={(e) => setFormDX({ ...formDX, so_tai_khoan: e.target.value })} /></label>
-        <label>Ngân hàng<input value={formDX.ngan_hang || ""} onChange={(e) => setFormDX({ ...formDX, ngan_hang: e.target.value })} /></label>
-      </div>
-      <label style={{ display: "block", marginTop: 8 }}>Nội dung đề xuất
-        <textarea rows={4} value={formDX.noi_dung || ""} onChange={(e) => setFormDX({ ...formDX, noi_dung: e.target.value })} /></label>
-      {formDX.khong_phai_chi_phi && <p className="muted">Khoản này được đánh dấu <b>không phải chi phí kỳ này</b> nên
-        sẽ không cộng vào tổng chi phí đội xe — tiền dầu thật nằm ở phiếu chi phí của từng chuyến.</p>}
-      <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-        <button className="act teal" disabled={dangLuu} onClick={luuDeXuat}>{dangLuu ? "Đang lưu…" : "Lập đề xuất"}</button>
-        <button className="act grey" onClick={() => setFormDX(null)}>Đóng</button>
-      </div>
-    </div>}
+    {tab === "giaodich" && formDX && <BonBuocDeXuatChi xe={xe} vai={user?.role || ""}
+      nguongChungTu={dm3?.nguong_chung_tu ?? null}
+      toast={toast} onXong={load} onDong={() => setFormDX(null)} />}
 
     {tab === "giaodich" && gd?.rows?.some((r: any) => r.source === "de_xuat_vietrip") && <div className="panel" style={{ borderColor: "var(--orange)" }}>
       <b>Dữ liệu đối chiếu – CHƯA CHÍNH THỨC.</b>
