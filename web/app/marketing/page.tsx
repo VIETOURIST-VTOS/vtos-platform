@@ -76,8 +76,32 @@ const TABS: [string, string, string][] = [
  *  trong `GROUPS` từ lâu, nhưng thanh dọc của crm chỉ vẽ tám phân hệ và các phòng con, nên
  *  không mục nào trong số chúng có mặt trong DOM. Chúng chỉ tới được bằng cách gõ đường dẫn.
  */
-const MUC_PHONG: [string, string][] =
-  ((((GROUPS as any[]).find((g) => g.key === "marketing") || {}).blocks) || []) as [string, string][];
+//  MKT-4 · 09/11/2026 — SỬA LỖI CỦA CHÍNH MKT-3, đo được trên bản thật ngay sau khi gộp:
+//  màn `/marketing` nổ trắng, «TypeError: n is not iterable». Chủ trương đúng, KIỂU DỮ LIỆU
+//  sai. Trong `Shell.tsx`: `type Block = Item | Section` — `Item` là một cặp
+//  ["tên", "đường dẫn"], còn `Section` là `{ label, items: Item[] }`. Nhóm `marketing` có
+//  mười một phần tử: mười `Item`, và phần tử CUỐI là một `Section` — «Chăm sóc & khiếu nại»
+//  với hai mục con `/cham-soc` và `/khieu-nai`. MKT-3 bóc mọi phần tử như một cặp nên tới
+//  phần tử cuối thì cả màn hình chết.
+//
+//  GỠ PHẲNG, chứ không bỏ `Section` đi: bỏ thì mất đúng hai mục ấy khỏi thanh — tức là lặp
+//  lại đúng cái lỗi mà MKT-3 sinh ra để chữa. `Item` lấy nguyên, `Section` lấy các mục con,
+//  nên thanh ngang vẫn liệt kê đủ MƯỜI HAI mục.
+//
+//  VÀ CHỈ NHẬN PHẦN TỬ NÀO THẬT SỰ LÀ MỘT MẢNG. Ngày mai bảng menu thêm một kiểu thứ ba thì
+//  màn hình BỎ QUA nó chứ không nổ: thiếu một mục trên thanh thì còn thấy được bằng mắt,
+//  còn màn trắng thì không ai làm gì được. Bài học của chính đợt này, ghi ngay tại chỗ.
+const MUC_PHONG: [string, string][] = (() => {
+  const nhom = (GROUPS as any[]).find((g) => g.key === "marketing");
+  const ra: [string, string][] = [];
+  for (const b of (((nhom || {}).blocks) || []) as any[]) {
+    if (Array.isArray(b)) { ra.push(b as [string, string]); continue; }
+    for (const m of (((b || {}).items) || []) as any[]) {
+      if (Array.isArray(m)) ra.push(m as [string, string]);
+    }
+  }
+  return ra;
+})();
 
 /** Một THẺ SỐ của Tổng quan. Bốn phần, và phần thứ tư không được bỏ:
  *      nhãn · số · số ấy đọc từ đâu · CỬA để đi tới chỗ sửa nó.
