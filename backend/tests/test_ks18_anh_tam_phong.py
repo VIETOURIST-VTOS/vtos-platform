@@ -18,9 +18,10 @@ def _s() -> str:
 
 def test_ks18_1_rieng_truoc_tam_sau_co_nhan():
     s = _s()
-    assert "const rieng = p.anh?.[0] || aP[0];" in s
+    # P1-02 (09/11/2026): KS-ANH gắn ảnh đại diện vào p.anh (cờ anh_dai_dien) — ảnh ấy không phải ảnh riêng.
+    assert "const rieng = p.anh_dai_dien ? null : (p.anh?.[0] || aP[0]);" in s
     assert "const anhP = rieng || anhTamPhong(anh, iP), tam = !rieng && !!anhP;" in s
-    assert '{tam && <span className="ksv-ct ksv-tam">Ảnh khách sạn</span>}' in s, "ảnh mượn phải ghi rõ là ảnh khách sạn"
+    assert '{tam && <span className="ksv-ct ksv-tam">Ảnh khách sạn · chưa có ảnh riêng của phòng</span>}' in s, "ảnh mượn phải ghi rõ là ảnh khách sạn"
 
 
 def test_ks18_2_thu_tu_muon_anh():
