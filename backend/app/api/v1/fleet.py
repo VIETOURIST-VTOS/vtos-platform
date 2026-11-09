@@ -380,6 +380,13 @@ class ChuyenIn(BaseModel):
     km_nguon: str = "nhap_tay"
     doanh_thu: float | None = None
     note: str = ""
+    # Đội xe v3.3 (Chủ tịch 10/11/2026): báo cáo xe nhập qua cửa bốn bước gửi `false` — chuyến CHƯA vào lợi
+    # nhuận, vào khi Chủ tịch duyệt tờ quyết toán (`quyet_toan_chuyen.ky`, bước `tgd`). Cửa cũ không gửi gì
+    # thì giữ như trước (KS-65: không đổi một đồng nào của sổ lịch sử).
+    quyet_toan: bool = True
+
+
+from app.models.fleet import QT_TRANG_THAI as _QT_TEN  # noqa: E402
 
 
 def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict) -> dict:
@@ -394,6 +401,10 @@ def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict) -> dict:
             "km_chay": (t.km_cuoi - t.km_dau) if (t.km_dau is not None and t.km_cuoi is not None) else None,
             "doanh_thu": t.doanh_thu, "status": t.status, "co": t.co, "co_ly_do": t.co_ly_do,
             "quyet_toan": t.quyet_toan,
+            # v3.3 màn gọn: trạng thái tờ báo cáo xe (Đang nhập → Chờ Chủ tịch duyệt → Chờ Kế toán chi → …)
+            "qt_trang_thai": t.qt_trang_thai or "nhap",
+            "qt_ten_trang_thai": _QT_TEN.get(t.qt_trang_thai or "nhap", ""),
+            "qt_tra_lai_ly_do": t.qt_tra_lai_ly_do or "",
             "note": t.note, "ma_phieu": t.ma_phieu, "nguon": t.nguon,
             "chi_phi": [{"id": c.id, "kind": c.kind, "kind_ten": COST_KINDS.get(c.kind, c.kind),
                          "amount": c.amount, "lit": c.lit, "ben_chiu": c.ben_chiu,
@@ -2095,10 +2106,9 @@ def lap_de_nghi_chi_xe(data: DeNghiChiXeIn, u: User = Depends(require_roles("gd_
                        "hen_bo_sung": data.hen_bo_sung, "ghi_chu_kiem_tra": data.ghi_chu_kiem_tra}})
     except ValueError as ex:
         raise HTTPException(422, str(ex))
-    cd = O.cap_duyet(db, r)
-    ai = cd["ai"] or "chưa chốt mốc duyệt chi — hồ sơ sẽ nằm chờ"
+    ai = O.cap_duyet(db, r)["ai"]
     return {"id": r.id, "code": r.code, "status": r.status,
-            "message": f"Đã gửi {r.code} — Kế toán kiểm chứng từ, rồi {ai} ký lệnh chi"}
+            "message": f"Đã gửi {r.code} — chờ {ai} duyệt, rồi Kế toán kiểm chứng từ và chi"}
 
 
 @router.get("/de-nghi-chi")

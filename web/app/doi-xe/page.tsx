@@ -91,6 +91,9 @@ function DoiXe() {
       const mo = new URLSearchParams(window.location.search).get("mo");
       if (mo === "de-xuat-chi") { setTab("giaodich"); setMoSan("de-xuat-chi"); }
       if (mo === "phieu-chi-phi") { setTab("chuyen"); setMoSan("phieu-chi-phi"); }
+      // `?xe=` — màn gọn «Hồ sơ xe» của /xe (v3.3) mở thẳng hồ sơ một xe.
+      const xeId = Number(new URLSearchParams(window.location.search).get("xe"));
+      if (xeId > 0) { setTab("xe"); api(`/fleet/xe/${xeId}`).then(setChon).catch(() => {}); }
     } catch { /* không có địa chỉ thì giữ tab mặc định */ }
   }, []);
 

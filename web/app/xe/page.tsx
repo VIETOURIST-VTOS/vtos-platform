@@ -7,6 +7,7 @@ import { errMsg } from "@/components/ui";
 import { KhoiHieuQuaXe } from "@/components/KhoiV14";
 import ChiPhiKyPanel from "@/components/doixe/ChiPhiKyPanel";
 import DeXuatChiTaiCho from "@/components/doixe/DeXuatChiTaiCho";
+import * as G from "@/components/doixe/TrangGon";
 
 /** Bàn làm việc Giám đốc đội xe — màn `/xe`. Bố cục v3.3, bản vẽ anh Tuấn gửi 09/11/2026.
  *
@@ -107,6 +108,19 @@ const NHOM: { ma: string; ten: string; tom: string; trang: Trang[] }[] = [
     { ma: "nhin-lai", ten: "Nhìn lại — thuê xe ngoài khi xe nhà đậu", toi: "/doi-xe?tab=nhin-lai" },
   ] },
 ];
+
+/** MÀN GỌN theo mã trang con — trang nào không có ở đây thì vẫn mở màn đang chạy. */
+type GonProps = { mo: (toi: string) => void; ky: string; onNhap: () => void };
+const MAN_GON: Record<string, (p: GonProps) => React.ReactNode> = {
+  "lich": (p) => <G.LichLenhGon mo={p.mo} />,
+  "ho-so-xe": (p) => <G.HoSoXeGon mo={p.mo} />,
+  "bao-cao-xe": (p) => <G.BaoCaoXeGon mo={p.mo} onNhap={p.onNhap} />,
+  "quyet-toan": (p) => <G.QuyetToanGon mo={p.mo} ky={p.ky} />,
+  "cong-no": (p) => <G.CongNoGon mo={p.mo} />,
+  "bao-duong": (p) => <G.BaoDuongGon mo={p.mo} />,
+  "bao-hong": (p) => <G.BaoHongGon mo={p.mo} />,
+  "dau": (p) => <G.DauGon mo={p.mo} />,
+};
 
 /** HAI CỬA NHẬP CHÍNH — Chủ tịch duyệt 10/11/2026: mở TẠI CHỖ, đúng trang con của nó, không rời /xe.
  *  `trang` là mã trang con trong nhóm «Báo cáo & chi phí»; `mo` bảo trang ấy bật sẵn biểu mẫu. */
@@ -216,6 +230,8 @@ function BanLamViecXe() {
   const [trang, setTrang] = useState<string | null>(null);
   /** Cửa nhập vừa bấm — trang con mở sẵn biểu mẫu. */
   const [moSan, setMoSan] = useState<string>("");
+  /** Màn chi tiết đang mở từ một màn gọn (nút «Mở…»). */
+  const [chiTiet, setChiTiet] = useState<string | null>(null);
   const [quyen, setQuyen] = useState(false);
   /** «Số tiền theo»: mặc định chuyến đã quyết toán (KS-65); chọn «tất cả» thì nói thêm phần đang treo. */
   const [theoTien, setTheoTien] = useState<"qt" | "tat_ca">("qt");
@@ -243,7 +259,7 @@ function BanLamViecXe() {
                   gap: 4, marginBottom: 4, borderBottom: "1px solid #dce3ec" }}>
       {NHOM.map((n) => (
         <button key={n.ma} type="button" title={n.tom}
-          onClick={() => { setNhom(nhom === n.ma ? null : n.ma); setTrang(null); setMoSan(""); }}
+          onClick={() => { setNhom(nhom === n.ma ? null : n.ma); setTrang(null); setMoSan(""); setChiTiet(null); }}
           aria-pressed={nhom === n.ma}
           style={{ padding: "8px 12px", border: 0, background: "none", cursor: "pointer",
                    fontWeight: nhom === n.ma ? 700 : 400,
@@ -257,7 +273,7 @@ function BanLamViecXe() {
     {nhomMo && nhomMo.trang.length > 1 && <nav aria-label={`Trang của ${nhomMo.ten}`}
       style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 14, paddingTop: 8 }}>
       {nhomMo.trang.map((t) => (
-        <button key={t.ma} type="button" onClick={() => { setTrang(t.ma); setMoSan(""); }}
+        <button key={t.ma} type="button" onClick={() => { setTrang(t.ma); setMoSan(""); setChiTiet(null); }}
           aria-pressed={trangMo?.ma === t.ma}
           style={{ padding: "6px 10px", borderRadius: 6, cursor: "pointer",
                    border: "1px solid " + (trangMo?.ma === t.ma ? "#1d5bbf" : "#dce3ec"),
@@ -295,11 +311,22 @@ function BanLamViecXe() {
     {nhomMo && trangMo && <section className="panel">
       {trangMo.ma === "de-xuat-chi"
         ? <DeXuatChiTaiCho vai={user?.role || ""} toast={toast} moSan={moSan === "de-xuat-chi"} />
-        : <>
-          <h2 style={{ marginTop: 0 }}>{trangMo.ten}</h2>
-          {trangMo.ghi && <p className="muted">{trangMo.ghi}</p>}
-          <KhungNhung toi={trangMo.toi} ten={trangMo.ten} mo={moSan || undefined} />
-        </>}
+        : (() => {
+          // v3.3 màn gọn (Chủ tịch duyệt bản xem trước 10/11/2026): trang có màn gọn thì hiện màn gọn;
+          // «Mở…» hoặc cửa nhập mới mở màn chi tiết đang chạy, ngay tại đây.
+          const Gon: ((p: GonProps) => React.ReactNode) | undefined = MAN_GON[trangMo.ma];
+          const moCT = (toi: string) => setChiTiet(toi);
+          if (Gon && !chiTiet && !moSan) return Gon({ mo: moCT, ky, onNhap: () => setMoSan("phieu-chi-phi") });
+          const toi = chiTiet || trangMo.toi;
+          const coGon = trangMo.ma in MAN_GON;
+          return <>
+            {coGon && <p style={{ margin: "0 0 8px" }}><button type="button"
+              onClick={() => { setChiTiet(null); setMoSan(""); }}>← Về màn gọn {trangMo.ten}</button></p>}
+            {!coGon && <h2 style={{ marginTop: 0 }}>{trangMo.ten}</h2>}
+            {!coGon && trangMo.ghi && <p className="muted">{trangMo.ghi}</p>}
+            <KhungNhung key={toi + moSan} toi={toi} ten={trangMo.ten} mo={moSan || undefined} />
+          </>;
+        })()}
     </section>}
 
     {/* ④ TỔNG QUAN */}

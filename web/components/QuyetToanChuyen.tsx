@@ -61,7 +61,8 @@ type To = {
 };
 
 const TEN_BUOC: Record<string, string> = {
-  dieu_hanh: "Điều hành", ke_toan: "Kế toán", tgd: "T. Giám đốc",
+  // Đội xe v3.3 (Chủ tịch 10/11/2026): Chủ tịch duyệt → Kế toán chi. Khóa `tgd` là bước Chủ tịch duyệt.
+  dieu_hanh: "Điều hành", tgd: "Chủ tịch duyệt", ke_toan: "Kế toán chi",
 };
 
 /** Ô máy cộng. KHÔNG phải <input> – không có chỗ để gõ sai, nên cũng không có chỗ để cộng nhầm. */

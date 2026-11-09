@@ -8,7 +8,7 @@ import { Cap, ConThieu, KhoiXem, OXacNhan, ThanhBuoc, TuyenDuyet, tien, useNhap 
 /** KS-64 · CỬA 1 — LẬP ĐỀ XUẤT CHI, bốn bước theo bản v3.3.
  *
  *  Đội xe v3.3 · Chủ tịch chốt 10/11/2026: phiếu gửi đi là một ĐỀ NGHỊ CHI 05-TT loại `chi_doi_xe`
- *  (`POST /fleet/de-nghi-chi`) — cùng hàng đợi Kế toán, cùng mốc duyệt chung, người lập không tự ký.
+ *  (`POST /fleet/de-nghi-chi`). Tuyến: GĐ đội xe gửi → Chủ tịch duyệt → Kế toán kiểm chứng từ và chi.
  *  Không còn ghi vào sổ đối soát nguồn ngoài; cửa ấy giữ cho bản trích Vietrip.
  *
  *  Bốn bước đặt đúng theo demo: Nội dung cần chi · Số tiền và hồ sơ · Đối chiếu trước khi gửi ·
@@ -38,11 +38,11 @@ const NHOM = ["Chi phí riêng của xe", "Chi phí chung phân bổ", "Sửa ch
 const CAN_CU = ["Đã gồm thuế / phí theo chứng từ", "Không phát sinh thuế / phí",
   "Tạm tính · chờ kế toán kiểm tra"];
 
+// Chủ tịch chốt 10/11/2026: «GĐ đội xe đề xuất lên thẳng Chủ tịch duyệt, sau đó Kế toán chi».
 const TUYEN: [string, string][] = [
-  ["Giám đốc đội xe", "Lập và gửi — gửi là bộ phận đã xác nhận"],
-  ["Kế toán", "Kiểm chứng từ, bên nhận theo danh mục; trả lại phải có lý do"],
-  ["TGĐ / Chủ tịch theo mốc chung", "Ký lệnh chi — người lập không tự ký"],
-  ["Kế toán", "Chi, gắn UNC và đối soát giao dịch ngân hàng"],
+  ["Giám đốc đội xe", "Lập và gửi"],
+  ["Chủ tịch", "Duyệt — mọi mức tiền"],
+  ["Kế toán", "Kiểm chứng từ, bên nhận theo danh mục, rồi chi và gắn UNC"],
 ];
 
 const rong = () => ({
@@ -125,8 +125,8 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
   /* ───────────── đã lưu: mở ô đính kèm, vì giờ mới có mã phiếu để gắn tệp ───────────── */
   if (daLuu) return <div className="panel">
     <h2>Đã lập đề xuất chi {daLuu.ma_gd}</h2>
-    <p className="muted">Phiếu đã vào hàng đợi <b>Kế toán kiểm</b>. Đính kèm chứng từ <b>ngay bây giờ</b> nếu đã có —
-      Kế toán không chuyển duyệt khi phiếu chưa có chứng từ;
+    <p className="muted">Phiếu đã lên <b>Chủ tịch duyệt</b>. Đính kèm chứng từ <b>ngay bây giờ</b> nếu đã có —
+      Kế toán không chi khi phiếu chưa có chứng từ;
       chứng từ nằm cùng phiếu thì đến kỳ đối soát không phải đi tìm, và người kiểm tra nhìn thấy
       đúng thứ họ đang kiểm.</p>
     <DinhKem doiTuong="de_xuat_chi_xe" doiTuongId={daLuu.ma_gd}
@@ -249,9 +249,9 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
           chu="Tôi đã kiểm tra số tiền, chứng từ và khoản chi gốc; đề nghị chuyển đúng người có quyền duyệt." />
       </>}
       {buoc === 3 && <>
-        <TuyenDuyet tuyen={TUYEN} ghi={"Phiếu đi đúng đường đề nghị chi 05-TT: Kế toán kiểm, rồi TGĐ hoặc Chủ tịch " +
-          "ký theo mốc duyệt chi chung. Người lập không tự kiểm, tự ký hay tự xác nhận đã chi. Đề nghị chi chưa phải " +
-          "chi phí đã chốt kỳ và chưa phải tiền đã trả."} />
+        <TuyenDuyet tuyen={TUYEN} ghi={"Phiếu là một đề nghị chi 05-TT: lên thẳng Chủ tịch duyệt, rồi Kế toán kiểm " +
+          "chứng từ và chi. Người lập không tự duyệt hay tự xác nhận đã chi. Đề nghị chi chưa phải chi phí đã chốt kỳ " +
+          "và chưa phải tiền đã trả."} />
         <label className="bb-ok"><input type="checkbox" checked={choTrung} onChange={(e) => setChoTrung(e.target.checked)} />
           <span>Vẫn gửi dù hệ thống báo trùng phiếu <span className="muted">— chỉ tích khi đã xem phiếu cũ và chắc đây là khoản khác.</span></span></label>
       </>}

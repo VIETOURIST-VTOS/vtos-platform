@@ -320,6 +320,18 @@ def _trung_doi_xe(db: Session, data: dict, amount: float) -> PaymentRequest | No
         PaymentRequest.supplier_name == data["supplier_name"])).scalars().first()
 
 
+def _kiem_chung_tu_mst(db: Session, r: PaymentRequest) -> None:
+    """Chứng từ + mã số thuế bên nhận — Kế toán kiểm. Đề nghị chi thường: ở bước `check`. Đề xuất chi đội
+    xe (không có bước `check`, Chủ tịch 10/11/2026): ở bước CHI, trước khi tiền ra."""
+    _dx = r.doi_xe if r.category == "chi_doi_xe" else None
+    if not r.has_document and not (_dx is not None and co_tep_doi_xe(db, r)):
+        raise ValueError("Thiếu chứng từ đính kèm (hợp đồng/hóa đơn/báo giá) – không chuyển duyệt"
+                         if _dx is None else "Thiếu chứng từ của đề xuất chi đội xe — chưa chi được")
+    _khong_mst = r.category in ("hoan_tien", "tam_ung") or (_dx is not None and (
+        _dx.get("loai") != "thanh_toan" or _dx.get("nhom") in NHOM_DOI_XE_KHONG_MST))
+    if not _khong_mst and not r.supplier_tax_code: raise ValueError("NCC chưa có MST – phải xác nhận trước khi thanh toán")
+
+
 def co_tep_doi_xe(db: Session, r: PaymentRequest) -> bool:
     """Chứng từ đội xe gắn ở kho «de_xuat_chi_xe» theo MÃ PHIẾU — có tệp còn hiệu lực là có chứng từ."""
     from app.models.attachments import Attachment
@@ -593,6 +605,10 @@ def cap_duyet(db: Session, r: PaymentRequest) -> dict:
     # KS-16d — Chủ tịch chốt 31/10/2026: trả khách sạn / nhà hàng tiền thu hộ (số đã khóa lúc Kế toán chốt)
     # KHÔNG theo mốc tiền. TGĐ và Chủ tịch ĐỀU có nút, MỘT TRONG HAI bấm là xong; người kia chỉ còn thấy.
     # Mọi mức tiền, kể cả khi chưa chốt mốc.
+    # Đội xe v3.3 (Chủ tịch 10/11/2026): mọi đề xuất chi đội xe do CHỦ TỊCH duyệt, mọi mức tiền, không theo mốc.
+    if getattr(r, "category", "") == "chi_doi_xe":
+        return {"nguong": None, "nguon": "chu_tich_doi_xe", "chua_chot": False, "tren_moc": None,
+                "mot_trong_hai": False, "can_tgd": False, "can_chutich": True, "ai": "Chủ tịch", "ly_do": ""}
     if getattr(r, "category", "") in LOAI_CHI_MOT_TRONG_HAI:
         return {"nguong": None, "nguon": "loai_chi", "chua_chot": False, "tren_moc": None, "mot_trong_hai": True,
                 "can_tgd": True, "can_chutich": True, "ai": "TGĐ hoặc Chủ tịch", "ly_do": ""}
@@ -710,7 +726,9 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     if dx is not None:
         from app.services.ket_qua_that import cong_ty_me
         r.doi_xe, r.company_id = dx, cong_ty_me(db)          # sổ VTD — Chủ tịch 10/11/2026
-        r.status, r.tp_by = "cho_kt", u.username              # GĐ đội xe gửi = bộ phận đã xác nhận
+        # Chủ tịch chốt lại 10/11/2026: «GĐ đội xe đề xuất lên thẳng Chủ tịch duyệt, sau đó Kế toán chi».
+        # GĐ gửi = bộ phận đã xác nhận; bỏ bước Kế toán kiểm trước duyệt — Kế toán kiểm chứng từ lúc CHI.
+        r.status, r.tp_by = "cho_duyet", u.username
     r.so_tien_ngoai_te, r.ty_gia, r.ngay_ty_gia = nt["so_tien_ngoai_te"], nt["ty_gia"], nt["ngay_ty_gia"]
     # R3: xếp cấp duyệt
     if cat == "marketing":
@@ -848,12 +866,7 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "",
     elif action == "check":
         if r.status != "cho_kt": raise ValueError("Không ở bước Kế toán kiểm tra")
         if u.role not in VAI_KIEM_CHUNG_TU and not toan_quyen_ke_ca_tach_bach(u, db): raise ValueError("Chỉ Kế toán kiểm tra")
-        _dx = r.doi_xe if r.category == "chi_doi_xe" else None
-        if not r.has_document and not (_dx is not None and co_tep_doi_xe(db, r)):
-            raise ValueError("Thiếu chứng từ đính kèm (hợp đồng/hóa đơn/báo giá) – không chuyển duyệt")
-        _khong_mst = r.category in ("hoan_tien", "tam_ung") or (_dx is not None and (
-            _dx.get("loai") != "thanh_toan" or _dx.get("nhom") in NHOM_DOI_XE_KHONG_MST))
-        if not _khong_mst and not r.supplier_tax_code: raise ValueError("NCC chưa có MST – phải xác nhận trước khi thanh toán")
+        _kiem_chung_tu_mst(db, r)
         r.status, r.kt_by = "cho_duyet", u.username
         # Câu này là thứ Kế toán đọc rồi đi gõ đúng người, nên nó phải hỏi CHÍNH hàm mà bước duyệt
         # hỏi. Bản trước suy từ `two_signatures`, tức luôn viết "TGĐ" cho mọi khoản trong dự toán —
@@ -938,6 +951,8 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "",
                 r.signed_tgd = True
         elif cd["nguon"] == "loai_chi":
             raise ValueError("Khoản trả NCC tiền thu hộ do TGĐ hoặc Chủ tịch duyệt (mọi mức tiền).")
+        elif cd["nguon"] == "chu_tich_doi_xe":
+            raise ValueError("Đề xuất chi đội xe do Chủ tịch duyệt (Chủ tịch chốt 10/11/2026).")
         else:
             raise ValueError(
                 f"Khoản {float(r.amount or 0):,.0f}đ "
@@ -965,6 +980,8 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "",
         if r.status != "cho_chi": raise ValueError("Chưa có lệnh chi được duyệt")
         if u.role not in VAI_GHI_DA_CHI and not toan_quyen_ke_ca_tach_bach(u, db): raise ValueError("Chỉ Kế toán ghi nhận đã chi")
         # KS-16d — Chủ tịch chốt 31/10/2026: MỌI loại chi phải có UNC / phiếu chi tải lên trước khi bấm «Đã chi».
+        if r.category == "chi_doi_xe":
+            _kiem_chung_tu_mst(db, r)         # đội xe: Kế toán kiểm chứng từ lúc chi (Chủ tịch 10/11/2026)
         if not co_unc(db, r):
             raise ValueError(f"Tải ủy nhiệm chi (UNC) / phiếu chi của {r.code} lên trước rồi mới bấm «Đã chi»")
         # ĐỢT R4c-3 02/11/2026 — HÌNH THỨC THANH TOÁN LÀ MỘT Ô, KHÔNG PHẢI MỘT PHÉP ĐOÁN.

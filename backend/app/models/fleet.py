@@ -147,10 +147,14 @@ TRA_BANG_TAI_XE = ("tai_xe_tien_mat",)
 
 # Tuyến ký của tờ quyết toán chuyến — Mẫu 2, Chủ tịch chọn 13/10/2026. Tài xế ký trên giấy rồi Đội
 # xe nhập hộ, nên bước đầu của tuyến điện tử là ĐIỀU HÀNH.
-QT_BUOC = ("dieu_hanh", "ke_toan", "tgd")
-QT_TRANG_THAI = {"nhap": "Đội xe đang nhập", "cho_dieu_hanh": "Chờ Điều hành ký",
-                 "cho_ke_toan": "Chờ Kế toán ký", "cho_tgd": "Chờ Tổng giám đốc ký",
-                 "da_duyet": "Đã duyệt đủ chữ ký", "tra_lai": "Trả lại để sửa"}
+#
+# ĐỘI XE v3.3 — Chủ tịch chốt 10/11/2026: «GĐ đội xe đề xuất lên thẳng Chủ tịch duyệt, sau đó Kế toán chi».
+# Tuyến điện tử còn HAI bước: Chủ tịch duyệt (khóa `tgd` — dùng lại cột `qt_tgd`, không thêm cột) rồi Kế
+# toán chi. Bước Điều hành bỏ. Tờ cũ đang «Chờ Điều hành ký» đi thẳng tới Chủ tịch.
+QT_BUOC = ("tgd", "ke_toan")
+QT_TRANG_THAI = {"nhap": "Đội xe đang nhập", "cho_dieu_hanh": "Chờ Chủ tịch duyệt",
+                 "cho_ke_toan": "Chờ Kế toán chi", "cho_tgd": "Chờ Chủ tịch duyệt",
+                 "da_duyet": "Đã duyệt, Kế toán đã chi", "tra_lai": "Trả lại để sửa"}
 COST_KINDS = {"dau": "Nhiên liệu", "cong_tac_phi": "Công tác phí tài xế", "giu_xe": "Phí giữ/bãi xe",
               "cau_duong": "Phí cầu đường", "sua_chua": "Sửa chữa, bảo dưỡng", "khac": "Khác"}
 # Mặc định dự phòng khi chưa có tham số trong cơ sở dữ liệu. Nguồn thật là `xe_sua_chua_ben_chiu`.
