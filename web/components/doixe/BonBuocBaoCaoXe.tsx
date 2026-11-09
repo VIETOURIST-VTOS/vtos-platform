@@ -32,11 +32,11 @@ import { Cap, ConThieu, KhoiXem, OXacNhan, ThanhBuoc, TuyenDuyet, soDoc, tien, u
 
 const TEN_BUOC = ["Gắn đúng xe và chuyến", "Hành trình và nguồn số km", "Doanh thu và chi phí chuyến", "Kiểm tra trước khi gửi"];
 
+// Chủ tịch chốt 10/11/2026: GĐ đội xe gửi → Chủ tịch duyệt (chuyến vào lợi nhuận) → Kế toán chi.
 const TUYEN: [string, string][] = [
-  ["Giám đốc đội xe", "Nhập báo cáo và chứng từ"],
-  ["Người kiểm tra theo phân quyền", "Đối chiếu km, doanh thu và chi phí"],
-  ["Người có quyền chốt", "Xác nhận / quyết toán theo quy trình"],
-  ["Hệ thống báo cáo", "Cập nhật số đã xác nhận, lưu lịch sử"],
+  ["Giám đốc đội xe", "Nhập báo cáo, chứng từ và gửi tờ quyết toán"],
+  ["Chủ tịch", "Duyệt — từ lúc này chuyến mới vào lợi nhuận"],
+  ["Kế toán", "Chi phần tạm ứng / hoàn trả / chi thêm"],
 ];
 
 /** Ngưỡng cảnh báo — CÙNG BỘ SỐ với bộ nạp tự động mỗi tối (khuôn «Nạp xe Vietrip lên VTOS»).
@@ -122,7 +122,7 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
         vehicle_id: Number(d.vehicle_id), ten_tour: d.ten_tour.trim(),
         ngay_di: d.ngay_di, ngay_ve: d.ngay_ve,
         km_dau: kd, km_cuoi: kc, km_gps: gps, km_nguon: d.km_nguon || "nhap_tay",
-        doanh_thu: dt,
+        doanh_thu: dt, quyet_toan: false,   // v3.3: vào lợi nhuận khi Chủ tịch duyệt tờ
         note: [d.note.trim(), d.hen_bo_sung.trim() ? `Hẹn bổ sung chứng từ: ${d.hen_bo_sung.trim()}` : ""]
           .filter(Boolean).join(" | ") } });
       // Bốn khoản ghi thành bốn dòng riêng — mỗi dòng phải trả lời được loại gì, ai chịu, chứng
@@ -265,9 +265,9 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
       </KhoiXem>
       {canhNay.length > 0 && <div className="bb-thieu"><b>{canhNay.length} chỗ nghi sai – vẫn gửi được, nhưng xem lại trước đã:</b>
         <ul>{canhNay.map((c) => <li key={c}>{c}</li>)}</ul></div>}
-      <TuyenDuyet tuyen={TUYEN} ghi={"Bốn ô trên là TUYẾN DỰ KIẾN, chỉ để xem. Gửi ở đây là ghi phiếu vào nhật " +
-        "trình chuyến — KHÔNG phải chốt quyết toán, và không tự thay số của báo cáo đã xác nhận. Người kiểm tra " +
-        "và người có quyền chốt là cấu hình §11 còn chờ chốt."} />
+      <TuyenDuyet tuyen={TUYEN} ghi={"Lưu ở đây là ghi phiếu vào nhật trình — CHƯA vào lợi nhuận. Khai tờ quyết toán " +
+        "ngay sau khi lưu rồi bấm gửi: tờ lên thẳng Chủ tịch duyệt, Chủ tịch duyệt xong chuyến mới tính vào lợi nhuận, " +
+        "sau đó Kế toán chi."} />
       <OXacNhan cho={d.ok} doi={(v) => dat("ok", v)}
         chu="Tôi đã đối chiếu xe, kỳ, nguồn km và chứng từ; các khoản ghi 0 là đã xác nhận không phát sinh, các khoản để trống là chưa có số." />
     </>}

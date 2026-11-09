@@ -36,12 +36,12 @@ from app.models.fleet import (Trip, TripCost, TRA_BANG, TRA_BANG_TAI_XE,
                               QT_BUOC, QT_TRANG_THAI, COST_KINDS)
 
 # Bước nào do vai nào ký. Khai ở đây một lần; cửa API đọc vào chứ không khai lần thứ hai.
-VAI_KY = {"dieu_hanh": ("tp_dh", "nv_dh", "gd_doi_xe"),
-          "ke_toan": ("ketoan", "kt_truong"),
-          "tgd": ("tgd", "chutich")}
+# Đội xe v3.3 (Chủ tịch 10/11/2026): Chủ tịch duyệt → Kế toán chi. Khóa `tgd` là bước CHỦ TỊCH duyệt.
+VAI_KY = {"tgd": ("chutich",),
+          "ke_toan": ("ketoan", "kt_truong")}
 # Trạng thái SAU khi bước ấy ký xong.
-SAU_KHI_KY = {"dieu_hanh": "cho_ke_toan", "ke_toan": "cho_tgd", "tgd": "da_duyet"}
-CHO_BUOC = {"cho_dieu_hanh": "dieu_hanh", "cho_ke_toan": "ke_toan", "cho_tgd": "tgd"}
+SAU_KHI_KY = {"tgd": "cho_ke_toan", "ke_toan": "da_duyet"}
+CHO_BUOC = {"cho_tgd": "tgd", "cho_dieu_hanh": "tgd", "cho_ke_toan": "ke_toan"}
 
 
 def _s(x) -> float:
@@ -243,9 +243,14 @@ def ky(db: Session, t: Trip, buoc: str, nguoi: str, vai: str) -> dict:
     do = [x for x in kiem(db, t) if x["muc"] == "do"]
     if do:
         raise ValueError("Còn điểm chặn chưa xử: " + " · ".join(x["noi"] for x in do))
+    if buoc == "tgd" and (t.qt_nhap_boi or "") == nguoi:
+        raise ValueError("Người gửi tờ không tự duyệt tờ của mình — phải người khác ở bước Chủ tịch duyệt.")
     setattr(t, f"qt_{buoc}", nguoi[:50])
     setattr(t, f"qt_{buoc}_luc", datetime.now())
     t.qt_trang_thai = SAU_KHI_KY[buoc]
+    if buoc == "tgd":
+        # Chủ tịch duyệt = chuyến VÀO lợi nhuận (Chủ tịch 10/11/2026). Kế toán chi sau là việc trả tiền.
+        t.quyet_toan = True
     t.qt_tra_lai_ly_do = ""
     db.flush()
     return {"trang_thai": t.qt_trang_thai, "ten_trang_thai": QT_TRANG_THAI[t.qt_trang_thai]}
@@ -263,6 +268,7 @@ def tra_lai(db: Session, t: Trip, ly_do: str, boi: str) -> dict:
         setattr(t, f"qt_{b}", "")
         setattr(t, f"qt_{b}_luc", None)
     t.qt_trang_thai = "tra_lai"
+    t.quyet_toan = False        # bị trả lại thì ra khỏi lợi nhuận tới khi Chủ tịch duyệt lại
     t.qt_tra_lai_ly_do = f"{ly_do.strip()[:280]} (bởi {boi})"[:300]
     db.flush()
     return {"trang_thai": t.qt_trang_thai, "ly_do": t.qt_tra_lai_ly_do}
@@ -275,7 +281,8 @@ def gui_di(db: Session, t: Trip, boi: str) -> dict:
     do = [x for x in kiem(db, t) if x["muc"] == "do"]
     if do:
         raise ValueError("Còn điểm chặn chưa xử: " + " · ".join(x["noi"] for x in do))
-    t.qt_trang_thai = "cho_dieu_hanh"
+    t.qt_trang_thai = "cho_tgd"                     # v3.3: lên thẳng Chủ tịch
+    t.quyet_toan = False                            # đang chờ duyệt thì chưa vào lợi nhuận
     t.qt_nhap_boi = boi[:50]
     t.qt_nhap_luc = datetime.now()
     t.qt_tra_lai_ly_do = ""

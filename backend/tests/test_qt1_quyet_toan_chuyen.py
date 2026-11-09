@@ -133,39 +133,50 @@ def test_khong_co_khoan_chi_nao_thi_chan(db):
     assert any(x["muc"] == "do" and x["o"] == "chi_phi" for x in QT.kiem(db, t))
 
 
-# ═══════════════════ 3 · TUYẾN KÝ BỐN BƯỚC ═══════════════════
+# ═══════════════════ 3 · TUYẾN KÝ: CHỦ TỊCH DUYỆT → KẾ TOÁN CHI ═══════════════════
+# Chủ tịch chốt lại 10/11/2026 (đội xe v3.3): «GĐ đội xe đề xuất lên thẳng Chủ tịch duyệt, sau đó Kế toán chi».
+# Thay tuyến Mẫu 2 cũ Điều hành → Kế toán → TGĐ (13/10/2026). Ý của các phép thử giữ nguyên: phải gửi trước,
+# không nhảy cóc, sai vai không ký, trả lại xóa hết chữ ký, gửi lại đi từ đầu, đủ chữ ký thì thôi.
 def test_phai_gui_di_truoc_khi_ai_do_ky_duoc(db):
     t = _bo_2(db)
     assert t.qt_trang_thai == "nhap"
-    assert QT.co_the_ky(t, "dieu_hanh", "tp_dh"), "tờ còn ở nháp thì chưa ký được"
+    assert QT.co_the_ky(t, "tgd", "chutich"), "tờ còn ở nháp thì chưa ký được"
 
 
 def test_ky_dung_thu_tu_va_ghi_ai_ky_luc_nao(db):
     t = _bo_2(db)
+    t.quyet_toan = False
     QT.gui_di(db, t, "doixe01")
-    assert t.qt_trang_thai == "cho_dieu_hanh"
-    QT.ky(db, t, "dieu_hanh", "nv_dieu_hanh", "tp_dh")
-    assert t.qt_trang_thai == "cho_ke_toan"
-    assert t.qt_dieu_hanh == "nv_dieu_hanh" and t.qt_dieu_hanh_luc is not None
+    assert t.qt_trang_thai == "cho_tgd"
+    QT.ky(db, t, "tgd", "anh_tuan", "chutich")
+    assert t.qt_trang_thai == "cho_ke_toan" and t.qt_tgd == "anh_tuan" and t.qt_tgd_luc is not None
+    assert t.quyet_toan is True, "Chủ tịch duyệt xong chuyến mới vào lợi nhuận"
     QT.ky(db, t, "ke_toan", "chi_ketoan", "ketoan")
-    QT.ky(db, t, "tgd", "anh_hieu", "tgd")
     assert t.qt_trang_thai == "da_duyet"
-    assert [x["nguoi"] for x in QT.xem(db, t)["ky"]] == ["nv_dieu_hanh", "chi_ketoan", "anh_hieu"]
+    assert [x["nguoi"] for x in QT.xem(db, t)["ky"]] == ["anh_tuan", "chi_ketoan"]
 
 
 def test_KHONG_nhay_coc_duoc_buoc_ky(db):
-    """Mỗi bước kiểm một thứ khác nhau — Kế toán ký trước Điều hành là ký một tờ chưa ai đối chiếu."""
+    """Kế toán chi trước khi Chủ tịch duyệt là chi một khoản chưa ai duyệt."""
     t = _bo_2(db)
     QT.gui_di(db, t, "doixe01")
     assert QT.co_the_ky(t, "ke_toan", "ketoan"), "chưa tới lượt Kế toán"
     with pytest.raises(ValueError):
-        QT.ky(db, t, "tgd", "anh_hieu", "tgd")
+        QT.ky(db, t, "ke_toan", "chi_ketoan", "ketoan")
 
 
 def test_sai_vai_thi_khong_ky_duoc(db):
     t = _bo_2(db)
     QT.gui_di(db, t, "doixe01")
-    assert QT.co_the_ky(t, "dieu_hanh", "ketoan"), "vai kế toán không ký bước điều hành"
+    assert QT.co_the_ky(t, "tgd", "tgd"), "TGĐ không còn ở tuyến này — Chủ tịch duyệt"
+    assert QT.co_the_ky(t, "tgd", "gd_doi_xe"), "GĐ đội xe không tự duyệt"
+
+
+def test_nguoi_gui_khong_tu_duyet(db):
+    t = _bo_2(db)
+    QT.gui_di(db, t, "anh_tuan")
+    with pytest.raises(ValueError):
+        QT.ky(db, t, "tgd", "anh_tuan", "chutich")
 
 
 def test_con_diem_CHAN_thi_khong_gui_di_duoc(db):
@@ -179,13 +190,12 @@ def test_tra_lai_XOA_HET_chu_ky_da_co(db):
     """Giữ chữ ký cũ là giữ một chữ ký cho nội dung người ấy chưa từng đọc."""
     t = _bo_2(db)
     QT.gui_di(db, t, "doixe01")
-    QT.ky(db, t, "dieu_hanh", "nv_dieu_hanh", "tp_dh")
-    QT.ky(db, t, "ke_toan", "chi_ketoan", "ketoan")
-    QT.tra_lai(db, t, "Km đầu lệch với ảnh đồng hồ", "anh_hieu")
+    QT.ky(db, t, "tgd", "anh_tuan", "chutich")
+    QT.tra_lai(db, t, "Km đầu lệch với ảnh đồng hồ", "chi_ketoan")
     assert t.qt_trang_thai == "tra_lai"
-    assert t.qt_dieu_hanh == "" and t.qt_ke_toan == ""
-    assert t.qt_dieu_hanh_luc is None and t.qt_ke_toan_luc is None
-    assert "Km đầu lệch" in t.qt_tra_lai_ly_do and "anh_hieu" in t.qt_tra_lai_ly_do
+    assert t.qt_tgd == "" and t.qt_ke_toan == "" and t.qt_tgd_luc is None
+    assert t.quyet_toan is False, "bị trả lại thì ra khỏi lợi nhuận"
+    assert "Km đầu lệch" in t.qt_tra_lai_ly_do and "chi_ketoan" in t.qt_tra_lai_ly_do
 
 
 def test_tra_lai_BAT_BUOC_co_ly_do(db):
@@ -198,19 +208,19 @@ def test_tra_lai_BAT_BUOC_co_ly_do(db):
 def test_tra_lai_roi_gui_lai_thi_di_lai_tu_dau(db):
     t = _bo_2(db)
     QT.gui_di(db, t, "doixe01")
-    QT.ky(db, t, "dieu_hanh", "nv_dieu_hanh", "tp_dh")
+    QT.ky(db, t, "tgd", "anh_tuan", "chutich")
     QT.tra_lai(db, t, "sửa km", "chi_ketoan")
     QT.gui_di(db, t, "doixe01")
-    assert t.qt_trang_thai == "cho_dieu_hanh"
+    assert t.qt_trang_thai == "cho_tgd"
     assert t.qt_tra_lai_ly_do == ""
 
 
 def test_da_du_chu_ky_thi_khong_ky_them(db):
     t = _bo_2(db)
     QT.gui_di(db, t, "doixe01")
-    for b, n, v in (("dieu_hanh", "a", "tp_dh"), ("ke_toan", "b", "ketoan"), ("tgd", "c", "tgd")):
+    for b, n, v in (("tgd", "a", "chutich"), ("ke_toan", "b", "ketoan")):
         QT.ky(db, t, b, n, v)
-    assert QT.co_the_ky(t, "tgd", "tgd")
+    assert QT.co_the_ky(t, "ke_toan", "ketoan")
 
 
 # ═══════════════════ 4 · MỘT TỜ ĐỂ MÀN HÌNH IN RA ═══════════════════
@@ -223,7 +233,7 @@ def test_xem_tra_du_khuon_mau_2(db):
         assert k in o, k
     assert o["so_ngay"] == 5 and o["km_tour"] == 976
     assert o["tong"]["tai_xe_chi"] == 360_000
-    assert len(o["ky"]) == 3
+    assert len(o["ky"]) == 2          # Chủ tịch duyệt → Kế toán chi (10/11/2026)
 
 
 # ───────────────────────────────────────────────────────────────────────────────────────────────

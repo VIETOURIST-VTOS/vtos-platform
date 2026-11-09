@@ -53,6 +53,6 @@ export default function DeXuatChiTaiCho({ vai, toast, moSan = false }: {
             {x.ly_do_tu_choi && <div className="muted" style={{ fontSize: 12 }}>{x.ly_do_tu_choi}</div>}</td>
         </tr>)}</tbody></table></div>}
     <p className="muted" style={{ marginBottom: 0 }}>Cùng danh sách dù mở từ nút trên tổng quan, từ thanh con hay từ hồ sơ xe.
-      Phiếu đi đường đề nghị chi 05-TT: Kế toán kiểm, TGĐ / Chủ tịch ký theo mốc chung.</p>
+      Tuyến: GĐ đội xe gửi → Chủ tịch duyệt → Kế toán kiểm chứng từ và chi.</p>
   </>;
 }

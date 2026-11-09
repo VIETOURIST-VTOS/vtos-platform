@@ -93,13 +93,13 @@ def test_1_phieu_la_de_nghi_chi_so_vtd_vao_thang_ke_toan():
     r = _lap()
     assert r.status_code == 201, r.text
     j = r.json()
-    assert j["code"].startswith("DC") and j["status"] == "cho_kt"
+    assert j["code"].startswith("DC") and j["status"] == "cho_duyet"      # Chủ tịch 10/11: lên thẳng Chủ tịch
     db = SessionLocal()
     p = db.get(PaymentRequest, j["id"])
     from app.services.ket_qua_that import cong_ty_me
     assert p.category == "chi_doi_xe" and p.company_id == cong_ty_me(db)
     assert p.doi_xe["tk"] == "627" and p.doi_xe["bien_so"] == CTX["bien_so"]
-    assert p.nguong_duyet_ap_dung == 100_000_000          # mốc chung, không có mốc riêng của đội xe
+    assert O.cap_duyet(db, p)["ai"] == "Chủ tịch" and O.vai_ky_duoc(db, p) == ["chutich"]   # mọi mức tiền
     db.close()
     CTX["id"] = j["id"]
 
@@ -128,27 +128,30 @@ def test_5_tai_khoan_theo_nhom():
     assert MS.CATEGORY_ACCOUNT["chi_doi_xe"] == "627" and "chi_doi_xe" not in MS.thieu_tai_khoan()
 
 
-def test_6_nguoi_lap_khong_tu_kiem_va_ke_toan_kiem_duoc():
-    assert _buoc(CTX["id"], "check", GD).status_code in (403, 422)    # vai GĐ không vào được bước Kế toán
-    r = _buoc(CTX["id"], "check", "ketoan")
+def test_6_chu_tich_duyet_tgd_khong_duyet_duoc():
+    r = _buoc(CTX["id"], "approve", "tgd")
+    assert r.status_code == 422 and "Chủ tịch" in r.text
+    r = _buoc(CTX["id"], "approve", "chutich")
     assert r.status_code == 200, r.text
-    assert r.json()["request"]["status"] == "cho_duyet"
+    assert r.json()["request"]["status"] == "cho_chi"
 
 
-def test_7_tam_ung_tai_xe_khong_doi_ma_so_thue():
+def test_7_ke_toan_kiem_chung_tu_luc_chi():
     r = _lap(chung_tu="", ma_so_thue="", so_tien=2_000_000, loai="tam_ung", nhom="Tài xế (công tác phí, lương)",
              nguoi_thu_huong="Tài xế Nguyễn Văn A", pham_vi="doi")
     assert r.status_code == 201, r.text
     rid = r.json()["id"]
-    # chưa có chứng từ → Kế toán chưa chuyển duyệt được
-    assert "chứng từ" in _buoc(rid, "check", "ketoan").text
+    assert _buoc(rid, "approve", "chutich").status_code == 200
+    # chưa có chứng từ → Kế toán chưa chi được (kiểm trước UNC)
+    r = _buoc(rid, "pay", "ketoan", hinh_thuc_tt="chuyen_khoan")
+    assert r.status_code == 422 and "chứng từ" in r.text, r.text
     db = SessionLocal()
     p = db.get(PaymentRequest, rid)
     p.has_document = True
     db.commit()
     assert p.doi_xe["tk"] == "141"
+    O._kiem_chung_tu_mst(db, p)            # tạm ứng tài xế: không đòi mã số thuế
     db.close()
-    assert _buoc(rid, "check", "ketoan").status_code == 200       # không đòi MST cho tạm ứng tài xế
 
 
 def test_8_danh_sach_doi_xe_chi_doc_loai_chi_doi_xe():
