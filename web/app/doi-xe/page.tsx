@@ -43,7 +43,21 @@ function DoiXe() {
   // Người được nhập và sửa số liệu đội xe: điều hành, kế toán, và lãnh đạo.
   // "gd_doi_xe" là chính người sẽ nhập số liệu đội xe hằng ngày – thiếu vai trò này thì nút nhập không hiện
   // ra với đúng người mà form được làm cho, dù máy chủ đã cho phép.
+  /** Biểu mẫu cần bật sẵn theo `?mo=` trên địa chỉ. Đọc ở effect đọc địa chỉ, nhưng
+   *  CHỈ bật ở effect dưới — lúc ấy mới biết người này có quyền nhập hay không.
+   *  Khai TRƯỚC `canNhap` vì effect bật biểu mẫu đứng ngay sau dòng ấy. */
+  const [moSan, setMoSan] = useState<"de-xuat-chi" | "phieu-chi-phi" | null>(null);
   const canNhap = ["cntt", "hcns", "tp_dh", "nv_dh", "ketoan", "chutich", "tgd", "gd_doi_xe"].includes(user?.role || "");
+
+  /** Bật biểu mẫu do `?mo=` yêu cầu — một lần, và chỉ khi có quyền nhập. Người không có
+   *  quyền vẫn mở được đúng tab để XEM, chỉ không có biểu mẫu; đó là cùng một màn hình họ
+   *  vẫn thấy khi tự bấm vào tab, không phải một trang lỗi. */
+  useEffect(() => {
+    if (!moSan || !canNhap) return;
+    if (moSan === "de-xuat-chi") setFormDX({ ngay: new Date().toISOString().slice(0, 10) });
+    if (moSan === "phieu-chi-phi") setForm({ ngay_di: "", ngay_ve: "" });
+    setMoSan(null);
+  }, [moSan, canNhap]);
   const [form, setForm] = useState<any>(null);      // form nhật trình chuyến (thêm / sửa)
   const [formDX, setFormDX] = useState<any>(null);  // form đề xuất chi
   const [formNga, setFormNga] = useState<any>(null); // form định tuyến một giao dịch nguồn ngoài
@@ -61,7 +75,20 @@ function DoiXe() {
       // xe trỏ sang đây. Không trỏ tới từng chuyến mà tới đúng tab chứa nhật trình: trỏ sâu hơn
       // đòi một mã mở sẵn một dòng, và một đường dẫn hứa nhiều hơn nó làm được thì tệ hơn.
       if (t === "chuyen") setTab("chuyen");
-      if (t === "nhin-lai") setTab("nhinlai");
+      if (t === "nhin-lai" || t === "nhinlai") setTab("nhinlai");
+      // Bốn tab còn lại: trước hôm nay gõ đúng tên tab vẫn rơi về «Hồ sơ xe».
+      if (t === "giaodich" || t === "giao-dich") setTab("giaodich");
+      if (t === "quyettoan" || t === "quyet-toan") setTab("quyettoan");
+      if (t === "congno" || t === "cong-no") setTab("congno");
+      if (t === "xe") setTab("xe");
+      if (t === "baoduong") setTab("baoduong");
+      if (t === "baohong") setTab("baohong");
+
+      // `?mo=` — hai nút nhập chính của màn /xe (v3.3) dẫn sang đây và bật sẵn biểu mẫu.
+      // Chỉ bật cho người đã có quyền nhập: địa chỉ không phải một cách xin quyền.
+      const mo = new URLSearchParams(window.location.search).get("mo");
+      if (mo === "de-xuat-chi") { setTab("giaodich"); setMoSan("de-xuat-chi"); }
+      if (mo === "phieu-chi-phi") { setTab("chuyen"); setMoSan("phieu-chi-phi"); }
     } catch { /* không có địa chỉ thì giữ tab mặc định */ }
   }, []);
 
