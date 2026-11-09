@@ -77,6 +77,8 @@ class DatBanIn(BaseModel):
     ghi_chu: str = ""
     dong_y_chinh_sach: bool = False
     dong_y_khach: bool = False
+    tuoi_tre: list[int] | None = None          # P1-03: tuổi từng trẻ (gói có khung tuổi trẻ em)
+    phu_thu_chon: list[int] | None = None      # P1-03: phụ thu «khách tự chọn» (số thứ tự trong gói)
 
 
 @router.get("")
@@ -98,9 +100,10 @@ def ds_nha_hang(tinh: str = "", am_thuc: str = "", gia_toi_da: int = 0, q: str =
 def mot_nha_hang(nid: int, tk: TaiKhoanNgoai = Depends(tai_khoan_ngoai), db: Session = Depends(get_db)):
     """AT-1: trang một nhà hàng (giới thiệu; nơi mở đặt có thực đơn) — sau khi nhận OTP."""
     from app.services import nha_hang as NH
+    from app.services import rewards as RW
     _goi(S._nguoi_dat, db, tk)
     try:
-        return NH.mot_nha_hang_cong(db, nid)[1]
+        return {**NH.mot_nha_hang_cong(db, nid)[1], "diem": RW.he_so_cua(db, tk)}   # P1-03: quyền lợi + tích điểm
     except NH.LoiNhaHang as ex:
         raise HTTPException(404, str(ex))
 

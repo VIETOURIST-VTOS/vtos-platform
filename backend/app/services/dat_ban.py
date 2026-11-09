@@ -95,6 +95,15 @@ def phai_tra(ts: dict, tam: int, doan: bool, cach: str) -> tuple[int, int]:
     return pct, min(int(tam), _nghin(tam * pct / 100))
 
 
+def tra_truoc(ts: dict, td: dict, tam: int, doan: bool, cach: str) -> tuple[int, int]:
+    """P1-03: gói gọi món có cọc cố định mỗi khách → trả trước = cọc × khách + phụ thu; còn lại theo luật 28/10."""
+    co_dinh = int((td.get("tinh") or {}).get("coc_co_dinh") or 0)
+    if co_dinh:
+        truoc = min(int(tam), co_dinh)
+        return (min(100, max(1, round(truoc * 100 / tam))) if tam else 100), truoc
+    return phai_tra(ts, tam, doan, cach)
+
+
 # ====================================================================== tạo đơn
 def _nguoi_dat(db: Session, tk: TaiKhoanNgoai):
     """(nguon, doi_tac | None). Chặn tài khoản không được đặt."""
@@ -147,12 +156,16 @@ def tao(db: Session, tk: TaiKhoanNgoai, d: dict, now: datetime | None = None) ->
         ngay = d.get("ngay")
         ngay = ngay if isinstance(ngay, date) else (date.fromisoformat(ngay) if ngay else None)
         o, td, tam = NH.kiem_dat_ban(db, int(d.get("nha_hang_id") or 0), int(d.get("thuc_don_id") or 0), ngay,
-                                     str(d.get("gio") or ""), nl, te, now.date())
+                                     str(d.get("gio") or ""), nl, te, now.date(), tuoi=d.get("tuoi_tre"),
+                                     chon_phu_thu=d.get("phu_thu_chon"), bat_tuoi=True)
     except (NH.LoiNhaHang, ValueError) as ex:
         raise LoiDatBan(str(ex))
     tam = int(round(tam))
     if tam <= 0:
         raise LoiDatBan("Gói này chưa có giá — gửi yêu cầu để Sales báo giá")
+    ct = td["tinh"]
+    if ct["coc_co_dinh"]:
+        cach = "coc"                                               # P1-03: gọi món cọc cố định — không có «trả đủ»
     _kiem_mo_tt(db, o["id"])                                       # AT-2
     ten_khach = (d.get("ten_khach") or "").strip()[:120]
     sdt = K.norm_phone(d.get("dien_thoai") or ("" if dt else tk.dien_thoai))
@@ -171,10 +184,14 @@ def tao(db: Session, tk: TaiKhoanNgoai, d: dict, now: datetime | None = None) ->
         raise LoiDatBan("Đã gửi nhiều đơn đặt bàn trong 24 giờ — vui lòng chờ hoặc gọi Sales", 429)
     ts = tham_so(db)
     doan = la_doan(ts, td, nl + te)
-    pct, truoc = phai_tra(ts, tam, doan, cach)
+    pct, truoc = tra_truoc(ts, td, tam, doan, cach)
     ma = _ma_moi(db, now)
     ghi = (d.get("ghi_chu") or "").strip()[:1000]
     noi_dung = f"{o['ten']} · {td['ten']} · {ngay:%d/%m/%Y} {d['gio']} · {nl} NL + {te} TE"
+    if ct["phu_thu"]:
+        ghi = (ghi + (" · " if ghi else "") + "Phụ thu: " + "; ".join(f"{x['ten']} {x['so_tien']:,} đ" for x in ct["phu_thu"]).replace(",", "."))[:1000]
+    if d.get("tuoi_tre") and te:
+        ghi = (ghi + (" · " if ghi else "") + "Tuổi trẻ: " + ", ".join(str(int(x)) for x in d["tuoi_tre"]))[:1000]
     # Lead đi đúng cửa sẵn có của Kinh doanh. Đơn qua đối tác: kênh CTV giới thiệu, giao bàn Sales Admin lẻ.
     if dt is not None:
         from app.services import doi_tac_cong as DT
@@ -199,7 +216,10 @@ def tao(db: Session, tk: TaiKhoanNgoai, d: dict, now: datetime | None = None) ->
     don = DonDatBan(ma=ma, yeu_cau_id=yc.id, tai_khoan_id=tk.id, nguon=nguon, doi_tac_id=dt.id if dt else None,
                     nha_hang_id=o["id"], thuc_don_id=td["id"], ngay=ngay, gio=d["gio"], nguoi_lon=nl, tre_em=te,
                     ten_khach=ten_khach, dien_thoai=sdt, la_doan=doan, cach_tt=cach, ty_le_coc=pct, tam_tinh=tam,
-                    phai_tra_truoc=truoc, trang_thai="cho_nhan", tao_luc=now)
+                    phai_tra_truoc=truoc, trang_thai="cho_nhan", tao_luc=now,
+                    phu_thu=[{"i": x["i"], "ten": x["ten"], "so_tien": x["so_tien"]} for x in ct["phu_thu"]] or None,
+                    tuoi_tre=[int(x) for x in d["tuoi_tre"]] if d.get("tuoi_tre") and te else None,
+                    han_phan_hoi=(now + timedelta(hours=int(td["han_phan_hoi_gio"]))) if td.get("han_phan_hoi_gio") else None)
     db.add(don); db.flush()
     R.audit(db, f"cong:{tk.id}", tk.loai, "dat_ban_tao", f"dat_ban:{ma}", after={"tam_tinh": tam, "cach": cach, "pct": pct,
                                                                                    "nguon": nguon})
@@ -430,7 +450,12 @@ def ra(db: Session, d: DonDatBan, now: datetime | None = None, doi_tac: bool = F
     tts = db.execute(select(ThanhToanDatBan).where(ThanhToanDatBan.don_id == d.id).order_by(ThanhToanDatBan.id)).scalars().all()
     r = {"id": d.id, "ma": d.ma, "nha_hang": nh.ten if nh else "", "thuc_don": td.ten if td else "", "ngay": d.ngay.isoformat(),
          "gio": d.gio, "nguoi_lon": d.nguoi_lon, "tre_em": d.tre_em, "la_doan": d.la_doan, "cach_tt": d.cach_tt,
-         "cach_tt_ten": f"{CACH_TT[d.cach_tt]} {d.ty_le_coc}%" if d.cach_tt == "coc" else CACH_TT[d.cach_tt],
+         "cach_tt_ten": ("Cọc giữ bàn" if td and td.coc_moi_khach and td.loai == "goi_mon"
+                         else f"{CACH_TT[d.cach_tt]} {d.ty_le_coc}%") if d.cach_tt == "coc" else CACH_TT[d.cach_tt],
+         # P1-03
+         "phu_thu": d.phu_thu or [], "tuoi_tre": d.tuoi_tre or [],
+         "han_phan_hoi": d.han_phan_hoi.isoformat(timespec="minutes") if d.han_phan_hoi else None,
+         "qua_han_phan_hoi": bool(d.trang_thai == "cho_nhan" and d.han_phan_hoi and now > d.han_phan_hoi),
          "tam_tinh": int(d.tam_tinh), "phai_tra_truoc": int(d.phai_tra_truoc), "da_tra": tra,
          "con_phai_tra_truoc": max(0, int(d.phai_tra_truoc) - (tra - int(d.so_hoan or 0))),
          "mo_thanh_toan": bool(nh) and _mo_tt(db, nh),                 # AT-2: khóa nút trả khi công tắc đóng
@@ -611,15 +636,19 @@ def _ap_dung(db: Session, d: DonDatBan, ngay: date, gio: str, nl: int, te: int, 
     doi_lich = (ngay, gio) != (d.ngay, d.gio)
     hn = now.date() if ngay != d.ngay else min(now.date(), ngay - timedelta(days=1))   # giữ ngày cũ: không kiểm lại «sau hôm nay»
     try:
-        _o, td, tam = NH.kiem_dat_ban(db, d.nha_hang_id, d.thuc_don_id, ngay, gio, nl, te, hn)
+        _o, td, tam = NH.kiem_dat_ban(db, d.nha_hang_id, d.thuc_don_id, ngay, gio, nl, te, hn,
+                                      tuoi=d.tuoi_tre, chon_phu_thu=[x.get("i") for x in (d.phu_thu or []) if x.get("i") is not None])
     except NH.LoiNhaHang as ex:
         raise LoiDatBan(str(ex))
     tam = int(round(tam))
     if tam < int(d.tam_tinh) and con_gio < ts["mien_phi_gio"]:
         tam = max(tam, _nghin(float(d.tam_tinh) * 0.8))       # bớt khách trong 24 giờ: tính tối thiểu 80%
     doan = la_doan(ts, td, nl + te)
-    pct, truoc = phai_tra(ts, tam, doan, d.cach_tt)
+    pct, truoc = tra_truoc(ts, td, tam, doan, d.cach_tt)
     d.ngay, d.gio, d.nguoi_lon, d.tre_em = ngay, gio, nl, te
+    d.phu_thu = [{"i": x["i"], "ten": x["ten"], "so_tien": x["so_tien"]} for x in td["tinh"]["phu_thu"]] or None
+    if d.tuoi_tre and len(d.tuoi_tre) != te:
+        d.tuoi_tre = None                                      # số trẻ đổi: tuổi cũ không còn khớp
     g = min(vc_con_giu(db, d), truoc)                        # KS-16b: voucher vẫn trừ vào phần trả trước
     if d.voucher_id and g != int(d.giam_voucher or 0):
         d.giam_voucher = g
@@ -667,7 +696,8 @@ def thay_doi(db: Session, tk: TaiKhoanNgoai, ma: str, ngay, gio: str, nguoi_lon:
     from app.services import nha_hang as NH
     hn = now.date() if ngay != d.ngay else min(now.date(), ngay - timedelta(days=1))
     try:
-        NH.kiem_dat_ban(db, d.nha_hang_id, d.thuc_don_id, ngay, gio, nl, te, hn)
+        NH.kiem_dat_ban(db, d.nha_hang_id, d.thuc_don_id, ngay, gio, nl, te, hn, tuoi=d.tuoi_tre,
+                        chon_phu_thu=[x.get("i") for x in (d.phu_thu or []) if x.get("i") is not None])
     except NH.LoiNhaHang as ex:
         raise LoiDatBan(str(ex))
     cu = d.nguoi_lon + d.tre_em
@@ -721,6 +751,8 @@ def ra_ncc(db: Session, d: DonDatBan, now: datetime | None = None) -> dict:
     return {"ma_don": d.ma, "tt_don": d.trang_thai, "tt_don_ten": TRANG_THAI[d.trang_thai], "la_doan": d.la_doan,
             "cach_tt_ten": f"{CACH_TT[d.cach_tt]} {d.ty_le_coc}%" if d.cach_tt == "coc" else CACH_TT[d.cach_tt],
             "phai_tra_truoc": int(d.phai_tra_truoc) + vc_con_giu(db, d), "da_tra_vtd": tra + vc_con_giu(db, d),
+            "phu_thu": d.phu_thu or [], "tuoi_tre": d.tuoi_tre or [],                                  # P1-03
+            "han_phan_hoi": d.han_phan_hoi.isoformat(timespec="minutes") if d.han_phan_hoi else None,
             "thu_tai_ban_du_kien": max(0, int(d.tam_tinh) - tra - vc_con_giu(db, d)),
             "bill_thuc_te": d.bill_thuc_te, "thu_tai_ban": d.thu_tai_ban, "so_giu": d.so_giu,
             "thay_doi": d.thay_doi, "thay_doi_ghi_chu": d.thay_doi_ghi_chu,

@@ -6,7 +6,10 @@
    Luồng đặt bàn giữ nguyên DT-2: gửi đơn → nhà hàng nhận bàn → mới hiện QR / thẻ (DatBanCuaToi). Máy chủ tự tính tiền.
    Công tắc thanh toán (chung + từng nhà hàng) chưa bật thì khách vẫn đi hết các bước nhưng nút cuối khóa, không gửi gì.
    Số đếm bộ lọc là số thật; nhóm lọc không có nơi nào khớp thì ẩn. Chưa có sức chứa theo giờ → mọi giờ trong giờ phục vụ
-   đều chọn được, nhà hàng xác nhận. */
+   đều chọn được, nhà hàng xác nhận.
+   P1-03 (Chủ tịch duyệt 09/11/2026): bốn bước như trang đặt khách sạn — 1 Chọn bàn → 2 Thông tin → 3 Thanh toán →
+   4 Xác nhận; vẫn giữ luật nhà hàng nhận bàn rồi mới trả. Gói có khung giờ, số khách tối đa, tuổi trẻ em, phụ thu,
+   hạn nhà hàng trả lời; gói gọi món cọc cố định mỗi khách. */
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
@@ -44,6 +47,39 @@ export function khungGio(gioPv: string): string[] {
   return ra.length ? ra : ["11:00", "11:30", "12:00", "18:00", "18:30", "19:00", "19:30"];
 }
 const trongGio = (gioPv: string, gio: string) => !gioPv || khungGio(gioPv).includes(gio);
+
+/** P1-03: thanh bốn bước, cùng kiểu trang đặt khách sạn. */
+const TEN_BUOC = ["Chọn bàn", "Thông tin", "Thanh toán", "Xác nhận"];
+function BuocDat({ toi }: { toi: 1 | 2 | 3 | 4 }) {
+  return <div className="ksv-bk"><div className="ksv-stp">{TEN_BUOC.map((t, i) => <span key={t} style={{ display: "contents" }}>
+    {i > 0 && <span className={`ln ${i < toi ? "on" : ""}`} />}
+    <span className={`s ${i + 1 < toi ? "dn" : i + 1 === toi ? "on" : ""}`}><i>{i + 1 < toi ? "✓" : i + 1}</i>{t}</span></span>)}</div></div>;
+}
+const YEU_CAU = ["Ghế trẻ em", "Bàn gần cửa sổ", "Khu không hút thuốc", "Bàn ngoài trời", "Có người ăn chay", "Có người dị ứng", "Có xe lăn", "Trang trí sinh nhật"];
+
+/** P1-03: cùng phép tính với máy chủ (nha_hang.tinh_goi) — chỉ để khách hình dung, máy chủ tính lại số chính thức. */
+export function tinhGoi(td: any, ngay: string, nl: number, te: number, tuoi: (number | "")[], ptChon: number[]) {
+  let lon = nl, tinhTe = te, mien = 0, thieuTuoi = false;
+  if (te && td.tuoi_te_tu != null && td.tuoi_te_den != null) {
+    if (tuoi.length !== te || tuoi.some((x) => x === "")) thieuTuoi = true;
+    else { tinhTe = 0; for (const x of tuoi as number[]) { if (x < td.tuoi_te_tu) mien++; else if (x <= td.tuoi_te_den) tinhTe++; else lon++; } }
+  }
+  const pt = (td.phu_thu || []).map((p: any, i: number) => ({ ...p, i })).filter((p: any) => (!p.tu_chon || ptChon.includes(p.i))
+    && (!p.tu_ngay || ngay >= p.tu_ngay) && (!p.den_ngay || ngay <= p.den_ngay))
+    .map((p: any) => { const so = p.theo === "khach" ? lon + tinhTe : 1; return { ten: p.ten, so, don_gia: p.so_tien, so_tien: p.so_tien * so, theo: p.theo }; });
+  const tongPt = pt.reduce((a: number, p: any) => a + p.so_tien, 0);
+  const coc = td.loai === "goi_mon" && td.coc_moi_khach ? td.coc_moi_khach * (nl + te) : 0;
+  let tam = (td.gia_nguoi_lon || 0) * lon + (td.gia_tre_em || 0) * tinhTe + tongPt;
+  if (coc) tam = Math.max(tam, coc + tongPt);
+  return { lon, te: tinhTe, mien, pt, tongPt, cocCoDinh: coc ? coc + tongPt : 0, tam, thieuTuoi };
+}
+/** P1-03: lý do gói chưa đặt được với giờ / số khách đang chọn ("" = được). */
+export function loiGoi(td: any, gio: string, khach: number): string {
+  if (td.so_khach_toi_thieu > khach) return `Gói này tối thiểu ${td.so_khach_toi_thieu} khách`;
+  if (td.so_khach_toi_da && khach > td.so_khach_toi_da) return `Gói này tối đa ${td.so_khach_toi_da} khách / đơn — nhiều hơn vui lòng gửi yêu cầu đoàn để Sales báo giá`;
+  if (td.gio_tu && td.gio_den && !(td.gio_tu <= gio && gio <= td.gio_den)) return `Gói này chỉ áp dụng ${td.gio_tu}–${td.gio_den} — chọn giờ khác hoặc gói khác`;
+  return "";
+}
 
 type Q = { q: string; tinh: string; ngay: string; gio: string; nl: number; te: number };
 type Loc = { dat: boolean; con: boolean; at: string[]; gia: string[]; ph: string[]; loai: string[]; ten: string };
@@ -90,9 +126,9 @@ export default function NhaHangAgoda({ ten = "", lienHe = "", coSdt = false, sdt
   const [anhI, setAnhI] = useState<Record<number, number>>({});
   const [nh, setNh] = useState<any>(null);
   const [album, setAlbum] = useState<{ nhom: string; i: number | null } | null>(null);
-  const [buoc, setBuoc] = useState<"ds" | "nh" | "dat" | "xong">("ds");
-  const [chon, setChon] = useState<{ td: number | null; gio: string }>({ td: null, gio: "19:00" });
-  const [kh, setKh] = useState({ sdt: "", ten_khach: "", ghi: "", cach: "coc", dongy: false, dongy_khach: false, dip: "" });
+  const [buoc, setBuoc] = useState<"ds" | "nh" | "tt" | "dat" | "xong">("ds");
+  const [chon, setChon] = useState<{ td: number | null; gio: string; tuoi?: (number | "")[]; pt?: number[] }>({ td: null, gio: "19:00" });
+  const [kh, setKh] = useState({ sdt: "", ten_khach: "", ghi: "", cach: "coc", dongy: false, dongy_khach: false, dip: "", yc: [] as string[], tt: "qr" });
   const [busy, setBusy] = useState(false);
   const [xong, setXong] = useState<any>(null);
   const [qrMa, setQrMa] = useState("");
@@ -103,12 +139,12 @@ export default function NhaHangAgoda({ ten = "", lienHe = "", coSdt = false, sdt
     const nho = layLuaChon<{ q: Q; nhId: number | null; chon: { td: number | null; gio: string }; kh: typeof kh; buoc: string }>("restaurant");
     if (nho?.q) {
       setQ(nho.q);
-      if (nho.nhId) moNh(nho.nhId).then(() => { setChon(nho.chon); setKh({ ...nho.kh, dongy: false, dongy_khach: false }); if (nho.buoc === "dat") setBuoc("dat"); });
+      if (nho.nhId) moNh(nho.nhId).then(() => { setChon(nho.chon); setKh({ ...nho.kh, dongy: false, dongy_khach: false }); if (nho.buoc === "dat" || nho.buoc === "tt") setBuoc(nho.buoc); });
       return;
     }
     if (moId) moNh(moId);
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (buoc !== "xong") nhoLuaChon("restaurant", { q, nhId: buoc === "nh" || buoc === "dat" ? nh?.id ?? null : null, chon, kh, buoc }); }, [q, nh, chon, kh, buoc]);   // P0-06
+  useEffect(() => { if (buoc !== "xong") nhoLuaChon("restaurant", { q, nhId: buoc === "nh" || buoc === "tt" || buoc === "dat" ? nh?.id ?? null : null, chon, kh, buoc }); }, [q, nh, chon, kh, buoc]);   // P0-06
 
   const moNh = async (id: number, toiThucDon = false) => {
     setLoi(""); setBusy(true);
@@ -162,23 +198,34 @@ export default function NhaHangAgoda({ ten = "", lienHe = "", coSdt = false, sdt
   // ---------- đặt bàn: số do máy chủ tính lại; ở đây chỉ hiện để khách hình dung ----------
   const ts = ds?.tham_so;
   const td = nh?.thuc_don?.find((t: any) => t.id === chon.td);
-  const tam = td ? td.gia_nguoi_lon * q.nl + (td.gia_tre_em || 0) * q.te : 0;
+  const tuoi = (chon.tuoi || []).slice(0, q.te).concat(Array(Math.max(0, q.te - (chon.tuoi || []).length)).fill(""));
+  const ptChon = chon.pt || [];
+  const tg = td ? tinhGoi(td, q.ngay, q.nl, q.te, tuoi, ptChon) : null;
+  const tam = tg ? tg.tam : 0;
+  const cocCoDinh = tg?.cocCoDinh || 0;
   const doan = !!(ts && td && q.nl + q.te >= ts.doan_tu && td.loai !== "goi_mon");
   const pct = ts ? (doan ? ts.coc_doan : ts.coc_le) : 0;
-  const traTruoc = kh.cach === "du" ? tam : Math.min(tam, nghin(tam * pct / 100));
+  const traTruoc = cocCoDinh ? Math.min(tam, cocCoDinh) : kh.cach === "du" ? tam : Math.min(tam, nghin(tam * pct / 100));
+  const loiTd = td ? loiGoi(td, chon.gio, q.nl + q.te) || (tg?.thieuTuoi ? "Ghi tuổi từng trẻ để tính đúng giá" : "") : "";
   const moTt = !!nh?.mo_thanh_toan;
+  const diem = nh?.diem;
+  const sangTt = () => { setLoi(""); if (loiTd) { setLoi(loiTd); return; } setBuoc("tt"); window.scrollTo(0, 0); };
   const gui = async () => {
     setLoi("");
     if (!td) { setLoi("Chọn một thực đơn"); return; }
-    if (td.so_khach_toi_thieu > q.nl + q.te) { setLoi(`Gói này tối thiểu ${td.so_khach_toi_thieu} khách`); return; }
+    if (loiTd) { setLoi(loiTd); return; }
     if (!kh.dongy) { setLoi("Đánh dấu ô đồng ý chính sách thanh toán và hủy bàn"); return; }
     if (!moTt) return;
     setBusy(true);
     try {
       const r = await goiCong("/dat-ban", { nha_hang_id: nh.id, thuc_don_id: td.id, ngay: q.ngay, gio: chon.gio, nguoi_lon: q.nl, tre_em: q.te,
-        cach_tt: kh.cach, ten_khach: kh.ten_khach, dien_thoai: kh.sdt, ghi_chu: [kh.dip, kh.ghi].filter(Boolean).join(" · "),
-        dong_y_chinh_sach: kh.dongy, dong_y_khach: kh.dongy_khach });
-      setXong({ ...r, ten: nh.ten, ngay: q.ngay, gio: chon.gio, nguoi: q.nl + q.te, td: td.ten, tam, traTruoc, dia_chi: [nh.khu_vuc, nh.tinh_thanh].filter(Boolean).join(", ") });
+        cach_tt: cocCoDinh ? "coc" : kh.cach, ten_khach: kh.ten_khach, dien_thoai: kh.sdt,
+        ghi_chu: [kh.dip, kh.yc.length ? `Yêu cầu: ${kh.yc.join(", ")}` : "", kh.ghi].filter(Boolean).join(" · "),
+        dong_y_chinh_sach: kh.dongy, dong_y_khach: kh.dongy_khach,
+        tuoi_tre: q.te && td.tuoi_te_tu != null ? tuoi.map(Number) : null, phu_thu_chon: ptChon });
+      const don = (r.dat_ban || []).find((x: any) => x.ma === r.ma);
+      setXong({ ...r, ten: nh.ten, ngay: q.ngay, gio: chon.gio, nguoi: q.nl + q.te, td: td.ten, tam, traTruoc, tt: kh.tt, han_phan_hoi: don?.han_phan_hoi || null,
+        dia_chi: [nh.khu_vuc, nh.tinh_thanh].filter(Boolean).join(", ") });
       setBuoc("xong"); window.scrollTo(0, 0);
       QRCode.toDataURL(r.ma, { margin: 1, width: 200, errorCorrectionLevel: "M" }).then(setQrMa).catch(() => setQrMa(""));
     } catch (x: any) { if (x.status !== 401) setLoi(x.message); } finally { setBusy(false); }
@@ -209,9 +256,8 @@ export default function NhaHangAgoda({ ten = "", lienHe = "", coSdt = false, sdt
       aria-pressed={loc.loai.includes(k)} onClick={() => setLoc({ ...loc, loai: bat(loc.loai, k, !loc.loai.includes(k)) })}>{t}</button>)}</div>}
   </form>;
 
-  // ============================== 7 · ĐÃ GỬI ĐẶT BÀN ==============================
-  if (buoc === "xong" && xong) return <div className="ksv nhv">{css}
-    <div className="ksv-steps"><span className="xong"><b>✓</b>Thông tin khách</span><hr /><span className="xong"><b>✓</b>Cách thanh toán</span><hr /><span className="on"><b>3</b>Đã gửi đặt bàn</span></div>
+  // ============================== 4 · XÁC NHẬN (đã gửi, chờ nhà hàng nhận) ==============================
+  if (buoc === "xong" && xong) return <div className="ksv nhv">{css}<BuocDat toi={4} />
     <section className="ksv-panel nhv-xong">
       <div className="nhv-xong-dau"><div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
         <span className="ksv-b out" style={{ alignSelf: "flex-start", whiteSpace: "normal", fontSize: 13 }}><b>Đã gửi · chờ nhà hàng nhận bàn {xong.ma}</b></span>
@@ -220,65 +266,113 @@ export default function NhaHangAgoda({ ten = "", lienHe = "", coSdt = false, sdt
         <span className="ksv-muted">{xong.message}</span>
         <span className="ksv-muted">Trả trước dự kiến ₫ {vnd(xong.traTruoc)} · phần còn lại trả tại nhà hàng theo hóa đơn thực tế.</span></div>
         {qrMa && <figure className="nhv-qr"><img src={qrMa} alt={`Mã đặt bàn ${xong.ma}`} width={140} height={140} /><figcaption>Đưa mã này cho nhà hàng</figcaption></figure>}</div>
+      <ol className="nhv-tl">
+        <li className="dn"><i>✓</i><span><b>Đã gửi đặt bàn</b></span></li>
+        <li className="on"><i>2</i><span><b>Nhà hàng nhận bàn</b><br /><small className="ksv-muted">{xong.han_phan_hoi
+          ? `Hạn trả lời: ${xong.han_phan_hoi.slice(11, 16)} ngày ${xong.han_phan_hoi.slice(8, 10)}/${xong.han_phan_hoi.slice(5, 7)}. Quá hạn, Vietourist gọi nhà hàng và báo bạn.`
+          : "Thường trong giờ làm việc; Vietourist báo bạn qua Zalo / điện thoại."}</small></span></li>
+        <li><i>3</i><span><b>Thanh toán ₫ {vnd(xong.traTruoc)} bằng {xong.tt === "the" ? "thẻ" : "QR chuyển khoản"}</b><br />
+          <small className="ksv-muted">Nút «Thanh toán» hiện ở đơn bên dưới ngay khi nhà hàng nhận. Quá hạn trả chưa trả, bàn tự hủy, không mất phí.</small></span></li>
+        <li><i>4</i><span><b>Bàn được giữ</b><br /><small className="ksv-muted">Đưa mã QR cho nhà hàng khi đến. Đổi giờ hoặc hủy theo chính sách ngay trong đơn.</small></span></li></ol>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button type="button" className="ksv-btn line" onClick={() => taiLich({ ma: xong.ma, ten: xong.ten, ngay: xong.ngay, gio: xong.gio, dia_chi: xong.dia_chi, nguoi: xong.nguoi })}>Thêm vào lịch</button>
         <a className="ksv-btn line nhv-a" href={chiDuong(nh || {})} target="_blank" rel="noopener noreferrer">Chỉ đường trên Google Maps</a>
         <button type="button" className="ksv-btn" onClick={() => { setBuoc("ds"); setNh(null); setXong(null); }}>Tìm nhà hàng khác</button></div>
-      <ol className="nhv-tiep"><li>Nhà hàng nhận bàn (thường trong giờ làm việc).</li><li>Nút <b>Thanh toán</b> hiện ở đơn bên dưới — trả cọc / trả đủ bằng QR hoặc thẻ trước hạn.</li>
-        <li>Đổi giờ hoặc hủy theo chính sách ngay trong đơn.</li></ol>
     </section>
     <section className="ksv-panel"><b style={{ fontSize: 18 }}>Đặt bàn của tôi</b><DatBanCuaToi doiTac={doiTac} moMa={xong.ma} /></section>
   </div>;
 
-  // ============================== 5–6 · THÔNG TIN KHÁCH + THANH TOÁN ==============================
-  if (buoc === "dat" && nh && td) return <div className="ksv nhv">{css}
-    <div className="ksv-steps"><span className="on"><b>1</b>Thông tin khách</span><hr /><span className="on"><b>2</b>Cách thanh toán</span><hr /><span><b>3</b>Xác nhận</span>
-      <button type="button" className="ksv-link" style={{ marginLeft: "auto" }} onClick={() => setBuoc("nh")}>← Quay lại chọn giờ</button></div>
+  // ============================== 2–3 · THÔNG TIN + THANH TOÁN (tóm tắt đi theo cả hai bước) ==============================
+  const tomTat = nh && td && tg && <aside className="ksv-panel nhv-tom" aria-label="Tóm tắt đặt bàn">
+    {nh.anh_nho ? <img src={nh.anh_nho} alt={nh.ten} className="nhv-tom-anh" /> : <OTrong n={nh} cao={120} />}
+    <b style={{ fontSize: 17 }}>{nh.ten}</b><span className="ksv-muted">{[nh.khu_vuc, nh.tinh_thanh].filter(Boolean).join(", ")}</span>
+    <div className="nhv-tom-o"><span>{ngayDep(q.ngay)}</span><span>{chon.gio}</span><span>{q.nl} NL{q.te ? ` + ${q.te} TE` : ""}</span></div>
+    {cocCoDinh ? <div className="ksv-sum"><span>{td.ten} · gọi món</span><span>theo món gọi</span></div> : <>
+      <div className="ksv-sum"><span>{td.ten} · NL × {tg.lon}</span><span>₫ {vnd(tg.lon * (td.gia_nguoi_lon || 0))}</span></div>
+      {tg.te > 0 && <div className="ksv-sum"><span>Trẻ em{td.tuoi_te_tu != null ? ` ${td.tuoi_te_tu}–${td.tuoi_te_den} tuổi` : ""} × {tg.te}</span><span>₫ {vnd(tg.te * (td.gia_tre_em || 0))}</span></div>}
+      {tg.mien > 0 && <div className="ksv-sum"><span>Trẻ dưới {td.tuoi_te_tu} tuổi × {tg.mien}</span><span>miễn phí</span></div>}</>}
+    {tg.pt.map((p: any) => <div key={p.ten} className="ksv-sum"><span>Phụ thu {p.ten}{p.theo === "khach" ? ` · ${p.so} khách` : ""}</span><span>₫ {vnd(p.so_tien)}</span></div>)}
+    {!cocCoDinh && <div className="ksv-sum"><span>Tạm tính</span><span>₫ {vnd(tam)}</span></div>}
+    {/* P0-05: nhắc lại điều kiện riêng của gói ngay trước nút gửi (bước chọn gói có thể đã bị lướt qua) */}
+    {(td.dieu_kien || td.dieu_kien_huy || td.gio_tu || td.so_khach_toi_da || td.han_phan_hoi_gio) && <small className="nhv-dk"><b>Điều kiện của gói:</b> {[
+      td.gio_tu && `áp dụng ${td.gio_tu}–${td.gio_den}`, td.so_khach_toi_da && `tối đa ${td.so_khach_toi_da} khách`,
+      td.han_phan_hoi_gio && `nhà hàng trả lời trong ${td.han_phan_hoi_gio} giờ`, td.dieu_kien, td.dieu_kien_huy].filter(Boolean).join(" · ")}</small>}
+    <div className="ksv-sum" style={{ borderTop: "1px solid var(--ksv-line)", paddingTop: 8 }}><b>Trả trước {cocCoDinh ? "(cọc giữ bàn)" : kh.cach === "du" ? "(toàn bộ)" : `(cọc ${pct}%)`}</b><b className="ksv-big" style={{ fontSize: 20 }}>₫ {vnd(traTruoc)}</b></div>
+    <small className="ksv-muted">{cocCoDinh ? "Món ăn chọn và trả tại nhà hàng theo thực đơn; tiền cọc trừ vào hóa đơn." : `Trả tại nhà hàng ~₫ ${vnd(Math.max(0, tam - traTruoc))} · đồ uống, món gọi thêm theo hóa đơn thực tế.`} Máy chủ tính lại số chính thức.</small>
+  </aside>;
+  const goiTen = (ten || "").trim().split(/\s+/).pop() || "";
+
+  // ---------- bước 2 · thông tin khách ----------
+  if (buoc === "tt" && nh && td) return <div className="ksv nhv">{css}<BuocDat toi={2} />
+    <div className="ksv-tmr" style={{ background: "var(--ksv-asoft)", color: "var(--ksv-ink)" }}><span>Giá hợp đồng của Vietourist · nhà hàng nhận bàn rồi bạn mới thanh toán</span></div>
+    <button type="button" className="ksv-link" onClick={() => setBuoc("nh")}>← Quay lại chọn giờ</button>
     <div className="ksv-co">
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
-        <section className="ksv-panel" style={{ padding: 20 }}><h2 style={{ margin: 0, fontSize: 20 }}>Ai đến ăn?</h2>
+      <div className="ksv-col">
+        {!doiTac && goiTen && <div className="ksv-panel" style={{ flexDirection: "row", alignItems: "center", gap: 12 }}><span className="ksv-av">{goiTen.charAt(0).toUpperCase()}</span>
+          <span>Chào <b>{goiTen}</b>! Thông tin đã điền sẵn từ tài khoản của bạn — kiểm tra lại trước khi tiếp.</span></div>}
+        <section className="ksv-panel" style={{ padding: 18 }}><h3 className="ksv-h3">Ai đến ăn?</h3>
           {doiTac ? <div className="ksv-f2">
             <label className="ksv-fld">Tên khách<input value={kh.ten_khach} onChange={(e) => setKh({ ...kh, ten_khach: e.target.value })} autoComplete="name" /></label>
             <label className="ksv-fld">Số điện thoại khách<input inputMode="tel" value={kh.sdt} placeholder="09xx xxx xxx" onChange={(e) => setKh({ ...kh, sdt: e.target.value })} /></label></div>
             : <div className="ksv-f2">
               <div className="ksv-fld">Người đặt<div className="nhv-ro">{ten || "Khách hàng Vietourist"}{lienHe ? ` · ${lienHe}` : ""}</div></div>
               <label className="ksv-fld">Số điện thoại liên hệ{coSdt ? " (trống = số đã xác thực)" : ""}<input inputMode="tel" value={kh.sdt} placeholder={coSdt ? sdtCho : "09xx xxx xxx"} onChange={(e) => setKh({ ...kh, sdt: e.target.value })} autoComplete="tel" /></label></div>}
-          <div className="ksv-f2">
-            <label className="ksv-fld">Dịp đặc biệt<select className="ksv-sel" value={kh.dip} onChange={(e) => setKh({ ...kh, dip: e.target.value })}>
-              {["", "Sinh nhật", "Kỷ niệm", "Gặp gỡ công việc", "Gia đình có trẻ nhỏ"].map((x) => <option key={x} value={x}>{x || "Không có"}</option>)}</select></label>
-            <label className="ksv-fld">Ghi chú cho nhà hàng<textarea value={kh.ghi} maxLength={800} placeholder="Ăn chay, ghế trẻ em, dị ứng…" onChange={(e) => setKh({ ...kh, ghi: e.target.value })} /></label></div>
+          <label className="ksv-fld" style={{ maxWidth: 320 }}>Dịp đặc biệt<select className="ksv-sel" value={kh.dip} onChange={(e) => setKh({ ...kh, dip: e.target.value })}>
+            {["", "Sinh nhật", "Kỷ niệm", "Gặp gỡ công việc", "Gia đình có trẻ nhỏ"].map((x) => <option key={x} value={x}>{x || "Không có"}</option>)}</select></label>
           {doiTac && <label className="ksv-chk"><input type="checkbox" checked={kh.dongy_khach} onChange={(e) => setKh({ ...kh, dongy_khach: e.target.checked })} /><span>Khách đã đồng ý để tôi chuyển thông tin cho Vietourist.</span></label>}
         </section>
-        <section className="ksv-panel" style={{ padding: 20 }}><h2 style={{ margin: 0, fontSize: 18 }}>Cách thanh toán</h2>
-          {[["coc", `Đặt cọc ${pct}%`, `Trả ₫ ${vnd(Math.min(tam, nghin(tam * pct / 100)))} sau khi nhà hàng nhận bàn, phần còn lại trả tại nhà hàng.`],
-            ["du", "Trả trước toàn bộ", `₫ ${vnd(tam)} · QR chuyển khoản hoặc thẻ (cổng SePay).`]].map(([v, t, m]) =>
-            <label key={v} className={`nhv-pay${kh.cach === v ? " on" : ""}`}><input type="radio" name="nhv-tt" checked={kh.cach === v} onChange={() => setKh({ ...kh, cach: v })} />
-              <span><b>{t}</b><br /><small className="ksv-muted">{m}</small></span></label>)}
-          {doan && <small className="ksv-muted">Từ {ts.doan_tu} khách là đoàn: cọc {ts.coc_doan}%.</small>}
-          {ts && <small className="ksv-muted">Hủy trước {ts.mien_phi_gio} giờ: hoàn đủ. Trong {ts.mien_phi_gio} giờ: giữ {ts.phat}% hóa đơn. Dưới {ts.gan_gio} giờ hoặc không đến: khách lẻ giữ {ts.phat}%, đoàn giữ {ts.phat_doan_gan}%. Không giữ quá số đã trả. Nhà hàng hủy: hoàn đủ.</small>}
-          <small className="ksv-muted">Voucher VTD Rewards áp ở bước thanh toán (sau khi nhà hàng nhận bàn), tối đa 5% tạm tính.</small>
-        </section>
+        <section className="ksv-panel" style={{ padding: 18 }}><h3 className="ksv-h3">Yêu cầu đặc biệt</h3><small className="ksv-muted" style={{ marginTop: -6 }}>Gửi nhà hàng cùng đơn; nhà hàng cố gắng đáp ứng nhưng không bảo đảm.</small>
+          <div className="nhv-yc">{YEU_CAU.map((t) => <label key={t} className="ksv-chk"><input type="checkbox" checked={kh.yc.includes(t)}
+            onChange={(e) => setKh({ ...kh, yc: e.target.checked ? [...kh.yc, t] : kh.yc.filter((x) => x !== t) })} /><span>{t}</span></label>)}</div>
+          <label className="ksv-fld">Ghi thêm cho nhà hàng<textarea value={kh.ghi} maxLength={800} placeholder="Dị ứng hải sản có vỏ, đến muộn 15 phút…" onChange={(e) => setKh({ ...kh, ghi: e.target.value })} /></label></section>
         {loi && <div className="ksv-loi">{loi}</div>}
-        <div className="ksv-panel" style={{ flexDirection: "row", alignItems: "center", gap: 14, flexWrap: "wrap", padding: "16px 20px" }}>
-          <label className="ksv-chk" style={{ flex: 1, minWidth: 220, alignItems: "flex-start" }}><input type="checkbox" checked={kh.dongy} onChange={(e) => setKh({ ...kh, dongy: e.target.checked })} />
-            <span style={{ fontSize: 13 }}>Tôi đồng ý chính sách thanh toán và hủy bàn. Nhà hàng nhận bàn xong mới hiện thanh toán; bàn chỉ giữ khi tiền đã vào.</span></label>
-          {moTt ? <button type="button" className="ksv-btn" style={{ minHeight: 52, padding: "0 28px", fontSize: 16 }} disabled={busy || (doiTac && !kh.dongy_khach)} onClick={gui}>
-            {busy ? "Đang gửi…" : `Gửi đặt bàn · trả trước ₫ ${vnd(traTruoc)}`}</button>
-            : <button type="button" className="ksv-btn ksv-khoa" disabled style={{ minHeight: 52, padding: "0 24px", fontSize: 15 }}>Thanh toán trực tuyến sắp mở cho nhà hàng này</button>}</div>
-        {!moTt && <small className="ksv-muted">Vietourist đang hoàn tất hợp tác với nhà hàng này. Bạn chưa phải trả gì và chưa có bàn nào được giữ.</small>}
+        <div className="ksv-panel" style={{ padding: 16 }}><button type="button" className="ksv-btn big wide" disabled={doiTac && (!kh.dongy_khach || !kh.ten_khach.trim())}
+          onClick={() => { setLoi(""); setBuoc("dat"); window.scrollTo(0, 0); }}>TIẾP: BƯỚC CUỐI</button>
+          <div className="ksv-okc" style={{ textAlign: "center", fontSize: 13 }}>Hôm nay chưa trừ tiền — chỉ trả khi nhà hàng đã nhận bàn</div></div>
       </div>
-      <aside className="ksv-panel nhv-tom" aria-label="Tóm tắt đặt bàn">
-        {nh.anh_nho ? <img src={nh.anh_nho} alt={nh.ten} className="nhv-tom-anh" /> : <OTrong n={nh} cao={120} />}
-        <b style={{ fontSize: 17 }}>{nh.ten}</b><span className="ksv-muted">{[nh.khu_vuc, nh.tinh_thanh].filter(Boolean).join(", ")}</span>
-        <div className="nhv-tom-o"><span>{ngayDep(q.ngay)}</span><span>{chon.gio}</span><span>{q.nl} NL{q.te ? ` + ${q.te} TE` : ""}</span></div>
-        <div className="ksv-sum"><span>{td.ten} · NL × {q.nl}</span><span>₫ {vnd(td.gia_nguoi_lon * q.nl)}</span></div>
-        {q.te > 0 && <div className="ksv-sum"><span>Trẻ em × {q.te}</span><span>₫ {vnd((td.gia_tre_em || 0) * q.te)}</span></div>}
-        <div className="ksv-sum"><span>Tạm tính</span><span>₫ {vnd(tam)}</span></div>
-        {/* P0-05: nhắc lại điều kiện riêng của gói ngay trước nút gửi (bước chọn gói có thể đã bị lướt qua) */}
-        {(td.dieu_kien || td.dieu_kien_huy) && <small className="nhv-dk"><b>Điều kiện của gói:</b> {[td.dieu_kien, td.dieu_kien_huy].filter(Boolean).join(" · ")}</small>}
-        <div className="ksv-sum" style={{ borderTop: "1px solid var(--ksv-line)", paddingTop: 8 }}><b>Trả trước {kh.cach === "du" ? "(toàn bộ)" : `(cọc ${pct}%)`}</b><b className="ksv-big" style={{ fontSize: 20 }}>₫ {vnd(traTruoc)}</b></div>
-        <small className="ksv-muted">Trả tại nhà hàng ~₫ {vnd(Math.max(0, tam - traTruoc))} · đồ uống, món gọi thêm theo hóa đơn thực tế. Máy chủ tính lại số chính thức.</small>
-      </aside>
+      {tomTat}
+    </div></div>;
+
+  // ---------- bước 3 · thanh toán ----------
+  if (buoc === "dat" && nh && td) return <div className="ksv nhv">{css}<BuocDat toi={3} />
+    <div className="ksv-tmr"><span>Gửi đặt bàn: nhà hàng trả lời {td.han_phan_hoi_gio ? <>trong <b>{td.han_phan_hoi_gio} giờ</b></> : "trong giờ làm việc"}. Hôm nay chưa trừ tiền.</span></div>
+    <button type="button" className="ksv-link" onClick={() => setBuoc("tt")}>← Sửa thông tin khách</button>
+    <div className="ksv-co">
+      <div className="ksv-col">
+        <section className="ksv-panel ksv-sec0"><h3>Chọn cách thanh toán</h3>
+          {cocCoDinh ? <label className="ksv-radio on"><input type="radio" name="nhv-tt" checked readOnly />
+            <span><b>Cọc giữ bàn · ₫ {vnd(traTruoc)}</b><span className="ksv-muted" style={{ display: "block" }}>{q.nl + q.te} khách × ₫ {vnd(td.coc_moi_khach)}{tg && tg.tongPt ? ` + phụ thu ₫ ${vnd(tg.tongPt)}` : ""}. Món ăn chọn và trả tại nhà hàng, tiền cọc trừ vào hóa đơn.</span></span></label>
+            : [["coc", `Đặt cọc ${pct}% · ₫ ${vnd(Math.min(tam, nghin(tam * pct / 100)))}`, "Phần còn lại trả tại nhà hàng theo hóa đơn thực tế."],
+              ["du", `Trả trước toàn bộ · ₫ ${vnd(tam)}`, "Đến nơi chỉ trả đồ uống, món gọi thêm."]].map(([v, t, m]) =>
+              <label key={v} className={`ksv-radio ${kh.cach === v ? "on" : ""}`}><input type="radio" name="nhv-tt" checked={kh.cach === v} onChange={() => setKh({ ...kh, cach: v })} />
+                <span><b>{t}</b><span className="ksv-muted" style={{ display: "block" }}>{m}</span></span></label>)}
+          {doan && !cocCoDinh && <small className="ksv-muted" style={{ padding: "0 14px 10px" }}>Từ {ts.doan_tu} khách là đoàn: cọc {ts.coc_doan}%.</small>}</section>
+        <section className="ksv-panel ksv-sec0"><h3>Phương thức thanh toán <small className="ksv-muted" style={{ fontWeight: 400 }}>· mã hóa, bảo mật</small></h3>
+          <label className={`ksv-radio ${kh.tt === "qr" ? "on" : ""}`}><input type="radio" name="nhv-pt" checked={kh.tt === "qr"} onChange={() => setKh({ ...kh, tt: "qr" })} />
+            <span style={{ flex: 1 }}><b>QR chuyển khoản ngân hàng</b><span className="ksv-muted" style={{ display: "block" }}>Mọi ngân hàng · tiền vào, đơn tự chuyển «Đã giữ bàn» trong 1–3 phút</span></span><span className="ksv-b green">Không mất phí</span></label>
+          {ds.the_bat && <label className={`ksv-radio ${kh.tt === "the" ? "on" : ""}`}><input type="radio" name="nhv-pt" checked={kh.tt === "the"} onChange={() => setKh({ ...kh, tt: "the" })} />
+            <span><b>Thẻ ATM nội địa / tín dụng / ghi nợ</b><span className="ksv-logos"><span>VISA</span><span>Mastercard</span><span>JCB</span><span>NAPAS</span></span>
+              <span className="ksv-muted" style={{ display: "block", marginTop: 4 }}>Nhập thẻ trên trang bảo mật của cổng thanh toán — Vietourist không thấy và không lưu số thẻ.</span></span></label>}
+          <small className="ksv-muted" style={{ padding: "0 14px 10px" }}>Nhà hàng nhận bàn xong, nút «Thanh toán» hiện ở đơn của bạn để trả bằng phương thức này.</small></section>
+        {ts && <section className="ksv-panel" style={{ padding: 18, gap: 4 }}><h3 className="ksv-h3">Quyền lợi của bạn</h3>
+          <span className="ksv-okc">✓ Hủy trước {ts.mien_phi_gio} giờ: hoàn đủ</span>
+          <span className="ksv-okc">✓ Nhà hàng từ chối: bạn không mất tiền (chưa phải trả)</span>
+          <span className="ksv-okc">✓ Đổi giờ / số khách ngay trong đơn</span>
+          <small className="ksv-muted">Trong {ts.mien_phi_gio} giờ: giữ {ts.phat}% hóa đơn. Dưới {ts.gan_gio} giờ hoặc không đến: khách lẻ giữ {ts.phat}%, đoàn giữ {ts.phat_doan_gan}%. Không giữ quá số đã trả. Nhà hàng hủy: hoàn đủ.</small>
+          {!doiTac && <small className="ksv-muted">Voucher VTD Rewards áp ở bước thanh toán (sau khi nhà hàng nhận bàn), tối đa 5% tạm tính.</small>}
+          {diem?.dang_bat && <div className="ksv13-diem"><b>Tích điểm VTD</b><span>{diem.cach_tinh === "hoa_hong"
+            ? `Cộng điểm sau bữa ăn, khi Vietourist chốt đơn: điểm = 20% hoa hồng Vietourist nhận ÷ 100 đ × hệ số hạng ${diem.hang}.`
+            : `Cộng điểm sau bữa ăn theo hạng ${diem.hang}${traTruoc > 0 ? ` — khoảng ${vnd(Math.floor(traTruoc / (diem.dong_moi_diem || 10000) * diem.he_so))} điểm trên số trả qua Vietourist` : ""}.`}</span></div>}</section>}
+        {loi && <div className="ksv-loi">{loi}</div>}
+        <div className="ksv-panel" style={{ padding: 16 }}>
+          <label className="ksv-chk" style={{ alignItems: "flex-start" }}><input type="checkbox" checked={kh.dongy} onChange={(e) => setKh({ ...kh, dongy: e.target.checked })} />
+            <span style={{ fontSize: 13 }}>Tôi đồng ý chính sách thanh toán và hủy bàn. Nhà hàng nhận bàn xong mới hiện thanh toán; bàn chỉ giữ khi tiền đã vào.</span></label>
+          {moTt ? <button type="button" className="ksv-btn big wide" disabled={busy || !kh.dongy || (doiTac && !kh.dongy_khach)} onClick={gui}>
+            {busy ? "Đang gửi…" : `Gửi đặt bàn · sẽ trả ₫ ${vnd(traTruoc)}`}</button>
+            : <button type="button" className="ksv-btn big wide ksv-khoa" disabled>Thanh toán trực tuyến sắp mở cho nhà hàng này</button>}
+          <div className="ksv-okc" style={{ textAlign: "center", fontSize: 13 }}>{moTt ? "Hôm nay chưa trừ tiền — chỉ trả khi nhà hàng đã nhận bàn" : "Vietourist đang hoàn tất hợp tác với nhà hàng này. Bạn chưa phải trả gì và chưa có bàn nào được giữ."}</div></div>
+      </div>
+      {tomTat}
     </div></div>;
 
   // ============================== 3–4 · TRANG NHÀ HÀNG + CHỌN GIỜ / THỰC ĐƠN ==============================
@@ -334,19 +428,34 @@ export default function NhaHangAgoda({ ten = "", lienHe = "", coSdt = false, sdt
               <button type="button" aria-label="Bớt trẻ em" onClick={() => setQ({ ...q, te: Math.max(0, q.te - 1) })}>−</button><b>{q.te} trẻ em</b>
               <button type="button" aria-label="Thêm trẻ em" onClick={() => setQ({ ...q, te: q.te + 1 })}>+</button></span></div></div>
           <div><b style={{ fontSize: 14 }}>Giờ đến</b><div className="nhv-slots" role="group" aria-label="Giờ đến">{gios.map((g) =>
-            <button key={g} type="button" className={`nhv-slot${chon.gio === g ? " on" : ""}`} aria-pressed={chon.gio === g} onClick={() => setChon({ ...chon, gio: g })}>{g}</button>)}</div>
-            <small className="ksv-muted">Khung giờ theo giờ phục vụ của nhà hàng. Nhà hàng xác nhận bàn sau khi nhận đơn.</small></div>
+            <button key={g} type="button" className={`nhv-slot${chon.gio === g ? " on" : ""}`} aria-pressed={chon.gio === g} onClick={() => setChon({ ...chon, gio: g })}
+              disabled={!!(td?.gio_tu && td?.gio_den && !(td.gio_tu <= g && g <= td.gio_den))}>{g}</button>)}</div>
+            <small className="ksv-muted">Khung giờ theo giờ phục vụ của nhà hàng{td?.gio_tu ? ` và gói «${td.ten}» (${td.gio_tu}–${td.gio_den})` : ""}. Nhà hàng xác nhận bàn sau khi nhận đơn.</small></div>
+          {/* P1-03: tuổi từng trẻ — gói có khung tuổi trẻ em */}
+          {td && q.te > 0 && td.tuoi_te_tu != null && <div><b style={{ fontSize: 14 }}>Tuổi từng trẻ</b>
+            <div className="nhv-tuoi">{tuoi.map((t, i) => <label key={i} className="ksv-fld">Trẻ {i + 1}<select className="ksv-sel" value={t === "" ? "" : String(t)}
+              onChange={(e) => setChon({ ...chon, tuoi: tuoi.map((x, j) => j === i ? (e.target.value === "" ? "" : Number(e.target.value)) : x) })}>
+              <option value="">Chọn tuổi</option>{Array.from({ length: 18 }, (_, k) => <option key={k} value={k}>{k < 1 ? "Dưới 1 tuổi" : `${k} tuổi`}</option>)}</select></label>)}</div>
+            <small className="ksv-muted">Dưới {td.tuoi_te_tu} tuổi miễn phí · {td.tuoi_te_tu}–{td.tuoi_te_den} tuổi giá trẻ em · từ {td.tuoi_te_den + 1} tuổi tính người lớn.</small></div>}
           <div className="nhv-menu">{nh.thuc_don.map((t: any) => { const thieu = t.so_khach_toi_thieu > q.nl + q.te;
             return <button key={t.id} type="button" className={`nhv-mn${chon.td === t.id ? " on" : ""}`} aria-pressed={chon.td === t.id} onClick={() => setChon({ ...chon, td: t.id })}>
               <span className="nhv-tag">{t.loai_ten}</span><b>{t.ten}</b>{t.mo_ta && <small className="ksv-muted">{t.mo_ta}</small>}
-              <span className="ksv-big" style={{ fontSize: 19 }}>₫ {vnd(t.gia_nguoi_lon)}<small className="ksv-muted" style={{ fontWeight: 400 }}> / người lớn</small></span>
-              {t.gia_tre_em != null && <small className="ksv-muted">Trẻ em ₫ {vnd(t.gia_tre_em)}</small>}
+              {t.loai === "goi_mon" && t.coc_moi_khach
+                ? <span className="ksv-big" style={{ fontSize: 19 }}>Cọc ₫ {vnd(t.coc_moi_khach)}<small className="ksv-muted" style={{ fontWeight: 400 }}> / khách · món trả tại nhà hàng</small></span>
+                : <span className="ksv-big" style={{ fontSize: 19 }}>₫ {vnd(t.gia_nguoi_lon)}<small className="ksv-muted" style={{ fontWeight: 400 }}> / người lớn</small></span>}
+              {t.gia_tre_em != null && !(t.loai === "goi_mon" && t.coc_moi_khach) && <small className="ksv-muted">Trẻ em ₫ {vnd(t.gia_tre_em)}{t.tuoi_te_tu != null ? ` (${t.tuoi_te_tu}–${t.tuoi_te_den} tuổi)` : ""}</small>}
+              {(t.gio_tu || t.so_khach_toi_da) && <small className="ksv-muted">{[t.gio_tu && `Áp dụng ${t.gio_tu}–${t.gio_den}`, t.so_khach_toi_da && `tối đa ${t.so_khach_toi_da} khách`].filter(Boolean).join(" · ")}</small>}
+              {(t.phu_thu || []).length > 0 && <small className="ksv-muted">Phụ thu: {t.phu_thu.map((p: any) => `${p.ten} ₫ ${vnd(p.so_tien)}/${p.theo === "khach" ? "khách" : "bàn"}`).join(" · ")}</small>}
               {t.so_khach_toi_thieu > 1 && <small className={thieu ? "nhv-warn" : "ksv-muted"}>Tối thiểu {t.so_khach_toi_thieu} khách</small>}
               {(t.dieu_kien || t.dieu_kien_huy) && <small className="ksv-muted">{[t.dieu_kien, t.dieu_kien_huy].filter(Boolean).join(" · ")}</small>}</button>; })}</div>
+          {/* P1-03: phụ thu «khách tự chọn» (vd phòng riêng) */}
+          {td && (td.phu_thu || []).some((p: any) => p.tu_chon) && <div className="nhv-ptc">{td.phu_thu.map((p: any, i: number) => p.tu_chon &&
+            <label key={i} className="ksv-chk"><input type="checkbox" checked={ptChon.includes(i)} onChange={(e) => setChon({ ...chon, pt: e.target.checked ? [...ptChon, i] : ptChon.filter((x) => x !== i) })} />
+              <span>{p.ten} (+₫ {vnd(p.so_tien)} / {p.theo === "khach" ? "khách" : "bàn"})</span></label>)}</div>}
           {td && <div className="ksv-total"><span style={{ flex: 1, minWidth: 180 }}><b>{td.ten} · {ngayDep(q.ngay)} {chon.gio} · {q.nl + q.te} khách</b><br />
-            <small className="ksv-muted">Tạm tính ₫ {vnd(tam)} · trả trước từ ₫ {vnd(Math.min(tam, nghin(tam * pct / 100)))} (cọc {pct}%)</small></span>
-            <button type="button" className="ksv-btn" style={{ minHeight: 50, padding: "0 26px", fontSize: 16 }} disabled={td.so_khach_toi_thieu > q.nl + q.te}
-              onClick={() => { setLoi(""); setBuoc("dat"); window.scrollTo(0, 0); }}>Đặt bàn</button></div>}
+            <small className={loiTd ? "nhv-warn" : "ksv-muted"}>{loiTd || (cocCoDinh ? `Cọc giữ bàn ₫ ${vnd(traTruoc)} · món ăn trả tại nhà hàng`
+              : `Tạm tính ₫ ${vnd(tam)}${tg?.tongPt ? ` (gồm phụ thu ₫ ${vnd(tg.tongPt)})` : ""} · trả trước từ ₫ ${vnd(Math.min(tam, nghin(tam * pct / 100)))} (cọc ${pct}%)`)}</small></span>
+            <button type="button" className="ksv-btn" style={{ minHeight: 50, padding: "0 26px", fontSize: 16 }} disabled={!!loiTd} onClick={sangTt}>Đặt bàn</button></div>}
         </> : <div className="nhv-chua"><b>Nhà hàng chưa mở đặt bàn qua Vietourist</b><span className="ksv-muted">Vietourist đang hoàn tất hợp tác. Bạn vẫn xem thực đơn, ảnh và chỉ đường.</span></div>}
         {(nh.thuc_don_nh || []).map((b: any) => <details key={b.loai} className="nhv-tdnh"><summary>{b.ten} · bản {b.ban} ({b.trang.length} trang)</summary>
           <div className="nhv-tdnh-tr">{b.trang.map((t: any, i: number) => <a key={i} href={t.hien} target="_blank" rel="noopener noreferrer"><img src={t.nho} alt={`${b.ten} trang ${i + 1}`} loading="lazy" /></a>)}</div></details>)}
@@ -452,6 +561,14 @@ export default function NhaHangAgoda({ ten = "", lienHe = "", coSdt = false, sdt
 }
 
 const CSS = `
+.nhv-tuoi{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin:6px 0 4px}
+.nhv-ptc{display:flex;flex-wrap:wrap;gap:4px 18px}
+.nhv-yc{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:2px 12px}
+.nhv-tl{list-style:none;margin:6px 0;padding:0;display:grid;gap:10px}
+.nhv-tl li{display:flex;gap:10px;align-items:flex-start}
+.nhv-tl i{font-style:normal;width:24px;height:24px;border-radius:50%;border:2px solid var(--ksv-line);display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
+.nhv-tl .dn i{background:var(--ksv-ok);border-color:var(--ksv-ok);color:#fff}.nhv-tl .on i{border-color:var(--ksv-accent);color:var(--ksv-accent)}
+.nhv-slot:disabled{opacity:.4;cursor:not-allowed}
 .nhv{--ksv-accent:#14538D;--ksv-ink:#14538D}
 .nhv-hero{background:linear-gradient(135deg,#0B2545,#1E63C8);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px;color:#fff}
 .nhv-hero.gon{padding:10px;background:#14538D}

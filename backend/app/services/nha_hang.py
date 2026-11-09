@@ -56,7 +56,11 @@ MIEN = {"bac": "Miền Bắc", "trung": "Miền Trung", "tay_nguyen": "Tây Nguy
 
 TRUONG_NH = ("ten", "tinh_thanh", "khu_vuc", "am_thuc", "gio_phuc_vu", "tien_ich", "mo_ta")
 TRUONG_TD = ("ten", "loai", "gia_nguoi_lon", "gia_tre_em", "so_khach_toi_thieu", "mo_ta", "dieu_kien", "dieu_kien_huy",
-             "tu_ngay", "den_ngay", "dang_ban")
+             "tu_ngay", "den_ngay", "dang_ban",
+             # P1-03
+             "gio_tu", "gio_den", "so_khach_toi_da", "tuoi_te_tu", "tuoi_te_den", "phu_thu", "han_phan_hoi_gio", "coc_moi_khach")
+TRUONG_P103 = TRUONG_TD[-8:]
+PHU_THU_THEO = {"khach": "mỗi khách", "ban": "mỗi bàn (đơn)"}
 
 
 class LoiNhaHang(ValueError):
@@ -151,15 +155,22 @@ def luu_thuc_don(db: Session, u: User, nha_hang_id: int, d: dict, thuc_don_id: i
     v = {k: d[k] if k in d and d[k] is not None else goc.get(k, getattr(td, k)) for k in TRUONG_TD}
     if "gia_tre_em" in d:
         v["gia_tre_em"] = d["gia_tre_em"]   # None có nghĩa: không bán vé trẻ em
+    for k in TRUONG_P103:
+        if k in d:
+            v[k] = d[k]                       # P1-03: None / "" = Điều hành xóa ô đó (bỏ kiểm mục đó)
     v["ten"] = (v["ten"] or "").strip()
     if not v["ten"]:
         raise LoiNhaHang("Ghi tên gói / thực đơn")
     if v["loai"] not in LOAI_GOI:
         raise LoiNhaHang("Loại gói không hợp lệ")
+    _chuan_p103(v)
     gl = v["gia_nguoi_lon"]
-    if gl in (None, "") or float(gl) <= 0:
+    if v["loai"] == "goi_mon" and v["coc_moi_khach"] and gl in (None, "", 0):
+        v["gia_nguoi_lon"] = None             # P1-03: gọi món có cọc cố định — không bắt mức chi dự kiến
+    elif gl in (None, "") or float(gl) <= 0:
         raise LoiNhaHang("Ghi giá bán người lớn (lớn hơn 0)")
-    v["gia_nguoi_lon"] = float(gl)
+    else:
+        v["gia_nguoi_lon"] = float(gl)
     v["gia_tre_em"] = float(v["gia_tre_em"]) if v["gia_tre_em"] not in (None, "") else None
     if v["gia_tre_em"] is not None and v["gia_tre_em"] < 0:
         raise LoiNhaHang("Giá trẻ em không âm")
@@ -178,6 +189,75 @@ def luu_thuc_don(db: Session, u: User, nha_hang_id: int, d: dict, thuc_don_id: i
         _tat(nh, f"Thực đơn «{td.ten}» vừa sửa bởi {u.username} — chờ Kinh doanh bật lại")
     db.commit(); db.refresh(td)
     return td
+
+
+def _so_nguyen(x, ten: str, tu: int, den: int) -> int | None:
+    if x in (None, ""):
+        return None
+    try:
+        n = int(x)
+    except (TypeError, ValueError):
+        raise LoiNhaHang(f"{ten}: ghi số")
+    if not tu <= n <= den:
+        raise LoiNhaHang(f"{ten}: từ {tu} đến {den}")
+    return n
+
+
+def _chuan_p103(v: dict) -> None:
+    """P1-03: kiểm và chuẩn hóa các ô điều kiện có cấu trúc của gói. Ô trống = không kiểm mục đó."""
+    for k in ("gio_tu", "gio_den"):
+        v[k] = (v.get(k) or "").strip()
+        if v[k] and not GIO_RE.match(v[k]):
+            raise LoiNhaHang("Khung giờ ghi dạng HH:MM")
+    if bool(v["gio_tu"]) != bool(v["gio_den"]):
+        raise LoiNhaHang("Khung giờ: ghi đủ giờ bắt đầu và giờ kết thúc, hoặc để trống cả hai")
+    if v["gio_tu"] and v["gio_den"] <= v["gio_tu"]:
+        raise LoiNhaHang("Khung giờ: giờ kết thúc phải sau giờ bắt đầu")
+    v["so_khach_toi_da"] = _so_nguyen(v.get("so_khach_toi_da"), "Số khách tối đa", 1, 1000)
+    if v["so_khach_toi_da"] and v["so_khach_toi_da"] < max(int(v.get("so_khach_toi_thieu") or 1), 1):
+        raise LoiNhaHang("Số khách tối đa phải từ số khách tối thiểu trở lên")
+    v["tuoi_te_tu"] = _so_nguyen(v.get("tuoi_te_tu"), "Tuổi trẻ em từ", 0, 17)
+    v["tuoi_te_den"] = _so_nguyen(v.get("tuoi_te_den"), "Tuổi trẻ em đến", 0, 17)
+    if (v["tuoi_te_tu"] is None) != (v["tuoi_te_den"] is None):
+        raise LoiNhaHang("Tuổi tính giá trẻ em: ghi đủ «từ» và «đến», hoặc để trống cả hai")
+    if v["tuoi_te_tu"] is not None and v["tuoi_te_den"] < v["tuoi_te_tu"]:
+        raise LoiNhaHang("Tuổi tính giá trẻ em: «đến» phải từ «từ» trở lên")
+    v["han_phan_hoi_gio"] = _so_nguyen(v.get("han_phan_hoi_gio"), "Hạn nhà hàng trả lời (giờ)", 1, 72)
+    c = v.get("coc_moi_khach")
+    v["coc_moi_khach"] = None if c in (None, "", 0) else float(c)
+    if v["coc_moi_khach"] is not None:
+        if v["loai"] != "goi_mon":
+            raise LoiNhaHang("Cọc mỗi khách chỉ dùng cho gói gọi món")
+        if v["coc_moi_khach"] < 0:
+            raise LoiNhaHang("Cọc mỗi khách không âm")
+    goi_mon = v["loai"] == "goi_mon"
+    ds = []
+    for i, p in enumerate(v.get("phu_thu") or []):
+        ten = str((p or {}).get("ten") or "").strip()[:80]
+        if not ten:
+            raise LoiNhaHang(f"Phụ thu dòng {i + 1}: ghi tên")
+        try:
+            tien = float(p.get("so_tien"))
+        except (TypeError, ValueError):
+            raise LoiNhaHang(f"Phụ thu «{ten}»: ghi số tiền")
+        if tien <= 0:
+            raise LoiNhaHang(f"Phụ thu «{ten}»: số tiền lớn hơn 0")
+        theo = p.get("theo") or "khach"
+        if theo not in PHU_THU_THEO:
+            raise LoiNhaHang(f"Phụ thu «{ten}»: tính theo khách hoặc theo bàn")
+        if goi_mon and theo == "khach":
+            raise LoiNhaHang(f"Phụ thu «{ten}»: gói gọi món chỉ có phụ thu theo bàn")
+        try:
+            tu, den = _ngay(p.get("tu_ngay")), _ngay(p.get("den_ngay"))
+        except ValueError:
+            raise LoiNhaHang(f"Phụ thu «{ten}»: ngày ghi dạng YYYY-MM-DD")
+        if tu and den and den < tu:
+            raise LoiNhaHang(f"Phụ thu «{ten}»: ngày kết thúc phải sau ngày bắt đầu")
+        ds.append({"ten": ten, "so_tien": int(round(tien)), "theo": theo, "tu_ngay": tu.isoformat() if tu else None,
+                   "den_ngay": den.isoformat() if den else None, "tu_chon": bool(p.get("tu_chon"))})
+    if len(ds) > 10:
+        raise LoiNhaHang("Tối đa 10 dòng phụ thu")
+    v["phu_thu"] = ds or None
 
 
 def _con_ban(td: ThucDonNhaHang, hom_nay: date) -> bool:
@@ -354,7 +434,11 @@ def _td_out(t: ThucDonNhaHang, noi_bo: bool) -> dict:
     o = {"id": t.id, "ten": t.ten, "loai": t.loai, "loai_ten": LOAI_GOI.get(t.loai, t.loai),
          "gia_nguoi_lon": int(t.gia_nguoi_lon or 0), "gia_tre_em": int(t.gia_tre_em) if t.gia_tre_em is not None else None,
          "so_khach_toi_thieu": t.so_khach_toi_thieu, "mo_ta": t.mo_ta, "dieu_kien": t.dieu_kien, "dieu_kien_huy": t.dieu_kien_huy,
-         "tu_ngay": t.tu_ngay.isoformat() if t.tu_ngay else None, "den_ngay": t.den_ngay.isoformat() if t.den_ngay else None}
+         "tu_ngay": t.tu_ngay.isoformat() if t.tu_ngay else None, "den_ngay": t.den_ngay.isoformat() if t.den_ngay else None,
+         # P1-03
+         "gio_tu": t.gio_tu or "", "gio_den": t.gio_den or "", "so_khach_toi_da": t.so_khach_toi_da,
+         "tuoi_te_tu": t.tuoi_te_tu, "tuoi_te_den": t.tuoi_te_den, "phu_thu": t.phu_thu or [],
+         "han_phan_hoi_gio": t.han_phan_hoi_gio, "coc_moi_khach": int(t.coc_moi_khach) if t.coc_moi_khach else None}
     if noi_bo:
         o.update({"dang_ban": t.dang_ban, "sua_boi": t.sua_boi})
     return o
@@ -563,9 +647,59 @@ def mot_nha_hang_cong(db: Session, nha_hang_id: int) -> tuple[NhaHang, dict]:
 GIO_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
+def tinh_goi(td: dict, ngay: date, nguoi_lon: int, tre_em: int, tuoi: list | None = None,
+             chon_phu_thu: list | None = None, bat_tuoi: bool = False) -> dict:
+    """P1-03: tách khách theo tuổi, cộng phụ thu, tính tạm tính và cọc cố định (gọi món). Hàm thuần — cổng
+    hiện cùng phép tính này để khách hình dung, máy chủ tính lại số chính thức ở đây.
+
+    `tuoi` = tuổi từng trẻ. Gói có khung tuổi mà không có `tuoi`: khi tạo đơn (`bat_tuoi`) thì bắt ghi;
+    khi đổi lịch / số khách sau này thì mọi trẻ tính giá trẻ em như trước P1-03."""
+    nl, te = int(nguoi_lon), int(tre_em)
+    lon, tinh_te, mien = nl, te, 0
+    a, b = td.get("tuoi_te_tu"), td.get("tuoi_te_den")
+    if te and a is not None and b is not None:
+        if tuoi is None or len(tuoi) != te:
+            if bat_tuoi:
+                raise LoiNhaHang("Ghi tuổi từng trẻ để tính đúng giá")
+        else:
+            lon, tinh_te = nl, 0
+            for x in tuoi:
+                try:
+                    x = int(x)
+                except (TypeError, ValueError):
+                    raise LoiNhaHang("Tuổi trẻ em ghi bằng số")
+                if not 0 <= x <= 17:
+                    raise LoiNhaHang("Tuổi trẻ em từ 0 đến 17")
+                if x < a:
+                    mien += 1
+                elif x <= b:
+                    tinh_te += 1
+                else:
+                    lon += 1
+    gl, gt = td.get("gia_nguoi_lon") or 0, td.get("gia_tre_em") or 0
+    pt = []
+    chon = set(int(i) for i in (chon_phu_thu or []))
+    for i, p in enumerate(td.get("phu_thu") or []):
+        if p.get("tu_chon") and i not in chon:
+            continue
+        if (p.get("tu_ngay") and ngay < date.fromisoformat(p["tu_ngay"])) or (p.get("den_ngay") and ngay > date.fromisoformat(p["den_ngay"])):
+            continue
+        so = (lon + tinh_te) if p["theo"] == "khach" else 1
+        pt.append({"i": i, "ten": p["ten"], "so_tien": int(p["so_tien"]) * so, "don_gia": int(p["so_tien"]), "theo": p["theo"], "so": so})
+    tong_pt = sum(x["so_tien"] for x in pt)
+    coc = int(td.get("coc_moi_khach") or 0) * (nl + te) if td.get("loai") == "goi_mon" and td.get("coc_moi_khach") else 0
+    tam = gl * lon + gt * tinh_te + tong_pt
+    if coc:
+        tam = max(tam, coc + tong_pt)          # gọi món chưa có mức chi dự kiến: tạm tính tối thiểu bằng phần trả trước
+    return {"lon": lon, "te": tinh_te, "mien": mien, "tien_nl": gl * lon, "tien_te": gt * tinh_te, "phu_thu": pt,
+            "tong_phu_thu": tong_pt, "coc_co_dinh": (coc + tong_pt) if coc else 0, "tam": int(round(tam))}
+
+
 def kiem_dat_ban(db: Session, nha_hang_id: int, thuc_don_id: int, ngay: date | None, gio: str, nguoi_lon: int, tre_em: int,
-                 hom_nay: date) -> tuple[dict, dict, int]:
-    """Kiểm yêu cầu đặt bàn; trả (nhà hàng, gói, tạm tính). Tạm tính do MÁY tính từ giá đã lưu."""
+                 hom_nay: date, tuoi: list | None = None, chon_phu_thu: list | None = None,
+                 bat_tuoi: bool = False) -> tuple[dict, dict, int]:
+    """Kiểm yêu cầu đặt bàn; trả (nhà hàng, gói, tạm tính). Tạm tính do MÁY tính từ giá đã lưu.
+    Gói trả về kèm `tinh` (chi tiết P1-03: khách theo tuổi, phụ thu, cọc cố định)."""
     _n, o = mot_nha_hang_cong(db, nha_hang_id)
     if not o["mo_dat"]:
         raise LoiNhaHang("Nhà hàng này chưa mở đặt bàn qua VTD")
@@ -584,8 +718,13 @@ def kiem_dat_ban(db: Session, nha_hang_id: int, thuc_don_id: int, ngay: date | N
         raise LoiNhaHang("Số người lớn từ 1, trẻ em từ 0")
     if int(nguoi_lon) + int(tre_em) < td["so_khach_toi_thieu"]:
         raise LoiNhaHang(f"Gói này tối thiểu {td['so_khach_toi_thieu']} khách")
-    tam = td["gia_nguoi_lon"] * int(nguoi_lon) + (td["gia_tre_em"] or 0) * int(tre_em)
-    return o, td, tam
+    # P1-03: khung giờ, số khách tối đa
+    if td.get("gio_tu") and td.get("gio_den") and not td["gio_tu"] <= gio <= td["gio_den"]:
+        raise LoiNhaHang(f"Gói này chỉ áp dụng {td['gio_tu']}–{td['gio_den']} — chọn giờ khác hoặc gói khác")
+    if td.get("so_khach_toi_da") and int(nguoi_lon) + int(tre_em) > td["so_khach_toi_da"]:
+        raise LoiNhaHang(f"Gói này tối đa {td['so_khach_toi_da']} khách / đơn — nhiều hơn vui lòng gửi yêu cầu đoàn để Sales báo giá")
+    ct = tinh_goi(td, ngay, int(nguoi_lon), int(tre_em), tuoi, chon_phu_thu, bat_tuoi)
+    return o, {**td, "tinh": ct}, ct["tam"]
 
 
 # ══ AT-1 · nhập danh sách, xác minh, hợp đồng, nội dung (Chủ tịch duyệt 28/10/2026) ═══════════════════════════

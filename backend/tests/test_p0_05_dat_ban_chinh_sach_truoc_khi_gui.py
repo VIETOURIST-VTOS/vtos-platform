@@ -15,11 +15,15 @@ def _src():
 
 
 def test_p0_05_1_dieu_kien_goi_canh_nut_gui():
+    # P1-03 (09/11/2026): khung tóm tắt dùng chung cho bước Thông tin và Thanh toán (`tomTat`); ý giữ nguyên —
+    # điều kiện riêng của gói vẫn nằm trong khung tóm tắt hiện cạnh nút «Gửi đặt bàn».
     s = _src()
-    i, j = s.index('if (buoc === "dat" && nh && td)'), s.index("// ============================== 3–4")
-    khoi = s[i:j]
-    assert "Điều kiện của gói:" in khoi and "td.dieu_kien_huy" in khoi
-    assert khoi.index("Điều kiện của gói:") > khoi.index("Gửi đặt bàn")    # trong khung tóm tắt, cùng bước gửi
+    i, j = s.index("const tomTat ="), s.index('if (buoc === "tt" && nh && td)')
+    tom = s[i:j]
+    assert "Điều kiện của gói:" in tom and "td.dieu_kien_huy" in tom
+    k, l = s.index('if (buoc === "dat" && nh && td)'), s.index("// ============================== 3–4")
+    khoi = s[k:l]
+    assert "Gửi đặt bàn" in khoi and khoi.index("{tomTat}") > khoi.index("Gửi đặt bàn")
 
 
 def test_p0_05_2_sau_khi_gui_chua_phai_da_co_ban():
