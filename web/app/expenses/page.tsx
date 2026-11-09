@@ -9,9 +9,9 @@ import { Tag, errMsg } from "@/components/ui";
 // là TGĐ / Chủ tịch như mọi loại khác. Bảng này phải khớp CATEGORY_CONFIRMER ở máy chủ – có hàng rào
 // canh (test_tx2), vì hai bảng khai tay thì sớm muộn cũng lệch và lúc lệch thì màn hình nói sai
 // tên người phụ trách.
-const CAT: Record<string, string> = { chi_tour: "Chi phí tour", marketing: "Marketing", hanh_chinh: "Hành chính", hoan_tien: "Hoàn tiền khách", tam_ung: "Tạm ứng HDV/NCC trước tour", sua_chua_xe: "Sửa chữa xe", tam_ung_tai_xe: "Tạm ứng tài xế", hoa_hong: "Hoa hồng đối tác (D06)" , tra_ncc_thu_ho: "Trả NCC tiền thu hộ (khách sạn / nhà hàng)" };
+const CAT: Record<string, string> = { chi_tour: "Chi phí tour", marketing: "Marketing", hanh_chinh: "Hành chính", hoan_tien: "Hoàn tiền khách", tam_ung: "Tạm ứng HDV/NCC trước tour", sua_chua_xe: "Sửa chữa xe", tam_ung_tai_xe: "Tạm ứng tài xế", chi_doi_xe: "Chi đội xe (GĐ đội xe lập)", hoa_hong: "Hoa hồng đối tác (D06)" , tra_ncc_thu_ho: "Trả NCC tiền thu hộ (khách sạn / nhà hàng)" };
 const ST: Record<string, [string, string]> = { cho_tp: ["Chờ bộ phận", "warn"], cho_kt: ["Chờ Kế toán", "warn"], cho_duyet: ["Chờ duyệt", "warn"], cho_chi: ["Lệnh chi chờ", "navy"], da_chi: ["Đã chi", "ok"], tu_choi: ["Từ chối", "red"] };
-const CONFIRMER: Record<string, string[]> = { chi_tour: ["tp_dh", "tgd"], marketing: ["ptgd_mkt", "tgd"], hanh_chinh: ["hcns", "tgd"], hoan_tien: ["gd_kd", "tp_dh", "tgd"], tam_ung: ["tp_dh", "tgd"], sua_chua_xe: ["gd_doi_xe", "tgd"], tam_ung_tai_xe: ["gd_doi_xe", "tgd"], hoa_hong: ["gd_kd", "tgd"] , tra_ncc_thu_ho: [] };
+const CONFIRMER: Record<string, string[]> = { chi_tour: ["tp_dh", "tgd"], marketing: ["ptgd_mkt", "tgd"], hanh_chinh: ["hcns", "tgd"], hoan_tien: ["gd_kd", "tp_dh", "tgd"], tam_ung: ["tp_dh", "tgd"], sua_chua_xe: ["gd_doi_xe", "tgd"], tam_ung_tai_xe: ["gd_doi_xe", "tgd"], chi_doi_xe: ["gd_doi_xe", "tgd"], hoa_hong: ["gd_kd", "tgd"] , tra_ncc_thu_ho: [] };
 
 function Expenses() {
   const { user, toast } = useShell();
@@ -144,7 +144,7 @@ function Expenses() {
             hồ sơ Marketing dừng ở một chữ ký của ông ấy, nên hồ sơ do chính ông ấy lập thì không
             còn ai ký được ngoài chính mình. Bỏ hẳn lựa chọn khỏi ô chọn loại thay vì để người ta
             điền xong cả biểu mẫu rồi mới bị máy chủ từ chối. */}
-        <label>Loại<select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>{Object.entries(CAT).filter(([k]) => k !== "tra_ncc_thu_ho" && !(k === "marketing" && role === "ptgd_mkt")).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+        <label>Loại<select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>{Object.entries(CAT).filter(([k]) => k !== "tra_ncc_thu_ho" && k !== "chi_doi_xe" && !(k === "marketing" && role === "ptgd_mkt")).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
         <label>Tour (bắt buộc với chi tour/hoàn tiền)<select value={f.tour_id} onChange={(e) => setF({ ...f, tour_id: e.target.value })}><option value="">–</option>{tours.map((t) => <option key={t.id} value={t.id}>{t.code} · {t.name}</option>)}</select></label>
         <label>NCC / người thụ hưởng<input value={f.supplier_name} onChange={(e) => setF({ ...f, supplier_name: e.target.value })} /></label>
         <label>MST NCC<input value={f.supplier_tax_code} onChange={(e) => setF({ ...f, supplier_tax_code: e.target.value })} /></label>

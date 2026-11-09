@@ -2038,6 +2038,93 @@ class DeXuatChiIn(BaseModel):
     cho_phep_trung: bool = False      # chỉ đặt True khi người lập đã xem phiếu trùng và vẫn muốn gửi
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# ĐỘI XE v3.3 · ĐỀ XUẤT CHI ĐI VÀO ĐỀ NGHỊ CHI 05-TT — Chủ tịch chốt 10/11/2026
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# Màn bốn bước của GĐ đội xe lập ở ĐÂY. Phiếu là một đề nghị chi loại `chi_doi_xe` (services/ops.py):
+# cùng mã DC…, cùng hàng đợi Kế toán, cùng mốc duyệt chung, cùng luật người lập không tự ký. Không có
+# bảng phiếu riêng và không có mốc duyệt riêng của đội xe (tài liệu v3.3 mục 3).
+#
+# Cửa cũ `POST /de-xuat-chi` ngay dưới GIỮ NGUYÊN: nó là cửa ghi một dòng ĐỐI CHIẾU nguồn ngoài, không
+# phải cửa lập phiếu nữa — màn bốn bước thôi gọi nó.
+LOAI_CHI_XE = ("chi_doi_xe", "sua_chua_xe", "tam_ung_tai_xe")
+
+
+class DeNghiChiXeIn(BaseModel):
+    so_tien: float
+    ngay: date | None = None              # ngày cần xử lý → ngày đến hạn của đề nghị chi
+    noi_dung: str
+    nguoi_thu_huong: str
+    ma_so_thue: str = ""
+    chung_tu: str = ""
+    pham_vi: str = "xe"
+    bien_so: str = ""
+    loai: str = "thanh_toan"
+    nhom: str = ""
+    can_cu_so_tien: str = ""
+    ma_khoan_goc: str = ""
+    hen_bo_sung: str = ""
+    ghi_chu_kiem_tra: str = ""
+    cho_phep_trung: bool = False
+    so_tai_khoan: str = ""                # vai GĐ đội xe gửi ô này là bị từ chối (services/ops.py)
+    ngan_hang: str = ""
+
+
+@router.post("/de-nghi-chi", status_code=201)
+def lap_de_nghi_chi_xe(data: DeNghiChiXeIn, u: User = Depends(require_roles("gd_doi_xe", "cntt")),
+                       db: Session = Depends(get_db)):
+    from app.services import ops as O
+    if (data.so_tien or 0) <= 0: raise HTTPException(422, "Số tiền phải lớn hơn 0")
+    if not (data.noi_dung or "").strip(): raise HTTPException(422, "Phải ghi nội dung đề xuất")
+    # Ngưỡng chứng từ bắt buộc của đội xe (chặn cứng B6) — giữ y như cửa cũ. Tạm ứng / nạp quỹ không có
+    # hóa đơn lúc lập, nên không áp.
+    nguong = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
+    if (data.so_tien >= nguong and not (data.chung_tu or "").strip() and data.loai == "thanh_toan"
+            and not data.nhom.startswith("Nạp quỹ")):
+        raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc ghi số chứng từ gốc (chặn cứng B6)")
+    ngan = " · ".join(x.strip() for x in (data.so_tai_khoan, data.ngan_hang) if x.strip())
+    try:
+        r = O.create_request(db, u, {
+            "category": "chi_doi_xe", "supplier_name": data.nguoi_thu_huong.strip()[:160],
+            "supplier_tax_code": data.ma_so_thue.strip()[:20], "supplier_bank": ngan[:120],
+            "amount": data.so_tien, "description": data.noi_dung.strip()[:300],
+            "has_document": bool(data.chung_tu.strip()), "document_ref": data.chung_tu.strip()[:120],
+            "ngay_den_han": data.ngay, "cho_phep_trung": data.cho_phep_trung,
+            "doi_xe": {"pham_vi": data.pham_vi, "bien_so": data.bien_so, "loai": data.loai, "nhom": data.nhom,
+                       "can_cu": data.can_cu_so_tien, "ma_khoan_goc": data.ma_khoan_goc,
+                       "hen_bo_sung": data.hen_bo_sung, "ghi_chu_kiem_tra": data.ghi_chu_kiem_tra}})
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    cd = O.cap_duyet(db, r)
+    ai = cd["ai"] or "chưa chốt mốc duyệt chi — hồ sơ sẽ nằm chờ"
+    return {"id": r.id, "code": r.code, "status": r.status,
+            "message": f"Đã gửi {r.code} — Kế toán kiểm chứng từ, rồi {ai} ký lệnh chi"}
+
+
+@router.get("/de-nghi-chi")
+def ds_de_nghi_chi_xe(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Danh sách đề nghị chi CỦA ĐỘI XE — cùng một nguồn cho nút tạo mới, thanh con «Đề xuất chi» và hồ sơ xe
+    (tài liệu v3.3 mục 1). Chỉ ba loại chi của đội xe; không mở sổ chi của phòng khác cho vai đội xe."""
+    from app.models.ops import PaymentRequest
+    from app.services import ops as O
+    BUOC = {"cho_tp": "Chờ bộ phận xác nhận", "cho_kt": "Kế toán kiểm", "cho_duyet": "Chờ ký lệnh chi",
+            "cho_chi": "Chờ Kế toán chi", "da_chi": "Đã chi", "tu_choi": "Từ chối"}
+    ds = db.execute(select(PaymentRequest).where(PaymentRequest.category.in_(LOAI_CHI_XE))
+                    .order_by(PaymentRequest.id.desc()).limit(200)).scalars().all()
+    ra = []
+    for r in ds:
+        x = r.doi_xe or {}
+        buoc = BUOC.get(r.status, r.status)
+        if r.status == "cho_duyet":
+            buoc = f"Chờ {O.cap_duyet(db, r)['ai'] or 'chốt mốc'} ký"
+        ra.append({"id": r.id, "code": r.code, "loai_chi": r.category, "ngay": r.created_at.date().isoformat() if r.created_at else None,
+                   "noi_dung": r.description, "ben_nhan": r.supplier_name, "so_tien": r.amount,
+                   "bien_so": x.get("bien_so") or "", "pham_vi": x.get("pham_vi") or "", "nhom": x.get("nhom") or "",
+                   "loai": O.LOAI_DOI_XE.get(x.get("loai") or "", ""), "trang_thai": r.status, "buoc": buoc,
+                   "ly_do_tu_choi": r.reject_reason or "", "nguoi_lap": r.created_by})
+    return {"de_nghi": ra}
+
+
 @router.post("/de-xuat-chi", status_code=201)
 def tao_de_xuat_chi(data: DeXuatChiIn, u: User = Depends(require_roles(*WRITE, *KETOAN, "chutich", "tgd")),
                     db: Session = Depends(get_db)):

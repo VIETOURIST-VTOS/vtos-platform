@@ -162,7 +162,8 @@ def chi_so(db: Session, ky: str) -> dict:
     bc = LL.bao_cao(db, ky)
     tong = bc["tong"]
 
-    ngay = tong["ngay_khai_thac"]
+    # Đội xe v3.3 (Chủ tịch 10/11/2026): ngày xe khai thác = MỌI chuyến đã ghi nhận, kể cả chưa quyết toán.
+    ngay = tong.get("ngay_khai_thac_ghi_nhan", tong["ngay_khai_thac"])
     dh = doi_hinh(db, d1, d2)
     rong = km_chay_rong(db, d1, d2)
 

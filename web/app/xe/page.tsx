@@ -1,12 +1,12 @@
 "use client";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
 import { api } from "@/lib/api";
 import { errMsg } from "@/components/ui";
 import { KhoiHieuQuaXe } from "@/components/KhoiV14";
 import ChiPhiKyPanel from "@/components/doixe/ChiPhiKyPanel";
-import TrangPhanHe from "@/components/TrangPhanHe";
+import DeXuatChiTaiCho from "@/components/doixe/DeXuatChiTaiCho";
 
 /** Bàn làm việc Giám đốc đội xe — màn `/xe`. Bố cục v3.3, bản vẽ anh Tuấn gửi 09/11/2026.
  *
@@ -108,15 +108,60 @@ const NHOM: { ma: string; ten: string; tom: string; trang: Trang[] }[] = [
   ] },
 ];
 
-/** HAI CỬA NHẬP CHÍNH — cả hai là cửa ĐANG CHẠY trên /doi-xe, không phải form mới dựng ở đây.
- *  `?mo=` chỉ bảo màn ấy bật sẵn đúng biểu mẫu. Chuỗi bước lấy đúng bản vẽ v3.3. */
-const CUA_NHAP: { nhan: string; ten: string; buoc: string; toi: string }[] = [
+/** HAI CỬA NHẬP CHÍNH — Chủ tịch duyệt 10/11/2026: mở TẠI CHỖ, đúng trang con của nó, không rời /xe.
+ *  `trang` là mã trang con trong nhóm «Báo cáo & chi phí»; `mo` bảo trang ấy bật sẵn biểu mẫu. */
+const CUA_NHAP: { nhan: string; ten: string; buoc: string; trang: string; mo: string }[] = [
   { nhan: "ĐỀ NGHỊ THANH TOÁN / TẠM ỨNG", ten: "Lập đề xuất chi",
-    buoc: "Nội dung → chứng từ → kiểm tra → gửi xử lý",
-    toi: "/doi-xe?tab=giaodich&mo=de-xuat-chi" },
+    buoc: "Nội dung → chứng từ → kiểm tra → gửi xử lý", trang: "de-xuat-chi", mo: "de-xuat-chi" },
   { nhan: "NHẬT TRÌNH & CHI PHÍ CHUYẾN", ten: "Nhập báo cáo từng xe",
-    buoc: "Xe & chuyến → km → thu chi → gửi kiểm tra",
-    toi: "/doi-xe?tab=chuyen&mo=phieu-chi-phi" },
+    buoc: "Xe & chuyến → km → thu chi → gửi kiểm tra", trang: "bao-cao-xe", mo: "phieu-chi-phi" },
+];
+
+/** Trang con mở TẠI CHỖ (bản vẽ v3.3 điểm 2): nhúng CHÍNH màn đang chạy. Không chép lại một màn nào: mọi
+ *  luật, mọi cửa nhập vẫn là của màn gốc. Cùng tên miền nên khung đọc được trang con: giấu thanh ngang và
+ *  thanh dọc của nó (đã có ở /xe) và tự co chiều cao theo nội dung.
+ *
+ *  Vì sao không sửa Shell để có chế độ nhúng: Shell đang được làn R2 giữ chỗ (MKT-1, MKT-2, PH-1). Giấu bằng
+ *  một thẻ style chèn vào khung thì không đụng tệp của làn khác. */
+function KhungNhung({ toi, ten, mo }: { toi: string; ten: string; mo?: string }) {
+  const [cao, setCao] = useState(640);
+  const src = toi + (mo ? (toi.includes("?") ? "&" : "?") + `mo=${mo}` : "");
+  const doCao = (f: HTMLIFrameElement) => {
+    try {
+      const doc = f.contentDocument;
+      const b = doc?.body;
+      if (!doc || !b) return;
+      if (!doc.getElementById("vtos-nhung")) {
+        const st = doc.createElement("style");
+        st.id = "vtos-nhung";
+        st.textContent = ".top,aside.side{display:none!important}main{max-width:none!important;padding:0!important;margin:0!important}body{background:transparent!important}";
+        doc.head.appendChild(st);
+      }
+      const dat = () => setCao(Math.max(400, b.scrollHeight + 24));
+      dat();
+      const ro = new ResizeObserver(dat);
+      ro.observe(b);
+    } catch { /* khác nguồn thì giữ chiều cao mặc định */ }
+  };
+  return <>
+    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+      <Link href={toi} className="muted">Mở toàn trang ↗</Link></div>
+    <iframe key={src} src={src} title={ten} onLoad={(e) => doCao(e.currentTarget)}
+      style={{ width: "100%", height: cao, border: 0, display: "block" }} />
+  </>;
+}
+
+/** Ô «Quyền của tôi» — ma trận quyền GĐ đội xe của tài liệu v3.3 mục 7. Chỉ để đọc; quyền thật do máy
+ *  chủ kiểm ở từng cửa. */
+const QUYEN_GD: [string, string][] = [
+  ["Xem xe và chỉ số đội", "Trong phạm vi được giao"],
+  ["Lập đề xuất chi", "Tạo, sửa nháp, gửi — Kế toán kiểm, TGĐ / Chủ tịch ký"],
+  ["Duyệt đề xuất tự lập", "Không"],
+  ["Thực hiện thanh toán", "Không — Kế toán"],
+  ["Nhập báo cáo xe", "Tạo, sửa nháp, gửi kiểm tra"],
+  ["Lập và chốt lệnh xe", "Theo người được cấu hình"],
+  ["Bảng giá vận tải", "Chưa có quyền"],
+  ["Đổi thông tin ngân hàng", "Không — Kế toán"],
 ];
 
 /** Ngăn kéo: xử lý tại chỗ, đóng lại là bàn tự đọc lại số. */
@@ -169,6 +214,11 @@ function BanLamViecXe() {
   const k = keo ? NGAN_KEO[keo] : null;
   const nhomMo = nhom ? NHOM.find((n) => n.ma === nhom) : null;
   const [trang, setTrang] = useState<string | null>(null);
+  /** Cửa nhập vừa bấm — trang con mở sẵn biểu mẫu. */
+  const [moSan, setMoSan] = useState<string>("");
+  const [quyen, setQuyen] = useState(false);
+  /** «Số tiền theo»: mặc định chuyến đã quyết toán (KS-65); chọn «tất cả» thì nói thêm phần đang treo. */
+  const [theoTien, setTheoTien] = useState<"qt" | "tat_ca">("qt");
   const trangMo = nhomMo ? (nhomMo.trang.find((t) => t.ma === trang) || nhomMo.trang[0]) : null;
 
   // THIẾU QUYỀN: nói rõ, và dừng ở đây. Không vẽ thanh nghiệp vụ, không vẽ hai nút nhập —
@@ -189,11 +239,11 @@ function BanLamViecXe() {
         Lối về tổng quan là chữ VTOS ở đầu trang; lối ra khỏi đội xe nằm cuối hàng, vì màn
         này ẩn thanh dọc nên nếu đây không có thì người dùng chỉ còn nút Back. */}
     <nav aria-label="Nghiệp vụ đội xe"
-         style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4,
-                  borderBottom: "1px solid #dce3ec" }}>
+         style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(max-content, 1fr)) auto", overflowX: "auto",
+                  gap: 4, marginBottom: 4, borderBottom: "1px solid #dce3ec" }}>
       {NHOM.map((n) => (
         <button key={n.ma} type="button" title={n.tom}
-          onClick={() => { setNhom(nhom === n.ma ? null : n.ma); setTrang(null); }}
+          onClick={() => { setNhom(nhom === n.ma ? null : n.ma); setTrang(null); setMoSan(""); }}
           aria-pressed={nhom === n.ma}
           style={{ padding: "8px 12px", border: 0, background: "none", cursor: "pointer",
                    fontWeight: nhom === n.ma ? 700 : 400,
@@ -207,7 +257,7 @@ function BanLamViecXe() {
     {nhomMo && nhomMo.trang.length > 1 && <nav aria-label={`Trang của ${nhomMo.ten}`}
       style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 14, paddingTop: 8 }}>
       {nhomMo.trang.map((t) => (
-        <button key={t.ma} type="button" onClick={() => setTrang(t.ma)}
+        <button key={t.ma} type="button" onClick={() => { setTrang(t.ma); setMoSan(""); }}
           aria-pressed={trangMo?.ma === t.ma}
           style={{ padding: "6px 10px", borderRadius: 6, cursor: "pointer",
                    border: "1px solid " + (trangMo?.ma === t.ma ? "#1d5bbf" : "#dce3ec"),
@@ -225,7 +275,8 @@ function BanLamViecXe() {
           Công ty TNHH Vận tải Vietrip · chỉ dữ liệu đội xe
         </p>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <button type="button" onClick={() => setQuyen(!quyen)} aria-expanded={quyen}>Quyền của tôi</button>
         <span className="muted">Kỳ</span>
         <button type="button" aria-label="Kỳ trước" onClick={() => setKy(doiKy(ky, -1))}>‹</button>
         <strong style={{ minWidth: 92, textAlign: "center" }}>{kyDoc(ky)}</strong>
@@ -233,14 +284,22 @@ function BanLamViecXe() {
       </div>
     </div>
 
-    {/* ③ MỘT NGHIỆP VỤ ĐANG MỞ — vùng nội dung đổi TẠI CHỖ, chỉ hiện trang của nghiệp vụ ấy. */}
+    {quyen && <section className="panel" aria-label="Quyền của tôi">
+      <h2 style={{ marginTop: 0 }}>Quyền của Giám đốc đội xe</h2>
+      <div style={{ overflowX: "auto" }}><table><tbody>{QUYEN_GD.map(([a, b]) =>
+        <tr key={a}><td>{a}</td><td>{b}</td></tr>)}</tbody></table></div>
+      <p className="muted" style={{ marginBottom: 0 }}>Theo ma trận quyền của bản v3.3. Nút ẩn chỉ là cách trình bày — máy chủ kiểm quyền ở từng cửa.</p>
+    </section>}
+
+    {/* ③ MỘT NGHIỆP VỤ ĐANG MỞ — vùng nội dung đổi TẠI CHỖ (v3.3 điểm 2, Chủ tịch duyệt 10/11/2026). */}
     {nhomMo && trangMo && <section className="panel">
-      <h2 style={{ marginTop: 0 }}>{trangMo.ten}</h2>
-      {trangMo.ghi && <p className="muted">{trangMo.ghi}</p>}
-      <p><Link href={trangMo.toi}>Mở {trangMo.ten} →</Link></p>
-      <p className="muted" style={{ marginBottom: 0 }}>
-        Đợt này nối lối đi, chưa dựng màn mới: mỗi trang trên mở đúng màn hình đang chạy của VTOS.
-      </p>
+      {trangMo.ma === "de-xuat-chi"
+        ? <DeXuatChiTaiCho vai={user?.role || ""} toast={toast} moSan={moSan === "de-xuat-chi"} />
+        : <>
+          <h2 style={{ marginTop: 0 }}>{trangMo.ten}</h2>
+          {trangMo.ghi && <p className="muted">{trangMo.ghi}</p>}
+          <KhungNhung toi={trangMo.toi} ten={trangMo.ten} mo={moSan || undefined} />
+        </>}
     </section>}
 
     {/* ④ TỔNG QUAN */}
@@ -248,15 +307,25 @@ function BanLamViecXe() {
       {dang && !d && <p className="muted">Đang đọc số…</p>}
 
       {/* HAI CỬA NHẬP — chỉ xuất hiện MỘT lần trên cả màn (v3.3). */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 18 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center",
+                    justifyContent: "space-between", marginBottom: 10 }}>
+        <strong>THÁNG {kyDoc(ky)}</strong>
+        <label className="muted">Số tiền theo{" "}
+          <select value={theoTien} onChange={(e) => setTheoTien(e.target.value as any)}>
+            <option value="qt">Chuyến đã quyết toán</option>
+            <option value="tat_ca">Tất cả chuyến ghi nhận</option>
+          </select></label>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12, marginBottom: 18 }}>
         {CUA_NHAP.map((c) => (
-          <Link key={c.toi} href={c.toi}
-                style={{ flex: "1 1 320px", display: "block", padding: "14px 16px", borderRadius: 10,
-                         border: "1px solid #dce3ec", background: "#fff", textDecoration: "none" }}>
+          <button key={c.trang} type="button"
+                onClick={() => { setNhom("finance"); setTrang(c.trang); setMoSan(c.mo); }}
+                style={{ textAlign: "left", display: "block", padding: "14px 16px", borderRadius: 10, cursor: "pointer",
+                         border: "1px solid #dce3ec", borderTop: "3px solid #1d5bbf", background: "#fff" }}>
             <small className="muted" style={{ display: "block", letterSpacing: ".04em" }}>{c.nhan}</small>
             <strong style={{ display: "block", fontSize: "1.1em", margin: "2px 0" }}>{c.ten}</strong>
             <span className="muted">{c.buoc} →</span>
-          </Link>))}
+          </button>))}
       </div>
 
       {/* ⑤ KHỐI HIỆU QUẢ ĐỘI XE — RÁP NGUYÊN KHỐI CỦA MÀN CHỦ TỊCH.
@@ -264,7 +333,18 @@ function BanLamViecXe() {
           ô chọn kỳ Tháng/Quý/Năm, và hình diễn biến 12 kỳ — tất cả đã có sẵn, không viết lại.
           Số của nó đi qua `fleet_lai_lo.bao_cao`, cùng phép tính với màn Lãi lỗ đội xe. */}
       {!boKy && <p className="muted">Đang tính khối hiệu quả đội xe… (cửa này nặng, 10–30 giây)</p>}
-      <KhoiHieuQuaXe theo_ky={boKy} xe={d?.xe_lenh} sheet={xe} />
+      <KhoiHieuQuaXe theo_ky={boKy} xe={d?.xe_lenh} sheet={xe}
+        chuaKhop={xe?.canh_bao ? { sheet: xe.dang_di ?? 0, nhat_trinh: xe.vtos_dang_chay ?? 0 } : null} />
+      {/* «Số tiền theo: tất cả chuyến ghi nhận» — lợi nhuận vẫn chỉ đếm chuyến đã quyết toán (KS-65): chuyến chưa
+          quyết toán chưa có dòng chi phí nào, cộng doanh thu của nó vào lợi nhuận là làm biên đẹp hơn sự thật. */}
+      {theoTien === "tat_ca" && boKy && (() => {
+        const o = boKy?.[boKy?.mac_dinh || "thang"] || {};
+        const treo = o?.doanh_thu_chua_quyet_toan ?? sk?.doanh_thu_chua_quyet_toan;
+        return <p className="muted" style={{ margin: "8px 0" }}>
+          Tất cả chuyến ghi nhận: doanh thu {(((o?.doanh_thu || 0) + (treo || 0)) / 1e6).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tr
+          {treo ? <> — gồm <b>{(treo / 1e6).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tr</b> chuyến chưa quyết toán, chưa có chi phí</> : null}.
+          Lợi nhuận tạm tính vẫn chỉ đếm chuyến đã quyết toán.</p>;
+      })()}
 
       {/* CHƯA NHẬP ≠ BẰNG 0 — không phải một con số cạnh tranh với khối trên, mà là lời nói ra
           rằng con số ấy còn thiếu nhóm nào. Giữ lại chính vì thế. */}
@@ -292,7 +372,8 @@ function BanLamViecXe() {
 
         {hd.viec.length === 0
           ? <p className="muted">Không có việc nào đang mở. Đây là số thật, không phải thiếu nguồn.</p>
-          : hd.viec.map((v: any) => (
+          : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 440px), 1fr))", columnGap: 28 }}>
+          {hd.viec.map((v: any) => (
             <div key={v.ma} style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center",
                                      padding: "12px 0", borderBottom: "1px solid #e6eaf0" }}>
               <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: "50%",
@@ -308,7 +389,7 @@ function BanLamViecXe() {
               {v.bam_duoc && v.ngan_keo
                 ? <button type="button" onClick={() => setKeo(v.ngan_keo)}>{v.nhan_nut}</button>
                 : <span className="muted"><strong>{v.nhan_nut}</strong></span>}
-            </div>))}
+            </div>))}</div>}
 
         {hd.bo_do_hong?.length > 0 && <p style={{ color: "#a66a00" }}>
           {hd.bo_do_hong.length} bộ dò lỗi ({hd.bo_do_hong.join(", ")}) — hàng đợi đang thiếu dòng,
@@ -316,14 +397,9 @@ function BanLamViecXe() {
         </p>}
       </section>}
 
-      {/* ⑦ TRANG PHÂN HỆ ĐIỀU HÀNH XE — trước là một TRANG RIÊNG (/phan-he/dhxe), nay nằm
-          ngay đây (KS-56). Gắn lại CHÍNH thân trang ấy nên không mất khối nào.
-          `Suspense` BẮT BUỘC: /xe là đường dẫn TĨNH, còn `TrangPhanHe` gọi `useSearchParams`. */}
-      <section style={{ marginTop: 26, borderTop: "1px solid #e6eaf0", paddingTop: 18 }}>
-        <Suspense fallback={<p className="muted">Đang tải…</p>}>
-          <TrangPhanHe khoa="dhxe" khongChip />
-        </Suspense>
-      </section>
+      {/* ⑦ KHỐI MỤC LỤC PHÂN HỆ (KS-56) ĐÃ GỠ — Chủ tịch duyệt 10/11/2026 theo demo v3.3: màn kết thúc ở
+          «Việc cần xử lý». Khối ấy lặp lại thanh năm mục và còn ghi mục «Bàn làm việc». Mọi trang của
+          nó vẫn mở được từ thanh con ở trên. */}
     </>}
 
     {/* NGĂN KÉO */}
@@ -357,6 +433,10 @@ function BanLamViecXe() {
   </>);
 }
 
+/* Màn không thanh dọc trải hết bề ngang — bản vẽ v3.3: biểu đồ chiếm toàn hàng. Thẻ style của riêng màn
+   này (chỉ sống khi /xe đang mở), không thêm lớp vào globals.css hay Shell.tsx (nhiều làn cùng giữ). */
+const RONG = <style>{`main{max-width:none!important}`}</style>;
+
 export default function Page() {
-  return <Shell khongThanhBen><BanLamViecXe /></Shell>;
+  return <Shell khongThanhBen>{RONG}<BanLamViecXe /></Shell>;
 }
