@@ -62,6 +62,15 @@ class ThucDonIn(BaseModel):
     tu_ngay: date | None = None
     den_ngay: date | None = None
     dang_ban: bool = True
+    # P1-03 — trống = không kiểm mục đó
+    gio_tu: str = ""
+    gio_den: str = ""
+    so_khach_toi_da: int | None = None
+    tuoi_te_tu: int | None = None
+    tuoi_te_den: int | None = None
+    phu_thu: list[dict] | None = None
+    han_phan_hoi_gio: int | None = None
+    coc_moi_khach: float | None = None
 
 
 @router.post("/{nid}/thuc-don")

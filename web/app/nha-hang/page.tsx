@@ -32,7 +32,11 @@ async function guiTep(path: string, fd: FormData) {
 }
 // AT-2a: máy chủ cũ (chưa có album) không trả anh_ht — màn vẫn phải mở được.
 const HT0 = { da_duyet: 0, cho_duyet: 0, nhap: 0, an: 0, co_bia: false, mon: 0, td: 0, nd_cho: 0 };
-const TD_TRONG = { ten: "", loai: "set", gia_nguoi_lon: "", gia_tre_em: "", so_khach_toi_thieu: 1, mo_ta: "", dieu_kien: "", dieu_kien_huy: "", tu_ngay: "", den_ngay: "", dang_ban: true };
+const TD_TRONG = { ten: "", loai: "set", gia_nguoi_lon: "", gia_tre_em: "", so_khach_toi_thieu: 1, mo_ta: "", dieu_kien: "", dieu_kien_huy: "", tu_ngay: "", den_ngay: "", dang_ban: true,
+  // P1-03: điều kiện có cấu trúc — ô trống = máy không kiểm mục đó
+  gio_tu: "", gio_den: "", so_khach_toi_da: "", tuoi_te_tu: "", tuoi_te_den: "", phu_thu: [] as any[], han_phan_hoi_gio: "", coc_moi_khach: "" };
+const PT_TRONG = { ten: "", so_tien: "", theo: "khach", tu_ngay: "", den_ngay: "", tu_chon: false };
+const soHoacNull = (v: any) => (v === "" || v == null ? null : Number(v));
 
 function Trang() {
   const { user, toast } = useShell();
@@ -117,7 +121,11 @@ function Trang() {
   const t = (k: string, nhan: string, type = "text") => <label>{nhan}<input type={type} value={td[k] ?? ""} onChange={(e) => setTd({ ...td, [k]: e.target.value })} /></label>;
   const luuTd = async () => {
     const body = { ...td, gia_nguoi_lon: td.gia_nguoi_lon === "" ? null : Number(td.gia_nguoi_lon), gia_tre_em: td.gia_tre_em === "" || td.gia_tre_em == null ? null : Number(td.gia_tre_em),
-      so_khach_toi_thieu: Number(td.so_khach_toi_thieu || 1), tu_ngay: td.tu_ngay || null, den_ngay: td.den_ngay || null };
+      so_khach_toi_thieu: Number(td.so_khach_toi_thieu || 1), tu_ngay: td.tu_ngay || null, den_ngay: td.den_ngay || null,
+      gio_tu: td.gio_tu || "", gio_den: td.gio_den || "", so_khach_toi_da: soHoacNull(td.so_khach_toi_da),
+      tuoi_te_tu: soHoacNull(td.tuoi_te_tu), tuoi_te_den: soHoacNull(td.tuoi_te_den), han_phan_hoi_gio: soHoacNull(td.han_phan_hoi_gio),
+      coc_moi_khach: td.loai === "goi_mon" ? soHoacNull(td.coc_moi_khach) : null,
+      phu_thu: (td.phu_thu || []).map((p: any) => ({ ...p, so_tien: Number(p.so_tien || 0), tu_ngay: p.tu_ngay || null, den_ngay: p.den_ngay || null })) };
     const r = await goi(`/nha-hang/${dang.id}/thuc-don${td.id ? `/${td.id}` : ""}`, body);
     if (r) setTd(null);
   };
@@ -297,12 +305,18 @@ function Trang() {
         <h3 style={{ marginTop: 14 }}>Gói đặt bàn qua VTD</h3>
         <p className="muted">Giá BÁN cho khách đặt qua Vietourist. Khác thực đơn nhà hàng (tab «Thực đơn», chỉ để tham khảo).</p>
         <div className="panel wrap"><table><thead><tr><th>Gói</th><th>Loại</th><th>Giá người lớn</th><th>Giá trẻ em</th><th>Áp dụng</th><th>Điều kiện / hủy</th><th>Đang bán</th><th></th></tr></thead>
-          <tbody>{dang.thuc_don.map((g: any) => <tr key={g.id}><td><b>{g.ten}</b>{g.so_khach_toi_thieu > 1 && <div className="muted">tối thiểu {g.so_khach_toi_thieu} khách</div>}</td>
+          <tbody>{dang.thuc_don.map((g: any) => <tr key={g.id}><td><b>{g.ten}</b>{g.so_khach_toi_thieu > 1 && <div className="muted">tối thiểu {g.so_khach_toi_thieu} khách</div>}
+            {/* P1-03 */}
+            <div className="muted">{[g.gio_tu && `${g.gio_tu}–${g.gio_den}`, g.so_khach_toi_da && `tối đa ${g.so_khach_toi_da} khách`,
+              g.tuoi_te_tu != null && `trẻ em ${g.tuoi_te_tu}–${g.tuoi_te_den} tuổi`, (g.phu_thu || []).length > 0 && `${g.phu_thu.length} phụ thu`,
+              g.han_phan_hoi_gio && `trả lời trong ${g.han_phan_hoi_gio} giờ`, g.coc_moi_khach && `cọc ${d(g.coc_moi_khach)}/khách`].filter(Boolean).join(" · ")}</div></td>
             <td>{g.loai_ten}</td><td>{d(g.gia_nguoi_lon)}</td><td>{d(g.gia_tre_em)}</td>
             <td>{g.tu_ngay || g.den_ngay ? `${g.tu_ngay || "…"} → ${g.den_ngay || "…"}` : "Quanh năm"}</td>
             <td className="muted">{[g.dieu_kien, g.dieu_kien_huy].filter(Boolean).join(" · ")}</td>
             <td>{g.dang_ban ? <Tag cls="ok">Có</Tag> : <Tag>Không</Tag>}</td>
-            <td>{nhap && <button className="act grey" onClick={() => setTd({ ...TD_TRONG, ...g, gia_tre_em: g.gia_tre_em ?? "", tu_ngay: g.tu_ngay || "", den_ngay: g.den_ngay || "" })}>Sửa</button>}</td></tr>)}
+            <td>{nhap && <button className="act grey" onClick={() => setTd({ ...TD_TRONG, ...g, gia_tre_em: g.gia_tre_em ?? "", tu_ngay: g.tu_ngay || "", den_ngay: g.den_ngay || "",
+              so_khach_toi_da: g.so_khach_toi_da ?? "", tuoi_te_tu: g.tuoi_te_tu ?? "", tuoi_te_den: g.tuoi_te_den ?? "", han_phan_hoi_gio: g.han_phan_hoi_gio ?? "",
+              coc_moi_khach: g.coc_moi_khach ?? "", phu_thu: (g.phu_thu || []).map((p: any) => ({ ...PT_TRONG, ...p, tu_ngay: p.tu_ngay || "", den_ngay: p.den_ngay || "" })) })}>Sửa</button>}</td></tr>)}
             {!dang.thuc_don.length && <tr><td colSpan={8} className="muted">Chưa có gói. Cần ít nhất một gói đang bán thì mới mở đặt bàn được.</td></tr>}</tbody></table></div>
         {nhap && !td && <button className="act teal" onClick={() => setTd({ ...TD_TRONG })}>+ Thêm gói</button>}
         {td && <div className="panel" style={{ marginTop: 10 }}>
@@ -312,8 +326,30 @@ function Trang() {
             {t("so_khach_toi_thieu", "Khách tối thiểu", "number")}
             {t("gia_nguoi_lon", "Giá bán người lớn (đ)", "number")}{t("gia_tre_em", "Giá bán trẻ em (đ, để trống nếu không bán)", "number")}
             {t("tu_ngay", "Áp dụng từ", "date")}{t("den_ngay", "Áp dụng đến", "date")}
-            {t("dieu_kien", "Điều kiện (đồ uống, phụ thu…)")}{t("dieu_kien_huy", "Điều kiện hủy")}
+            {t("dieu_kien", "Điều kiện khác (đồ uống…)")}{t("dieu_kien_huy", "Điều kiện hủy")}
           </div>
+          {/* P1-03 · Chủ tịch duyệt 09/11/2026: máy dùng các ô này để chặn đơn sai, cộng phụ thu, báo hạn trả lời */}
+          <h4 style={{ margin: "12px 0 4px" }}>Điều kiện máy kiểm khi khách đặt <span className="muted" style={{ fontWeight: 400 }}>· ô trống = không kiểm</span></h4>
+          <div className="grid">
+            {t("gio_tu", "Khung giờ áp dụng từ", "time")}{t("gio_den", "đến", "time")}
+            {t("so_khach_toi_da", "Số khách tối đa / đơn", "number")}
+            {t("han_phan_hoi_gio", "Hạn nhà hàng nhận / từ chối (giờ)", "number")}
+            {td.loai !== "goi_mon" && <>{t("tuoi_te_tu", "Tuổi tính giá trẻ em từ (dưới: miễn phí)", "number")}{t("tuoi_te_den", "đến (trên: giá người lớn)", "number")}</>}
+            {td.loai === "goi_mon" && t("coc_moi_khach", "Cọc mỗi khách (đ) — gọi món", "number")}
+          </div>
+          {td.loai === "goi_mon" && <p className="muted" style={{ margin: "4px 0" }}>Gọi món: khách trả cọc = số khách × mức cọc khi nhà hàng nhận bàn, món ăn trả tại nhà hàng. Có cọc thì không cần «giá người lớn»; chỉ có phụ thu theo bàn.</p>}
+          <div className="wrap"><table><thead><tr><th>Phụ thu</th><th>Số tiền (đ)</th><th>Tính theo</th><th>Áp dụng từ</th><th>đến</th><th>Khách tự chọn</th><th></th></tr></thead>
+            <tbody>{(td.phu_thu || []).map((p: any, i: number) => { const doi = (k: string, v: any) => setTd({ ...td, phu_thu: td.phu_thu.map((x: any, j: number) => j === i ? { ...x, [k]: v } : x) });
+              return <tr key={i}><td><input value={p.ten} placeholder="Lễ 30/4, phòng riêng…" onChange={(e) => doi("ten", e.target.value)} /></td>
+                <td><input type="number" value={p.so_tien} onChange={(e) => doi("so_tien", e.target.value)} style={{ width: 110 }} /></td>
+                <td><select value={p.theo} onChange={(e) => doi("theo", e.target.value)}>{td.loai !== "goi_mon" && <option value="khach">mỗi khách</option>}<option value="ban">mỗi bàn (đơn)</option></select></td>
+                <td><input type="date" value={p.tu_ngay} onChange={(e) => doi("tu_ngay", e.target.value)} /></td>
+                <td><input type="date" value={p.den_ngay} onChange={(e) => doi("den_ngay", e.target.value)} /></td>
+                <td><input type="checkbox" checked={!!p.tu_chon} onChange={(e) => doi("tu_chon", e.target.checked)} aria-label="Khách tự chọn" /></td>
+                <td><button className="act grey" onClick={() => setTd({ ...td, phu_thu: td.phu_thu.filter((_: any, j: number) => j !== i) })}>Xóa</button></td></tr>; })}
+              {!(td.phu_thu || []).length && <tr><td colSpan={7} className="muted">Chưa có phụ thu.</td></tr>}</tbody></table></div>
+          <button className="act grey" disabled={(td.phu_thu || []).length >= 10} onClick={() => setTd({ ...td, phu_thu: [...(td.phu_thu || []), { ...PT_TRONG, theo: td.loai === "goi_mon" ? "ban" : "khach" }] })}>+ Thêm phụ thu</button>
+          <p className="muted" style={{ margin: "4px 0 8px" }}>Để trống ngày = áp dụng mọi ngày. «Khách tự chọn» (vd phòng riêng) hiện thành ô đánh dấu ở cổng; không đánh dấu thì máy tự cộng khi ngày đến trong khoảng áp dụng.</p>
           <label>Món trong gói<textarea rows={2} value={td.mo_ta} onChange={(e) => setTd({ ...td, mo_ta: e.target.value })} /></label>
           <label style={{ display: "flex", flexDirection: "row", justifyContent: "flex-start", gap: 6, alignItems: "center" }}><input type="checkbox" checked={!!td.dang_ban} onChange={(e) => setTd({ ...td, dang_ban: e.target.checked })} />Đang bán</label>
           <button className="act teal" disabled={busy} onClick={luuTd}>Lưu gói</button><button className="act grey" onClick={() => setTd(null)}>Bỏ</button>

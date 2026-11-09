@@ -110,7 +110,11 @@ function Trang() {
         <td>{x.ma}<div className="muted" style={{ fontSize: 12 }}>{x.nha_hang} · {x.thuc_don} · {fmtD(x.ngay)} {x.gio}</div></td>
         <td>{x.ten_khach} · {x.dien_thoai}<div className="muted" style={{ fontSize: 12 }}>{x.nguon} · {x.nguoi_lon} NL + {x.tre_em} TE{x.la_doan ? " · đoàn" : ""}</div></td>
         <td>{x.cach_tt_ten} · tạm tính {vnd(x.tam_tinh)}<div className="muted" style={{ fontSize: 12 }}>đã trả {vnd(x.da_tra)} / {vnd(x.phai_tra_truoc)}{x.han_tra ? ` · hạn ${fmtDT(x.han_tra)}` : ""}</div></td>
-        <td><Tag cls={TT[x.trang_thai] || ""}>{x.trang_thai_ten}</Tag></td>
+        <td><Tag cls={TT[x.trang_thai] || ""}>{x.trang_thai_ten}</Tag>
+          {/* P1-03: quá hạn nhà hàng trả lời — Sales gọi nhà hàng; đơn không tự hủy */}
+          {x.qua_han_phan_hoi && <div><Tag cls="red">Quá hạn nhà hàng trả lời</Tag><div className="muted" style={{ fontSize: 12 }}>hạn {fmtDT(x.han_phan_hoi)} · gọi nhà hàng, báo khách</div></div>}
+          {!x.qua_han_phan_hoi && x.trang_thai === "cho_nhan" && x.han_phan_hoi && <div className="muted" style={{ fontSize: 12 }}>nhà hàng trả lời trước {fmtDT(x.han_phan_hoi)}</div>}
+          {(x.phu_thu || []).length > 0 && <div className="muted" style={{ fontSize: 12 }}>phụ thu: {x.phu_thu.map((p: any) => `${p.ten} ${vnd(p.so_tien)}`).join("; ")}</div>}</td>
         <td style={{ whiteSpace: "nowrap" }}>{Q.sales && x.co_the_huy && <>
           <input placeholder="Lý do hủy" value={q[`u${x.id}`] || ""} onChange={(e) => setQ({ ...q, [`u${x.id}`]: e.target.value })} style={{ width: 130 }} />
           <button className="act red" style={{ margin: "0 0 0 6px" }} disabled={busy || (q[`u${x.id}`] || "").trim().length < 5} onClick={() => goi(`/dat-ban-nha-hang/${x.id}/huy`, { ly_do: q[`u${x.id}`] })}>Hủy theo chính sách</button>
