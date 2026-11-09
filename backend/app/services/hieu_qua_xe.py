@@ -227,6 +227,16 @@ def chi_so(db: Session, ky: str) -> dict:
         "doanh_thu": tong["doanh_thu"] or None,
         "loi_nhuan": tong["loi_nhuan"] if tong["doanh_thu"] else None,
         "ty_le_loi_nhuan": tong["ty_le_loi_nhuan"],
+        # KS-65 · 09/11/2026 — PHẢI NÓI RA PHẦN ĐANG TREO, không chỉ trừ nó đi.
+        #
+        # Từ bản này doanh thu và lợi nhuận ở trên chỉ gồm chuyến ĐÃ quyết toán (xem chú thích dài
+        # ở `fleet_lai_lo.bao_cao`). Nếu dừng ở đó thì màn Chủ tịch im lặng bỏ bớt một phần doanh
+        # thu có thật: kỳ 2026-11 đo ngày 09/11 là 94.000.000 đ của 10 chuyến đang chạy. Ông ấy
+        # nhìn thấy con số nhỏ đi mà không biết vì sao, và đó là một kiểu nói dối khác.
+        #
+        # Nên hai ô này đi KÈM, và màn hình in chúng ngay dưới lợi nhuận.
+        "so_chuyen_chua_quyet_toan": tong["so_chuyen_chua_quyet_toan"] or None,
+        "doanh_thu_chua_quyet_toan": tong["doanh_thu_chua_quyet_toan"] or None,
         "tieu_hao_l100": tieu_hao,
         # Ngưỡng chưa khai thì KHÔNG im lặng: in ra đang chờ ai, đúng luật của `cong_suat_thieu`.
         "tieu_hao_nguong_thieu": None if nguong else {
@@ -359,6 +369,12 @@ def _gop(db: Session, kys: list[str], nho: dict | None = None) -> dict:
         "doanh_thu": dt or None,
         "loi_nhuan": ln if dt else None,
         "ty_le_loi_nhuan": round(ln / dt, 4) if dt else None,
+        # KS-65 — phần ĐỂ RA NGOÀI ba con số trên, cộng được qua nhiều kỳ vì nó là số đếm và số
+        # tiền, không phải tỷ lệ. Phải có ở ĐÂY nữa chứ không chỉ ở `chi_so`: khối Chủ tịch đọc
+        # kết quả của `_gop` (tháng / quý / năm), nên thiếu hai dòng này thì ba con số bị trừ bớt
+        # mà màn hình không còn gì để giải thích vì sao.
+        "so_chuyen_chua_quyet_toan": sum((x["so_chuyen_chua_quyet_toan"] or 0) for x in ds) or None,
+        "doanh_thu_chua_quyet_toan": sum((x["doanh_thu_chua_quyet_toan"] or 0) for x in ds) or None,
         "tieu_hao_l100": round(lit * 100 / km_chuyen, 1) if (lit and km_chuyen) else None,
         "tieu_hao_nguong_thieu": next((x["tieu_hao_nguong_thieu"] for x in ds
                                        if x["tieu_hao_nguong_thieu"]), None),
