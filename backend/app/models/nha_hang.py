@@ -144,6 +144,17 @@ class ThucDonNhaHang(Base):
     dang_ban: Mapped[bool] = mapped_column(Boolean, default=True)
     sua_boi: Mapped[str] = mapped_column(String(50), default="")
     sua_luc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # P1-03 (Chủ tịch duyệt bản xem trước 09/11/2026): điều kiện CÓ CẤU TRÚC để máy kiểm, thay cho chữ trong `dieu_kien`.
+    # Ô trống = máy không kiểm mục đó (gói cũ bán như trước).
+    gio_tu: Mapped[str] = mapped_column(String(5), default="")              # khung giờ áp dụng HH:MM
+    gio_den: Mapped[str] = mapped_column(String(5), default="")
+    so_khach_toi_da: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tuoi_te_tu: Mapped[int | None] = mapped_column(Integer, nullable=True)   # dưới mốc này: miễn phí
+    tuoi_te_den: Mapped[int | None] = mapped_column(Integer, nullable=True)  # trên mốc này: tính giá người lớn
+    # [{ten, so_tien, theo: "khach"|"ban", tu_ngay, den_ngay, tu_chon}] — «khách tự chọn» hiện thành ô đánh dấu ở cổng
+    phu_thu: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    han_phan_hoi_gio: Mapped[int | None] = mapped_column(Integer, nullable=True)   # nhà hàng nhận / từ chối trong N giờ
+    coc_moi_khach: Mapped[float | None] = mapped_column(TIEN, nullable=True)       # gói gọi món: cọc cố định mỗi khách
 
 
 # ══ AT-2a · ALBUM ẢNH NHÀ HÀNG (Chủ tịch + Điều hành chốt 29/10/2026) ═══════════════════════════════════════
