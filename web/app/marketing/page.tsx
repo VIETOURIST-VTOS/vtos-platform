@@ -4,6 +4,11 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtD, fmtDT, pct, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import BaoCaoChuyenDoi, { tyLe } from "@/components/BaoCaoChuyenDoi";
+// MKT-2 · 09/11/2026 — mục lục chức năng của phân hệ dọn về đây, thành tab thứ tám.
+// `khongChip` vì đây đã là màn của phòng: chip sang phân hệ khác thuộc về trang mục lục
+// đứng riêng, không thuộc một tab bên trong màn hình nghiệp vụ. Màn `/xe` đã gắn mục lục
+// vào chính nó đúng kiểu này từ trước, nên đây là đi theo nếp có sẵn chứ không mở nếp mới.
+import MucLucPhanHe from "@/components/MucLucPhanHe";
 
 /** KHÔNG GIAN LÀM VIỆC MARKETING & PR — bảy màn hình, một chỗ (18/9/2026)
  *
@@ -53,6 +58,12 @@ const TABS: [string, string, string][] = [
   // kèm đồng hồ hai giờ — thứ người ta cần tìm lúc gấp nhất. Tên cũ không gợi gì tới việc ấy.
   ["thuonghieu", "Khủng hoảng, PR & thương hiệu",
    "Hàng đợi tin nghi ngờ, sổ hoạt động PR kèm hạn phản hồi, và tài sản thương hiệu."],
+  // MKT-2 · 09/11/2026 — ĐỨNG CUỐI, và đó là chủ ý. Bảy tab trên là việc làm hằng ngày;
+  // tab này trả lời một câu khác hẳn và hỏi mỗi tháng một lần: «phòng này còn nợ màn hình
+  // nào so với bản vẽ V1.3». Đặt nó lên trên là bắt người làm việc đi qua một bản kiểm kê
+  // mỗi lần mở máy.
+  ["muc-luc", "Mục lục chức năng",
+   "Toàn bộ mục của phân hệ theo bản vẽ V1.3, ghi rõ mục nào đã có trang và mục nào còn nợ."],
 ];
 
 /** Một THẺ SỐ của Tổng quan. Bốn phần, và phần thứ tư không được bỏ:
@@ -162,6 +173,11 @@ function Marketing() {
     // Đường dẫn CŨ của menu vẫn phải mở đúng chỗ cũ – xem ghi chú "HAI ĐƯỜNG DẪN CŨ" ở đầu tệp.
     if (url === "ngansach") { setTab("chiendich"); setSub("ngansach"); }
     else if (url && TABS.some(([k]) => k === url)) setTab(url);
+    // MKT-2 · 09/11/2026 — `/phan-he/marketing?xem=muc-luc` nay chuyển hướng về đây mang
+    // theo nguyên tham số. Đọc nó ra thành tab là để những dấu trang và tin nhắn đã gửi
+    // nhau vẫn mở đúng chỗ người gửi muốn, thay vì rơi về tab Tổng quan rồi tự đi tìm.
+    else if (new URLSearchParams(window.location.search).get("xem") === "muc-luc")
+      setTab("muc-luc");
     load();
   }, [load]);
 
@@ -314,6 +330,18 @@ function Marketing() {
           onClick={() => setTab(k)}>{l}</button>)}
     </div>
     <p className="muted">{TABS.find(([k]) => k === tab)?.[2]}</p>
+
+    {/* ═══════════════ 8 · MỤC LỤC CHỨC NĂNG ═══════════════
+        MKT-2 · 09/11/2026 — gộp từ `/phan-he/marketing`. Trang ấy không còn: bấm vào nó
+        chuyển hướng về đây. Chủ tịch chốt cùng ngày — một phòng, một trang.
+
+        HỆ QUẢ ĐÃ NÓI RA TRƯỚC KHI LÀM: mục lục cũ ai cũng mở được, màn này chỉ mở cho vai
+        của phòng. Nên người ngoài phòng — ví dụ Giám đốc đội xe — từ nay không xem được
+        mục lục Marketing nữa. Đó là một lần SIẾT có người quyết, không phải tác dụng phụ.
+
+        KHÔNG gọi máy chủ ở tab này: mục lục đọc cây tĩnh `cay_phan_he.ts`. Luật ấy là ranh
+        giới 09/9/2026 và hàng rào soi theo TỆP `MucLucPhanHe.tsx`, nên nó còn nguyên. */}
+    {tab === "muc-luc" && <MucLucPhanHe khoa="marketing" khongChip />}
 
     {/* ═══════════════ 1 · TỔNG QUAN ═══════════════ */}
     {tab === "tongquan" && <>

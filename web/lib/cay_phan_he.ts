@@ -148,6 +148,20 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           // TC-80 · 24/9/2026 – cửa /cham-soc/chi-so đã chạy và chính màn hình /cham-soc đang
           // đọc nó; chỉ thiếu đường dẫn ở cả hai chỗ treo mục này.
           { ma: "3.5.3", ten: "Báo cáo chăm sóc", href: "/cham-soc", chuyen: true }
+        ] },
+      // MKT-2 · 09/11/2026 — TRẢ NỢ ĐỢT MKT-1. Hai bàn làm việc của phòng đã có màn hình
+      // thật và đã có mục menu, nhưng chưa có mặt ở đây — nên mục lục đếm thiếu hai màn và
+      // người đọc tưởng phòng còn nợ nhiều hơn thực tế. Bốn bàn làm việc có trước
+      // (`/ptgd-doan`, `/sales-admin`, `/ban-tour-le`, `/xe`) đều đã nằm trong cây, nên
+      // đây là đi theo nếp chứ không mở nếp mới.
+      //
+      // `them: true` vì hai màn này KHÔNG có trong bản vẽ V1.3 (12/9/2026) — chúng sinh ra
+      // sau, ngày 09/11/2026. Khai thẳng là «thêm» để con số «đủ mục bản vẽ» không bị một
+      // màn hình mới làm cho đẹp lên mà không ai quyết.
+      { ma: "2.10", ten: "Bàn làm việc", them: true,
+        con: [
+          { ma: "2.10.1", ten: "Bàn Phó TGĐ Marketing", href: "/ptgd-mkt" },
+          { ma: "2.10.2", ten: "Bàn nhân viên Marketing", href: "/ban-mkt" }
         ] }
     ] },
   { khoa: "khachhang", ma: "03", ten: "Kinh doanh",
