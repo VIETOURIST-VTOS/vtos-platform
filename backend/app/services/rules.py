@@ -330,6 +330,20 @@ DEFAULT_PARAMS = [
     ("xe_vay_dao_han_ngay", "60", "Cảnh báo trước ngày đáo hạn khế ước", "ngày", "Đội xe v1.3 – A8"),
     ("xe_vay_tra_goc_ngay", "10", "Cảnh báo trước kỳ trả gốc", "ngày", "Đội xe v1.3 – A8"),
     ("xe_chung_tu_bat_buoc_tu", "10000000", "Khoản chi từ mức này bắt buộc có chứng từ gốc đính kèm", "đồng", "Đội xe v1.3 – B6"),
+    # ── KS-63 (09/11/2026) · tuyến duyệt đề xuất chi đội xe, bản vẽ v3.3 §3 và §11 ──────
+    #
+    # §11 ghi năm cấu hình phải CHỐT trước khi phát hành, và ba trong số đó là ba ô dưới
+    # đây. Chúng nằm ở đây chứ không trong mã nguồn vì đổi hạn mức hay đổi người duyệt là
+    # việc có người ký, không phải việc triển khai lại phần mềm.
+    #
+    # HAI Ô DANH SÁCH ĐỂ TRỐNG LÀ ĐI THEO VAI, KHÔNG PHẢI CHẶN HẾT. Để trống mà chặn hết
+    # thì ngày phát hành không ai bấm được gì, và cả luồng bị tắt bằng một ô chưa khai —
+    # cùng lý do `xe_nguoi_lap_lenh` ở dưới cũng chọn như vậy.
+    #
+    # 50 triệu là số ĐỀ NGHỊ, chờ anh Tuấn chốt. Ghi ra để không ai tưởng nó đã được ký.
+    ("xe_de_xuat_han_muc_tgd", "50000000", "Đề xuất chi đội xe từ mức này trở lên phải do Tổng giám đốc hoặc Chủ tịch duyệt; dưới mức này Kế toán trưởng duyệt được", "đồng", "v3.3 §3 – ĐỀ NGHỊ, chờ Chủ tịch chốt"),
+    ("xe_de_xuat_nguoi_kiem_tra", "", "Tài khoản được kiểm tra đề xuất chi đội xe – để trống là theo vai (Điều hành, Kế toán)", "danh sách", "v3.3 §3/§11"),
+    ("xe_de_xuat_nguoi_duyet", "", "Tài khoản được duyệt đề xuất chi đội xe – để trống là theo vai và theo hạn mức", "danh sách", "v3.3 §3/§11"),
     ("xe_chenh_gia_ban_vang", "0.20", "Giá chào bán thấp hơn định giá nội bộ quá mức này → cờ vàng bắt buộc giải trình", "tỷ lệ", "Đội xe v1.3 – A9"),
     # Chỉ đạo Chủ tịch 07/9/2026: GĐ điều hành đội xe là người DUY NHẤT được tạo và chốt lệnh điều xe.
     # Ghi bằng tài khoản/mã nhân viên trong tham số chứ KHÔNG viết tên một người vào mã nguồn – thay người

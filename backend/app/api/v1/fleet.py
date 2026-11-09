@@ -8,8 +8,8 @@ router Nhân sự; router này chỉ nhận các đường sâu hơn (/fleet/xe,
 nhận thẳng một cột trạng thái. Lý do: đổi biển không phải sửa một ô chữ, nó phải đóng dòng lịch sử cũ và mở
 dòng mới trong cùng một giao dịch – để giữa chừng có lỗi thì không còn chiếc xe nào mang hai biển hiệu lực.
 """
-from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, Query
+from datetime import date, datetime
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -19,7 +19,9 @@ from app.models.core import User, Company
 from app.models.hr import Vehicle, Employee
 from app.models.fleet import (VehiclePlate, VehicleDocument, FleetVerification, LIFECYCLE, OP_RIGHT,
                               DOC_KINDS, VEHICLE_DOCS, DRIVER_DOCS, VERIFY, VERIFY_STATUS)
+from app.models.fleet_de_xuat import FleetDeXuat
 from app.services import fleet as FL
+from app.services import fleet_de_xuat as DX
 from app.services import rules as R
 
 router = APIRouter(prefix="/api/v1/fleet", tags=["fleet"])
@@ -2618,3 +2620,169 @@ def dan_link_sheet(v: LinkSheetVao, u: User = Depends(require_roles(*GHI_LINK_SH
     db.commit()
     return {"doc_thu": thu, "da_trinh": True, "id": p.id,
             "message": "Đã trình link — chờ Chủ tịch ký ở màn Chính sách & định mức. Ký xong robot mới đọc."}
+
+
+# ══════════════════ KS-63 · PHIẾU ĐỀ XUẤT CHI ĐỘI XE (bản vẽ v3.3 §3, 09/11/2026) ══════════════════
+#
+# Khác hẳn `POST /de-xuat-chi` ở trên: cửa ấy ghi một dòng `fleet_external_txns` để ĐỐI CHIẾU và vẫn
+# giữ nguyên. Cửa này ghi một PHIẾU có bảy bước, có người kiểm khác người lập, có nhật ký lý do.
+#
+# MỘT CỬA CHUYỂN BƯỚC, KHÔNG BẢY CỬA. `POST /de-xuat/{id}/chuyen` nhận hành động trong thân yêu cầu.
+# Bảy đường dẫn riêng thì luật "ai được bấm bước nào" phải kiểm ở bảy chỗ, và chỗ thứ tám thêm vào
+# sau sẽ là chỗ quên kiểm. Một cửa thì `fleet_de_xuat.co_the()` là hàng rào duy nhất, và nó cũng
+# chính là hàm giao diện gọi để biết nút nào bấm được — một luật, hai nơi đọc.
+DX_VAO = tuple(sorted(set(DX.VAI_XEM + READ)))
+
+
+class DeXuatSoan(BaseModel):
+    """Trường của phiếu, đúng bộ của bản vẽ. KHÔNG có số tài khoản, KHÔNG có ngân hàng — v3.3 §2/§7."""
+    pham_vi: str = "xe"
+    vehicle_id: int | None = None
+    loai: str = "thanh_toan"
+    nhom: str = ""
+    noi_dung: str = ""
+    supplier_id: int | None = None
+    ben_nhan_de_nghi: str = ""
+    so_tien: float | None = None
+    ngay_can: date | None = None
+    can_cu_thue: str = ""
+    so_chung_tu: str = ""
+    hen_bo_sung: bool = False
+    ly_do_bo_sung: str = ""
+    trip_cost_id: int | None = None
+    ma_khoan_goc: str = ""
+    ghi_chu: str = ""
+    buoc_nhap: int = 0
+    phien_ban: int | None = None       # gửi lên để biết mình có đè lên người khác không
+
+
+class DeXuatChuyen(BaseModel):
+    hanh_dong: str
+    ly_do: str = ""
+    so_tien_tra: float | None = None
+
+
+def _dx_gan(p, d: dict) -> None:
+    for k in ("pham_vi", "vehicle_id", "loai", "nhom", "noi_dung", "supplier_id",
+              "ben_nhan_de_nghi", "so_tien", "ngay_can", "can_cu_thue", "so_chung_tu",
+              "hen_bo_sung", "ly_do_bo_sung", "trip_cost_id", "ma_khoan_goc", "ghi_chu"):
+        if k in d:
+            setattr(p, k, d[k])
+    if "buoc_nhap" in d and d["buoc_nhap"] is not None:
+        p.buoc_nhap = max(0, min(3, int(d["buoc_nhap"])))
+
+
+@router.get("/de-xuat/danh-muc")
+def dx_danh_muc(u: User = Depends(require_roles(*DX_VAO)), db: Session = Depends(get_db)):
+    """Mọi danh sách để dựng form — giao diện KHÔNG gõ lại bảy nhóm khoản. Xem fleet_de_xuat.danh_muc."""
+    return DX.danh_muc(db)
+
+
+@router.get("/de-xuat")
+def dx_danh_sach(trang_thai: str = "", cua_toi: bool = False, xe: int | None = None,
+                 tu: date | None = None, den: date | None = None,
+                 u: User = Depends(require_roles(*DX_VAO)), db: Session = Depends(get_db)):
+    """Sổ đề xuất chi. `cua_toi` = phiếu mình lập, để người lập mở lại nháp của mình."""
+    sel = select(FleetDeXuat).order_by(FleetDeXuat.id.desc())
+    if trang_thai:
+        sel = sel.where(FleetDeXuat.trang_thai.in_(tuple(x for x in trang_thai.split(",") if x)))
+    if cua_toi:
+        sel = sel.where(FleetDeXuat.nguoi_lap == u.username)
+    if xe:
+        sel = sel.where(FleetDeXuat.vehicle_id == xe)
+    if tu:
+        sel = sel.where(FleetDeXuat.ngay_lap >= tu)
+    if den:
+        sel = sel.where(FleetDeXuat.ngay_lap <= den)
+    ds = [DX.hien(db, p) for p in db.execute(sel).scalars()]
+    # Đếm theo trạng thái cho hàng thẻ trên đầu sổ. Đếm ở máy chủ vì danh sách có thể bị cắt trang,
+    # và một con số đếm trên trang hiện tại thì đọc ra như con số của cả sổ.
+    dem = {k: 0 for k in DX.TRANG_THAI}
+    for p in db.execute(select(FleetDeXuat.trang_thai)).scalars():
+        if p in dem:
+            dem[p] += 1
+    return {"so_phieu": len(ds), "dem_theo_trang_thai": dem, "phieu": ds,
+            "vai_cua_toi": u.role, "tai_khoan": u.username}
+
+
+@router.post("/de-xuat", status_code=201)
+def dx_lap(data: DeXuatSoan, u: User = Depends(require_roles(*DX.VAI_LAP)),
+           db: Session = Depends(get_db)):
+    """Lập một phiếu NHÁP. Nháp không kiểm đủ trường — §5: thiếu dữ liệu vẫn lưu nháp được."""
+    p = FleetDeXuat(ma_phieu=DX.ma_moi(db), nguoi_lap=u.username, trang_thai="nhap",
+                    ngay_lap=date.today())
+    _dx_gan(p, data.model_dump(exclude_unset=True))
+    db.add(p)
+    db.flush()
+    DX.ghi_log(db, p, "tao", "nhap", "", boi=u.username, vai=u.role)
+    R.audit(db, u.username, u.role, "de_xuat_xe_lap", f"de_xuat:{p.ma_phieu}",
+            after={"ma_phieu": p.ma_phieu, "so_tien": float(p.so_tien or 0)})
+    db.commit()
+    return DX.hien(db, p, u.username, u.role, day_du=True)
+
+
+@router.get("/de-xuat/{pid}")
+def dx_chi_tiet(pid: int, u: User = Depends(require_roles(*DX_VAO)), db: Session = Depends(get_db)):
+    p = db.get(FleetDeXuat, pid)
+    if p is None:
+        raise HTTPException(404, "Không có phiếu đề xuất này")
+    return DX.hien(db, p, u.username, u.role, day_du=True)
+
+
+@router.put("/de-xuat/{pid}")
+def dx_sua(pid: int, data: DeXuatSoan, u: User = Depends(require_roles(*DX.VAI_LAP)),
+           db: Session = Depends(get_db)):
+    """Sửa phiếu — CHỈ khi phiếu còn ở «Nháp» hoặc «Trả bổ sung», và chỉ người lập.
+
+    Phiếu đã gửi thì không sửa đè: bản vẽ ghi *"Phiếu đã gửi: theo dõi, chờ kiểm tra; không sửa
+    đè"*. Người kiểm tra đang đọc một con số thì con số ấy không được đổi dưới tay họ.
+    """
+    p = db.get(FleetDeXuat, pid)
+    if p is None:
+        raise HTTPException(404, "Không có phiếu đề xuất này")
+    if p.trang_thai not in DX.CON_SUA_DUOC:
+        raise HTTPException(403, f"Phiếu đang ở «{DX.TRANG_THAI[p.trang_thai]}» — không sửa đè. "
+                                 f"Muốn sửa thì người trong tuyến phải trả bổ sung trước.")
+    if p.nguoi_lap and p.nguoi_lap != u.username:
+        raise HTTPException(403, f"Phiếu do {p.nguoi_lap} lập — chỉ người lập sửa được")
+    d = data.model_dump(exclude_unset=True)
+    from app.services import ghi_mot_lan as GML
+    GML.kiem_phien_ban(p, d.pop("phien_ban", None), f"Đề xuất chi {p.ma_phieu}",
+                       lambda: DX.hien(db, p, u.username, u.role))
+    _dx_gan(p, d)
+    GML.tang_phien_ban(p)
+    p.sua_luc = datetime.now()
+    db.commit()
+    return DX.hien(db, p, u.username, u.role, day_du=True)
+
+
+@router.post("/de-xuat/{pid}/chuyen")
+def dx_chuyen(pid: int, data: DeXuatChuyen, x_khoa_ghi: str | None = Header(default=None),
+              u: User = Depends(require_roles(*DX_VAO)), db: Session = Depends(get_db)):
+    """Một bước chuyển: gui · kiem_tra · duyet · tra · thanh_toan · doi_soat · huy.
+
+    KHÓA CHỐNG GỬI HAI LẦN (WF05, v3.3 §3 "bấm Gửi hai lần / tải lại khi mạng chậm phải trả về một
+    kết quả"). Đây là chỗ đội xe còn thiếu so với `payments`, `sepay`, `vietrip`: giao diện gửi
+    khóa ở đầu đề `X-Khoa-Ghi`; không gửi thì suy từ nội dung trong cửa sổ ngắn. Lần bấm thứ hai
+    nhận lại ĐÚNG kết quả lần đầu, không chuyển bước lần nữa — mà chuyển bước lần nữa ở đây nghĩa
+    là một phiếu đi qua hai lần duyệt, hoặc một khoản tiền được ghi thanh toán hai lần.
+    """
+    p = db.get(FleetDeXuat, pid)
+    if p is None:
+        raise HTTPException(404, "Không có phiếu đề xuất này")
+    from app.services import ghi_mot_lan as GML
+    duong = f"/fleet/de-xuat/{pid}/chuyen"
+    khoa = x_khoa_ghi or GML.suy_khoa(duong, u.username, {
+        "hanh_dong": data.hanh_dong, "pb": p.phien_ban, "tien": data.so_tien_tra})
+    cu = GML.da_ghi_roi(db, khoa, tu_suy=not x_khoa_ghi)
+    if cu is not None:
+        return cu
+    ra = DX.chuyen_buoc(db, p, data.hanh_dong, u.username, u.role,
+                        ly_do=data.ly_do, so_tien_tra=data.so_tien_tra)
+    R.audit(db, u.username, u.role, f"de_xuat_xe_{data.hanh_dong}", f"de_xuat:{p.ma_phieu}",
+            after={"trang_thai": p.trang_thai, "ly_do": data.ly_do,
+                   "so_tien_tra": data.so_tien_tra})
+    GML.nho_ket_qua(db, khoa, duong, u.username, ra)
+    db.commit()
+    ra["phieu"] = DX.hien(db, p, u.username, u.role, day_du=True)
+    return ra
