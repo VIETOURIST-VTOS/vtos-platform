@@ -295,6 +295,8 @@ def xem(db: Session, t: Trip) -> dict:
     from app.models.hr import Vehicle
     v = db.get(Vehicle, t.vehicle_id) if t.vehicle_id else None
     g = tong(db, t)
+    from app.services.ops import de_nghi_theo_khoan_goc as _dn
+    _kg = _dn(db)
     return {
         "id": t.id, "ma_phieu": t.ma_phieu,
         "bien_so": v.plate if v else "", "ma_xe": v.code if v else "",
@@ -311,7 +313,9 @@ def xem(db: Session, t: Trip) -> dict:
         "chi_phi": [{"id": c.id, "kind": c.kind, "kind_ten": COST_KINDS.get(c.kind, c.kind),
                      "amount": c.amount, "lit": c.lit, "chung_tu": c.chung_tu or "",
                      "tra_bang": c.tra_bang or "",
-                     "tra_bang_ten": TRA_BANG.get(c.tra_bang or "", "")}
+                     "tra_bang_ten": TRA_BANG.get(c.tra_bang or "", ""),
+                     # Chống ghi hai lần (10/11/2026): khoản này đã có đề nghị chi nào làm khoản gốc.
+                     "de_nghi_chi": _kg.get(f"tc:{c.id}")}
                     for c in db.execute(select(TripCost)
                                         .where(TripCost.trip_id == t.id)
                                         .order_by(TripCost.id)).scalars().all()],

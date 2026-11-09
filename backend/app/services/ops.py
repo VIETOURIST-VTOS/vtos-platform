@@ -2,6 +2,7 @@
 
 R3 chỉ tính toán, gắn cảnh báo và xếp cấp duyệt; quyết định duyệt là người. Không robot nào chuyển tiền.
 """
+import re
 from datetime import date, datetime, timedelta, time
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -302,10 +303,72 @@ def _chuan_doi_xe(db: Session, u: User, data: dict) -> dict:
             raise ValueError("Chọn xe, hoặc đổi phạm vi sang «chi phí toàn đội»")
     if not (x.get("can_cu") or "").strip():
         raise ValueError("Chọn căn cứ số tiền — VTOS không tự cộng VAT")
+    kg_ma = (x.get("ma_khoan_goc") or "").strip()
+    if kg_ma:
+        kg = khoan_goc(db, kg_ma)
+        if kg is None:
+            raise ValueError("Khoản gốc phải chọn trong danh sách khoản đã ghi của xe (phiếu chuyến / phiếu bảo "
+                             "dưỡng) — mã gõ tay thì máy không đối chiếu được, và chống ghi hai lần không chạy")
+        if v is not None and kg["vehicle_id"] != v.id:
+            raise ValueError(f"Khoản gốc {kg['ten']} thuộc xe khác — chọn khoản của chính xe {v.plate}")
+        cu = de_nghi_theo_khoan_goc(db).get(kg_ma)
+        if cu:
+            raise ValueError(f"Khoản gốc {kg['ten']} đã có đề nghị chi {cu} — một khoản gốc chỉ một đề nghị chi. "
+                             f"Cần chi thêm thì Kế toán chi tiếp phần còn lại của {cu}.")
     return {"pham_vi": pv, "xe_id": v.id if v else None, "bien_so": v.plate if v else "", "loai": loai, "nhom": nhom,
             "tk": tk_doi_xe(nhom, loai), "can_cu": x["can_cu"].strip()[:80],
-            "ma_khoan_goc": (x.get("ma_khoan_goc") or "").strip()[:60], "hen_bo_sung": (x.get("hen_bo_sung") or "").strip()[:200],
+            "ma_khoan_goc": kg_ma[:60], "hen_bo_sung": (x.get("hen_bo_sung") or "").strip()[:200],
             "ghi_chu_kiem_tra": (x.get("ghi_chu_kiem_tra") or "").strip()[:500]}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# CHỐNG GHI CHI PHÍ HAI LẦN — Chủ tịch duyệt bản xem trước 10/11/2026 (phần D).
+#
+# «Mã khoản gốc» trước đây là ô chữ tự do: gõ gì cũng nhận, nên không máy nào đối chiếu được. Nay là
+# một mã CHỌN từ sổ thật: `tc:<id>` một dòng chi phí chuyến, `bd:<id>` một phiếu bảo dưỡng / sửa chữa.
+# Một khoản gốc chỉ một đề nghị chi — khoản đã ghi ở phiếu chuyến mà lại đề nghị chi thêm lần nữa là
+# tiền ra hai lần cho một việc.
+# ══════════════════════════════════════════════════════════════════════════════════════════
+def khoan_goc(db: Session, ma: str) -> dict | None:
+    from app.models.fleet import Maintenance, Trip, TripCost
+    m = re.fullmatch(r"(tc|bd):(\d+)", (ma or "").strip())
+    if not m:
+        return None
+    if m.group(1) == "tc":
+        c = db.get(TripCost, int(m.group(2)))
+        t = db.get(Trip, c.trip_id) if c else None
+        if not c or not t:
+            return None
+        return {"ma": ma, "loai": "tc", "id": c.id, "vehicle_id": t.vehicle_id, "so_tien": c.amount,
+                "ngay": t.ngay_di, "ten": f"Chuyến {t.ma_phieu or t.id} · {c.kind}", "chung_tu": c.chung_tu or ""}
+    b = db.get(Maintenance, int(m.group(2)))
+    if not b:
+        return None
+    return {"ma": ma, "loai": "bd", "id": b.id, "vehicle_id": b.vehicle_id, "so_tien": b.so_tien, "ngay": b.ngay,
+            "ten": f"Phiếu bảo dưỡng #{b.id} · {b.noi_dung[:60]}", "chung_tu": b.chung_tu or ""}
+
+
+def de_nghi_theo_khoan_goc(db: Session) -> dict[str, str]:
+    """{mã khoản gốc: mã DC} của mọi đề nghị chi đội xe còn hiệu lực (không tính hồ sơ đã từ chối)."""
+    ra: dict[str, str] = {}
+    for r in db.execute(select(PaymentRequest).where(PaymentRequest.category == "chi_doi_xe",
+                                                     PaymentRequest.status != "tu_choi")).scalars():
+        k = ((r.doi_xe or {}).get("ma_khoan_goc") or "").strip()
+        if k:
+            ra.setdefault(k, r.code)
+    return ra
+
+
+def chung_tu_trung(db: Session, so_ct: str, bo_id: int | None = None) -> list[str]:
+    """Mã các đề nghị chi KHÁC (mọi loại) đang dùng cùng số chứng từ — để CẢNH BÁO, không chặn: một hóa đơn
+    trả hai đợt là chuyện có thật, nhưng người duyệt phải thấy."""
+    ct = (so_ct or "").strip()
+    if not ct:
+        return []
+    q = select(PaymentRequest.code).where(PaymentRequest.document_ref == ct, PaymentRequest.status != "tu_choi")
+    if bo_id:
+        q = q.where(PaymentRequest.id != bo_id)
+    return [c for (c,) in db.execute(q).all()]
 
 
 def _trung_doi_xe(db: Session, data: dict, amount: float) -> PaymentRequest | None:
@@ -834,7 +897,7 @@ VAI_GHI_DA_CHI = ("ketoan", "thu_quy")
 
 
 def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "",
-         hinh_thuc_tt: str = "") -> str:
+         hinh_thuc_tt: str = "", so_tien: float | None = None) -> str:
     """confirm (người phụ trách bộ phận) → check (Kế toán) → approve (TGĐ; +Chủ tịch nếu 2 chữ ký) → pay (Kế toán) | reject."""
     # ── Đợt E2a: tách bạch trách nhiệm THEO NGƯỜI ──────────────────────────────────────
     # Lớp cũ ở ngay dưới (`u.role != "ketoan"`) so hai VAI. Đo 19/9/2026: 6 người giữ từ hai
@@ -850,8 +913,13 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "",
         if _kq["chan"]:
             raise ValueError(_kq["vi_pham"][0]["thong_diep"] if _kq["vi_pham"]
                              else _kq["thong_diep_thieu_ma"])
-    if action == "reject":
+    if action == "tra_bo_sung":
+        _tra_bo_sung(db, u, r, reason)
+        msg = f"Đã trả {r.code} về người lập để bổ sung: {reason.strip()}"
+    elif action == "reject":
         if r.status in ("da_chi", "tu_choi"): raise ValueError("Không từ chối được")
+        if (r.da_chi_tien or 0) > 0:
+            raise ValueError(f"{r.code} đã chi {float(r.da_chi_tien):,.0f}đ – không từ chối được phần đã ra")
         if not reason.strip(): raise ValueError("Từ chối phải có lý do")
         r.status, r.reject_reason = "tu_choi", reason
         msg = f"Đã từ chối {r.code}: {reason}"
@@ -1012,9 +1080,39 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "",
                 + ("Một khoản đang ghi nhận ĐÃ CHI thì không thể là chưa thanh toán."
                    if _ht == "chua_tt"
                    else "Chọn một trong: " + ", ".join(k for k in HINH_THUC_TT if k and k != "chua_tt")))
-        r.status, r.paid_at, r.paid_ref = "da_chi", datetime.now(), reason
+        # CHI MỘT PHẦN — Chủ tịch duyệt 10/11/2026, mọi đề nghị chi. Rỗng = chi hết phần còn lại (như cũ).
+        _con = round(float(r.amount or 0) - float(r.da_chi_tien or 0), 2)
+        _lan = _con if so_tien is None else round(float(so_tien), 2)
+        if _lan <= 0:
+            raise ValueError("Số tiền chi lần này phải lớn hơn 0")
+        if _lan > _con + 0.5:
+            raise ValueError(f"Chi lần này {_lan:,.0f}đ vượt phần còn phải chi {_con:,.0f}đ "
+                             f"(được duyệt {float(r.amount or 0):,.0f}đ, đã chi {float(r.da_chi_tien or 0):,.0f}đ)")
+        _lan = min(_lan, _con)
+        # Mỗi lần chi một UNC / phiếu chi: lần thứ hai mà vẫn chỉ có tệp của lần đầu thì chặn.
+        if so_unc(db, r) <= len(r.lan_chi or []):
+            raise ValueError(f"Lần chi thứ {len(r.lan_chi or []) + 1} của {r.code} cần UNC / phiếu chi riêng – "
+                             "tải lên trước rồi mới bấm «Đã chi»")
+        _bo_but = list(r.entry_ids or [])
         r.paid_method = _ht
-        _post_payment(db, r)
+        _post_payment(db, r, _lan, reason)
+        _moi = [e for e in (r.entry_ids or []) if e not in _bo_but]
+        r.lan_chi = list(r.lan_chi or []) + [{"so_tien": _lan, "luc": datetime.now().isoformat(timespec="seconds"),
+                                              "ma_gd": reason[:120], "hinh_thuc": _ht, "boi": u.username,
+                                              "entry_id": _moi[0] if _moi else None}]
+        r.da_chi_tien = round(float(r.da_chi_tien or 0) + _lan, 2)
+        r.paid_ref = reason
+        if (r.da_chi_tien or 0) < float(r.amount or 0) - 0.5:
+            con_lai = float(r.amount or 0) - (r.da_chi_tien or 0)
+            msg = (f"{r.code}: đã chi một phần {_lan:,.0f}đ (lần {len(r.lan_chi)}), "
+                   f"còn {con_lai:,.0f}đ chờ chi")
+            if _b:
+                _KTN.ghi_buoc(db, _pv, _b, u)
+            R.audit(db, u.username, u.role, "de_nghi_chi_pay_mot_phan", f"dc:{r.code}",
+                    after={"lan": len(r.lan_chi), "so_tien": _lan, "da_chi": r.da_chi_tien, "ma_gd": reason})
+            db.commit()
+            return msg
+        r.status, r.paid_at = "da_chi", datetime.now()
         if r.category in LOAI_CHI_MAY_LAP:
             # KS-16e (Chủ tịch 31/10/2026): đã chi trả khách sạn / nhà hàng → ghi doanh thu hoa hồng của đơn gốc.
             from app.services import don_ks_vtd as _KS
@@ -1022,7 +1120,8 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "",
         if r.category == "hoan_tien":
             from app.services import bookings as BK
             BK.on_refund_paid(db, r)
-        msg = f"{r.code} đã chi ({r.paid_ref or 'không có mã GD'})"
+        msg = (f"{r.code} đã chi ({r.paid_ref or 'không có mã GD'})" if len(r.lan_chi or []) <= 1
+               else f"{r.code} đã chi đủ sau {len(r.lan_chi)} lần ({float(r.da_chi_tien):,.0f}đ)")
     else:
         raise ValueError("Hành động không hợp lệ")
     if _b:
@@ -1030,6 +1129,119 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "",
     R.audit(db, u.username, u.role, f"de_nghi_chi_{action}", f"dc:{r.code}", after={"trang_thai": r.status, "ly_do": reason})
     db.commit()
     return msg
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# TRẢ BỔ SUNG — Chủ tịch duyệt bản xem trước 10/11/2026, áp cho MỌI đề nghị chi 05-TT.
+#
+# Khác «Từ chối»: từ chối là hết đường, người lập phải lập hồ sơ mới (mã mới, mất dấu hồ sơ cũ).
+# Trả bổ sung là hồ sơ VỀ NGƯỜI LẬP, giữ nguyên mã, người lập sửa rồi gửi lại. Chữ ký cũ XOÁ — một
+# chữ ký đặt trên bản trước không phải chữ ký cho bản đã sửa — nhưng bản trước và ai đã ký vẫn nằm
+# trong `lan_tra`, nên đọc lại được hồ sơ đã đổi gì giữa hai lần ký.
+# ══════════════════════════════════════════════════════════════════════════════════════════
+O_SUA_DUOC = ("supplier_name", "supplier_tax_code", "supplier_bank", "amount", "description",
+              "has_document", "document_ref", "has_invoice", "ngay_den_han")
+
+
+def _ai_tra_duoc(db: Session, u: User, r: PaymentRequest) -> bool:
+    """Ai đang giữ bước hiện tại thì trả được — đúng người sẽ bấm bước ấy."""
+    if r.status == "cho_tp":
+        return u.role in CATEGORY_CONFIRMER.get(r.category, ()) or u.role == "tgd" or toan_quyen(u)
+    if r.status == "cho_kt":
+        return u.role in VAI_KIEM_CHUNG_TU or toan_quyen_ke_ca_tach_bach(u, db)
+    if r.status == "cho_duyet":
+        return u.role in vai_ky_duoc(db, r) or u.role == "tgd" or toan_quyen(u)
+    if r.status == "cho_chi":
+        return u.role in VAI_GHI_DA_CHI + VAI_KIEM_CHUNG_TU or toan_quyen_ke_ca_tach_bach(u, db)
+    return False
+
+
+def _tra_bo_sung(db: Session, u: User, r: PaymentRequest, ly_do: str) -> None:
+    if not (ly_do or "").strip():
+        raise ValueError("Trả bổ sung phải ghi lý do – người lập cần biết bổ sung cái gì")
+    if r.status not in ("cho_tp", "cho_kt", "cho_duyet", "cho_chi"):
+        raise ValueError(f"{r.code} đang ở bước không trả bổ sung được")
+    if r.category in LOAI_CHI_MAY_LAP:
+        raise ValueError("Hồ sơ do máy tự lập không có người lập để trả về – bổ sung NCC rồi bấm «Robot kiểm lại»")
+    if (r.da_chi_tien or 0) > 0:
+        raise ValueError(f"{r.code} đã chi {float(r.da_chi_tien):,.0f}đ – phần còn lại chi tiếp, không trả về được")
+    if r.entry_ids:
+        raise ValueError(f"{r.code} đã ghi công nợ lúc duyệt – trả về thì sổ còn treo bút toán cũ. "
+                         "Dùng «Từ chối» rồi lập hồ sơ mới.")
+    if not _ai_tra_duoc(db, u, r):
+        raise ValueError("Chỉ người đang giữ bước hiện tại của hồ sơ mới trả bổ sung được")
+    ban_truoc = {k: (getattr(r, k).isoformat() if hasattr(getattr(r, k), "isoformat") else getattr(r, k))
+                 for k in O_SUA_DUOC}
+    ban_truoc["chu_ky"] = {"tp_by": r.tp_by, "kt_by": r.kt_by, "nguoi_da_ky": r.nguoi_da_ky,
+                           "signed_tgd": r.signed_tgd, "signed_chutich": r.signed_chutich}
+    if r.doi_xe:
+        ban_truoc["doi_xe"] = dict(r.doi_xe)
+    r.lan_tra = list(r.lan_tra or []) + [{"luc": datetime.now().isoformat(timespec="seconds"), "boi": u.username,
+                                          "vai": u.role, "ly_do": ly_do.strip()[:300], "buoc": r.status,
+                                          "ban_truoc": ban_truoc}]
+    r.status = "tra_bo_sung"
+    r.tp_by = r.kt_by = r.approved_by = ""
+    r.signed_tgd = r.signed_chutich = False
+    r.nguoi_da_ky, r.approved_at = "", None
+    r.reject_reason = ly_do.strip()[:300]
+
+
+def gui_lai(db: Session, u: User, r: PaymentRequest, data: dict) -> str:
+    """Người lập sửa hồ sơ bị trả rồi gửi lại — đi lại tuyến duyệt từ đầu, giữ nguyên mã."""
+    if r.status != "tra_bo_sung":
+        raise ValueError(f"{r.code} không ở trạng thái trả bổ sung")
+    if (r.created_by or "") != u.username and not toan_quyen(u):
+        raise ValueError(f"Chỉ người lập (`{r.created_by}`) gửi lại hồ sơ của mình")
+    doi = {}
+    for k in O_SUA_DUOC:
+        if k not in data or data[k] is None:
+            continue
+        v = data[k]
+        if k == "amount":
+            if r.tien_te:
+                raise ValueError("Khoản ngoại tệ: số tiền do máy nhân từ ngoại tệ × tỷ giá – từ chối rồi lập lại")
+            v = round(float(v), 2)
+            if v <= 0:
+                raise ValueError("Số tiền phải lớn hơn 0")
+        elif isinstance(getattr(r, k), str):
+            v = str(v).strip()[:300 if k == "description" else 160]
+        if getattr(r, k) != v:
+            doi[k] = v
+            setattr(r, k, v)
+    if not r.supplier_name.strip() or not r.description.strip():
+        raise ValueError("Thiếu tên người nhận hoặc nội dung")
+    if r.category == "chi_doi_xe" and isinstance(data.get("doi_xe"), dict):
+        dx = dict(r.doi_xe or {})
+        for k in ("can_cu", "hen_bo_sung", "ghi_chu_kiem_tra"):
+            if k in data["doi_xe"]:
+                dx[k] = str(data["doi_xe"][k] or "").strip()[:200]
+        r.doi_xe = dx
+    if "amount" in doi:
+        # Số tiền đổi thì xét lại «ngoài dự toán» như lúc lập — một khoản tăng tiền phải đi qua đúng cổng ấy.
+        t = db.get(Tour, r.tour_id) if r.tour_id else None
+        if t and r.category in ("chi_tour", "tam_ung"):
+            cf = tour_cashflow(db, t)
+            r.over_budget = r.two_signatures = (
+                (cf["paid"] or 0) + cf["committed"] + cf["pending"] + (r.amount or 0) > (cf["budget"] or 0) + 1)
+    if r.category == "chi_doi_xe":
+        r.status, r.tp_by = "cho_duyet", u.username      # GĐ gửi → Chủ tịch duyệt (10/11/2026)
+    else:
+        r.status = "cho_tp"
+    r.reject_reason = ""
+    if r.lan_tra:
+        r.lan_tra = list(r.lan_tra[:-1]) + [{**r.lan_tra[-1], "gui_lai_luc": datetime.now().isoformat(timespec="seconds"),
+                                             "da_sua": sorted(doi)}]
+    R.audit(db, u.username, u.role, "de_nghi_chi_gui_lai", f"dc:{r.code}", after={"da_sua": doi, "lan": len(r.lan_tra or [])})
+    db.commit()
+    return f"Đã gửi lại {r.code}" + (f" (sửa: {', '.join(sorted(doi))})" if doi else " (không đổi ô nào)")
+
+
+def so_unc(db: Session, r: PaymentRequest) -> int:
+    """Số tệp UNC / phiếu chi còn hiệu lực — chi nhiều lần thì mỗi lần một tệp."""
+    from app.models.attachments import Attachment
+    return len(db.execute(select(Attachment.id).where(Attachment.doi_tuong == "de_nghi_chi",
+                                                      Attachment.doi_tuong_id.in_((r.code, str(r.id))),
+                                                      Attachment.loai == "unc", Attachment.thu_hoi.is_(False))).all())
 
 
 def co_unc(db: Session, r: PaymentRequest) -> bool:
@@ -1060,7 +1272,7 @@ def _post_liability(db: Session, r: PaymentRequest):
         R.audit(db, "robot", "robot", "ghi_so_that_bai", f"dc:{r.code}", after={"ly_do": str(ex)})
 
 
-def _post_payment(db: Session, r: PaymentRequest):
+def _post_payment(db: Session, r: PaymentRequest, so_tien: float | None = None, ma_gd: str | None = None):
     # ĐỢT R4c-3 02/11/2026 — VẾ TIỀN GHI Ở CẤP CHI TIẾT, KHÔNG Ở CẤP CHA.
     #
     # Dòng cũ ghi `"111"` / `"112"`. Đo được: cả hai là tài khoản CHA (`111` "Tiền mặt",
@@ -1082,20 +1294,24 @@ def _post_payment(db: Session, r: PaymentRequest):
     # ngân hàng nên nó thuộc bên 112x, và luật ấy đã khai MỘT LẦN ở `models/hach_toan.py`. So chuỗi
     # ở đây là khai lại nó lần thứ hai, và lần này sai.
     cash = "1111" if r.paid_method in HTTT_QUA_TIEN_MAT else "1121"
+    # Chi một phần (10/11/2026): mỗi lần chi ghi đúng số của lần ấy. Rỗng = cả khoản (đường cũ).
+    tien = float(r.amount or 0) if so_tien is None else float(so_tien)
+    gd = r.paid_ref if ma_gd is None else ma_gd
     if r.category == "hoan_tien":
-        lines = [{"account": "131", "debit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": r.amount, "partner": r.supplier_name}]
+        lines = [{"account": "131", "debit": tien, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": tien, "partner": r.supplier_name}]
     elif r.category == "tam_ung":   # tạm ứng HDV/NCC trước tour: Nợ 141 – Có 111/112; hoàn ứng khi Kế toán xác nhận quyết toán
-        lines = [{"account": "141", "debit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": r.amount, "partner": r.supplier_name}]
+        lines = [{"account": "141", "debit": tien, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": tien, "partner": r.supplier_name}]
     elif r.category == "chi_doi_xe" and r.doi_xe:
         # Đội xe v3.3: không ghi công nợ lúc duyệt, nên lúc chi ghi THẲNG tài khoản đã khóa trên phiếu —
         # 627 chi phí tháng phát sinh, 141 tạm ứng, 331 trả chủ xe. Ghi Nợ 331 cho khoản chưa từng ghi Có 331
         # là để một số dư treo ở 331 mà không ai nợ ai.
-        lines = [{"account": r.doi_xe.get("tk") or "627", "debit": r.amount, "partner": r.supplier_name},
-                 {"account": cash, "credit": r.amount, "partner": r.supplier_name}]
+        lines = [{"account": r.doi_xe.get("tk") or "627", "debit": tien, "partner": r.supplier_name},
+                 {"account": cash, "credit": tien, "partner": r.supplier_name}]
     else:
-        lines = [{"account": "331", "debit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": r.amount, "partner": r.supplier_name}]
+        lines = [{"account": "331", "debit": tien, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": tien, "partner": r.supplier_name}]
     try:
-        e = ACC.post_entry(db, "robot", "robot", date.today(), f"Chi {r.code} – {r.supplier_name}" + (f" (GD {r.paid_ref})" if r.paid_ref else ""), lines, "lenh_chi", f"dc:{r.code}", r.tour_id, nghiep_vu="chi_tien")
+        e = ACC.post_entry(db, "robot", "robot", date.today(), f"Chi {r.code} – {r.supplier_name}" + (f" (GD {gd})" if gd else "")
+                           + (f" – lần {len(r.lan_chi or []) + 1}" if so_tien is not None and (r.lan_chi or tien < float(r.amount or 0) - 0.5) else ""), lines, "lenh_chi", (f"dc:{r.code}" if not r.lan_chi else f"dc:{r.code}/lan{len(r.lan_chi) + 1}"), r.tour_id, nghiep_vu="chi_tien")
         r.entry_ids = list(r.entry_ids or []) + [e.id]
     except ValueError as ex:
         R.audit(db, "robot", "robot", "ghi_so_that_bai", f"dc:{r.code}", after={"ly_do": str(ex)})

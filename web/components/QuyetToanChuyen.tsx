@@ -40,7 +40,7 @@ type Lech = { muc: string; o: string; noi: string };
 type Ky = { buoc: string; nguoi: string; luc: string | null };
 type Dong = {
   id: number; kind: string; kind_ten: string; amount: number | null; lit: number | null;
-  chung_tu: string; tra_bang: string; tra_bang_ten: string;
+  chung_tu: string; tra_bang: string; tra_bang_ten: string; de_nghi_chi?: string | null;
 };
 type To = {
   id: number; ma_phieu: string; bien_so: string; ma_xe: string;
@@ -177,7 +177,8 @@ export default function QuyetToanChuyen({ tripId, toast }: {
                   <td>{c.kind_ten}</td>
                   <td className="num">{vnd(c.amount)}</td>
                   <td className="num">{c.lit ? c.lit.toLocaleString("vi-VN") : ""}</td>
-                  <td>{c.chung_tu || <span className="muted">—</span>}</td>
+                  <td>{c.chung_tu || <span className="muted">—</span>}
+                    {c.de_nghi_chi && <div><Tag cls="navy">đã có đề nghị chi {c.de_nghi_chi}</Tag></div>}</td>
                   <td style={{ minWidth: 190 }}>
                     {sua
                       ? <select value={c.tra_bang} disabled={dang}

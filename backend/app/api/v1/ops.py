@@ -438,7 +438,12 @@ def pr_out(r: PaymentRequest, db: Session) -> dict:
     # nhận" chung chung (Đợt F1b). Người đọc màn hình đi gõ đúng tên người trên dòng này.
     _buoc1 = ("P.TGĐ Marketing duyệt nội dung" if r.category == "marketing" else "Bộ phận xác nhận")
     nxt = {"cho_tp": _buoc1, "cho_kt": "Kế toán kiểm tra", "cho_duyet": ai_duyet + " ký lệnh chi", "cho_chi": "Kế toán chi trên ngân hàng",
-           "da_chi": "Hoàn tất", "tu_choi": "Từ chối"}[r.status]
+           "da_chi": "Hoàn tất", "tu_choi": "Từ chối",
+           "tra_bo_sung": f"Trả bổ sung – {r.created_by} sửa rồi gửi lại"}[r.status]
+    # Chi một phần (10/11/2026): trạng thái vẫn `cho_chi` tới khi đủ — dòng chữ nói rõ đã ra bao nhiêu.
+    _da = float(r.da_chi_tien or 0)
+    if r.status == "cho_chi" and _da > 0:
+        nxt = f"Đã chi một phần {_da:,.0f}đ – còn {float(r.amount or 0) - _da:,.0f}đ chờ chi"
     return {"id": r.id, "code": r.code, "category": r.category, "tour_id": r.tour_id, "tour_code": t.code if t else "", "supplier_name": r.supplier_name, "supplier_tax_code": r.supplier_tax_code,
             "supplier_bank": r.supplier_bank, "amount": r.amount, "description": r.description, "has_document": r.has_document, "document_ref": r.document_ref, "has_invoice": r.has_invoice,
             "over_budget": r.over_budget, "two_signatures": r.two_signatures, "status": r.status, "next": nxt, "created_by": r.created_by, "created_at": r.created_at, "tp_by": r.tp_by,
@@ -461,7 +466,11 @@ def pr_out(r: PaymentRequest, db: Session) -> dict:
             "tien_te": r.tien_te, "so_tien_ngoai_te": r.so_tien_ngoai_te,
             "ty_gia": r.ty_gia, "ngay_ty_gia": r.ngay_ty_gia,
             "ngoai_te_loi_nhan": (f"{r.so_tien_ngoai_te:,.2f} {r.tien_te} × {r.ty_gia:,.2f}"
-                                  if r.tien_te and r.so_tien_ngoai_te and r.ty_gia else "")}
+                                  if r.tien_te and r.so_tien_ngoai_te and r.ty_gia else ""),
+            # Trả bổ sung + chi một phần (Chủ tịch duyệt 10/11/2026, mọi đề nghị chi).
+            "da_chi_tien": _da, "con_phai_chi": max(0.0, float(r.amount or 0) - _da),
+            "chi_mot_phan": r.status == "cho_chi" and _da > 0,
+            "lan_chi": r.lan_chi or [], "lan_tra": r.lan_tra or [], "so_unc": O.so_unc(db, r)}
 
 
 @router.get("/payment-requests")
@@ -586,6 +595,38 @@ class StepIn(BaseModel):
     # DOT R4c-3 02/11/2026 — hinh thuc thanh toan cua buoc `pay`. RONG la CHUA CO SO:
     # `services/ops.py::step` TU CHOI chu khong doan, va cung khong mac dinh chuyen khoan.
     hinh_thuc_tt: str = ""
+    # Chi một phần (10/11/2026): số tiền chi LẦN NÀY. Rỗng = chi hết phần còn lại.
+    so_tien: float | None = None
+
+
+class GuiLaiIn(BaseModel):
+    """Ô người lập sửa được khi hồ sơ bị trả bổ sung. Ô không gửi = giữ nguyên."""
+    supplier_name: str | None = None
+    supplier_tax_code: str | None = None
+    supplier_bank: str | None = None
+    amount: float | None = None
+    description: str | None = None
+    has_document: bool | None = None
+    document_ref: str | None = None
+    has_invoice: bool | None = None
+    ngay_den_han: date | None = None
+    doi_xe: dict | None = None
+
+
+@router.post("/payment-requests/{rid}/gui-lai")
+def pr_gui_lai(rid: int, data: GuiLaiIn,
+               u: User = Depends(require_roles("nv_dh", "tp_dh", "ptgd_mkt", "hcns", "cntt", "gd_kd", "tp_kd", "tn_kd",
+                                               "nv_kd", "nv_mkt", "gd_doi_xe", "tai_xe",
+                                               mo_ta="gửi lại đề nghị chi bị trả bổ sung (vai lập được đề nghị chi)")),
+               db: Session = Depends(get_db)):
+    """Người lập gửi lại hồ sơ bị trả bổ sung — máy kiểm đúng người lập ở `services/ops.py::gui_lai`."""
+    r = db.get(PaymentRequest, rid)
+    if not r: raise HTTPException(404, "Không có đề nghị chi")
+    try:
+        msg = O.gui_lai(db, u, r, data.model_dump(exclude_unset=True))
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    return {"message": msg, "request": pr_out(r, db)}
 
 
 @router.post("/payment-requests/{rid}/step")
@@ -593,7 +634,7 @@ def pr_step(rid: int, data: StepIn, u: User = Depends(current_user), db: Session
     r = db.get(PaymentRequest, rid)
     if not r: raise HTTPException(404, "Không có đề nghị chi")
     try:
-        msg = O.step(db, u, r, data.action, data.reason, data.hinh_thuc_tt)
+        msg = O.step(db, u, r, data.action, data.reason, data.hinh_thuc_tt, data.so_tien)
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     return {"message": msg, "request": pr_out(r, db)}

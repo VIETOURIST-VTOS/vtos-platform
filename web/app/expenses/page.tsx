@@ -10,7 +10,7 @@ import { Tag, errMsg } from "@/components/ui";
 // canh (test_tx2), vì hai bảng khai tay thì sớm muộn cũng lệch và lúc lệch thì màn hình nói sai
 // tên người phụ trách.
 const CAT: Record<string, string> = { chi_tour: "Chi phí tour", marketing: "Marketing", hanh_chinh: "Hành chính", hoan_tien: "Hoàn tiền khách", tam_ung: "Tạm ứng HDV/NCC trước tour", sua_chua_xe: "Sửa chữa xe", tam_ung_tai_xe: "Tạm ứng tài xế", chi_doi_xe: "Chi đội xe (GĐ đội xe lập)", hoa_hong: "Hoa hồng đối tác (D06)" , tra_ncc_thu_ho: "Trả NCC tiền thu hộ (khách sạn / nhà hàng)" };
-const ST: Record<string, [string, string]> = { cho_tp: ["Chờ bộ phận", "warn"], cho_kt: ["Chờ Kế toán", "warn"], cho_duyet: ["Chờ duyệt", "warn"], cho_chi: ["Lệnh chi chờ", "navy"], da_chi: ["Đã chi", "ok"], tu_choi: ["Từ chối", "red"] };
+const ST: Record<string, [string, string]> = { cho_tp: ["Chờ bộ phận", "warn"], cho_kt: ["Chờ Kế toán", "warn"], cho_duyet: ["Chờ duyệt", "warn"], cho_chi: ["Lệnh chi chờ", "navy"], da_chi: ["Đã chi", "ok"], tu_choi: ["Từ chối", "red"], tra_bo_sung: ["Trả bổ sung", "red"] };
 const CONFIRMER: Record<string, string[]> = { chi_tour: ["tp_dh", "tgd"], marketing: ["ptgd_mkt", "tgd"], hanh_chinh: ["hcns", "tgd"], hoan_tien: ["gd_kd", "tp_dh", "tgd"], tam_ung: ["tp_dh", "tgd"], sua_chua_xe: ["gd_doi_xe", "tgd"], tam_ung_tai_xe: ["gd_doi_xe", "tgd"], chi_doi_xe: ["gd_doi_xe", "tgd"], hoa_hong: ["gd_kd", "tgd"] , tra_ncc_thu_ho: [] };
 
 function Expenses() {
@@ -19,7 +19,7 @@ function Expenses() {
   const [tab, setTab] = useState("requests");
   const [tepDN, setTepDN] = useState("");   // mã đề nghị chi đang mở chứng từ
   const [tepUnc, setTepUnc] = useState(false);   // KS-16d: ô đang mở là ô tải UNC (Kế toán, lệnh chi chờ)
-  const [filter, setFilter] = useState("cho_tp,cho_kt,cho_duyet,cho_chi");
+  const [filter, setFilter] = useState("cho_tp,cho_kt,cho_duyet,cho_chi,tra_bo_sung");
   const [rows, setRows] = useState<any[]>([]);
   const [cf, setCf] = useState<any[]>([]);
   const [tours, setTours] = useState<any[]>([]);
@@ -48,8 +48,20 @@ function Expenses() {
   }, [f.category, dmMkt]);
   useEffect(() => { load(); }, [load]);
   const post = async (path: string, json?: any) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || "Xong"); load(); return r; } catch (x) { toast(errMsg(x), true); } };
-  const step = (r: any, action: string, reason = "", hinh_thuc_tt = "") =>
-    post(`/payment-requests/${r.id}/step`, { action, reason, hinh_thuc_tt });
+  const step = (r: any, action: string, reason = "", hinh_thuc_tt = "", so_tien: number | null = null) =>
+    post(`/payment-requests/${r.id}/step`, { action, reason, hinh_thuc_tt, so_tien });
+  // TRẢ BỔ SUNG (Chủ tịch duyệt 10/11/2026, mọi đề nghị chi): người lập sửa ngay trên hồ sơ cũ rồi gửi lại.
+  const [sua, setSua] = useState<any>(null);
+  const guiLai = async () => {
+    if (!sua) return;
+    const { r, ...o } = sua;
+    const json: any = {};
+    for (const k of ["supplier_name", "supplier_tax_code", "supplier_bank", "description", "document_ref"]) json[k] = o[k];
+    if (!r.tien_te) json.amount = Number(o.amount);
+    json.has_document = !!o.has_document; json.has_invoice = !!o.has_invoice;
+    const kq = await post(`/payment-requests/${r.id}/gui-lai`, json);
+    if (kq) setSua(null);
+  };
   // DOT R4c-3 02/11/2026 — HAI O ROI NHAU THAY MOT HOP `prompt()`.
   //
   // Hop cu hoi "Ma giao dich ngan hang (hoac 'TM' neu tien mat)" — tuc chinh loi trong hop
@@ -65,7 +77,9 @@ function Expenses() {
   }, [chi, httt]);
   const ghiDaChi = async () => {
     if (!chi?.hinh_thuc_tt) { toast("Chọn hình thức thanh toán", true); return; }
-    await step(chi.r, "pay", chi.ma || "", chi.hinh_thuc_tt);
+    const tien = chi.so_tien === "" ? null : Number(chi.so_tien);
+    if (tien !== null && !(tien > 0)) { toast("Số tiền chi lần này phải lớn hơn 0", true); return; }
+    await step(chi.r, "pay", chi.ma || "", chi.hinh_thuc_tt, tien);
     setChi(null);
   };
   // Gõ hoặc sửa ngày phải trả. Gửi rỗng = gỡ ngày, khoản ấy quay lại danh sách chưa có hạn — nhập
@@ -113,7 +127,12 @@ function Expenses() {
       out.push([role === "tgd" ? "TGĐ ký lệnh chi" : "Chủ tịch ký lệnh chi", "approve", ""]);
     // KS-16d: CK xong → Kế toán tải UNC → mới bấm «Đã chi» (máy chủ chặn nếu chưa có UNC, mọi loại chi).
     if (r.status === "cho_chi" && role === "ketoan") { out.push(["Tải UNC", "unc", "grey"]); out.push(["Đã chi (nhập mã GD)", "pay", "orange"]); }
-    if (!["da_chi", "tu_choi"].includes(r.status) && ["tgd", "chutich", "ketoan", "tp_dh", "ptgd_mkt"].includes(role)) out.push(["Từ chối", "reject", "grey"]);
+    // Trả bổ sung: người giữ bước hiện tại trả về người lập (máy chủ kiểm đúng người, `ops._ai_tra_duoc`).
+    if (["cho_tp", "cho_kt", "cho_duyet", "cho_chi"].includes(r.status) && !r.may_lap && !(r.da_chi_tien > 0)
+        && ["tgd", "chutich", "ketoan", "ketoan_tt", "ketoan_truong", "thu_quy", ...(CONFIRMER[r.category] || [])].includes(role))
+      out.push(["Trả bổ sung", "tra_bo_sung", "grey"]);
+    if (r.status === "tra_bo_sung" && r.created_by === user?.username) out.push(["Bổ sung & gửi lại", "gui_lai", "teal"]);
+    if (!["da_chi", "tu_choi"].includes(r.status) && !(r.da_chi_tien > 0) && ["tgd", "chutich", "ketoan", "tp_dh", "ptgd_mkt"].includes(role)) out.push(["Từ chối", "reject", "grey"]);
     return out;
   };
 
@@ -128,12 +147,29 @@ function Expenses() {
           {Object.entries(httt).filter(([k]) => k && k !== "chua_tt")
             .map(([k, t]: any) => <option key={k} value={k}>{t}</option>)}
         </select></label>
+      <label style={{ display: "block", marginTop: 8 }}>Số tiền chi lần này (đ)
+        <input type="number" value={chi.so_tien} onChange={(e) => setChi({ ...chi, so_tien: e.target.value })} /></label>
+      <p className="muted" style={{ margin: "4px 0 0" }}>Được duyệt {vnd(chi.r.amount)} · đã chi {vnd(chi.r.da_chi_tien || 0)} · còn {vnd(chi.r.con_phai_chi ?? chi.r.amount)}.
+        Chi ít hơn phần còn lại thì hồ sơ ở «Đã chi một phần»; mỗi lần chi cần một UNC riêng.</p>
       <label style={{ display: "block", marginTop: 8 }}>Mã giao dịch / số chứng từ
         <input value={chi.ma} placeholder="để trống nếu không có"
                onChange={(e) => setChi({ ...chi, ma: e.target.value })} /></label>
       <div style={{ marginTop: 10 }}>
         <button className="act" onClick={ghiDaChi}>Ghi nhận đã chi</button>
         <button className="act grey" style={{ marginLeft: 8 }} onClick={() => setChi(null)}>Thôi</button>
+      </div>
+    </div>)}
+    {sua && (<div style={{ border: "1px solid #b42318", borderRadius: 8, padding: 14, margin: "12px 0", maxWidth: 560 }}>
+      <b>Bổ sung & gửi lại – {sua.r.code}</b>
+      <p className="muted" style={{ margin: "4px 0 8px" }}>Lý do trả: {sua.r.reject_reason || "—"}. Gửi lại thì đi lại tuyến duyệt từ đầu; chữ ký cũ không còn, bản trước vẫn lưu trong lịch sử hồ sơ.</p>
+      {[["supplier_name", "Người nhận / NCC"], ["supplier_tax_code", "Mã số thuế"], ["supplier_bank", "Số TK – ngân hàng"], ["description", "Nội dung"], ["document_ref", "Số chứng từ"]].map(([k, l]) =>
+        <label key={k} style={{ display: "block", marginTop: 6 }}>{l}<input value={sua[k] ?? ""} onChange={(e) => setSua({ ...sua, [k]: e.target.value })} /></label>)}
+      {!sua.r.tien_te && <label style={{ display: "block", marginTop: 6 }}>Số tiền (đ)<input type="number" value={sua.amount} onChange={(e) => setSua({ ...sua, amount: e.target.value })} /></label>}
+      <label style={{ display: "block", marginTop: 6 }}><input type="checkbox" checked={!!sua.has_document} onChange={(e) => setSua({ ...sua, has_document: e.target.checked })} /> Có chứng từ</label>
+      <label style={{ display: "block" }}><input type="checkbox" checked={!!sua.has_invoice} onChange={(e) => setSua({ ...sua, has_invoice: e.target.checked })} /> Có hóa đơn GTGT</label>
+      <div style={{ marginTop: 10 }}>
+        <button className="act teal" onClick={guiLai}>Gửi lại</button>
+        <button className="act grey" style={{ marginLeft: 8 }} onClick={() => setSua(null)}>Thôi</button>
       </div>
     </div>)}
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{[["requests", "Đề nghị chi"], ["thieu_ngay", "Chưa có ngày phải trả"], ["cashflow", "Dòng tiền tour"]].map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}</div>
@@ -180,16 +216,16 @@ function Expenses() {
             <span className="muted">Để trống được. Nhưng khoản để trống nằm ở phần “chưa gắn chiến dịch” của bảng Đóng góp doanh thu, và không chiến dịch nào nhận nó.</span></label>
         </>}
       </div><button className="act" disabled={!f.supplier_name || !f.description || (f.tien_te ? !(f.so_tien_ngoai_te && f.ty_gia && f.ngay_ty_gia) : !f.amount)} onClick={() => post("/payment-requests", { ...f, tour_id: f.tour_id ? Number(f.tour_id) : null, amount: f.tien_te ? 0 : Number(f.amount), tien_te: f.tien_te, so_tien_ngoai_te: f.tien_te && f.so_tien_ngoai_te ? Number(f.so_tien_ngoai_te) : null, ty_gia: f.tien_te && f.ty_gia ? Number(f.ty_gia) : null, ngay_ty_gia: f.tien_te && f.ngay_ty_gia ? f.ngay_ty_gia : null, ngay_den_han: f.ngay_den_han || null, marketing_muc: f.category === "marketing" ? f.marketing_muc : "", campaign_id: f.category === "marketing" && f.campaign_id ? Number(f.campaign_id) : null }).then((r) => r && setF({ ...f, supplier_name: "", amount: "", description: "", document_ref: "", has_document: false, ngay_den_han: "", marketing_muc: "", campaign_id: "", so_tien_ngoai_te: "", ty_gia: "", ngay_ty_gia: "" }))}>Lập đề nghị</button></div>}
-      <div>{[["cho_tp,cho_kt,cho_duyet,cho_chi", "Đang xử lý"], ["cho_chi", "Lệnh chi chờ"], ["da_chi", "Đã chi"], ["tu_choi", "Từ chối"], ["", "Tất cả"]].map(([v, l]) => <button key={v} className={"act " + (filter === v ? "" : "grey")} onClick={() => setFilter(v)}>{l}</button>)}</div>
+      <div>{[["cho_tp,cho_kt,cho_duyet,cho_chi,tra_bo_sung", "Đang xử lý"], ["cho_chi", "Lệnh chi chờ"], ["tra_bo_sung", "Trả bổ sung"], ["da_chi", "Đã chi"], ["tu_choi", "Từ chối"], ["", "Tất cả"]].map(([v, l]) => <button key={v} className={"act " + (filter === v ? "" : "grey")} onClick={() => setFilter(v)}>{l}</button>)}</div>
       <div className="panel wrap"><table><thead><tr><th>Số ĐN</th><th>Loại / Tour</th><th>NCC</th><th style={{ textAlign: "right" }}>Số tiền</th><th>Nội dung</th><th>Hạn trả</th><th>Cờ R3</th><th>Trạng thái → bước tiếp</th><th>Người</th><th></th></tr></thead>
         <tbody>{rows.length ? rows.map((r) => <tr key={r.id}><td><b>{r.code}</b><div className="muted">{fmtDT(r.created_at)}</div></td><td>{CAT[r.category]}<div className="muted">{r.tour_code}</div></td><td>{r.supplier_name}<div className="muted">{r.supplier_tax_code || <Tag cls="warn">chưa MST</Tag>}</div></td><td style={{ textAlign: "right" }}><b>{vnd(r.amount)}</b>{r.ngoai_te_loi_nhan && <div className="muted">{r.ngoai_te_loi_nhan}</div>}</td><td>{r.description}<div className="muted">{r.document_ref || <Tag cls="warn">thiếu chứng từ</Tag>}{!r.has_invoice && !["hoan_tien", "tam_ung", "tam_ung_tai_xe"].includes(r.category) && <Tag cls="warn">không HĐ</Tag>}</div></td>
           <td>{r.ngay_den_han ? <b>{String(r.ngay_den_han).slice(0, 10).split("-").reverse().join("/")}</b> : <Tag cls="warn">Chưa có hạn</Tag>}
             <div className="muted">{r.ngay_den_han_boi ? `${r.ngay_den_han_boi} gõ` : ""}{!["da_chi", "tu_choi"].includes(r.status) && <> <button className="act grey" style={{ margin: 0, padding: "1px 6px", fontSize: 11 }} onClick={() => datNgay(r)}>{r.ngay_den_han ? "Sửa" : "Gõ hạn"}</button></>}</div></td>
-          <td>{r.over_budget && <Tag cls="red">Ngoài dự toán</Tag>}{r.two_signatures && <Tag cls="navy">2 chữ ký</Tag>}</td><td><Tag cls={ST[r.status]?.[1]}>{ST[r.status]?.[0]}</Tag><div className="muted">{r.next}{r.two_signatures && r.status === "cho_duyet" && ` (CT ${r.signed_chutich ? "✔" : "…"} · TGĐ ${r.signed_tgd ? "✔" : "…"})`}{r.reject_reason && ` – ${r.reject_reason}`}{r.paid_ref && ` – ${r.paid_ref}`}</div>
+          <td>{r.over_budget && <Tag cls="red">Ngoài dự toán</Tag>}{r.two_signatures && <Tag cls="navy">2 chữ ký</Tag>}</td><td><Tag cls={r.chi_mot_phan ? "warn" : ST[r.status]?.[1]}>{r.chi_mot_phan ? "Đã chi một phần" : ST[r.status]?.[0]}</Tag><div className="muted">{r.next}{r.two_signatures && r.status === "cho_duyet" && ` (CT ${r.signed_chutich ? "✔" : "…"} · TGĐ ${r.signed_tgd ? "✔" : "…"})`}{r.reject_reason && ` – ${r.reject_reason}`}{r.paid_ref && ` – ${r.paid_ref}`}</div>
             {r.robot_ghi_chu && <div style={{ fontSize: 12, color: "#9a5b00" }}>{r.robot_ghi_chu}</div>}
             {r.status === "cho_chi" && !r.co_unc && <div style={{ fontSize: 12 }}><Tag cls="warn">Chưa có UNC</Tag> CK xong tải UNC rồi bấm «Đã chi»</div>}</td>
           <td className="muted">{r.created_by}{r.tp_by && ` → ${r.tp_by}`}{r.kt_by && ` → ${r.kt_by}`}{r.approved_by && ` → ${r.approved_by}`}</td>
-          <td>{actions(r).map(([l, a, c]) => <button key={a} className={"act " + c} style={{ margin: "0 4px 4px 0" }} disabled={a === "pay" && !r.co_unc} title={a === "pay" && !r.co_unc ? "Tải UNC trước" : ""} onClick={() => { if (a === "unc") { setTepUnc(true); setTepDN(r.code); return; } if (a === "robot") { post(`/payment-requests/${r.id}/robot-kiem`); return; } let reason = ""; if (a === "reject") { reason = prompt("Lý do từ chối (bắt buộc):") || ""; if (!reason) return; } if (a === "pay") { setChi({ r, hinh_thuc_tt: "", ma: "" }); return; } step(r, a, reason); }}>{l}</button>)}
+          <td>{actions(r).map(([l, a, c]) => <button key={a} className={"act " + c} style={{ margin: "0 4px 4px 0" }} disabled={a === "pay" && (r.so_unc ?? (r.co_unc ? 1 : 0)) <= (r.lan_chi || []).length} title={a === "pay" && (r.so_unc ?? 0) <= (r.lan_chi || []).length ? "Tải UNC cho lần chi này trước" : ""} onClick={() => { if (a === "unc") { setTepUnc(true); setTepDN(r.code); return; } if (a === "robot") { post(`/payment-requests/${r.id}/robot-kiem`); return; } if (a === "gui_lai") { setSua({ r, supplier_name: r.supplier_name, supplier_tax_code: r.supplier_tax_code, supplier_bank: r.supplier_bank, description: r.description, document_ref: r.document_ref, amount: r.amount, has_document: r.has_document, has_invoice: r.has_invoice }); return; } let reason = ""; if (a === "reject" || a === "tra_bo_sung") { reason = prompt(a === "reject" ? "Lý do từ chối (bắt buộc):" : "Trả bổ sung — người lập cần bổ sung gì? (bắt buộc)") || ""; if (!reason) return; } if (a === "pay") { setChi({ r, hinh_thuc_tt: "", ma: "", so_tien: String(r.con_phai_chi ?? r.amount) }); return; } step(r, a, reason); }}>{l}</button>)}
             {" "}<button className="act grey" style={{ margin: "0 4px 4px 0" }} title="Chứng từ kèm theo" onClick={() => { setTepUnc(false); setTepDN(r.code); }}>Chứng từ</button></td></tr>) : <tr><td colSpan={10} className="muted">Không có đề nghị chi.</td></tr>}</tbody></table></div>
       {tepDN && tepUnc && <DinhKem key={`unc-${tepDN}`} doiTuong="de_nghi_chi" doiTuongId={tepDN} loai="unc" tieuDe={`Tải UNC / phiếu chi của ${tepDN}`}
         goi="Chuyển khoản xong trên ngân hàng → tải ủy nhiệm chi (UNC) hoặc phiếu chi tiền mặt lên đây → nút «Đã chi» mở." onDoi={load} />}

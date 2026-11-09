@@ -244,4 +244,15 @@ class PaymentRequest(Base):
     # {pham_vi: "xe"|"doi", xe_id, bien_so, loai: thanh_toan|tam_ung|hoan_ung, nhom, tk, can_cu,
     #  ma_khoan_goc, hen_bo_sung, ghi_chu_kiem_tra}. `tk` là tài khoản đã khóa lúc lập theo nhóm khoản.
     doi_xe: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # ── 05-TT · TRẢ BỔ SUNG + CHI MỘT PHẦN (Chủ tịch duyệt bản xem trước 10/11/2026, áp mọi đề nghị chi) ──
+    # Chi nhiều lần: mỗi lần một dòng {so_tien, luc, ma_gd, hinh_thuc, boi, entry_id}; `da_chi_tien` là tổng
+    # các lần — cột thật để mọi bảng dự báo trừ được phần đã ra mà không phải mở JSON. Trạng thái giữ
+    # `cho_chi` tới khi đủ, nên các sổ đang lọc `cho_chi` không đổi nghĩa; phần còn phải chi =
+    # amount − (da_chi_tien or 0).
+    # RỖNG = chưa chi lần nào (luật cột tiền K2 / KT-12: không mặc định 0 trên cột tiền).
+    da_chi_tien: Mapped[float | None] = mapped_column(TIEN, nullable=True)
+    lan_chi: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Trả bổ sung: mỗi lần trả một dòng {luc, boi, vai, ly_do, buoc, ban_truoc}. `ban_truoc` là bản chụp các ô
+    # người lập sửa được và các chữ ký đã có — gửi lại thì chữ ký xoá, ký lại từ đầu, nhưng lịch sử còn.
+    lan_tra: Mapped[list | None] = mapped_column(JSON, nullable=True)
 

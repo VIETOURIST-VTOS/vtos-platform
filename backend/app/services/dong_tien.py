@@ -314,7 +314,7 @@ def tien_kha_dung(db: Session, company_id: int, den_ngay: date | None = None) ->
     for pr in db.execute(select(PaymentRequest).where(
             PaymentRequest.status.in_(TRANG_THAI_DA_DUYET_CHUA_CHUYEN),
             PaymentRequest.company_id == company_id)).scalars():
-        da_duyet_chua_chuyen += float(pr.amount or 0)
+        da_duyet_chua_chuyen += float((pr.amount or 0) - (pr.da_chi_tien or 0))   # chi một phần: chỉ phần còn lại
 
     # --- Kết luận: PHÉP TÍNH KHÔNG NẰM Ở ĐÂY.
     #
@@ -516,7 +516,8 @@ def _khoang(db: Session, company_id: int, ma: str, nguon: str | None,
         if tu > date.today():
             return 0.0
         return float(db.execute(
-            select(func.coalesce(func.sum(PaymentRequest.amount), 0.0))
+            select(func.coalesce(func.sum(func.coalesce(PaymentRequest.amount, 0)
+                                          - func.coalesce(PaymentRequest.da_chi_tien, 0)), 0.0))
             .where(PaymentRequest.company_id == company_id,
                    PaymentRequest.status.in_(TRANG_THAI_DA_DUYET_CHUA_CHUYEN))).scalar() or 0)
 
