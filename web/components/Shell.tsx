@@ -341,7 +341,11 @@ export const GROUPS: Group[] = [
   // ghi ra để anh lật lại được. Hai màn hình ấy làm việc với khách SAU khi đã bán – giữ tiếng và
   // giữ khách, cùng một việc với Nội dung & thương hiệu. Phiếu chăm sóc VẪN tự giao cho nhân viên
   // đã bán như chốt 07/9; đổi nhóm menu không đổi người được giao việc.
-  { key: "marketing", label: "Marketing & PR", icon: "marketing", href: "/phan-he/marketing", blocks: [
+  // MKT-2 · 09/11/2026 — thanh phân hệ trỏ thẳng `/marketing`, không qua `/phan-he/marketing`
+  // nữa. Trang ấy đã gộp vào đây cùng với mục lục của nó, và bấm vào nó cũng chỉ chuyển
+  // hướng về đây — để thanh menu đi qua một lượt chuyển hướng là bắt người dùng chờ một
+  // nhịp không cần có.
+  { key: "marketing", label: "Marketing & PR", icon: "marketing", href: "/marketing", blocks: [
     // 19/9/2026 · ĐẶT ĐẦU TIÊN, và đó là chủ ý. Trước hôm nay cửa lọc khủng hoảng nằm lẫn trong
     // tab "Thương hiệu & PR" — sâu ba lớp, sau một cái tên không gợi gì tới khủng hoảng. Chính
     // anh Tuấn, người đặt làm nó, mở web mà không thấy; người trực lúc 2 giờ sáng càng không.

@@ -24,6 +24,12 @@ TRANG = os.path.join(ROOT, "web", "app", "phan-he", "[khoa]", "page.tsx")
 # TRANG thì từ hôm nay chúng soi nhầm chỗ — và một hàng rào soi nhầm chỗ mà vẫn xanh còn nguy
 # hiểm hơn không có hàng rào.
 MUC_LUC = os.path.join(ROOT, "web", "components", "MucLucPhanHe.tsx")
+# 09/11/2026 — và lần thứ hai cùng một kiểu: đợt PH-1 dọn THÂN trang phân hệ sang
+# `components/TrangPhanHe.tsx`, để `app/phan-he/[khoa]/page.tsx` chỉ còn là bộ rẽ nhánh.
+# Phép thử "lối vào mục lục ở CẢ HAI ĐẦU" vẫn đọc tệp trang, nên nó soi nhầm chỗ và đỏ
+# trong khi hai lối vào vẫn nằm nguyên ở tệp mới. Đúng bài học khối chú thích ngay trên
+# đã ghi — một hàng rào soi nhầm chỗ thì sửa hàng rào, không sửa mã.
+THAN_TRANG = os.path.join(ROOT, "web", "components", "TrangPhanHe.tsx")
 BANG = os.path.join(ROOT, "web", "components", "BangChiTieuPhong.tsx")
 SHELL = os.path.join(ROOT, "web", "components", "Shell.tsx")
 
@@ -41,6 +47,19 @@ def _shell():
 
 def _khong_ghi_chu(s):
     return re.sub(r'/\*.*?\*/|//[^\n]*', '', s, flags=re.S)
+
+
+def _duong_phong():
+    """Đọc `DUONG_PHONG` từ `web/lib/duong_phong.ts` — khoá phân hệ → đường dẫn riêng.
+
+    ĐỌC BẢNG, KHÔNG CHÉP TÊN PHÒNG SANG ĐÂY. Chép thì ngày phòng thứ hai dời đi, hai phép
+    thử dưới vẫn xanh với một bảng đã cũ — và chúng sẽ đòi một `href` mà màn hình không
+    còn dùng, hoặc miễn cho một đường dẫn không còn là cửa của phòng nào.
+    """
+    s = open(os.path.join(ROOT, "web", "lib", "duong_phong.ts"), encoding="utf-8").read()
+    m = re.search(r"export const DUONG_PHONG[^{]*\{(.*?)\n\};", s, re.S)
+    assert m, "không tìm thấy DUONG_PHONG trong web/lib/duong_phong.ts"
+    return dict(re.findall(r'(\w+)\s*:\s*"([^"]+)"', _khong_ghi_chu(m.group(1))))
 
 
 def _duong_dan(src):
@@ -143,7 +162,16 @@ def test_moi_thanh_phan_he_deu_bam_di_duoc():
             continue
 
         assert m, f"nhóm {khoa} không có href – bấm vào thanh phân hệ sẽ không đi đâu cả"
-        mong = "/" if khoa == "tongquan" else f"/phan-he/{khoa}"
+        # ══ MKT-2 · 09/11/2026 — LUẬT ĐƯỢC NỚI LẦN THỨ HAI, ghi cả hai bên ═══════════════
+        # BÊN CŨ (13/9): mọi nhóm phải trỏ `/phan-he/<khoá>`. Lý do vẫn đúng và vẫn được
+        #   canh cho mọi phòng chưa dời: một thanh trỏ vào trang không có thật thì người
+        #   dùng gặp «Không có phân hệ này».
+        # BÊN MỚI (09/11): phòng nào đã có đường dẫn riêng trong `DUONG_PHONG` thì thanh
+        #   trỏ THẲNG vào đó. Marketing là phòng đầu tiên: `/phan-he/marketing` gộp hẳn
+        #   vào `/marketing` cùng với mục lục của nó, nên bắt thanh menu đi vòng qua một
+        #   lượt chuyển hướng là bắt người dùng chờ một nhịp không cần có.
+        # Cái bị cấm vẫn nguyên: thanh trỏ vào một đường dẫn KHÔNG phải cửa của phòng ấy.
+        mong = "/" if khoa == "tongquan" else _duong_phong().get(khoa, f"/phan-he/{khoa}")
         assert m.group(1) == mong, f"nhóm {khoa} trỏ {m.group(1)}, phải là {mong}"
 
 
@@ -178,7 +206,19 @@ def test_khong_man_hinh_nao_cua_menu_bi_rot_khoi_cay():
     j = shell.index("const CA_NHAN")
     for m in re.finditer(r'\["[^"]+",\s*"(/[^"]+)"\]', shell[i:j]):
         trong_menu.add(m.group(1).split("?")[0].split("#")[0])
-    thieu = sorted(trong_menu - trong_cay)
+    # ══ MKT-2 · 09/11/2026 — CỬA CỦA PHÒNG KHÔNG PHẢI MỘT MỤC TRONG PHÂN HỆ ════════
+    # Cây liệt kê CHỨC NĂNG của một phân hệ. Đường dẫn riêng của chính phòng ấy —
+    # `/fit`, `/mice`, `/op`, `/guide`, `/marketing` — là CỬA VÀO phân hệ, không phải
+    # một chức năng bên trong nó; đòi nó có mặt trong cây là đòi mục lục tự liệt kê
+    # chính mình. `DUONG_PHONG` là nguồn sự thật duy nhất của những cửa ấy.
+    #
+    # ĐÂY LÀ MỘT LẦN TRẢ NỢ, nói thẳng: đợt PH-1 sáng 09/11 thêm bốn mục menu mà không
+    # thêm vào cây, nên phép thử này ĐÃ ĐỎ trên main từ lúc ấy — và không ai thấy, vì
+    # tệp này KHÔNG nằm trong 17 tệp phép thử mà CI chạy. Cái bị cấm vẫn nguyên: một
+    # MÀN HÌNH thật có trong menu mà vắng trong cây thì mục lục đếm thiếu, và người
+    # đọc tưởng hệ thống còn nợ nhiều hơn thực tế. Hai bàn làm việc Marketing đúng là
+    # loại ấy, nên chúng được ĐƯA VÀO CÂY chứ không được miễn.
+    thieu = sorted(trong_menu - trong_cay - set(_duong_phong().values()))
     assert not thieu, f"{len(thieu)} màn hình có trong menu nhưng vắng trong cây phân hệ: {thieu}"
 
 
@@ -389,7 +429,7 @@ def test_cua_phan_he_van_con_loi_vao_muc_luc_o_CA_HAI_DAU():
     được dựa vào hai câu trả lời của máy chủ — `hidden_menus` của phiên và danh sách phạm vi.
     Khai một danh sách vai trò ở đây là dựng bản sao thứ hai của bảng phân quyền.
     """
-    src = open(TRANG, encoding="utf-8").read()
+    src = open(THAN_TRANG, encoding="utf-8").read()
     assert src.count("<LoiVaoMucLuc") >= 2, (
         "trang phân hệ phải có lối vào mục lục ở CẢ hai đầu (trên tiêu đề và cuối trang)")
     assert "?xem=muc-luc" in src, "thiếu đường dẫn mở mục lục"

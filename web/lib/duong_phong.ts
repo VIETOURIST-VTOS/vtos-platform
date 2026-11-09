@@ -36,6 +36,12 @@ export const DUONG_PHONG: Record<string, string> = {
   dhtour: "/op",
   dhxe: "/xe",
   hdv: "/guide",
+  // MKT-2 · 09/11/2026 — Marketing vào bảng này, và nó vào theo một lẽ KHÁC bốn dòng trên.
+  // Bốn phòng kia dời sang một trang MỚI dựng. Marketing thì không dời đi đâu cả: `/marketing`
+  // đã chạy từ lâu, và đợt này gộp nốt mục lục của `/phan-he/marketing` vào đó rồi bỏ trang
+  // cũ. Kết quả giống nhau — `/phan-he/marketing` chuyển hướng về `/marketing` — nên nó
+  // thuộc đúng bảng này, chỗ duy nhất trả lời câu «phòng này ở đường dẫn nào».
+  marketing: "/marketing",
 };
 
 /** Đường dẫn mới → khoá phân hệ. Bốn trang mới đọc bảng này để biết mình là phòng nào. */
