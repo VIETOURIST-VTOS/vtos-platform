@@ -942,6 +942,17 @@ def ds_giao_dich(source: str = "", chua_khop: bool = False, gom_ban_trung: bool 
                       "bien_so": t.bien_so, "the_4so": t.the_4so, "xe": veh.get(t.vehicle_id, ""),
                       "vehicle_id": t.vehicle_id, "so_tien": t.so_tien, "lit": t.lit, "khop": t.khop,
                       "co": t.co, "trung": t.trung, "nhom": t.nhom,
+                      # KS-64 · 09/11/2026 — `mo_ta` TRƯỚC NAY KHÔNG ĐƯỢC TRẢ RA.
+                      #
+                      # Nó vẫn được lưu (`nhap_giao_dich` ghi `mo_ta=r.get("mo_ta","")`), nhưng
+                      # dòng trả về của cửa này bỏ sót, nên NỘI DUNG mà người lập đề xuất gõ vào
+                      # — tiền này chi cho việc gì — chưa bao giờ hiện trên màn Đối soát. Màn hình
+                      # có mã phiếu, số tiền, nhóm và ghi chú của máy, thiếu đúng câu của con người.
+                      #
+                      # Dấu vết: phép thử cũ `test_lap_de_xuat_chi_tren_vtos` viết
+                      # `assert "Năm Tuội" in dong["mo_ta"] if "mo_ta" in dong else True` — một lối
+                      # lui để phép thử khỏi đỏ, và nó đã che chỗ này suốt từ đó.
+                      "mo_ta": t.mo_ta,
                       "khong_phai_chi_phi": t.khong_phai_chi_phi, "ghi_chu": t.ghi_chu} for t in rows],
             "tong_chi_phi": sum((t.so_tien or 0) for t in rows if not t.khong_phai_chi_phi),
             "tong_dieu_chuyen": sum((t.so_tien or 0) for t in rows if t.khong_phai_chi_phi),
@@ -1007,7 +1018,15 @@ def danh_muc_dot3(u: User = Depends(require_roles(*READ)), db: Session = Depends
     return {"giai_doan_ban_xe": SALE_STAGES, "trang_thai_lich": PLAN_STATUS,
             "trang_thai_quyet_toan": SETTLE_STATUS, "loai_dong": SETTLE_LINE_KINDS,
             "nguoi_lap_lenh": [{"username": x.username, "full_name": x.full_name} for x in ai],
-            "nguoi_lap_lenh_ghi_chu": ly_do}
+            "nguoi_lap_lenh_ghi_chu": ly_do,
+            # KS-64: ngưỡng chứng từ bắt buộc (chặn cứng B6) trả về cho màn hình, để bước 2 của
+            # hai cửa nhập bốn bước BÁO TRƯỚC bằng đúng con số đang áp — thay vì để người gõ đi
+            # hết bốn bước rồi mới bị máy chủ từ chối ở lần bấm Gửi.
+            #
+            # Trả từ máy chủ chứ KHÔNG gõ lại số 10.000.000 trong mã web: gõ lại là ngày nào đó
+            # ai sửa tham số trên màn Chính sách & định mức, còn màn hình vẫn báo con số cũ, và
+            # hai bên nói hai điều khác nhau về cùng một hàng rào.
+            "nguong_chung_tu": R.get_param(db, "xe_chung_tu_bat_buoc_tu")}
 
 
 class ChuXeIn(BaseModel):
@@ -1986,7 +2005,16 @@ def tinh_lai_co(tu: date | None = None, den: date | None = None,
 
 
 class DeXuatChiIn(BaseModel):
-    """Một đề xuất chi nhập tay trên VTOS – cùng bộ trường với phiếu đề xuất chi trên phần mềm Vietrip."""
+    """Một đề xuất chi nhập tay trên VTOS – cùng bộ trường với phiếu đề xuất chi trên phần mềm Vietrip.
+
+    KS-64 · 09/11/2026 — thêm sáu trường của bản v3.3 (bốn bước). Chúng khai ở ĐÂY chứ không
+    chỉ ở màn hình, vì pydantic BỎ LẶNG LẼ trường lạ: một ô trên giao diện gửi lên tên trường
+    máy chủ không biết thì người gõ thấy mình đã khai, mà sổ không có gì cả. Đó là loại sai
+    không ai phát hiện được — không có thông báo đỏ ở đâu hết.
+
+    Sáu trường này KHÔNG thêm bảng, KHÔNG thêm cột: chúng đi vào `mo_ta` và `ghi_chu` của dòng
+    `ExternalTxn` đang có, và vào nhật ký `audit` dưới dạng đầy đủ.
+    """
     ngay: date
     so_tien: float
     noi_dung: str
@@ -1998,6 +2026,16 @@ class DeXuatChiIn(BaseModel):
     ngan_hang: str = ""
     chung_tu: str = ""
     ma_gd: str = ""                   # để trống thì hệ thống tự sinh
+    # ── v3.3 bước 1 ──
+    pham_vi: str = ""                 # "xe" = chi phí một xe · "doi" = chi phí toàn đội
+    loai: str = ""                    # thanh_toan | tam_ung | hoan_ung
+    # ── v3.3 bước 2 ──
+    can_cu_so_tien: str = ""          # §2 "không tự cộng VAT": người lập phải NÓI RA căn cứ
+    ma_khoan_goc: str = ""            # WF06 – liên kết khoản đã ghi ở phiếu chuyến, chống cộng hai lần
+    hen_bo_sung: str = ""             # lý do + thời hạn, khi gửi mà chứng từ chưa về
+    ghi_chu_kiem_tra: str = ""        # ghi chú gửi người kiểm tra
+    # ── bước 4 ──
+    cho_phep_trung: bool = False      # chỉ đặt True khi người lập đã xem phiếu trùng và vẫn muốn gửi
 
 
 @router.post("/de-xuat-chi", status_code=201)
@@ -2015,9 +2053,54 @@ def tao_de_xuat_chi(data: DeXuatChiIn, u: User = Depends(require_roles(*WRITE, *
     if not (data.nhom or "").strip():
         raise HTTPException(422, "Phải chọn nhóm khoản chi – không phân loại lúc lập thì cuối tháng "
                                  "phải đọc lại từng phiếu để đoán khoản nào là chi phí, khoản nào là nạp quỹ")
+
+    # ── KS-64 · B6 của bản v3.3 — Ô NGÂN HÀNG KHÔNG THUỘC VAI GIÁM ĐỐC ĐỘI XE ──
+    #
+    # v3.3 §2 và §7: "GĐ đội xe không nhập hoặc thay tài khoản ngân hàng tùy ý trong màn đề nghị",
+    # và ma trận quyền ghi "Đổi thông tin ngân hàng — không theo vai GĐ".
+    #
+    # Chặn ở ĐÂY, không chỉ ẩn ô trên màn hình. Ẩn nút là một lời đề nghị, không phải một hàng
+    # rào: ai cũng gọi thẳng được cửa này bằng một dòng fetch. Một kiểm soát chi tiền mà chỉ
+    # sống ở lớp giao diện thì nó không tồn tại.
+    #
+    # Người thụ hưởng VẪN ghi được — v3.3 giữ ô "Bên nhận / nhà cung cấp" cho GĐ. Cái bị lấy ra
+    # khỏi tay GĐ là SỐ TÀI KHOẢN và NGÂN HÀNG: hai thứ quyết định tiền chạy vào đâu.
+    if u.role == "gd_doi_xe" and ((data.so_tai_khoan or "").strip() or (data.ngan_hang or "").strip()):
+        raise HTTPException(422, "Số tài khoản và ngân hàng của bên nhận do Kế toán kiểm soát, không nhập "
+                                 "ở màn Giám đốc đội xe (v3.3 §2, §7). Ghi tên bên nhận vào ô Bên nhận; "
+                                 "Kế toán đối chiếu tài khoản theo danh mục đã quản lý.")
+
+    # Ngưỡng chứng từ bắt buộc GIỮ NGUYÊN LÀ CHẶN CỨNG. Bước 2 của bản v3.3 có ô "hẹn bổ sung
+    # chứng từ", và sẽ rất dễ để ô ấy mở ngưỡng này ra — nhưng §11 xếp "trường hợp được gửi thiếu
+    # chứng từ" vào danh sách năm cấu hình PHẢI CÓ NGƯỜI CHỐT trước khi phát hành. Một dòng lý do
+    # gõ tay không phải một người chốt. Nên `hen_bo_sung` chỉ được GHI LẠI (xem phần ghi_chu dưới),
+    # nó KHÔNG cho qua ngưỡng. Hôm nào anh Tuấn chốt ai được miễn và miễn tới mức nào thì sửa đúng
+    # chỗ này, và sửa có chủ ý.
     nguong = R.get_param(db, "xe_chung_tu_bat_buoc_tu")
     if (data.so_tien or 0) >= nguong and not (data.chung_tu or "").strip() and not data.khong_phai_chi_phi:
         raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc ghi số chứng từ gốc (chặn cứng B6)")
+
+    # ── KS-64 · B2 – GỬI HAI LẦN THÌ CHỈ MỘT PHIẾU ──
+    #
+    # Bốn bước làm việc này cần thiết hơn một trang: ở bước cuối người ta bấm Gửi, trang chưa kịp
+    # trả lời, họ bấm lại hoặc tải lại. Trước bản này mỗi lần bấm sinh một mã mới nên hệ thống
+    # KHÔNG thấy gì trùng — hai phiếu khác mã, cùng một khoản tiền thật.
+    #
+    # Dấu nhận biết lấy đúng bộ mà người kế toán dùng để nhận ra phiếu lặp: cùng số chứng từ,
+    # cùng số tiền, cùng bên nhận. Không có số chứng từ thì KHÔNG đoán — nói ra là không kiểm
+    # được, chứ không im lặng cho qua.
+    if not data.cho_phep_trung and (data.chung_tu or "").strip():
+        ct = data.chung_tu.strip()
+        cu = db.execute(select(ExternalTxn).where(ExternalTxn.source == "de_xuat_vietrip",
+                                                  ExternalTxn.so_tien == data.so_tien)).scalars().all()
+        for t in cu:
+            kho = f"{t.mo_ta or ''} {t.ghi_chu or ''}"
+            if ct in kho and (not (data.nguoi_thu_huong or "").strip()
+                              or data.nguoi_thu_huong.strip() in kho):
+                raise HTTPException(422, f"Đã có phiếu {t.ma_gd} cùng chứng từ {ct}, cùng số tiền "
+                                         f"{data.so_tien:,.0f} đ và cùng bên nhận. Nếu đây là khoản KHÁC "
+                                         "thì gửi lại với ô «vẫn gửi dù trùng»; nếu là lần bấm thứ hai thì "
+                                         "phiếu cũ đã vào sổ rồi, không cần gửi nữa.")
 
     ma = (data.ma_gd or "").strip()
     if not ma:
@@ -2025,20 +2108,39 @@ def tao_de_xuat_chi(data: DeXuatChiIn, u: User = Depends(require_roles(*WRITE, *
                        .where(ExternalTxn.source == "de_xuat_vietrip")).scalar() or 0
         ma = f"VTOS-DX-{date.today():%Y%m}-{n + 1:04d}"
     tk = " · ".join(x for x in [data.nguoi_thu_huong, data.so_tai_khoan, data.ngan_hang] if x.strip())
+    # KS-64: ba trường mới của bước 1–2 đi vào chính `mo_ta`, vì đó là ô mà màn Đối soát và mọi
+    # bản xuất đang ĐỌC. Nhét vào `ghi_chu` cả thì người xem danh sách không thấy, mà một căn cứ
+    # số tiền không ai thấy thì nó không khác gì chưa khai.
+    LOAI_TEN = {"thanh_toan": "Thanh toán", "tam_ung": "Tạm ứng", "hoan_ung": "Hoàn ứng / hoàn chi"}
+    duoi = [x for x in [
+        LOAI_TEN.get((data.loai or "").strip(), ""),
+        f"Thụ hưởng: {tk}" if tk else "",
+        f"Căn cứ: {data.can_cu_so_tien.strip()}" if (data.can_cu_so_tien or "").strip() else "",
+        f"Khoản gốc: {data.ma_khoan_goc.strip()}" if (data.ma_khoan_goc or "").strip() else "",
+    ] if x]
     rows = [{"ma_gd": ma, "thoi_diem": f"{data.ngay}T00:00:00", "bien_so": data.bien_so,
              "so_tien": data.so_tien, "nhom": data.nhom,
              "khong_phai_chi_phi": data.khong_phai_chi_phi,
              "tai_khoan": data.so_tai_khoan[:40],
-             "mo_ta": (data.noi_dung.strip() + (f" | Thụ hưởng: {tk}" if tk else ""))[:300]}]
+             "mo_ta": (data.noi_dung.strip() + ("".join(" | " + x for x in duoi)))[:300]}]
     try:
         kq = FL.nhap_giao_dich(db, "de_xuat_vietrip", rows, u.username)
     except (ValueError, TypeError) as ex:
         raise HTTPException(422, f"Không ghi được đề xuất: {ex}")
     if kq["da_nhap"] == 0:
         raise HTTPException(422, f"Mã đề xuất {ma} đã tồn tại – đổi mã khác hoặc để trống cho hệ thống tự sinh")
-    if (data.chung_tu or "").strip():
+    # Chứng từ, hẹn bổ sung và ghi chú cho người kiểm tra vào `ghi_chu`. Hẹn bổ sung phải nằm
+    # trong sổ chứ không chỉ trong nhật ký: nó là lời hứa còn nợ giấy, và người đi thu hồi chứng
+    # từ đọc danh sách giao dịch, không đọc audit log.
+    phu = [x for x in [
+        f"Chứng từ: {data.chung_tu.strip()}" if (data.chung_tu or "").strip() else "",
+        f"CHƯA CÓ CHỨNG TỪ – hẹn: {data.hen_bo_sung.strip()}" if (data.hen_bo_sung or "").strip() else "",
+        f"Phạm vi: {'toàn đội' if (data.pham_vi or '') == 'doi' else 'một xe'}" if (data.pham_vi or "").strip() else "",
+        data.ghi_chu_kiem_tra.strip() if (data.ghi_chu_kiem_tra or "").strip() else "",
+    ] if x]
+    if phu:
         t = db.execute(select(ExternalTxn).where(ExternalTxn.ma_gd == ma)).scalars().first()
-        if t is not None: t.ghi_chu = (f"Chứng từ: {data.chung_tu.strip()} · " + (t.ghi_chu or ""))[:300]
+        if t is not None: t.ghi_chu = (" · ".join(phu) + (" · " + t.ghi_chu if t.ghi_chu else ""))[:300]
     R.audit(db, u.username, u.role, "de_xuat_chi_xe", f"de_xuat:{ma}", after=data.model_dump(mode="json"))
     db.commit()
     return {"ma_gd": ma, "message": f"Đã lập đề xuất chi {ma} – {data.so_tien:,.0f} đ"}

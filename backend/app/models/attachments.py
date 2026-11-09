@@ -50,6 +50,14 @@ DOI_TUONG_DAY_DU = {
     # PC-1 · 19/10/2026: tệp kèm yêu cầu Pháp chế do trưởng phòng tự gửi.
     "yeu_cau_phap_che": ("Yêu cầu Pháp chế", "phap_che", "07_Hop_dong", True),
     "xe":            ("Hồ sơ xe", "doi_xe", "01_Phap_ly", True),
+    # KS-64 · 09/11/2026 — chứng từ của ĐỀ XUẤT CHI đội xe (bản v3.3, bước 2).
+    #
+    # Vì sao không dùng "de_nghi_chi" đã có: đối tượng ấy thuộc phòng Kế toán và xếp theo THÁNG
+    # (cờ cuối là False). Đề xuất chi đội xe sống theo MÃ PHIẾU `VTOS-DX-…` – một phiếu lập cuối
+    # tháng 10 mà chứng từ về đầu tháng 11 thì xếp theo tháng là hai thư mục khác nhau cho cùng
+    # một khoản tiền. Và người tải lên là đội xe, không phải kế toán: để nguyên phòng ban cũ thì
+    # ma trận quyền cho sai người.
+    "de_xuat_chi_xe": ("Đề xuất chi đội xe", "doi_xe", "02_Ke_toan", True),
     "nha_cung_cap":  ("Nhà cung cấp", "dieu_hanh", "07_Hop_dong", True),
     # AT-1c (28/10/2026): ảnh món / nhà hàng / thành phố trên trang Khám phá ẩm thực web VTD — nội dung đối ngoại.
     "am_thuc":       ("Ảnh ẩm thực (web VTD)", "mkt", "10_Marketing", True),

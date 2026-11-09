@@ -66,7 +66,15 @@ def _loai_co_o_gan() -> set:
     ra = set()
     if not WEB.exists():
         return ra
-    for p in list(WEB.glob("app/**/*.tsx")) + list(WEB.glob("components/*.tsx")):
+    # KS-64 · 09/11/2026 — quét CẢ THƯ MỤC CON của components/.
+    #
+    # Trước hôm nay chỗ này là `components/*.tsx`: một bậc, không đệ quy. Nên mọi ô đính kèm
+    # nằm trong components/doixe/, components/cong/, components/nha-hang/… đều VÔ HÌNH với phép
+    # thử — nó báo "không màn hình nào có ô gắn" cho một loại hồ sơ đã có ô gắn hẳn hoi.
+    #
+    # Đó là loại hỏng tệ hơn cả không có phép thử: nó đẩy người sửa về phía thêm một dòng vào
+    # CHUA_CO_CUA (danh sách hoãn) cho một việc đã làm xong rồi.
+    for p in list(WEB.glob("app/**/*.tsx")) + list(WEB.glob("components/**/*.tsx")):
         if p.name == "DinhKem.tsx":
             continue                                  # chính thành phần ấy, không phải nơi dùng
         for m in re.findall(r'<DinhKem[^>]*?doiTuong=\{?"([a-z_0-9]+)"', _ma(p.read_text(encoding="utf-8"))):
