@@ -196,6 +196,8 @@ NGUOI_XAC_NHAN_THEO_LOAI = {
     # TGĐ / Chủ tịch như mọi loại chi khác, nên bảng bước bên dưới không đổi một dòng nào.
     "sua_chua_xe":    ("gd_doi_xe",),
     "tam_ung_tai_xe": ("gd_doi_xe",),
+    # Đội xe v3.3 (Chủ tịch 10/11/2026): GĐ đội xe lập và gửi = bộ phận đã xác nhận; phiếu vào thẳng Kế toán.
+    "chi_doi_xe":     ("gd_doi_xe",),
     # Hoa hồng D06 đại lý / CTV – Chủ tịch chốt 26/10/2026: Kế toán lập từ kỳ đã chốt, GĐ KD xác nhận
     # nguồn bán, duyệt theo mốc như mọi loại chi khác.
     "hoa_hong":       ("gd_kd",),

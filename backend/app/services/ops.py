@@ -238,7 +238,7 @@ CATEGORY_TK_KHOA = {"chi_tour": "dn_chi_chi_tour", "marketing": "dn_chi_marketin
 # ngoài tầm đọc ấy, và hàng rào mù đi mà không báo gì.
 CATEGORY_CONFIRMER = {"chi_tour": ("tp_dh",), "marketing": ("ptgd_mkt",), "hanh_chinh": ("hcns",),
                       "hoan_tien": ("gd_kd", "tp_kd", "tp_dh"), "tam_ung": ("tp_dh",),
-                      "sua_chua_xe": ("gd_doi_xe",), "tam_ung_tai_xe": ("gd_doi_xe",), "hoa_hong": ("gd_kd",),
+                      "sua_chua_xe": ("gd_doi_xe",), "tam_ung_tai_xe": ("gd_doi_xe",), "chi_doi_xe": ("gd_doi_xe",), "hoa_hong": ("gd_kd",),
                       "tra_ncc_thu_ho": ("robot",)}   # KS-16d: robot kế toán xác nhận + kiểm (Chủ tịch 31/10/2026)
 
 # Loại chi tài xế được TỰ LẬP. Đúng một loại, và cố ý.
@@ -249,6 +249,84 @@ CATEGORY_CONFIRMER = {"chi_tour": ("tp_dh",), "marketing": ("ptgd_mkt",), "hanh_
 # lập SAU KHI có báo giá. Việc "báo hư hỏng" là một việc khác, chưa có cửa, và nó chưa có cửa là
 # một việc CÒN THIẾU chứ không phải một việc đã xong.
 LOAI_CHI_TAI_XE_TU_LAP = ("tam_ung_tai_xe",)
+
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# ĐỘI XE v3.3 — `chi_doi_xe`. Chủ tịch chốt 10/11/2026, bốn ý:
+#   1. Đề xuất chi của GĐ đội xe đi VÀO đề nghị chi này, không dựng luồng duyệt thứ hai (tài liệu v3.3
+#      mục 3). Mốc duyệt là mốc chung `nguong_chu_tich_duyet_chi`, không có mốc riêng của đội xe.
+#   2. GĐ đội xe là trưởng bộ phận, nên phiếu GĐ gửi coi như BỘ PHẬN ĐÃ XÁC NHẬN: bắt đầu ở `cho_kt`.
+#      Vẫn đủ hai người khác người lập: Kế toán kiểm, TGĐ / Chủ tịch ký (người lập không tự ký — `step`).
+#   3. Vào SỔ VTD (pháp nhân mẹ): Vietrip chỉ là đơn vị vận hành.
+#   4. Tài khoản theo nhóm khoản, khóa lúc lập: chi phí → 627 (như sửa xe, tháng nào tính tháng đó),
+#      tạm ứng / nạp quỹ → 141, quyết toán chủ xe → 331.
+#
+# «Điều chuyển tiền nội bộ» KHÔNG đi đường này: nó không phải một khoản chi, và sổ VTOS chưa có tài
+# khoản nội bộ (136 / 336) để ghi. Chặn ở cửa lập, nói ra để Kế toán làm bút toán điều chuyển.
+NHOM_DOI_XE = {"Chi phí riêng của xe": "627", "Chi phí chung phân bổ": "627", "Sửa chữa – bảo dưỡng": "627",
+               "Tài xế (công tác phí, lương)": "627", "Quyết toán chủ xe / đối tác": "331",
+               "Nạp quỹ / tạm ứng (không phải chi phí)": "141"}
+NHOM_DOI_XE_CHAN = "Điều chuyển tiền nội bộ (không phải chi phí)"
+LOAI_DOI_XE = {"thanh_toan": "Thanh toán", "tam_ung": "Tạm ứng", "hoan_ung": "Hoàn ứng / hoàn chi"}
+# Khoản trả cho người của mình (tài xế), tạm ứng, nạp quỹ: không có mã số thuế bên nhận để Kế toán đòi.
+NHOM_DOI_XE_KHONG_MST = ("Tài xế (công tác phí, lương)", "Nạp quỹ / tạm ứng (không phải chi phí)")
+
+
+def tk_doi_xe(nhom: str, loai: str) -> str:
+    """Tài khoản của một phiếu đội xe. Tạm ứng luôn 141, bất kể nhóm: tiền giao người của công ty."""
+    return "141" if loai == "tam_ung" else NHOM_DOI_XE[nhom]
+
+
+def _chuan_doi_xe(db: Session, u: User, data: dict) -> dict:
+    from app.models.hr import Vehicle
+    if u.role == "gd_doi_xe" and (data.get("supplier_bank") or "").strip():
+        raise ValueError("Số tài khoản và ngân hàng của bên nhận do Kế toán kiểm soát, không nhập ở màn Giám "
+                         "đốc đội xe (v3.3 §2, §7). Ghi tên bên nhận; Kế toán đối chiếu theo danh mục.")
+    x = dict(data.get("doi_xe") or {})
+    nhom, loai, pv = (x.get("nhom") or "").strip(), (x.get("loai") or "thanh_toan").strip(), x.get("pham_vi") or "xe"
+    if nhom == NHOM_DOI_XE_CHAN:
+        raise ValueError("Điều chuyển tiền nội bộ không phải một đề nghị chi — Kế toán lập bút toán điều chuyển "
+                         "giữa VTD và Vietrip. Sổ VTOS chưa có tài khoản nội bộ để ghi khoản này.")
+    if nhom not in NHOM_DOI_XE:
+        raise ValueError("Chọn nhóm khoản chi — không phân loại lúc lập thì cuối tháng phải đọc lại từng phiếu để đoán")
+    if loai not in LOAI_DOI_XE:
+        raise ValueError("Loại đề nghị không hợp lệ")
+    if pv not in ("xe", "doi"):
+        raise ValueError("Phạm vi là một xe hoặc toàn đội")
+    v = None
+    if pv == "xe":
+        if x.get("xe_id"):
+            v = db.get(Vehicle, int(x["xe_id"]))
+        elif (x.get("bien_so") or "").strip():
+            v = db.execute(select(Vehicle).where(Vehicle.plate == x["bien_so"].strip())).scalars().first()
+        if v is None:
+            raise ValueError("Chọn xe, hoặc đổi phạm vi sang «chi phí toàn đội»")
+    if not (x.get("can_cu") or "").strip():
+        raise ValueError("Chọn căn cứ số tiền — VTOS không tự cộng VAT")
+    return {"pham_vi": pv, "xe_id": v.id if v else None, "bien_so": v.plate if v else "", "loai": loai, "nhom": nhom,
+            "tk": tk_doi_xe(nhom, loai), "can_cu": x["can_cu"].strip()[:80],
+            "ma_khoan_goc": (x.get("ma_khoan_goc") or "").strip()[:60], "hen_bo_sung": (x.get("hen_bo_sung") or "").strip()[:200],
+            "ghi_chu_kiem_tra": (x.get("ghi_chu_kiem_tra") or "").strip()[:500]}
+
+
+def _trung_doi_xe(db: Session, data: dict, amount: float) -> PaymentRequest | None:
+    """Bấm Gửi hai lần / tải lại khi mạng chậm: cùng chứng từ, cùng số tiền, cùng bên nhận là MỘT phiếu.
+    Không có số chứng từ thì không đoán (giữ đúng luật KS-64 B2)."""
+    ct = (data.get("document_ref") or "").strip()
+    if not ct or data.get("cho_phep_trung"):
+        return None
+    return db.execute(select(PaymentRequest).where(
+        PaymentRequest.category == "chi_doi_xe", PaymentRequest.status != "tu_choi",
+        PaymentRequest.document_ref == ct, PaymentRequest.amount == amount,
+        PaymentRequest.supplier_name == data["supplier_name"])).scalars().first()
+
+
+def co_tep_doi_xe(db: Session, r: PaymentRequest) -> bool:
+    """Chứng từ đội xe gắn ở kho «de_xuat_chi_xe» theo MÃ PHIẾU — có tệp còn hiệu lực là có chứng từ."""
+    from app.models.attachments import Attachment
+    return db.execute(select(Attachment.id).where(Attachment.doi_tuong == "de_xuat_chi_xe",
+                                                  Attachment.doi_tuong_id == r.code,
+                                                  Attachment.thu_hoi.is_(False))).first() is not None
+
 
 # Vai DUY NHẤT duyệt được chi Marketing, kể từ chỉ đạo 23/9/2026.
 VAI_DUYET_MKT = "ptgd_mkt"
@@ -611,6 +689,12 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
     if cat == "tam_ung_tai_xe" and not data.get("supplier_name"):
         data = {**data, "supplier_name": u.full_name or u.username}
     if not data.get("supplier_name"): raise ValueError("Thiếu nhà cung cấp / người thụ hưởng")
+    dx = _chuan_doi_xe(db, u, data) if cat == "chi_doi_xe" else None
+    if dx is not None:
+        cu = _trung_doi_xe(db, data, nt["amount"])
+        if cu is not None:
+            raise ValueError(f"Đã có phiếu {cu.code} cùng chứng từ {cu.document_ref}, cùng số tiền và cùng bên nhận. "
+                             "Nếu là lần bấm thứ hai thì phiếu cũ đã vào sổ; nếu là khoản khác thì gửi lại với ô «vẫn gửi dù trùng».")
     r = PaymentRequest(code=_next_code(db), category=cat, tour_id=t.id if t else None, supplier_name=data["supplier_name"], supplier_tax_code=data.get("supplier_tax_code", ""),
                        supplier_bank=data.get("supplier_bank", ""), amount=nt["amount"], description=data["description"], has_document=bool(data.get("has_document")),
                        document_ref=data.get("document_ref", ""), has_invoice=bool(data.get("has_invoice")), created_by=u.username,
@@ -623,6 +707,10 @@ def create_request(db: Session, u: User, data: dict) -> PaymentRequest:
         r.ngay_den_han_boi, r.ngay_den_han_luc = u.username, datetime.now()
     # Bốn ô ngoại tệ đã qua kiểm. `tien_te` rỗng nghĩa là khoản đồng Việt Nam – ba ô còn lại để None.
     r.tien_te = nt["tien_te"]
+    if dx is not None:
+        from app.services.ket_qua_that import cong_ty_me
+        r.doi_xe, r.company_id = dx, cong_ty_me(db)          # sổ VTD — Chủ tịch 10/11/2026
+        r.status, r.tp_by = "cho_kt", u.username              # GĐ đội xe gửi = bộ phận đã xác nhận
     r.so_tien_ngoai_te, r.ty_gia, r.ngay_ty_gia = nt["so_tien_ngoai_te"], nt["ty_gia"], nt["ngay_ty_gia"]
     # R3: xếp cấp duyệt
     if cat == "marketing":
@@ -760,8 +848,12 @@ def step(db: Session, u: User, r: PaymentRequest, action: str, reason: str = "",
     elif action == "check":
         if r.status != "cho_kt": raise ValueError("Không ở bước Kế toán kiểm tra")
         if u.role not in VAI_KIEM_CHUNG_TU and not toan_quyen_ke_ca_tach_bach(u, db): raise ValueError("Chỉ Kế toán kiểm tra")
-        if not r.has_document: raise ValueError("Thiếu chứng từ đính kèm (hợp đồng/hóa đơn/báo giá) – không chuyển duyệt")
-        if r.category not in ("hoan_tien", "tam_ung") and not r.supplier_tax_code: raise ValueError("NCC chưa có MST – phải xác nhận trước khi thanh toán")
+        _dx = r.doi_xe if r.category == "chi_doi_xe" else None
+        if not r.has_document and not (_dx is not None and co_tep_doi_xe(db, r)):
+            raise ValueError("Thiếu chứng từ đính kèm (hợp đồng/hóa đơn/báo giá) – không chuyển duyệt")
+        _khong_mst = r.category in ("hoan_tien", "tam_ung") or (_dx is not None and (
+            _dx.get("loai") != "thanh_toan" or _dx.get("nhom") in NHOM_DOI_XE_KHONG_MST))
+        if not _khong_mst and not r.supplier_tax_code: raise ValueError("NCC chưa có MST – phải xác nhận trước khi thanh toán")
         r.status, r.kt_by = "cho_duyet", u.username
         # Câu này là thứ Kế toán đọc rồi đi gõ đúng người, nên nó phải hỏi CHÍNH hàm mà bước duyệt
         # hỏi. Bản trước suy từ `two_signatures`, tức luôn viết "TGĐ" cho mọi khoản trong dự toán —
@@ -977,6 +1069,12 @@ def _post_payment(db: Session, r: PaymentRequest):
         lines = [{"account": "131", "debit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": r.amount, "partner": r.supplier_name}]
     elif r.category == "tam_ung":   # tạm ứng HDV/NCC trước tour: Nợ 141 – Có 111/112; hoàn ứng khi Kế toán xác nhận quyết toán
         lines = [{"account": "141", "debit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": r.amount, "partner": r.supplier_name}]
+    elif r.category == "chi_doi_xe" and r.doi_xe:
+        # Đội xe v3.3: không ghi công nợ lúc duyệt, nên lúc chi ghi THẲNG tài khoản đã khóa trên phiếu —
+        # 627 chi phí tháng phát sinh, 141 tạm ứng, 331 trả chủ xe. Ghi Nợ 331 cho khoản chưa từng ghi Có 331
+        # là để một số dư treo ở 331 mà không ai nợ ai.
+        lines = [{"account": r.doi_xe.get("tk") or "627", "debit": r.amount, "partner": r.supplier_name},
+                 {"account": cash, "credit": r.amount, "partner": r.supplier_name}]
     else:
         lines = [{"account": "331", "debit": r.amount, "partner": r.supplier_name, "tour_id": r.tour_id}, {"account": cash, "credit": r.amount, "partner": r.supplier_name}]
     try:

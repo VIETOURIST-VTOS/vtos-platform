@@ -7,8 +7,9 @@ import { Cap, ConThieu, KhoiXem, OXacNhan, ThanhBuoc, TuyenDuyet, tien, useNhap 
 
 /** KS-64 · CỬA 1 — LẬP ĐỀ XUẤT CHI, bốn bước theo bản v3.3.
  *
- *  Thay cho biểu mẫu MỘT TRANG trước đây (vẫn cùng một cửa máy chủ `POST /fleet/de-xuat-chi`,
- *  không dựng cửa thứ hai — anh Tuấn đã bác việc dựng biểu mẫu thứ hai một lần).
+ *  Đội xe v3.3 · Chủ tịch chốt 10/11/2026: phiếu gửi đi là một ĐỀ NGHỊ CHI 05-TT loại `chi_doi_xe`
+ *  (`POST /fleet/de-nghi-chi`) — cùng hàng đợi Kế toán, cùng mốc duyệt chung, người lập không tự ký.
+ *  Không còn ghi vào sổ đối soát nguồn ngoài; cửa ấy giữ cho bản trích Vietrip.
  *
  *  Bốn bước đặt đúng theo demo: Nội dung cần chi · Số tiền và hồ sơ · Đối chiếu trước khi gửi ·
  *  Luồng xử lý. Chia bước KHÔNG phải để màn hình đẹp hơn: nó để người lập đọc lại toàn bộ phiếu
@@ -20,7 +21,7 @@ import { Cap, ConThieu, KhoiXem, OXacNhan, ThanhBuoc, TuyenDuyet, tien, useNhap 
  *    từ chối, không chỉ ẩn ô: ẩn nút là lời đề nghị, không phải hàng rào.
  *  · TỆP CHỨNG TỪ — chỉ mở được SAU KHI LƯU, vì kho hồ sơ gắn tệp theo mã phiếu mà mã chỉ có
  *    sau khi máy chủ sinh ra. Bước 2 nói trước điều đó thay vì vẽ một ô tải tệp rồi làm mất tệp.
- *  · TUYẾN DUYỆT — chỉ xem. VTOS chưa có luồng duyệt đề nghị chi (B1 của KS-57).
+ *  · TUYẾN DUYỆT — chỉ xem: tuyến là của đề nghị chi 05-TT, máy chủ xếp, màn này không chọn người.
  */
 
 const TEN_BUOC = ["Nội dung cần chi", "Số tiền và hồ sơ", "Đối chiếu trước khi gửi", "Luồng xử lý đề nghị"];
@@ -38,16 +39,16 @@ const CAN_CU = ["Đã gồm thuế / phí theo chứng từ", "Không phát sinh
   "Tạm tính · chờ kế toán kiểm tra"];
 
 const TUYEN: [string, string][] = [
-  ["Giám đốc đội xe", "Lập và gửi đề nghị"],
-  ["Người được phân quyền", "Kiểm tra, duyệt hoặc trả bổ sung"],
-  ["Kế toán được phân quyền", "Kiểm tra bên nhận và thực hiện thanh toán"],
-  ["Bộ phận đối soát", "Liên kết chứng từ và khoản chi gốc"],
+  ["Giám đốc đội xe", "Lập và gửi — gửi là bộ phận đã xác nhận"],
+  ["Kế toán", "Kiểm chứng từ, bên nhận theo danh mục; trả lại phải có lý do"],
+  ["TGĐ / Chủ tịch theo mốc chung", "Ký lệnh chi — người lập không tự ký"],
+  ["Kế toán", "Chi, gắn UNC và đối soát giao dịch ngân hàng"],
 ];
 
 const rong = () => ({
   pham_vi: "xe", bien_so: "", loai: "thanh_toan", nhom: "", noi_dung: "", nguoi_thu_huong: "",
   so_tien: "" as any, ngay: new Date().toISOString().slice(0, 10), can_cu_so_tien: "",
-  ma_khoan_goc: "", chung_tu: "", hen_bo_sung: "", ghi_chu_kiem_tra: "",
+  ma_khoan_goc: "", chung_tu: "", hen_bo_sung: "", ghi_chu_kiem_tra: "", ma_so_thue: "",
   so_tai_khoan: "", ngan_hang: "", ok: false,
 });
 
@@ -58,7 +59,7 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
   const { data: d, setData, xoaNhap, coNhapCu } = useNhap("vtos.doixe.de-xuat-chi.nhap", rong);
   const [buoc, setBuoc] = useState(0);
   const [dang, setDang] = useState(false);
-  const [daLuu, setDaLuu] = useState<{ ma_gd: string } | null>(null);
+  const [daLuu, setDaLuu] = useState<{ ma_gd: string } | null>(null);   // ma_gd = mã đề nghị chi DC…
   const [choTrung, setChoTrung] = useState(false);
   const dat = (k: string, v: any) => setData({ ...d, [k]: v });
 
@@ -67,13 +68,16 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
   const hienNganHang = vai !== "gd_doi_xe";
   const soTien = d.so_tien === "" || d.so_tien === null ? null : Number(d.so_tien);
   const vuotNguong = !!nguongChungTu && soTien !== null && soTien >= nguongChungTu;
-  const nhomKhongPhaiChiPhi = d.nhom.startsWith("Nạp quỹ") || d.nhom.startsWith("Điều chuyển");
+  const nhomKhongPhaiChiPhi = d.nhom.startsWith("Nạp quỹ");
+  // Điều chuyển nội bộ không phải một đề nghị chi (Chủ tịch 10/11/2026) — Kế toán lập bút toán điều chuyển.
+  const nhomDieuChuyen = d.nhom.startsWith("Điều chuyển");
 
   const thieu = (b: number): string[] => {
     const t: string[] = [];
     if (b >= 0) {
       if (d.pham_vi === "xe" && !d.bien_so) t.push("Chọn xe, hoặc đổi phạm vi sang «chi phí toàn đội».");
       if (!d.nhom) t.push("Chọn nhóm khoản chi – không phân loại lúc lập thì cuối tháng phải đọc lại từng phiếu để đoán.");
+      if (nhomDieuChuyen) t.push("Điều chuyển tiền nội bộ không lập ở đây — báo Kế toán lập bút toán điều chuyển giữa VTD và Vietrip.");
       if (!d.noi_dung.trim()) t.push("Ghi nội dung và căn cứ đề nghị.");
       if (!d.nguoi_thu_huong.trim()) t.push("Ghi bên nhận / nhà cung cấp.");
     }
@@ -81,7 +85,7 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
       if (soTien === null || !(soTien > 0)) t.push("Nhập số tiền đề nghị lớn hơn 0.");
       if (!d.ngay) t.push("Chọn ngày cần xử lý.");
       if (!d.can_cu_so_tien) t.push("Chọn căn cứ số tiền – VTOS không tự cộng VAT, nên con số này phải nói rõ nó đã gồm gì.");
-      if (vuotNguong && !d.chung_tu.trim() && !nhomKhongPhaiChiPhi)
+      if (vuotNguong && !d.chung_tu.trim() && !nhomKhongPhaiChiPhi && d.loai === "thanh_toan")
         t.push(`Khoản từ ${nguongChungTu!.toLocaleString("vi-VN")} đ bắt buộc ghi số chứng từ gốc (chặn cứng B6) – máy chủ sẽ từ chối nếu để trống.`);
     }
     if (b >= 2 && !d.ok) t.push("Xác nhận đã đối chiếu số tiền, chứng từ và khoản chi gốc.");
@@ -95,16 +99,16 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
       const json: any = {
         ngay: d.ngay, so_tien: soTien, noi_dung: d.noi_dung.trim(),
         bien_so: d.pham_vi === "xe" ? d.bien_so : "",
-        nhom: d.nhom, khong_phai_chi_phi: nhomKhongPhaiChiPhi,
+        nhom: d.nhom, ma_so_thue: d.ma_so_thue.trim(),
         nguoi_thu_huong: d.nguoi_thu_huong.trim(), chung_tu: d.chung_tu.trim(),
         pham_vi: d.pham_vi, loai: d.loai, can_cu_so_tien: d.can_cu_so_tien,
         ma_khoan_goc: d.ma_khoan_goc.trim(), hen_bo_sung: d.hen_bo_sung.trim(),
         ghi_chu_kiem_tra: d.ghi_chu_kiem_tra.trim(), cho_phep_trung: choTrung,
       };
       if (hienNganHang) { json.so_tai_khoan = d.so_tai_khoan.trim(); json.ngan_hang = d.ngan_hang.trim(); }
-      const r = await api<any>("/fleet/de-xuat-chi", { method: "POST", json });
+      const r = await api<any>("/fleet/de-nghi-chi", { method: "POST", json });
       toast(r.message);
-      setDaLuu({ ma_gd: r.ma_gd });
+      setDaLuu({ ma_gd: r.code });
       xoaNhap();            // đã vào sổ thì nháp không còn nghĩa gì, giữ lại chỉ gây lập hai lần
       onXong();
     } catch (e) {
@@ -121,7 +125,8 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
   /* ───────────── đã lưu: mở ô đính kèm, vì giờ mới có mã phiếu để gắn tệp ───────────── */
   if (daLuu) return <div className="panel">
     <h2>Đã lập đề xuất chi {daLuu.ma_gd}</h2>
-    <p className="muted">Phiếu đã vào sổ đối soát. Đính kèm chứng từ <b>ngay bây giờ</b> nếu đã có —
+    <p className="muted">Phiếu đã vào hàng đợi <b>Kế toán kiểm</b>. Đính kèm chứng từ <b>ngay bây giờ</b> nếu đã có —
+      Kế toán không chuyển duyệt khi phiếu chưa có chứng từ;
       chứng từ nằm cùng phiếu thì đến kỳ đối soát không phải đi tìm, và người kiểm tra nhìn thấy
       đúng thứ họ đang kiểm.</p>
     <DinhKem doiTuong="de_xuat_chi_xe" doiTuongId={daLuu.ma_gd}
@@ -175,6 +180,8 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
       <label style={{ display: "block", marginTop: 8 }}>Bên nhận / nhà cung cấp <span aria-hidden="true">*</span>
         <input value={d.nguoi_thu_huong} onChange={(e) => dat("nguoi_thu_huong", e.target.value)}
           placeholder="Tên đơn vị hoặc người nhận tiền" /></label>
+      <label style={{ display: "block", marginTop: 8 }}>Mã số thuế bên nhận <span className="muted">(garage, cửa hàng — Kế toán cần trước khi chi; tài xế, tạm ứng thì để trống)</span>
+        <input value={d.ma_so_thue} onChange={(e) => dat("ma_so_thue", e.target.value)} inputMode="numeric" /></label>
       {nhomKhongPhaiChiPhi && <p className="muted">Nhóm này được đánh dấu <b>không phải chi phí kỳ này</b> nên
         không cộng vào tổng chi phí đội xe — tiền dầu thật nằm ở phiếu chi phí của từng chuyến.</p>}
     </>}
@@ -226,6 +233,7 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
         <Cap nhan="Nhóm khoản" value={d.nhom} />
         <Cap nhan="Nội dung" value={d.noi_dung.trim()} />
         <Cap nhan="Bên nhận" value={d.nguoi_thu_huong.trim()} />
+        <Cap nhan="Mã số thuế bên nhận" value={d.ma_so_thue.trim()} />
         <Cap nhan="Số tiền đề nghị" value={tien(d.so_tien)} />
         <Cap nhan="Căn cứ số tiền" value={d.can_cu_so_tien} />
         <Cap nhan="Ngày cần xử lý" value={d.ngay} />
@@ -241,9 +249,9 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
           chu="Tôi đã kiểm tra số tiền, chứng từ và khoản chi gốc; đề nghị chuyển đúng người có quyền duyệt." />
       </>}
       {buoc === 3 && <>
-        <TuyenDuyet tuyen={TUYEN} ghi={"Bốn ô trên là TUYẾN DỰ KIẾN, chỉ để xem. VTOS chưa có luồng duyệt đề nghị " +
-          "chi: phiếu này vào sổ đối soát nguồn ngoài, chưa có bước kiểm tra và duyệt riêng, và chưa tách " +
-          "người lập khỏi người duyệt. Người kiểm tra, người phê duyệt và hạn mức là năm cấu hình §11 còn chờ chốt."} />
+        <TuyenDuyet tuyen={TUYEN} ghi={"Phiếu đi đúng đường đề nghị chi 05-TT: Kế toán kiểm, rồi TGĐ hoặc Chủ tịch " +
+          "ký theo mốc duyệt chi chung. Người lập không tự kiểm, tự ký hay tự xác nhận đã chi. Đề nghị chi chưa phải " +
+          "chi phí đã chốt kỳ và chưa phải tiền đã trả."} />
         <label className="bb-ok"><input type="checkbox" checked={choTrung} onChange={(e) => setChoTrung(e.target.checked)} />
           <span>Vẫn gửi dù hệ thống báo trùng phiếu <span className="muted">— chỉ tích khi đã xem phiếu cũ và chắc đây là khoản khác.</span></span></label>
       </>}

@@ -280,7 +280,7 @@ type XeTheoSheet = {
   dang_di?: number; o_bai?: number; khong_khop?: number; so_can_sua?: number;
 };
 
-export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet }: {
+export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet, chuaKhop }: {
   d?: HieuQuaXe | null;
   /** `sections.xe_hom_nay` — xem `XeHomNay`. */
   xe?: XeHomNay | null;
@@ -289,6 +289,10 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet }: {
   /** Khi máy chủ trả số theo từng kỳ thì truyền vào đây: { thang: {...}, quy: {...}, nam: {...} },
    *  kèm `mac_dinh` — kỳ HẸP NHẤT còn có số. */
   theo_ky?: BoKy | null;
+  /** Đội xe v3.3 (10/11/2026): hai nguồn «xe đang đi» lệch nhau (sheet báo X xe, nhật trình VTOS biết Y chuyến
+   *  đang chạy) thì ô hiện «Chưa khớp» kèm cả hai số — không in một con số trông như thật. Màn nào không
+   *  truyền thì ô giữ cách cũ. */
+  chuaKhop?: { sheet: number; nhat_trinh: number } | null;
 }) {
   /* HQ-1c — MỞ SẴN Ở KỲ CÒN CÓ SỐ, không cứng ở "thang".
      Sổ quyết toán xe chỉ chốt sau khi hết tháng, nên tháng đang chạy trống gần như suốt. Đo trên
@@ -416,8 +420,9 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet }: {
   };
   const chu: [string, string | null, string][] = [
     ["Doanh thu", tien(o.doanh_thu), "doanh_thu"],
-    ["Lợi nhuận", tien(o.loi_nhuan), "loi_nhuan"],
-    ["Biên lợi nhuận", pt(o.ty_le_loi_nhuan), "ty_le_loi_nhuan"],
+    // v3.3 (10/11/2026): «tạm tính» — lợi nhuận còn thiếu nhóm chi phí chưa nhập thì không phải lợi nhuận đủ.
+    ["Lợi nhuận tạm tính", tien(o.loi_nhuan), "loi_nhuan"],
+    ["Biên tạm tính", pt(o.ty_le_loi_nhuan), "ty_le_loi_nhuan"],
   ];
   /* HQ-4 (23/10/2026) — «Chi phí / km» GỠ KHỎI MÀN HÌNH CHỦ TỊCH, anh Tuấn chốt.
      Lý do xếp chỗ: tầng vận hành đang có SÁU ô (bốn ô của `vanHanh` + Công suất + Xe đang đi) trong một
@@ -598,6 +603,15 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet }: {
         <div className={"v14-o" + (xeCoNguon && (!chuaLapLenh || (!!sheet && !sheet.loi)) ? "" : " rong")}
              style={O_VH}>
           <div className="v14-o-nhan">Xe đang đi · hôm nay</div>
+          {chuaKhop && (
+            <>
+              <div className="v14-o-so v14-o-chu" style={{ ...SO_NHO, color: "var(--orange)" }}>Chưa khớp</div>
+              <div className="muted" style={PHU}>Sheet: {chuaKhop.sheet} xe · nhật trình: {chuaKhop.nhat_trinh} chuyến</div>
+              <Link className="the-cua" href="/doi-xe/xe-hom-nay" style={XEM}>Xem chi tiết →</Link>
+            </>
+          )}
+          {/* Hai nguồn lệch thì giấu các nhánh dưới — chúng sẽ in con số của một nguồn như thể đã đúng. */}
+          <div style={{ display: chuaKhop ? "none" : "contents" }}>
           {xeCoNguon && chuaLapLenh && sheet && !sheet.loi ? (
             /* XS-1 (25/10/2026): chưa có lệnh điều xe thì đếm theo sheet quyết toán của Đội xe. Nguồn
                và giờ đọc nằm ở màn chi tiết; ô chỉ giữ con số và việc cần làm. */
@@ -635,6 +649,7 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet }: {
               <Link className="the-cua" href="/doi-xe" style={XEM}>Xem chi tiết →</Link>
             </>
           )}
+          </div>
         </div>
       </div>
 

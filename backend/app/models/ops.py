@@ -239,4 +239,9 @@ class PaymentRequest(Base):
     ty_gia: Mapped[float | None] = mapped_column(TY_GIA_KIEU, nullable=True)
     # Ngày của tỷ giá = ngày chuyển tiền thật, không phải ngày lập phiếu.
     ngay_ty_gia: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # ĐỘI XE · v3.3 (Chủ tịch chốt 10/11/2026): đề xuất chi của Giám đốc đội xe đi VÀO đề nghị chi này,
+    # không dựng luồng duyệt thứ hai. Phần riêng của đội xe nằm ở đây, chỉ có ở loại `chi_doi_xe`:
+    # {pham_vi: "xe"|"doi", xe_id, bien_so, loai: thanh_toan|tam_ung|hoan_ung, nhom, tk, can_cu,
+    #  ma_khoan_goc, hen_bo_sung, ghi_chu_kiem_tra}. `tk` là tài khoản đã khóa lúc lập theo nhóm khoản.
+    doi_xe: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
