@@ -668,7 +668,7 @@ function DoiXe() {
 
     {tab === "xe" && chon && <div className="panel"><h2>Hồ sơ xe {chon.code} · {chon.plate}</h2>
       <p className="muted">Số khung {chon.vin || "chưa nhập"} · {chon.seats} chỗ · đồng hồ {chon.odo_km ? `${chon.odo_km.toLocaleString("vi-VN")} km` : "chưa nhập"}{chon.odo_at ? ` (ghi ngày ${fmtD(chon.odo_at)})` : ""}</p>
-      <DonGiaNgay key={chon.id} xe={chon} ghi={["cntt", "hcns", "tp_dh", "nv_dh", "gd_doi_xe"].includes(user?.role || "")} xong={() => mo(chon.id)} />
+      <DonGiaNgay key={"dg-" + chon.id} xe={chon} ghi={["cntt", "hcns", "tp_dh", "nv_dh", "gd_doi_xe"].includes(user?.role || "")} xong={() => mo(chon.id)} />
       <div className="grid">
         <div><h3>Lịch sử biển số</h3>
           <table><tbody>{chon.lich_su_bien.map((p: any, i: number) => <tr key={i}>

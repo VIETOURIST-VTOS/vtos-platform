@@ -137,6 +137,13 @@ const CUA_NHAP: { nhan: string; ten: string; buoc: string; trang: string; mo: st
  *
  *  Vì sao không sửa Shell để có chế độ nhúng: Shell đang được làn R2 giữ chỗ (MKT-1, MKT-2, PH-1). Giấu bằng
  *  một thẻ style chèn vào khung thì không đụng tệp của làn khác. */
+/** VH-6 (Chủ tịch dặn 10/11/2026): «bấm vào chi tiết thì nhảy qua màn hình tổng CRM — không phải thao tác
+ *  trên màn hình riêng». Mọi đường dẫn có tiền tố dưới đây là màn của đội xe: bấm ở /xe hay bấm trong khung
+ *  nhúng đều MỞ TẠI CHỖ trong /xe, không sang trang có thanh dọc CRM, không mở tab mới. Lối ra duy nhất là
+ *  «Trang tổng CRM →». */
+const DUONG_DOI_XE = ["/doi-xe", "/lai-lo-doi-xe", "/lenh-dieu-xe", "/tai-xe", "/hieu-qua-doi-xe", "/su-co-tour", "/nap-du-lieu"];
+const laDoiXe = (href: string) => DUONG_DOI_XE.some((t) => href === t || href.startsWith(t + "/") || href.startsWith(t + "?"));
+
 function KhungNhung({ toi, ten, mo }: { toi: string; ten: string; mo?: string }) {
   const [cao, setCao] = useState(640);
   const src = toi + (mo ? (toi.includes("?") ? "&" : "?") + `mo=${mo}` : "");
@@ -148,8 +155,20 @@ function KhungNhung({ toi, ten, mo }: { toi: string; ten: string; mo?: string })
       if (!doc.getElementById("vtos-nhung")) {
         const st = doc.createElement("style");
         st.id = "vtos-nhung";
-        st.textContent = ".top,aside.side{display:none!important}main{max-width:none!important;padding:0!important;margin:0!important}body{background:transparent!important}";
+        st.textContent = ".top,aside.side{display:none!important}main{max-width:none!important;padding:0!important;margin:0!important}body{background:transparent!important}"
+          // VH-6: vụn đường «VTOS · Đội xe · …» dẫn về trang chủ CRM — trong /xe thì giấu, cùng mũi tên «mở tab mới».
+          + ".thanh-viec .tv-duong,.thanh-viec .tv-mui{display:none!important}";
         doc.head.appendChild(st);
+        // VH-6: liên kết trong khung — màn đội xe mở NGAY TRONG KHUNG (kể cả nút ↗ vốn mở tab mới);
+        // liên kết về trang chủ / phân hệ CRM thì không đi đâu cả.
+        doc.addEventListener("click", (e) => {
+          const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+          if (!a) return;
+          const h = a.getAttribute("href") || "";
+          if (!h.startsWith("/")) return;
+          e.preventDefault();
+          if (laDoiXe(h)) f.contentWindow?.location.assign(h);
+        }, true);
       }
       const dat = () => setCao(Math.max(400, b.scrollHeight + 24));
       dat();
@@ -157,9 +176,8 @@ function KhungNhung({ toi, ten, mo }: { toi: string; ten: string; mo?: string })
       ro.observe(b);
     } catch { /* khác nguồn thì giữ chiều cao mặc định */ }
   };
+  // VH-6: bỏ «Mở toàn trang ↗» — nó đưa người dùng sang màn có thanh dọc CRM.
   return <>
-    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
-      <Link href={toi} className="muted">Mở toàn trang ↗</Link></div>
     <iframe key={src} src={src} title={ten} onLoad={(e) => doCao(e.currentTarget)}
       style={{ width: "100%", height: cao, border: 0, display: "block" }} />
   </>;
@@ -250,6 +268,27 @@ function BanLamViecXe() {
   const [theoTien, setTheoTien] = useState<"qt" | "tat_ca">("qt");
   const trangMo = nhomMo ? (nhomMo.trang.find((t) => t.ma === trang) || nhomMo.trang[0]) : null;
 
+  /** VH-6: mở một đường dẫn đội xe TẠI CHỖ — chọn trang con có `toi` khớp dài nhất, rồi mở chi tiết. */
+  const moTaiCho = (href: string) => {
+    const duong = href.split("?")[0];
+    let tot: { n: string; t: string; dai: number } | null = null;
+    for (const n of NHOM) for (const t of n.trang) {
+      const td = t.toi.split("?")[0];
+      const khop = href === t.toi ? 1000 : (duong === td || duong.startsWith(td + "/")) ? td.length : -1;
+      if (khop > (tot?.dai ?? -1)) tot = { n: n.ma, t: t.ma, dai: khop };
+    }
+    // Không khớp trang con nào (vd. /nap-du-lieu — cửa nạp hồ sơ xe): đặt dưới «Hồ sơ xe».
+    setNhom(tot ? tot.n : "fleet"); setTrang(tot ? tot.t : "ho-so-xe"); setMoSan(""); setChiTiet(href);
+    setKeo(null);
+    try { window.scrollTo({ top: 0 }); } catch { /* không cuộn được thì thôi */ }
+  };
+  const giuTaiCho = (e: React.MouseEvent) => {
+    const a = (e.target as HTMLElement).closest?.("a[href]") as HTMLAnchorElement | null;
+    const h = a?.getAttribute("href") || "";
+    if (!a || !laDoiXe(h) || e.ctrlKey || e.metaKey || e.button === 1) return;
+    e.preventDefault(); e.stopPropagation(); moTaiCho(h);
+  };
+
   // THIẾU QUYỀN: nói rõ, và dừng ở đây. Không vẽ thanh nghiệp vụ, không vẽ hai nút nhập —
   // một cái khung đầy đủ mà rỗng ruột đọc ra như phần mềm hỏng.
   if (khongCoQuyen) return (
@@ -263,7 +302,7 @@ function BanLamViecXe() {
     </div>
   );
 
-  return (<>
+  return (<div onClickCapture={giuTaiCho}>
     {/* ① NĂM MỤC NGHIỆP VỤ — một hàng ngang, KHÔNG có mục "Bàn làm việc" (v3.3).
         Lối về tổng quan là chữ VTOS ở đầu trang; lối ra khỏi đội xe nằm cuối hàng, vì màn
         này ẩn thanh dọc nên nếu đây không có thì người dùng chỉ còn nút Back. */}
@@ -469,7 +508,7 @@ function BanLamViecXe() {
         <button type="button" onClick={() => { setKeo(null); doc(ky); }}>Xong — đọc lại số</button>
       </aside>
     </>}
-  </>);
+  </div>);
 }
 
 /* Màn không thanh dọc trải hết bề ngang — bản vẽ v3.3: biểu đồ chiếm toàn hàng. Thẻ style của riêng màn
