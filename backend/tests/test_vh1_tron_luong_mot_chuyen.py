@@ -266,3 +266,24 @@ def test_10_man_hinh_ba_phan_da_noi():
     g = _web("components", "doixe", "TaiXeGhiChuyen.tsx")
     assert "doanh_thu" not in g and 'capture="environment"' in g
     assert "<SanSangVanHanh" in _web("app", "xe", "page.tsx")
+
+
+def test_11_chi_phi_gui_lit_rong_van_ghi_duoc():
+    """VH-2 · bấm thử giao diện 10/11/2026: cửa bốn bước gửi `lit: null` cho cầu đường / công tác phí / gửi
+    xe — trước bản sửa cả dòng bị 422 và khoản ấy không vào sổ."""
+    r = client.post("/api/v1/fleet/chuyen", headers=h("vh1.gdxe"),
+                    json={"vehicle_id": CTX["xe"], "ten_tour": "Chuyến lẻ VH2", "ngay_di": str(CTX["di"]),
+                          "ngay_ve": str(CTX["di"]), "quyet_toan": False})
+    assert r.status_code == 201, r.text
+    r = client.post(f"/api/v1/fleet/chuyen/{r.json()['id']}/chi-phi", headers=h("vh1.gdxe"),
+                    json={"kind": "cong_tac_phi", "amount": 200_000, "lit": None, "chung_tu": ""})
+    assert r.status_code == 201, r.text
+
+
+def test_12_mo_thang_to_bao_cao_va_the_lenh_tren_dien_thoai():
+    dx = _web("app", "doi-xe", "page.tsx")
+    assert 'get("chuyen")' in dx and "setMoChuyen(ct)" in dx
+    assert "/doi-xe?tab=chuyen&chuyen=${x.id}" in _web("components", "doixe", "TrangGon.tsx")
+    assert "(soTien(d.lit) || 0) : 0" in _web("components", "doixe", "BonBuocBaoCaoXe.tsx")
+    tx = _web("app", "xe-hdv", "page.tsx")
+    assert "<table><thead><tr><th>Tour</th><th>Xe</th>" not in tx and "tôi đã nhận" in tx

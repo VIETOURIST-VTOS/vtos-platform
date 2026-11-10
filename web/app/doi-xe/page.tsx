@@ -34,6 +34,8 @@ function DoiXe() {
   const [bdLs, setBdLs] = useState<any[]>([]);      // lịch sử phiếu bảo dưỡng
   const [formBD, setFormBD] = useState<any>(null);  // form ghi phiếu bảo dưỡng
   const [chuyen, setChuyen] = useState<any[]>([]);
+  /** VH-2: chuyến cần mở sẵn tờ báo cáo (từ `?chuyen=`); mở khi danh sách chuyến đã về. */
+  const [moChuyen, setMoChuyen] = useState<number>(0);
   const [gd, setGd] = useState<any>(null);
   const [chuXe, setChuXe] = useState<any[]>([]);
   const [qt, setQt] = useState<any[]>([]);
@@ -91,6 +93,9 @@ function DoiXe() {
       const mo = new URLSearchParams(window.location.search).get("mo");
       if (mo === "de-xuat-chi") { setTab("giaodich"); setMoSan("de-xuat-chi"); }
       if (mo === "phieu-chi-phi") { setTab("chuyen"); setMoSan("phieu-chi-phi"); }
+      // `?chuyen=` — VH-2: mở thẳng tờ báo cáo xe của một chuyến (màn gọn «Báo cáo từng xe», hàng chờ ký).
+      const ct = Number(new URLSearchParams(window.location.search).get("chuyen"));
+      if (ct > 0) { setTab("chuyen"); setMoChuyen(ct); }
       // `?xe=` — màn gọn «Hồ sơ xe» của /xe (v3.3) mở thẳng hồ sơ một xe.
       const xeId = Number(new URLSearchParams(window.location.search).get("xe"));
       if (xeId > 0) { setTab("xe"); api(`/fleet/xe/${xeId}`).then(setChon).catch(() => {}); }
@@ -128,6 +133,15 @@ function DoiXe() {
       setBh(await api("/fleet/bao-hong"));
     } catch (e) { toast(errMsg(e), true); }
   }, [toast]);
+  useEffect(() => {
+    if (!moChuyen || !chuyen.length) return;
+    const t = chuyen.find((x: any) => x.id === moChuyen);
+    if (t) setForm({ id: t.id, vehicle_id: t.vehicle_id, ten_tour: t.ten_tour,
+      ngay_di: (t.ngay_di || "").slice(0, 10), ngay_ve: (t.ngay_ve || "").slice(0, 10),
+      km_dau: t.km_dau, km_cuoi: t.km_cuoi, km_gps: t.km_gps, km_nguon: t.km_nguon,
+      doanh_thu: t.doanh_thu, note: t.note });
+    setMoChuyen(0);
+  }, [moChuyen, chuyen]);
   useEffect(() => { load(); }, [load]);
 
   /** Ghi một phiếu bảo dưỡng / sửa chữa.
