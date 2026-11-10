@@ -22,6 +22,7 @@ from app.models.fleet import (VehiclePlate, VehicleDocument, FleetVerification, 
                               DOC_KINDS, VEHICLE_DOCS, DRIVER_DOCS, VERIFY, VERIFY_STATUS)
 from app.services import fleet as FL
 from app.services import rules as R
+from app.services import nhan_lenh as _NL
 
 router = APIRouter(prefix="/api/v1/fleet", tags=["fleet"])
 
@@ -487,7 +488,9 @@ class ChiPhiIn(BaseModel):
     amount: float
     ben_chiu: str | None = None
     tra_bang: str | None = None       # ai bo tien ra tai cho - de trong nghia la CHUA KHAI
-    lit: float = 0
+    # VH-2: cửa bốn bước gửi `lit: null` cho mọi khoản không phải dầu — trước đây cả dòng bị từ chối 422 và
+    # cầu đường / công tác phí / gửi xe không vào sổ. Rỗng = không có lít.
+    lit: float | None = 0
     chung_tu: str = ""
     nguon: str = "nhap_tay"
     note: str = ""
@@ -550,7 +553,7 @@ def them_chi_phi(tid: int, data: ChiPhiIn, u: User = Depends(require_roles(*WRIT
     if (data.amount or 0) >= nguong and not (data.chung_tu or "").strip():
         raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc có chứng từ gốc đính kèm (chặn cứng B6)")
     c = TripCost(trip_id=tid, **{**data.model_dump(exclude={"ben_chiu"}), "ben_chiu": bc,
-                                 "tra_bang": data.tra_bang or ""}, created_by=u.username)
+                                 "tra_bang": data.tra_bang or "", "lit": data.lit or 0}, created_by=u.username)
     db.add(c); db.flush()
     kt = FL.kiem_chuyen(db, t); t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
     R.audit(db, u.username, u.role, "chi_phi_chuyen", f"trip:{tid}", after={**data.model_dump(mode="json"), "ben_chiu": bc})
@@ -1846,7 +1849,10 @@ def ds_lenh(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_d
                     # DL-5 · 15/10/2026: màn hình gửi lại con số này khi đổi xe. Thiếu nó thì màn
                     # hình gửi `undefined`, `kiem_phien_ban` cho qua theo đúng luật "chưa gửi thì
                     # không chặn", và khoá chống ghi đè tắt lặng lẽ – đúng kiểu báo an toàn giả.
-                    "phien_ban": d.phien_ban})
+                    "phien_ban": d.phien_ban,
+                    # VH-3: màn gọn «Lập lệnh» cho thấy tài xế đã bấm nhận chưa và hạn nhận.
+                    "trang_thai_nhan": _NL.trang_thai_nhan(d), "nhan_luc": d.nhan_luc,
+                    "han_nhan": _NL.han_nhan(d)})
     return out
 
 
@@ -2407,6 +2413,76 @@ def _chuyen(db: Session, tid: int):
     if t is None:
         raise HTTPException(404, "Không có chuyến này")
     return t
+
+
+@router.get("/quyet-toan-chuyen/cho-toi-ky")
+def qt_cho_toi_ky(u: User = Depends(require_roles(*QT_XEM)), db: Session = Depends(get_db)):
+    """VH-3 · 10/11/2026 — những tờ báo cáo xe đang chờ ĐÚNG người đăng nhập ký.
+
+    Bấm thử VH-2 cho thấy Chủ tịch và Kế toán phải lục nhật trình mới tìm ra tờ của mình. Ô «Chờ tôi
+    ký» chỉ lấy tờ mà bước đang chờ (`CHO_BUOC`) có vai của người này trong `VAI_KY` — cùng hai bảng
+    mà cửa ký đọc, nên ô này không bao giờ mời ai ký một tờ mà cửa ký sẽ từ chối.
+    """
+    from app.models.fleet import Trip, QT_TRANG_THAI
+    from app.models.core import Tour
+    from app.services.quyet_toan_chuyen import CHO_BUOC
+    trang_thai = [k for k, buoc in CHO_BUOC.items() if u.role in _VAI_KY.get(buoc, ())]
+    if not trang_thai:
+        return {"rows": [], "tong": 0, "vai": u.role}
+    veh = {v.id: v for v in db.execute(select(Vehicle)).scalars()}
+    out = []
+    for t in db.execute(select(Trip).where(Trip.qt_trang_thai.in_(trang_thai), Trip.status != "huy")
+                        .order_by(Trip.ngay_di, Trip.id)).scalars():
+        v = veh.get(t.vehicle_id)
+        tour = db.get(Tour, t.tour_id) if t.tour_id else None
+        out.append({"id": t.id, "xe": v.plate if v else "", "tour": tour.code if tour else "",
+                    "ten_tour": t.ten_tour, "ngay_di": t.ngay_di, "ngay_ve": t.ngay_ve,
+                    "doanh_thu": t.doanh_thu or 0, "qt_trang_thai": t.qt_trang_thai,
+                    "buoc_ten": QT_TRANG_THAI.get(t.qt_trang_thai, t.qt_trang_thai)})
+    return {"rows": out, "tong": len(out), "vai": u.role}
+
+
+@router.get("/xe-hom-nay-gon")
+def xe_hom_nay_gon(ngay: str = "", u: User = Depends(require_roles(*READ)),
+                   db: Session = Depends(get_db)):
+    """VH-3 · 10/11/2026 — Xe hôm nay tính từ dữ liệu VTOS, không từ sheet.
+
+    Ba nhóm, mỗi xe đang chạy đúng một nhóm: BỊ CHẶN (báo hỏng mức phải dừng xe chưa đóng) xếp trước
+    ĐANG ĐI (lệnh VTOS phủ ngày này), còn lại là Ở BÃI. Xe chạy ngoài lệnh không có trong VTOS nên
+    nằm ở «ở bãi» — màn hình nói rõ câu này, không để người đọc tưởng xe ấy rảnh thật.
+    """
+    from datetime import date as _d
+    from app.models.fleet import Fault
+    from app.models.core import Tour
+    from app.models.hr import DispatchOrder
+    hom_nay = _d.fromisoformat(ngay) if ngay else _d.today()
+    xe = [v for v in db.execute(select(Vehicle).order_by(Vehicle.plate)).scalars()
+          if getattr(v, "active", True)]
+    chan = {}
+    for f in db.execute(select(Fault).where(Fault.trang_thai.in_(FL.HONG_CON_MO),
+                                            Fault.muc_do == "phai_dung_xe")
+                        .order_by(Fault.id.desc())).scalars():
+        chan.setdefault(f.vehicle_id, f.hien_tuong)
+    lenh = {}
+    for d in db.execute(select(DispatchOrder).where(DispatchOrder.date_from <= hom_nay,
+                                                    DispatchOrder.date_to >= hom_nay,
+                                                    DispatchOrder.status != "huy")).scalars():
+        lenh.setdefault(d.vehicle_id, d)
+    emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
+    dang_di, bi_chan, o_bai = [], [], []
+    for v in xe:
+        if v.id in chan:
+            bi_chan.append({"id": v.id, "xe": v.plate, "ly_do": chan[v.id]})
+        elif v.id in lenh:
+            d = lenh[v.id]
+            t = db.get(Tour, d.tour_id) if d.tour_id else None
+            dang_di.append({"id": v.id, "xe": v.plate, "tour": t.code if t else "",
+                            "ten_tour": t.name if t else "", "ve": d.date_to,
+                            "tai_xe": emps.get(d.driver_id, ""), "lenh_id": d.id})
+        else:
+            o_bai.append({"id": v.id, "xe": v.plate})
+    return {"ngay": hom_nay, "dang_di": dang_di, "bi_chan": bi_chan, "o_bai": o_bai,
+            "ghi_chu": "«Đang đi» chỉ tính xe có lệnh VTOS; xe chạy ngoài lệnh vẫn hiện là ở bãi."}
 
 
 @router.get("/quyet-toan-chuyen/{tid}")

@@ -121,6 +121,12 @@ const MAN_GON: Record<string, (p: GonProps) => React.ReactNode> = {
   "bao-duong": (p) => <G.BaoDuongGon mo={p.mo} />,
   "bao-hong": (p) => <G.BaoHongGon mo={p.mo} />,
   "dau": (p) => <G.DauGon mo={p.mo} />,
+  // VH-3 (Chủ tịch duyệt 10/11/2026): năm trang điều xe còn mở màn cũ toàn trang.
+  "de-nghi": (p) => <G.DeNghiXeGon mo={p.mo} />,
+  "lap-lenh": (p) => <G.LapLenhGon mo={p.mo} />,
+  "xe-hom-nay": (p) => <G.XeHomNayGon mo={p.mo} />,
+  "tai-xe": (p) => <G.TaiXeGon mo={p.mo} />,
+  "chu-xe": (p) => <G.ChuXeGon mo={p.mo} />,
 };
 
 /** HAI CỬA NHẬP CHÍNH — Chủ tịch duyệt 10/11/2026: mở TẠI CHỖ, đúng trang con của nó, không rời /xe.
