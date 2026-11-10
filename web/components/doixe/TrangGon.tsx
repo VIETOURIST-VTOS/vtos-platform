@@ -106,7 +106,7 @@ export function BaoCaoXeGon({ mo, onNhap }: { mo: Mo; onNhap: () => void }) {
           x.qt_trang_thai === "tra_lai" && x.qt_tra_lai_ly_do ? `trả lại: ${x.qt_tra_lai_ly_do}` : ""].filter(Boolean).join(" · ")}
       tag={x.qt_ten_trang_thai || (x.quyet_toan ? "Đã quyết toán" : "Chưa quyết toán")}
       cls={x.qt_trang_thai === "tra_lai" ? "red" : x.qt_trang_thai === "da_duyet" || x.quyet_toan ? "ok" : "warn"}
-      nut="Mở" onNut={() => mo("/doi-xe?tab=chuyen")} />)}
+      nut="Mở" onNut={() => mo(`/doi-xe?tab=chuyen&chuyen=${x.id}`)} />)}
     {!ds.length && <p className="muted">Không có phiếu ở nhóm này.</p>}
   </>;
 }

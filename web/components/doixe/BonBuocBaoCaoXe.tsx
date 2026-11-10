@@ -173,7 +173,7 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
         if (daTX[k]) continue;            // tài xế đã ghi khoản này kèm ảnh hoá đơn — không ghi lần hai
         try {
           await api(`/fleet/chuyen/${r.id}/chi-phi`, { method: "POST", json: {
-            kind: k, amount: v, lit: k === "dau" ? soTien(d.lit) : null, chung_tu: d.chung_tu.trim() } });
+            kind: k, amount: v, lit: k === "dau" ? (soTien(d.lit) || 0) : 0, chung_tu: d.chung_tu.trim() } });
         } catch (e) { loi.push(`${k}: ${errMsg(e)}`); }
       }
       // Phiếu đã vào sổ mà một dòng chi phí bị từ chối thì PHẢI NÓI RA, không được báo "đã lưu"

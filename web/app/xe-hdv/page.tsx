@@ -118,7 +118,6 @@ function XeHdv() {
     <DonNghiPhep guiDuoc={laHienTruong} /></>;
   if (err) return <><h1>Xe &amp; lệnh của tôi</h1><p className="muted">{err}</p></>;
   if (!d) return <p className="muted">Đang tải…</p>;
-  const st = (s: string) => s === "hoan_thanh" ? <Tag cls="ok">Hoàn thành</Tag> : s === "da_xac_nhan" ? <Tag cls="navy">Đã nhận</Tag> : s === "huy" ? <Tag cls="red">Hủy</Tag> : s === "tu_choi" ? <Tag>Đã từ chối</Tag> : s === "het_han" ? <Tag>Lời chào hết hạn</Tag> : <Tag cls="warn">Đang chờ trả lời</Tag>;
 
   return (<>
     <h1>Xe &amp; lệnh của tôi</h1>
@@ -131,31 +130,34 @@ function XeHdv() {
         <tbody>{d.xe.map((v: any) => <tr key={v.id}><td><b>{v.plate}</b></td><td className="num">{v.seats || "—"}</td><td>{v.kind}</td><td>{v.company || <Tag cls="warn">chưa gán</Tag>}</td>
           <td>{v.active ? <Tag cls="ok">Đang khai thác</Tag> : <Tag cls="red">Ngưng khai thác</Tag>}</td></tr>)}</tbody></table></div>}
 
-    {d.lenh_dieu_xe.length > 0 && <div className="panel wrap"><h2>Lệnh điều xe của tôi</h2>
+    {d.lenh_dieu_xe.length > 0 && <div className="panel"><h2>Lệnh điều xe của tôi</h2>
       <p className="muted">Lệnh nào còn chờ thì anh bấm <b>Tôi nhận lệnh này</b>. Không nhận được thì bấm nút bên cạnh và ghi lý do — <b>lệnh vẫn còn hiệu lực</b> cho tới khi Giám đốc đội xe quyết, anh đừng tự bỏ chuyến.</p>
-      <table><thead><tr><th>Tour</th><th>Xe</th><th>Thời gian</th><th className="num">Số ngày</th><th>Trạng thái</th><th>Tôi nhận</th><th>Sự cố</th></tr></thead>
-        <tbody>{d.lenh_dieu_xe.map((x: any) => <tr key={x.id}><td><b>{x.tour_code}</b><div className="muted">{x.tour_name}</div></td><td className="mono">{x.vehicle}</td>
-          <td>{fmtD(x.date_from)} → {fmtD(x.date_to)}</td><td className="num">{x.days}</td><td>{st(x.status)}</td>
-          <td>
-            {/* Cột này KHÔNG phải cột "Trạng thái" bên cạnh. Bên cạnh là GIÁM ĐỐC ĐỘI XE đã chốt
-                lệnh chưa; cột này là TÔI đã nhận chưa. Hai câu hỏi khác nhau, hai cột. */}
-            {x.trang_thai_nhan === "da_nhan"
-              ? <><Tag cls="ok">đã nhận</Tag> <div className="muted">{fmtDT(x.nhan_luc)}</div></>
-              : x.trang_thai_nhan === "tu_choi"
-              ? <><Tag cls="red">tôi báo không nhận được</Tag> <div className="muted">{x.tu_choi_nhan_ly_do}</div></>
-              : x.con_cho_nhan
-              ? <>
-                  {x.trang_thai_nhan === "qua_han"
-                    ? <div className="muted"><Tag cls="warn">quá hạn</Tag> hạn là {fmtDT(x.han_nhan)}</div>
-                    : <div className="muted">hạn {fmtDT(x.han_nhan)}</div>}
-                  <button className="act teal" style={{ margin: "6px 6px 0 0" }}
-                    onClick={() => nhanLenh(x.id)}>Tôi nhận lệnh này</button>
-                  <button className="act grey" style={{ margin: "6px 0 0 0" }}
-                    onClick={() => { setTuChoi(x); setLyDoTuChoi(""); }}>Tôi không nhận được</button>
-                </>
-              : <span className="muted">—</span>}
-          </td>
-          <td className="muted">{x.incident_note}</td></tr>)}</tbody></table></div>}
+      {/* VH-2: thẻ dọc thay bảng bảy cột — tài xế đọc trên điện thoại, bảng rộng phải kéo ngang. */}
+      {d.lenh_dieu_xe.map((x: any) => <div key={x.id} style={{ borderTop: "1px solid var(--line, #e6eaf0)", padding: "10px 0" }}>
+        <div><b>{x.tour_code}</b> · <span className="mono">{x.vehicle}</span>{" "}
+          {x.status === "huy" ? <Tag cls="red">Lệnh đã huỷ</Tag> : x.status === "hoan_thanh" ? <Tag cls="ok">Hoàn thành</Tag> : null}</div>
+        <div className="muted">{x.tour_name}</div>
+        <div>{fmtD(x.date_from)} → {fmtD(x.date_to)} · {x.days} ngày</div>
+        <div style={{ marginTop: 4 }}>
+          {/* Đây là TÔI đã nhận chưa — khác với Giám đốc đội xe đã chốt lệnh chưa. */}
+          {x.trang_thai_nhan === "da_nhan"
+            ? <><Tag cls="ok">tôi đã nhận</Tag> <span className="muted">{fmtDT(x.nhan_luc)}</span></>
+            : x.trang_thai_nhan === "tu_choi"
+            ? <><Tag cls="red">tôi báo không nhận được</Tag> <div className="muted">{x.tu_choi_nhan_ly_do}</div></>
+            : x.con_cho_nhan
+            ? <>
+                {x.trang_thai_nhan === "qua_han"
+                  ? <div className="muted"><Tag cls="warn">quá hạn</Tag> hạn là {fmtDT(x.han_nhan)}</div>
+                  : <div className="muted">hạn nhận {fmtDT(x.han_nhan)}</div>}
+                <button className="act teal" style={{ margin: "6px 6px 0 0" }}
+                  onClick={() => nhanLenh(x.id)}>Tôi nhận lệnh này</button>
+                <button className="act grey" style={{ margin: "6px 0 0 0" }}
+                  onClick={() => { setTuChoi(x); setLyDoTuChoi(""); }}>Tôi không nhận được</button>
+              </>
+            : null}
+        </div>
+        {x.incident_note && <div className="muted">Sự cố: {x.incident_note}</div>}
+      </div>)}</div>}
 
     {/* GHI CHUYẾN TRÊN ĐIỆN THOẠI (Chủ tịch duyệt 10/11/2026): một thẻ cho mỗi lệnh đã nhận còn đang chạy
         hoặc vừa về trong 7 ngày. */}

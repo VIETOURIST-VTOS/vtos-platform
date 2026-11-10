@@ -487,7 +487,9 @@ class ChiPhiIn(BaseModel):
     amount: float
     ben_chiu: str | None = None
     tra_bang: str | None = None       # ai bo tien ra tai cho - de trong nghia la CHUA KHAI
-    lit: float = 0
+    # VH-2: cửa bốn bước gửi `lit: null` cho mọi khoản không phải dầu — trước đây cả dòng bị từ chối 422 và
+    # cầu đường / công tác phí / gửi xe không vào sổ. Rỗng = không có lít.
+    lit: float | None = 0
     chung_tu: str = ""
     nguon: str = "nhap_tay"
     note: str = ""
@@ -550,7 +552,7 @@ def them_chi_phi(tid: int, data: ChiPhiIn, u: User = Depends(require_roles(*WRIT
     if (data.amount or 0) >= nguong and not (data.chung_tu or "").strip():
         raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc có chứng từ gốc đính kèm (chặn cứng B6)")
     c = TripCost(trip_id=tid, **{**data.model_dump(exclude={"ben_chiu"}), "ben_chiu": bc,
-                                 "tra_bang": data.tra_bang or ""}, created_by=u.username)
+                                 "tra_bang": data.tra_bang or "", "lit": data.lit or 0}, created_by=u.username)
     db.add(c); db.flush()
     kt = FL.kiem_chuyen(db, t); t.co, t.co_ly_do = kt["co"], " · ".join(kt["ly_do"])
     R.audit(db, u.username, u.role, "chi_phi_chuyen", f"trip:{tid}", after={**data.model_dump(mode="json"), "ben_chiu": bc})
