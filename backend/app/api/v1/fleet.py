@@ -2949,3 +2949,42 @@ def lich_xe_gui_tuan(db: Session = Depends(get_db)):
     R.audit(db, "robot", "robot", "gui_lich_xe_trong_tuan", ref, after={"nguoi_nhan": list(LX.NGUOI_NHAN_TUAN)})
     db.commit()
     return {"da_gui": True, "ref": ref, "nguoi_nhan": list(LX.NGUOI_NHAN_TUAN)}
+
+
+# ====================== VH-13 · XUẤT EXCEL BA BẢNG ĐỘI XE ======================
+# Chủ tịch duyệt bản xem trước 11/11/2026. Mỗi cửa đọc ĐÚNG hàm mà màn hình đọc, cùng nhóm vai được xem
+# màn ấy — tệp không mở rộng quyền xem, và không ra con số khác màn hình.
+from fastapi import Response as _Resp                               # noqa: E402
+from app.services import xuat_excel_doi_xe as XL                    # noqa: E402
+
+_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _tep(b: bytes, ten: str):
+    return _Resp(content=b, media_type=_XLSX, headers={"Content-Disposition": f'attachment; filename="{ten}"'})
+
+
+def _ky_hop_le(ky: str):
+    try:
+        return QT.ky_range(ky)
+    except Exception:
+        raise HTTPException(422, "Kỳ phải có dạng YYYY-MM")
+
+
+@router.get("/hieu-qua.xlsx")
+def hieu_qua_xlsx(ky: str, u: User = Depends(require_roles(*XEM_HIEU_QUA)), db: Session = Depends(get_db)):
+    _ky_hop_le(ky)
+    return _tep(XL.xep_hang(AI.hieu_qua_ky(db, ky), ky), XL.ten_tep("XEP_HANG_XE_TAI_XE", ky))
+
+
+@router.get("/lai-lo.xlsx")
+def lai_lo_xlsx(ky: str, u: User = Depends(require_roles(*XEM_LAI_LO)), db: Session = Depends(get_db)):
+    _ky_hop_le(ky)
+    return _tep(XL.lai_lo(LL.bao_cao(db, ky, "khong"), LL.theo_chuyen(db, ky), ky), XL.ten_tep("LAI_LO_DOI_XE", ky))
+
+
+@router.get("/chuyen.xlsx")
+def chuyen_xlsx(ky: str, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    d1, d2 = _ky_hop_le(ky)
+    ds = danh_sach_chuyen(vehicle_id=None, tu=d1, den=d2, u=u, db=db)
+    return _tep(XL.bao_cao_xe(ds, ky), XL.ten_tep("BAO_CAO_TUNG_XE", ky))
