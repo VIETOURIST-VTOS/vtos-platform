@@ -282,16 +282,15 @@ function BanLamViecXe() {
     chu.addEventListener("click", ve, true);
     return () => { chu.removeEventListener("click", ve, true); chu.removeAttribute("title"); };
   }, []);
-  /* VH-12 (Chủ tịch duyệt 11/11/2026): logo nổi bật trên ô nền trắng bo tròn — cần bản chữ navy cho nền sáng
-     (`khoachu-holdings-ngang.svg`). Đổi ảnh khi /xe mở, trả lại khi rời màn; Shell.tsx không sửa. */
+  /* VH-14 (Chủ tịch dặn 11/11/2026): trên thanh đầu, chức danh «Giám đốc điều hành đội xe» quá dài — in tắt
+     «GĐĐH xe». Chỉ đổi CHỮ HIỆN trên /xe (lớp gắn lên <html>, CSS bên dưới); tên vai trong máy chủ, chứng từ và
+     các màn khác giữ nguyên. Shell.tsx (làn R2) không sửa. */
   useEffect(() => {
-    const img = document.querySelector("a.brand img.brand-logo") as HTMLImageElement | null;
-    if (!img) return;
-    const cu = img.getAttribute("src") || "";
-    img.setAttribute("src", "/thuong-hieu/v2/khoachu-holdings-ngang.svg");
-    img.classList.add("xe-logo-o");
-    return () => { img.setAttribute("src", cu); img.classList.remove("xe-logo-o"); };
-  }, []);
+    if (user?.role !== "gd_doi_xe") return;
+    document.documentElement.classList.add("xe-chuc-tat");
+    return () => document.documentElement.classList.remove("xe-chuc-tat");
+  }, [user?.role]);
+  /* VH-12 đã về thanh đầu dùng chung (LOGO-1 của làn R2, PR #788) — lớp ghi đè tạm ở /xe gỡ ở VH-14. */
   const hd = d?.hang_doi, sk = d?.so_ky, xe = d?.xe_hom_nay;
   /** «Mỗi nút một chỗ» (Chủ tịch dặn 10/11/2026): việc nào «Việc cần xử lý» đã nói thì bảng sẵn sàng
    *  không nói lại. Khoá là mã việc của hàng đợi → mã dòng / mã nhóm của bảng sẵn sàng. */
@@ -675,18 +674,13 @@ main .panel{background:#fff;border:0!important;border-radius:16px!important;box-
 .xe-cua small{display:block;font-size:11.5px;letter-spacing:1.2px;text-transform:uppercase}
 .xe-cua strong{display:block;font-size:23px;font-weight:800;letter-spacing:.2px;color:var(--xe-nhan)}
 /* VH-8: «HỆ THỐNG ĐIỀU HÀNH» trên thanh đầu là lối về trang tổng CRM (thay nút «Trang tổng CRM →»). */
-/* VH-12 · logo trên ô trắng bo tròn: viền ba màu logo chạy chậm (lớp border-box), vệt sáng lướt (lớp
-   padding-box, nằm dưới nét logo), quầng sáng xanh quanh ô. */
-a.brand img.xe-logo-o{box-sizing:content-box;height:46px;width:auto;padding:7px 18px;border:2px solid transparent;border-radius:16px;
-  background:linear-gradient(110deg,#fff 40%,#eef5ff 50%,#fff 60%) padding-box,
-    linear-gradient(120deg,#5A9BD4,#FF6F96,#5FAE66,#5A9BD4) border-box;
-  background-size:250% 100%,300% 100%;box-shadow:0 0 0 4px #8cc4ff40,0 6px 20px #0a234866;
-  animation:xe-logo-vien 6s linear infinite;transition:transform .2s,box-shadow .2s}
-a.brand:hover img.xe-logo-o{transform:translateY(-1px);box-shadow:0 0 0 6px #8cc4ff70,0 10px 26px #0a234888}
-@keyframes xe-logo-vien{from{background-position:120% 0,0 0}to{background-position:-120% 0,300% 0}}
-@media (prefers-reduced-motion:reduce){a.brand img.xe-logo-o{animation:none}}
-@media (max-width:640px){a.brand img.xe-logo-o{height:32px;padding:5px 12px;border-radius:12px}}
-a.brand:has(img.xe-logo-o) small{font-size:12px;font-weight:700;letter-spacing:.18em;opacity:1;text-shadow:0 0 12px #8cc4ff99}
+/* VH-14 · hộp xổ xuống của tên người dùng: Shell tô chữ trắng cho mọi liên kết trên thanh navy, nên hộp nền
+   trắng thành chữ trắng trên nền trắng (lớp .menu-toi của globals.css chỉ bắt «.top .right», hộp nay nằm trong
+   «.top .bar»). Trên /xe ép chữ tối. Chức danh in tắt cho GĐ đội xe. */
+.top .menu-toi a{color:#1d2b3d!important;display:block;font-weight:600;padding:8px 10px;border-radius:6px;text-decoration:none}
+.top .menu-toi a:hover,.top .menu-toi a:focus-visible{background:#edf3fc;color:#183c69!important}
+html.xe-chuc-tat .top .who-ten b{font-size:0}
+html.xe-chuc-tat .top .who-ten b::after{content:"GĐĐH xe";font-size:calc(13/14*1rem)}
 a.brand small{cursor:pointer;border-radius:6px;padding:2px 6px;transition:background .15s}
 a.brand small:hover{background:#ffffff26;text-decoration:underline}
 .xe-cua:hover{transform:translateY(-2px);box-shadow:var(--xe-b2)!important}
