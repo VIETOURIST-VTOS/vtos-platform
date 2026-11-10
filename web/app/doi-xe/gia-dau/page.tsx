@@ -4,6 +4,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, getUser, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import ThanhViec, { useDaDoi } from "@/components/ThanhViec";
+import MauDoiXe from "@/components/doixe/MauDoiXe";
 
 /** GIÁ DẦU THEO NGÀY + ĐỊNH MỨC TIÊU HAO — cửa còn thiếu, Chủ tịch chốt 16/10/2026.
  *
@@ -108,4 +109,4 @@ function GiaDau() {
   </>);
 }
 
-export default function Page() { return <Shell><GiaDau /></Shell>; }
+export default function Page() { return <Shell><MauDoiXe><GiaDau /></MauDoiXe></Shell>; }

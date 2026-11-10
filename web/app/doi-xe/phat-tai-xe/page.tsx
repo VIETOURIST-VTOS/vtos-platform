@@ -4,6 +4,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, getUser, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import ThanhViec, { docUrl, ghiUrl, useDaDoi } from "@/components/ThanhViec";
+import MauDoiXe from "@/components/doixe/MauDoiXe";
 
 /** SỔ PHẠT TÀI XẾ — cửa còn thiếu, Chủ tịch chốt 16/10/2026 làm trước bốn chỗ hở của đội xe.
  *
@@ -135,4 +136,4 @@ function SoPhat() {
   </>);
 }
 
-export default function Page() { return <Shell><SoPhat /></Shell>; }
+export default function Page() { return <Shell><MauDoiXe><SoPhat /></MauDoiXe></Shell>; }
