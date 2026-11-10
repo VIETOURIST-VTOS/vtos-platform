@@ -8,7 +8,23 @@
    Vẫn KHÔNG có khối @media (prefers-color-scheme): màu không được đổi theo cài đặt của máy, vì như
    thế hai người mở cùng một trang thấy hai màu khác nhau. Bảng màu tối nằm trong tokens.css v1.1,
    lấy từ bản vẽ V1.4 và đã đo tương phản từng cặp chữ–nền. */
-:root{--top-h:calc(64/14*1rem);
+/* LOGO-1 · 11/11/2026 — `--top-h` nay là SỐ LỚN HƠN trong hai số. Đây là phép tính, không
+   phải chuyện thẩm mỹ, và nó là điều làn Phân quyền không nói vì ở `/xe` không lộ ra:
+
+     · Ô trắng của logo cao 46 + đệm 7×2 + viền 2×2 = 64px cứng, cộng đệm 6×2 của `.top`
+       cộng viền đáy 1px
+       là 77px. `.top` khai `min-height` và `box-sizing:border-box` nên nó CAO LÊN THẬT.
+     · Đo trên bản thật 11/11/2026: thanh đầu đang cao 73,1px (vì `calc(64/14*1rem)` với
+       `1rem = 16px` ra 73,1 chứ không ra 64 — số 64 là số của bản vẽ, không phải px).
+     · `nav.tabs` và `aside.side` đều dính ở `top: var(--top-h)`. Để nguyên thì hai thanh ấy
+       nằm cao hơn đáy thanh đầu gần 3px, tức bị thanh đầu đè lên một vệt.
+
+   `max(...)` giữ ĐƯỢC CẢ HAI: ai phóng to cỡ chữ thì thanh vẫn nở theo chữ như trước; còn
+   ở cỡ chữ thường thì nó không bao giờ thấp hơn 77px mà ô logo cần. Viết 77px cứng thì mất
+   vế đầu; để nguyên `calc` thì mất vế sau.
+   Điện thoại trả về nguyên bản cũ ở cuối khối LOGO-1 bên dưới: ở đó logo 32px nên ô chỉ cao
+   46px, nằm gọn trong lòng thanh, không cần nới gì cả. */
+:root{--top-h:max(calc(64/14*1rem),77px);
   /* --navy là màu CHỮ, --navy2 là màu NỀN của nút. Bản sáng dùng chung một navy cho cả hai;
      bản tối thì không thể, xem ghi chú "MỘT BIẾN, MỘT VAI" trong tokens.css.
      --orange nay là VÀNG chú ý của bản vẽ, không còn dùng lại màu xanh của --vtos-info: một thẻ
@@ -45,10 +61,37 @@ a{color:var(--navy);font-weight:600}
    Màn hẹp (≤ 640px) giấu dòng chữ phụ để logo không đẩy các nút ra khỏi thanh. */
 .top .brand{display:inline-flex;flex-direction:row;align-items:center;gap:12px;line-height:1;flex:0 0 auto;
   padding:0 4px 0 0}
-.top .brand .brand-logo{height:40px;width:auto;display:block}
-.top .brand small{font-weight:500;font-size:calc(10/14*1rem);letter-spacing:.14em;opacity:.78;white-space:nowrap;
+/* ══ LOGO-1 · 11/11/2026 ══ Ô NỀN TRẮNG cho logo, Chủ tịch duyệt; làn Phân quyền gửi khuôn.
+   KHÔNG tự nghĩ ra thông số nào: mọi con số dưới đây lấy nguyên từ màn `/xe`, nơi bản này đã
+   chạy thật từ 08–11/11 bằng một lớp ghi đè tạm (PR #786). Đợt này đưa nó về đúng chỗ — thanh
+   đầu dùng chung — và làn Phân quyền sẽ gỡ lớp ghi đè ấy.
+   HAI LỚP NỀN chồng nhau: `padding-box` là ô trắng có một vệt sáng lướt qua; `border-box` là
+   viền 2px ba màu của bộ nhận diện (#5A9BD4 · #FF6F96 · #5FAE66) chạy vòng chậm 6 giây. Viền
+   vẽ bằng nền chứ không bằng `border-color` vì `border-color` không nhận gradient.
+   CAO 46px thay cho 40px: logo nay là bản CHỮ NAVY nằm trong một ô trắng, không còn nằm thẳng
+   trên nền navy, nên phải lớn hơn một bậc mới giữ được sức nặng cũ trên thanh.
+   AI CHỌN GIẢM CHUYỂN ĐỘNG thì viền đứng yên — vẫn đủ ba màu, chỉ không chạy. */
+.top .brand .brand-logo{box-sizing:content-box;height:46px;width:auto;display:block;
+  padding:7px 18px;border:2px solid transparent;border-radius:16px;
+  background:linear-gradient(110deg,#fff 40%,#eef5ff 50%,#fff 60%) padding-box,
+             linear-gradient(120deg,#5A9BD4,#FF6F96,#5FAE66,#5A9BD4) border-box;
+  background-size:250% 100%,300% 100%;
+  box-shadow:0 0 0 4px #8cc4ff40,0 6px 20px #0a234866;
+  animation:vtos-logo-vien 6s linear infinite;transition:transform .2s,box-shadow .2s}
+.top .brand:hover .brand-logo{transform:translateY(-1px);
+  box-shadow:0 0 0 6px #8cc4ff70,0 10px 26px #0a234888}
+@keyframes vtos-logo-vien{from{background-position:120% 0,0 0}to{background-position:-120% 0,300% 0}}
+@media (prefers-reduced-motion:reduce){.top .brand .brand-logo{animation:none}}
+/* LOGO-1: chữ «HỆ THỐNG ĐIỀU HÀNH» đậm và sáng hơn để đứng ngang hàng với ô trắng bên cạnh —
+   ô trắng kéo hết mắt người đọc, chữ mờ 78% bên cạnh nó đọc như một dòng bị bỏ quên. */
+.top .brand small{font-weight:700;font-size:12px;letter-spacing:.18em;opacity:1;white-space:nowrap;
+  text-shadow:0 0 12px #8cc4ff99;
   border-left:1px solid rgba(255,255,255,.35);padding-left:12px;font-family:var(--vtos-font-text)}
-@media (max-width:640px){.top .brand small{display:none}.top .brand .brand-logo{height:32px}}
+/* LOGO-1 · điện thoại: ô trắng nhỏ lại theo logo, và `--top-h` TRẢ VỀ 64px — ở cỡ này
+   32 + đệm 5×2 + viền 2×2 = 46, cộng đệm 6×2 là 58px, để 76 thì thừa một khoảng trống. */
+@media (max-width:640px){:root{--top-h:calc(64/14*1rem)}
+  .top .brand small{display:none}
+  .top .brand .brand-logo{height:32px;padding:5px 12px;border-radius:12px}}
 .top .right{margin-left:auto;font-size:calc(13/14*1rem)}.top .right b{color:#fff}.top .right a{color:#fff;margin-left:10px}
 nav.tabs{display:flex;gap:2px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:var(--top-h);z-index:4}
 nav.tabs a{border-bottom:3px solid transparent;padding:10px 12px;font-size:calc(13/14*1rem);color:var(--ink2);text-decoration:none;white-space:nowrap;font-weight:500}

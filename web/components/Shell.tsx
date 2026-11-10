@@ -813,8 +813,15 @@ export default function Shell({ children, khongThanhBen = false }:
               #5FAE66 + chữ trắng), đã bỏ ô nền #0B2545 để nằm thẳng trên thanh navy #14538D.
               Bên cạnh là chữ nhỏ «Hệ thống điều hành» để nhân viên biết đang ở VTOS.
               Dấu VTOS v1.0 (thuong-hieu/vtos-logo-*.svg) GIỮ trong kho để tra cứu, không xoá. */}
+          {/* LOGO-1 · 11/11/2026 — Chủ tịch duyệt: logo đứng trên một Ô NỀN TRẮNG bo tròn.
+              VÌ THẾ PHẢI ĐỔI ẢNH: `khoachu-holdings-nen-trong.svg` là bản CHỮ TRẮNG, dựng cho
+              nền navy; đặt nó lên ô trắng là mất chữ. `khoachu-holdings-ngang.svg` là bản CHỮ
+              NAVY — đúng bản mà màn `/xe` đang dùng từ 08/11 (PR #786).
+              Hình dáng ô trắng nằm ở `globals.css`, không ở đây: một thẻ ảnh thì chỉ nên biết
+              mình là ảnh nào. Màn `/xe` hiện còn một lớp ghi đè tạm làm đúng việc này cho
+              riêng nó; làn Phân quyền gỡ lớp ấy sau khi đợt này lên. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/thuong-hieu/v2/khoachu-holdings-nen-trong.svg" alt="" width={1107} height={269} className="brand-logo" />
+          <img src="/thuong-hieu/v2/khoachu-holdings-ngang.svg" alt="" width={1107} height={269} className="brand-logo" />
           <small>HỆ THỐNG ĐIỀU HÀNH</small>
         </Link>
         <span className="bar">
