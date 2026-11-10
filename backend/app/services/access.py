@@ -500,6 +500,18 @@ MAN_HINH_API = {
     # "/api/v1/fleet", đúng nhóm mà "/doi-xe" và "/lai-lo-doi-xe" đã gọi.
     "/xe": ("/api/v1/fleet",),
     "/lai-lo-doi-xe": ("/api/v1/fleet",),
+    # XE-KD-1 · 11/11/2026 — «Lịch xe trống để bán» của phòng Kinh doanh. MỘT TIỀN TỐ DÀI,
+    # cố ý KHÔNG chép theo hai dòng ngay trên.
+    #
+    # Cổng phân quyền chặn theo TIỀN TỐ (`check_restricted_scope`: path.startswith). Khai
+    # "/api/v1/fleet" như màn đội xe là mở TOÀN BỘ API đội xe cho Kinh doanh — lãi lỗ, chi
+    # phí, tài xế, hồ sơ tài xế. Chủ tịch chốt 11/11/2026 đúng một việc: «chỉ xem khoảng
+    # trống và công suất tuần, không xem lưới xe/tour».
+    #
+    # Cửa lưới xe đầy đủ "/lich-xe-tuong-lai" KHÔNG nằm trong tiền tố này — nó dài hơn một
+    # đoạn — nên Kinh doanh không với tới. Và kể cả với tới thì `require_roles(*READ)` ở
+    # router vẫn chặn: hai hàng rào, không phải một.
+    "/lich-xe-trong": ("/api/v1/fleet/lich-xe-tuong-lai/khoang-trong",),
     "/leads": ("/api/v1/leads", "/api/v1/zalo", "/api/v1/dau-quang-cao"),
     "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers",
                       # DL-1 (11/10/2026): đề nghị xe là mắt đầu của chuỗi điều xe, và nó ở CÙNG
@@ -1131,6 +1143,14 @@ MENU_ROLES = {
     # Lãi lỗ đội xe gồm lãi vay và chi phí cố định của cả đội – đây là kết quả kinh doanh của một trung
     # tâm lợi nhuận, không phải bảng theo dõi vận hành. Điều hành và HCNS không xem.
     "/lai-lo-doi-xe": BASE_VIEW + FLEET_MGR + ("ketoan", "cntt"),
+    # XE-KD-1 · 11/11/2026 — danh sách này viết THẲNG, không ghép từ các hằng nhóm, và đó là
+    # chủ ý: nó phải TRÙNG KHÍT `KHOANG_TRONG_XEM` của chính cửa ấy trong
+    # `api/v1/fleet.py` (= READ ∪ {chutich, tgd, ptgd_doan, ptgd_mkt, tp_dh, gd_kd, tp_kd,
+    # cntt}). Ghép từ BASE_VIEW/SALES/… thì gọn hơn hôm nay, nhưng ngày một hằng nhóm nhận
+    # thêm một vai, vai ấy THẤY mục menu rồi bấm vào và nhận 403 — mà người nhận 403 không
+    # có cách nào biết đó là quyền hay là lỗi. Thà dài một dòng.
+    "/lich-xe-trong": ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "ketoan",
+                       "bks", "cntt", "hcns", "gd_doi_xe", "gd_kd", "tp_kd"),
     # KS-46 (08/11/2026) — "/xe": màn RIÊNG của đội xe, không cột dọc, không phân hệ
     # phòng khác. HẸP HƠN "/lai-lo-doi-xe" một vai: kế toán không có việc gì trên bàn
     # làm việc của giám đốc, họ đã có màn Lãi lỗ để đọc số. Chủ tịch nằm trong
