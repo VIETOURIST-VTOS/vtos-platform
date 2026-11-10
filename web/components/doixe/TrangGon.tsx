@@ -26,16 +26,16 @@ const O3 = ({ ds }: { ds: [string, React.ReactNode, string?][] }) => (
       <strong style={{ display: "block", fontSize: "1.45em", fontVariantNumeric: "tabular-nums" }}>{v}</strong>
       {p && <span className="muted" style={{ fontSize: 12.5 }}>{p}</span>}</div>)}
   </div>);
-const Dong = ({ t, p, tag, cls, nut, onNut }: { t: React.ReactNode; p?: React.ReactNode; tag?: string; cls?: string; nut?: string; onNut?: () => void }) => (
-  <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", padding: "9px 0", borderBottom: "1px solid #e6eaf0" }}>
+const Dong = ({ t, p, tag, cls, nut, onNut, chinh, do: laDo }: { t: React.ReactNode; p?: React.ReactNode; tag?: string; cls?: string; nut?: string; onNut?: () => void; chinh?: boolean; do?: boolean }) => (
+  <div className={"xe-it" + (laDo ? " xe-do" : "")} style={laDo ? { margin: "4px 0", borderRadius: 8, padding: "9px 12px" } : undefined}>
     <span style={{ flex: "1 1 260px", minWidth: 0 }}><strong>{t}</strong>{p && <><br /><span className="muted">{p}</span></>}</span>
     {tag && <span className={`tag ${cls || ""}`}>{tag}</span>}
-    {nut && <button type="button" onClick={onNut}>{nut}</button>}
+    {nut && <button type="button" className={chinh ? "xe-nut-chinh" : undefined} onClick={onNut}>{nut}</button>}
   </div>);
 const Chip = ({ on, t, onClick }: { on: boolean; t: string; onClick: () => void }) => (
   <button type="button" aria-pressed={on} onClick={onClick}
-    style={{ borderRadius: 999, padding: "4px 11px", cursor: "pointer", border: "1px solid " + (on ? "#1d5bbf" : "#dce3ec"),
-             background: on ? "#eef3fb" : "#fff", fontWeight: on ? 700 : 400 }}>{t}</button>);
+    style={{ borderRadius: 999, padding: "4px 11px", cursor: "pointer", border: "1px solid " + (on ? "var(--xe-nhan, #2c5fa2)" : "#dce3ec"),
+             background: on ? "var(--xe-nhat, #edf3fc)" : "#fff", color: on ? "var(--xe-nhan, #2c5fa2)" : undefined, fontWeight: on ? 700 : 400 }}>{t}</button>);
 const Loi = ({ loi }: { loi: string }) => loi ? <p className="muted">Không đọc được số: {loi}</p> : <p className="muted">Đang đọc…</p>;
 
 /* ───────── Điều xe › Lịch & lệnh ───────── */
@@ -52,7 +52,7 @@ export function LichLenhGon({ mo }: { mo: Mo }) {
     <O3 ds={[["Lệnh VTOS đang chạy hôm nay", homNay.length], ["Tổng lệnh trên VTOS", d.length],
              ["Lệnh chưa xác nhận", chuaXacNhan.length]]} />
     {homNay.map((x) => <Dong key={x.id} t={`${x.xe} · ${x.tour || "—"}`} p={`${x.date_from} → ${x.date_to} · ${x.tai_xe || "chưa có tài xế"}`} />)}
-    {!homNay.length && <p className="muted">Hôm nay chưa có lệnh VTOS. Nhật trình có chuyến chưa gắn lệnh thì không dùng lịch trống để kết luận xe rảnh.</p>}
+    {!homNay.length && <p className="muted">Hôm nay chưa có lệnh VTOS.</p>}
     <p><button type="button" onClick={() => mo("/lenh-dieu-xe")}>Mở lịch & lệnh đầy đủ</button></p>
   </>;
 }
@@ -77,15 +77,18 @@ export function HoSoXeGon({ mo }: { mo: Mo }) {
       <Chip on={loc === "chan"} t={`Đang bị chặn · ${chan.length}`} onClick={() => setLoc("chan")} /></div>
     {ds.map((x) => { const [t, c] = nhan[muc(x)] || ["—", ""];
       return <Dong key={x.id} t={x.plate} p={[x.code || "Chưa có mã", ...(x.san_sang?.ly_do || []).slice(0, 1), x.active ? "" : x.lifecycle_ten].filter(Boolean).join(" · ")}
-        tag={t} cls={c} nut="Mở hồ sơ" onNut={() => mo(`/doi-xe?xe=${x.id}`)} />; })}
+        tag={t} cls={c} do={c === "red"} nut="Mở hồ sơ" onNut={() => mo(`/doi-xe?xe=${x.id}`)} />; })}
   </>;
 }
 
 /* ───────── Báo cáo & chi phí › Báo cáo từng xe ───────── */
 export function BaoCaoXeGon({ mo, onNhap }: { mo: Mo; onNhap: () => void }) {
   const { d, loi } = useDoc<any[]>("/fleet/chuyen");
+  const ky = useDoc<any>("/fleet/quyet-toan-chuyen/cho-toi-ky");
   const [loc, setLoc] = useState("all");
   if (!d) return <Loi loi={loi} />;
+  // VH-4 «mỗi nút một chỗ»: tờ đã nằm trong ô «Chờ tôi ký» không hiện lại ở danh sách bên dưới.
+  const daKy = new Set<number>((ky.d?.rows || []).map((x: any) => x.id));
   const NHOM: [string, string, (x: any) => boolean][] = [
     ["all", "Tất cả", () => true],
     ["nhap", "Đang nhập", (x) => (x.qt_trang_thai || "nhap") === "nhap"],
@@ -94,12 +97,12 @@ export function BaoCaoXeGon({ mo, onNhap }: { mo: Mo; onNhap: () => void }) {
     ["xong", "Đã chốt", (x) => x.qt_trang_thai === "da_duyet" || (x.quyet_toan && (x.qt_trang_thai || "nhap") === "nhap")],
   ];
   const f = NHOM.find((n) => n[0] === loc)![2];
-  const ds = d.filter(f).slice(0, 60);
+  const ds = d.filter(f).filter((x) => !daKy.has(x.id)).slice(0, 60);
   return <>
     <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
       <h2 style={{ margin: 0 }}>Báo cáo từng xe</h2>
       <button type="button" className="act teal" style={{ margin: 0 }} onClick={onNhap}>Nhập báo cáo từng xe</button></div>
-    <ChoToiKy mo={mo} />
+    <ChoToiKy mo={mo} d={ky.d} />
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "8px 0" }}>
       {NHOM.map(([k, t, g]) => <Chip key={k} on={loc === k} t={`${t} · ${d.filter(g).length}`} onClick={() => setLoc(k)} />)}</div>
     {ds.map((x) => <Dong key={x.id} t={`${x.ma_phieu || "#" + x.id} · ${x.xe}`}
@@ -107,6 +110,7 @@ export function BaoCaoXeGon({ mo, onNhap }: { mo: Mo; onNhap: () => void }) {
           x.qt_trang_thai === "tra_lai" && x.qt_tra_lai_ly_do ? `trả lại: ${x.qt_tra_lai_ly_do}` : ""].filter(Boolean).join(" · ")}
       tag={x.qt_ten_trang_thai || (x.quyet_toan ? "Đã quyết toán" : "Chưa quyết toán")}
       cls={x.qt_trang_thai === "tra_lai" ? "red" : x.qt_trang_thai === "da_duyet" || x.quyet_toan ? "ok" : "warn"}
+      do={x.qt_trang_thai === "tra_lai"}
       nut="Mở" onNut={() => mo(`/doi-xe?tab=chuyen&chuyen=${x.id}`)} />)}
     {!ds.length && <p className="muted">Không có phiếu ở nhóm này.</p>}
   </>;
@@ -122,7 +126,7 @@ export function QuyetToanGon({ ky, mo }: { ky: string; mo: Mo }) {
     <O3 ds={[["Chuyến chưa chốt", t.so_chuyen_chua_quyet_toan ?? "—", `${tr(t.doanh_thu_chua_quyet_toan)} doanh thu đang treo`],
              ["Doanh thu chuyến đã quyết toán", tr(t.doanh_thu)],
              ["Chuyến đã quyết toán", t.so_chuyen ?? (d.xe || []).reduce((a: number, x: any) => a + (x.so_chuyen || 0), 0)]]} />
-    <p className="muted">Doanh thu chưa quyết toán không cộng vào lợi nhuận kỳ. Chuyến vào lợi nhuận khi Chủ tịch duyệt tờ quyết toán.</p>
+    <p className="muted">Doanh thu chưa quyết toán không vào lợi nhuận kỳ.</p>
     <p style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
       <button type="button" onClick={() => mo("/doi-xe?tab=quyettoan")}>Mở bảng quyết toán chủ xe</button>
       <button type="button" onClick={() => mo("/doi-xe?tab=giaodich")}>Mở đối soát nguồn ngoài</button></p>
@@ -139,7 +143,6 @@ export function CongNoGon({ mo }: { mo: Mo }) {
     <O3 ds={[["Công ty phải trả chủ xe", vnd(d.voi_chu_xe?.cong_ty_phai_tra)],
              ["Chủ xe phải trả công ty", vnd(d.voi_chu_xe?.chu_xe_phai_tra_cong_ty)],
              ["Còn phải thu người mua xe", vnd(d.ban_xe?.con_phai_thu)]]} />
-    <p className="muted">Khoản vay và tài khoản ngân hàng chỉ hiện ở màn chi tiết với người có quyền tài chính.</p>
     <p><button type="button" onClick={() => mo("/doi-xe?tab=congno")}>Mở công nợ chi tiết</button></p>
   </>;
 }
@@ -170,7 +173,7 @@ export function BaoHongGon({ mo }: { mo: Mo }) {
     <h2 style={{ margin: 0 }}>Báo hỏng → sửa chữa</h2>
     <O3 ds={[["Đang mở", d.dem?.dang_mo ?? mo_.length], ["Phải dừng xe", d.dem?.phai_dung_xe ?? 0, "chặn điều xe tới khi nghiệm thu"]]} />
     {mo_.map((r) => <Dong key={r.id} t={`${r.plate} · ${r.hien_tuong}`} p={[String(r.bao_luc || "").slice(0, 10), r.trang_thai_ten, r.nguoi_bao].filter(Boolean).join(" · ")}
-      tag={r.muc_do_ten} cls={r.muc_do === "phai_dung_xe" ? "red" : "warn"} />)}
+      tag={r.muc_do_ten} cls={r.muc_do === "phai_dung_xe" ? "red" : "warn"} do={r.muc_do === "phai_dung_xe"} />)}
     {!mo_.length && <p className="muted">Hiện chưa có báo hỏng đang mở.</p>}
     <p><button type="button" onClick={() => mo("/doi-xe?tab=bao-hong")}>Mở sổ báo hỏng</button></p>
   </>;
@@ -208,7 +211,7 @@ export function DeNghiXeGon({ mo }: { mo: Mo }) {
   const conNgay = (s: string) => Math.round((new Date(s).getTime() - new Date(isoHom()).getTime()) / 864e5);
   return <>
     <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-      <h2 style={{ margin: 0 }}>Đề nghị xe</h2><span className="muted">Điều hành gửi sang · Đội xe lập lệnh</span></div>
+      <h2 style={{ margin: 0 }}>Đề nghị xe</h2></div>
     <O3 ds={[["Chờ lập lệnh", d.dem?.cho_lap_lenh ?? cho.length], ["Đã có lệnh tháng này", coLenh],
              ["Đội xe từ chối", d.dem?.tu_choi ?? 0, "Điều hành thấy lý do và thuê xe ngoài"]]} />
     {cho.map((x) => { const n = conNgay(x.ngay_di);
@@ -237,12 +240,11 @@ export function LapLenhGon({ mo }: { mo: Mo }) {
     <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
       <h2 style={{ margin: 0 }}>Lập lệnh điều xe</h2>
       <button type="button" className="act teal" style={{ margin: 0 }} onClick={() => mo("/lenh-dieu-xe/lap-lenh")}>Mở màn tìm phương án</button></div>
-    <p className="muted">Màn tìm phương án (lọc cứng, xếp hạng, chốt lệnh) giữ nguyên. Ở đây chỉ là việc trước mắt.</p>
     <Dong t="Đề nghị đang chờ lệnh" tag={String((dn.d.rows || []).length)} cls="warn" />
     <Dong t="Lệnh chạy trong 7 ngày tới" tag={String(sap.length)} />
     {sap.map((x) => { const [t, c] = NHAN[x.trang_thai_nhan] || ["—", ""];
       return <Dong key={x.id} t={`${x.xe} · ${x.tour || "—"} · ${ngayVN(x.date_from)}`} p={x.tai_xe || "chưa có tài xế"}
-        tag={x.trang_thai_nhan === "chua_nhan" && x.han_nhan ? `${t} · hạn ${ngayVN(x.han_nhan)}` : t} cls={c} />; })}
+        tag={x.trang_thai_nhan === "chua_nhan" && x.han_nhan ? `${t} · hạn ${ngayVN(x.han_nhan)}` : t} cls={c} do={c === "red"} />; })}
     {!sap.length && <p className="muted">7 ngày tới chưa có lệnh VTOS nào.</p>}
   </>;
 }
@@ -255,7 +257,7 @@ export function XeHomNayGon({ mo }: { mo: Mo }) {
     <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
       <h2 style={{ margin: 0 }}>Xe hôm nay</h2><span className="muted">{ngayVN(d.ngay)}/{String(d.ngay).slice(0, 4)}</span></div>
     <O3 ds={[["Đang đi tour", d.dang_di.length], ["Ở bãi", d.o_bai.length], ["Đang sửa / bị chặn", d.bi_chan.length, "báo hỏng mức phải dừng xe"]]} />
-    {d.bi_chan.map((x: any) => <Dong key={"c" + x.id} t={x.xe} p={`báo hỏng «${x.ly_do}»`} tag="bị chặn" cls="red" />)}
+    {d.bi_chan.map((x: any) => <Dong key={"c" + x.id} t={x.xe} p={`báo hỏng «${x.ly_do}»`} tag="bị chặn" cls="red" do />)}
     {d.dang_di.map((x: any) => <Dong key={"d" + x.id} t={`${x.xe} · ${x.tour || "—"}`} p={`về ${ngayVN(x.ve)} · ${x.tai_xe || "chưa có tài xế"}`} tag="đang đi" />)}
     <p className="muted">{d.ghi_chu}</p>
     <p><button type="button" onClick={() => mo("/doi-xe/xe-hom-nay")}>Mở bảng theo sheet</button></p>
@@ -283,8 +285,8 @@ export function TaiXeGon({ mo }: { mo: Mo }) {
         : x.sap_het_han ? ["bằng sắp hết hạn", "warn"] : x.du_dieu_kien ? ["đủ điều kiện", "ok"] : [x.thieu?.[0] || "thiếu dữ liệu", "warn"];
       return <Dong key={x.id} t={x.full_name}
         p={[(x.xe_dang_dung_ten || []).map((v: any) => v.bien).join(", ") || "chưa gán xe", `${x.so_chuyen_90_ngay} chuyến/90 ngày`].join(" · ")}
-        tag={tag[0]} cls={tag[1]} nut="Mở hồ sơ" onNut={() => mo("/tai-xe")} />; })}
-    <p className="muted">Chưa có tài khoản thì tài xế không bấm nhận lệnh, không ghi chuyến trên điện thoại được — báo HCNS tạo tài khoản gắn mã nhân viên.</p>
+        tag={tag[0]} cls={tag[1]} do={tag[1] === "red"} nut="Mở hồ sơ" onNut={() => mo("/tai-xe")} />; })}
+    <p className="muted">Chưa có tài khoản = không nhận lệnh được — báo HCNS.</p>
   </>;
 }
 
@@ -295,7 +297,7 @@ export function ChuXeGon({ mo }: { mo: Mo }) {
   const ds: any[] = d.voi_chu_xe?.chi_tiet || [];
   return <>
     <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-      <h2 style={{ margin: 0 }}>Chủ xe & hợp đồng</h2><span className="muted">xe hợp tác</span></div>
+      <h2 style={{ margin: 0 }}>Chủ xe & hợp đồng</h2></div>
     <O3 ds={[["Chủ xe", ds.length], ["Xe hợp tác", ds.reduce((a, c) => a + (c.so_xe || 0), 0)],
              ["Công ty phải trả", tr(d.voi_chu_xe?.cong_ty_phai_tra), "chỉ tính kỳ đã chốt"]]} />
     {ds.map((c) => { const k = (c.cac_ky || []).slice(-1)[0];
@@ -307,13 +309,12 @@ export function ChuXeGon({ mo }: { mo: Mo }) {
 }
 
 /* ───────── Báo cáo từng xe › ô «Chờ tôi ký» ───────── */
-export function ChoToiKy({ mo }: { mo: Mo }) {
-  const { d } = useDoc<any>("/fleet/quyet-toan-chuyen/cho-toi-ky");
+export function ChoToiKy({ mo, d }: { mo: Mo; d: any }) {
   if (!d || !d.rows?.length) return null;
-  return <div style={{ border: "1.5px solid #1d5bbf", background: "#eef3fb", borderRadius: 8, padding: "10px 12px", margin: "10px 0" }}>
-    <strong>{d.rows[0].buoc_ten} · {d.tong} tờ</strong>
+  return <div className="xe-uu" style={{ margin: "10px 0" }}>
+    <strong style={{ fontSize: 16 }}>{d.rows[0].buoc_ten} · {d.tong} tờ</strong>
     {d.rows.map((x: any) => <Dong key={x.id} t={`QT-${x.id} · ${x.xe} · ${x.tour || x.ten_tour || "—"}`}
-      p={`${ngayVN(x.ngay_di)}→${ngayVN(x.ngay_ve)} · doanh thu ${vnd(x.doanh_thu)}`} nut="Mở tờ để ký"
+      p={`${ngayVN(x.ngay_di)}→${ngayVN(x.ngay_ve)} · doanh thu ${vnd(x.doanh_thu)}`} nut="Mở tờ để ký" chinh
       onNut={() => mo(`/doi-xe?tab=chuyen&chuyen=${x.id}`)} />)}
   </div>;
 }

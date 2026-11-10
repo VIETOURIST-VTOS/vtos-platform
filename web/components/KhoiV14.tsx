@@ -280,7 +280,7 @@ type XeTheoSheet = {
   dang_di?: number; o_bai?: number; khong_khop?: number; so_can_sua?: number;
 };
 
-export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet, chuaKhop }: {
+export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet, chuaKhop, gon }: {
   d?: HieuQuaXe | null;
   /** `sections.xe_hom_nay` — xem `XeHomNay`. */
   xe?: XeHomNay | null;
@@ -293,6 +293,9 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet, chuaKhop }: {
    *  đang chạy) thì ô hiện «Chưa khớp» kèm cả hai số — không in một con số trông như thật. Màn nào không
    *  truyền thì ô giữ cách cũ. */
   chuaKhop?: { sheet: number; nhat_trinh: number } | null;
+  /** VH-4 (Chủ tịch duyệt 10/11/2026): /xe «bớt ghi chú» — bỏ đoạn chú thích dài dưới hình và cuối khối.
+   *  Màn Chủ tịch không truyền nên giữ nguyên. Các nhãn «chưa có số» KHÔNG bị bỏ. */
+  gon?: boolean;
 }) {
   /* HQ-1c — MỞ SẴN Ở KỲ CÒN CÓ SỐ, không cứng ở "thang".
      Sổ quyết toán xe chỉ chốt sau khi hết tháng, nên tháng đang chạy trống gần như suốt. Đo trên
@@ -667,7 +670,7 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet, chuaKhop }: {
         <BieuDoDuong ten="Diễn biến hiệu quả đội xe" phu={o.nhan || undefined}
           ds={dienBien} nhan={nhanKy} dinh_dang="tien"
           ai="Đội xe" cua="/doi-xe" cua_ten="Cửa nhập đội xe"
-          chan={<span className="muted">12 tháng của năm. Tháng không có điểm là tháng <b>chưa nạp
+          chan={gon ? undefined : <span className="muted">12 tháng của năm. Tháng không có điểm là tháng <b>chưa nạp
             chuyến nào</b> hoặc <b>chưa tới</b> — đường cắt tại đó chứ không nối qua, vì nối là vẽ ra
             một con số không ai nhập.</span>} />
       </div>
@@ -727,12 +730,13 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet, chuaKhop }: {
       )}
       {coNguonKy && !o.trong_vi_sao && cot.every(([, g]) => g === null) &&
         <p className="v14-ghi"><ChuaNoi ai="Đội xe" cua="/doi-xe" cua_ten="Cửa nhập đội xe" /></p>}
-      {/* Hai câu cảnh báo nghiệp vụ của bản vẽ. Giữ nguyên vì cả hai đều là chỗ dễ đọc sai con số. */}
-      <p className="muted v14-ghi">
+      {/* Hai câu cảnh báo nghiệp vụ của bản vẽ. Giữ nguyên vì cả hai đều là chỗ dễ đọc sai con số.
+          /xe (gon) bỏ đoạn này theo bản xem trước Chủ tịch duyệt 10/11/2026; màn Chủ tịch vẫn giữ. */}
+      {!gon && <p className="muted v14-ghi">
         Cập nhật hằng ngày. Xe không có lệnh <b>chưa chắc</b> sẵn sàng; công suất tính trên thời
         gian xe <b>có thể</b> khai thác, không phải trên số ngày trong kỳ. Hướng dẫn viên vẫn được
         quản lý riêng.
-      </p>
+      </p>}
     </section>
   );
 }
