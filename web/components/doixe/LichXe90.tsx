@@ -9,7 +9,7 @@ import { api } from "@/lib/api";
  *  đề nghị vẫn đi qua Điều hành như luồng hiện có, nên xe không bị bán trùng. */
 type Mo = (toi: string) => void;
 const dd = (s: string) => s.slice(8, 10) + "/" + s.slice(5, 7);
-const MAU: Record<string, string> = { lenh: "#2c5fa2", chan: "#c2475d", "": "#fff" };
+const MAU: Record<string, string> = { lenh: "#2c5fa2", sheet: "#7fa7d9", chan: "#c2475d", "": "#fff" };
 
 export default function LichXe90({ mo }: { mo: Mo }) {
   const [soNgay, setSoNgay] = useState(90);
@@ -17,6 +17,11 @@ export default function LichXe90({ mo }: { mo: Mo }) {
   const [d, setD] = useState<any>(null);
   const [loi, setLoi] = useState("");
   useEffect(() => { setD(null); api(`/fleet/lich-xe-tuong-lai?so_ngay=${soNgay}`).then(setD).catch((e) => setLoi(String(e?.message || e))); }, [soNgay]);
+  /* VH-15 (Chủ tịch 11/11/2026): «Giữ xe cho tour» chỉ hiện với vai GỬI ĐƯỢC đề nghị xe — máy chủ trả lời
+     (`/de-nghi-xe/meta.toi_duoc_de_nghi`), màn này không gõ lại danh sách vai. GĐ đội xe không gửi được nên
+     không thấy nút (bấm vào chỉ ra trang «không có quyền»). */
+  const [duocGiu, setDuocGiu] = useState(false);
+  useEffect(() => { api("/de-nghi-xe/meta").then((m: any) => setDuocGiu(!!m?.toi_duoc_de_nghi)).catch(() => setDuocGiu(false)); }, []);
   if (!d) return loi ? <p className="muted">Không đọc được lịch: {loi}</p>
     : <div className="xe-cho" aria-busy="true" aria-label="Đang đọc lịch xe"><i /><i /><i /><i /></div>;
   const loaiCho = Array.from(new Set<number>(d.xe.map((x: any) => x.so_cho))).sort((a, b) => a - b);
@@ -34,12 +39,16 @@ export default function LichXe90({ mo }: { mo: Mo }) {
       </div></div>
 
     <div className="lx-so">
-      <div className="lx-s s1"><small>Công suất 30 ngày tới</small><b>{pc(d.cong_suat_30)}</b><em>ngày-xe đã có lệnh</em></div>
-      <div className="lx-s s2"><small>Công suất ngày 31–60</small><b>{pc(d.cong_suat_31_60)}</b><em>lệnh đã chốt</em></div>
+      <div className="lx-s s1"><small>Công suất 30 ngày tới</small><b>{pc(d.cong_suat_30)}</b><em>ngày-xe có lệnh hoặc chuyến trên Sheet</em></div>
+      <div className="lx-s s2"><small>Công suất ngày 31–60</small><b>{pc(d.cong_suat_31_60)}</b><em>lệnh + chuyến ghi trước</em></div>
       <div className="lx-s s3"><small>Ngày-xe còn trống</small><b>{d.ngay_xe_trong}</b><em>gồm {d.ngay_xe_trong_cuoi_tuan} ngày cuối tuần</em></div>
       <div className="lx-s s4"><small>Đề nghị xe chờ lệnh</small><b>{d.de_nghi_cho}</b><em>đang hỏi {d.ngay_xe_de_nghi} ngày-xe</em></div>
     </div>
 
+    {/* VH-15: nói rõ nguồn — sheet đọc hỏng thì «trống» không đáng tin, phải in ra chứ không im. */}
+    {d.sheet?.loi ? <p className="lx-bao do">Chưa đọc được Sheet xe — ô «trống» có thể đã có khách: {d.sheet.loi}</p>
+      : d.sheet?.co_link ? <p className="lx-bao">Đã gộp Sheet xe (đọc lúc {d.sheet.doc_luc}) · {d.sheet.so_chuyen} chuyến ghi trước trong khoảng này.</p>
+      : <p className="lx-bao do">Chưa dán link Sheet xe — lịch chỉ tính lệnh điều xe trên VTOS.</p>}
     <div className="lx-boc"><table className="lx-luoi">
       <thead><tr><th className="lx-xe">Xe</th>
         {ngay.map((s, i) => { const dt = new Date(s); const dau = i === 0 || s.slice(8) === "01";
@@ -49,13 +58,13 @@ export default function LichXe90({ mo }: { mo: Mo }) {
         {xe.map((x: any) => <tr key={x.id}>
           <th className="lx-xe">{x.xe}<small>{x.so_cho} chỗ{x.bi_chan ? " · đang hỏng" : ""}</small></th>
           {x.o.map((t: string, i: number) => { const dt = new Date(ngay[i]); const ct = dt.getDay() === 0 || dt.getDay() === 6;
-            return <td key={i} title={`${x.xe} · ${dd(ngay[i])} · ${t === "lenh" ? "đã có lệnh" : t === "chan" ? "bị chặn: " + x.bi_chan : "trống"}`}
+            return <td key={i} title={`${x.xe} · ${dd(ngay[i])} · ${t === "lenh" ? "đã có lệnh" : t === "sheet" ? "chuyến trên Sheet: " + (x.tour_sheet?.[String(i)] || "") : t === "chan" ? "bị chặn: " + x.bi_chan : "trống"}`}
               style={{ background: t ? MAU[t] : ct ? "#f3f6fa" : "#fff" }} className={dt.getDay() === 1 ? "lx-dt" : ""} />; })}
           <td className="lx-cs">{pc(x.cong_suat)}</td></tr>)}
         <tr><th className="lx-xe">Đề nghị chờ lệnh<small>số xe đang được hỏi</small></th>
           {d.hoi_theo_ngay.map((n: number, i: number) => <td key={i} className="lx-hoi">{n || ""}</td>)}<td className="lx-cs" /></tr>
       </tbody></table></div>
-    <div className="lx-chu"><span><i style={{ background: "#2c5fa2" }} />Đã có lệnh</span><span><i style={{ background: "#c2475d" }} />Đang hỏng — không tính trống</span>
+    <div className="lx-chu"><span><i style={{ background: "#2c5fa2" }} />Đã có lệnh</span><span><i style={{ background: "#7fa7d9" }} />Chuyến ghi trước trên Sheet xe</span><span><i style={{ background: "#c2475d" }} />Đang hỏng — không tính trống</span>
       <span><i style={{ background: "#fff" }} />Trống — bán được</span><span><i style={{ background: "#f3f6fa" }} />Cuối tuần</span></div>
 
     <div className="lx-hai">
@@ -63,7 +72,7 @@ export default function LichXe90({ mo }: { mo: Mo }) {
         {kt.map((k: any, i: number) => <div key={i} className="xe-it">
           <span className="lx-ngay">{dd(k.tu)}–{dd(k.den)}</span>
           <span style={{ flex: "1 1 200px", minWidth: 0 }}><b>{k.xe} · {k.so_cho} chỗ</b><span className="muted" style={{ display: "block", fontSize: 13 }}>{k.so_ngay} ngày liền{k.cuoi_tuan ? " · có cuối tuần" : ""}</span></span>
-          <button type="button" onClick={() => mo(`/lenh-dieu-xe/de-nghi/moi?tu=${k.tu}&den=${k.den}`)}>Giữ xe cho tour</button>
+          {duocGiu && <button type="button" onClick={() => mo(`/lenh-dieu-xe/de-nghi/moi?tu=${k.tu}&den=${k.den}`)}>Giữ xe cho tour</button>}
         </div>)}
         {!kt.length && <p className="muted">Không có khoảng trống từ 2 ngày trở lên.</p>}</section>
       <section className="xe-blk"><div className="xe-dau-con"><h3 style={{ margin: 0 }}>Công suất theo tuần</h3><span className="muted">vàng: dưới {d.nguong_thap}%</span></div>
@@ -76,6 +85,8 @@ export default function LichXe90({ mo }: { mo: Mo }) {
 }
 
 const CSS = `
+.lx-bao{margin:0 0 10px;font-size:13.5px;color:#4a5d78;background:#edf3fc;border-radius:10px;padding:8px 12px}
+.lx-bao.do{color:#8a1f33;background:#fff0f3}
 .xe-dau-con{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
 .lx-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .lx-chips button{font:inherit;font-size:13px;border:1px solid #c9d6e8;background:#fff;color:var(--xe-nhan,#2c5fa2);border-radius:999px;padding:5px 12px;cursor:pointer;font-weight:600}

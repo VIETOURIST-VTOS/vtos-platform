@@ -99,10 +99,14 @@ def test_3_phan_kinh_doanh_chi_co_khoang_trong():
     # Kinh doanh nhận danh sách qua tin sáng thứ Hai (test_4).
     r = client.get("/api/v1/fleet/lich-xe-tuong-lai/khoang-trong", headers=h("chutich"))
     assert r.status_code == 200, r.text
-    assert set(r.json()) == {"tu", "den", "khoang_trong", "tuan", "nguong_thap", "cong_suat_30"}
+    assert set(r.json()) == {"tu", "den", "khoang_trong", "tuan", "nguong_thap", "cong_suat_30", "sheet"}
 
 
-def test_4_tin_sang_thu_hai_mot_tuan_mot_tin():
+def test_4_tin_sang_thu_hai_mot_tuan_mot_tin(monkeypatch):
+    # VH-15: lịch đọc thêm Sheet xe; sheet đọc hỏng thì robot không gửi. Ở đây cho sheet đọc được, không chuyến.
+    from app.services import xe_theo_sheet as XS
+    monkeypatch.setattr(XS, "doc", lambda url, doc_lai=False, tai=None: {
+        "noi_dung": "XE SỐ,SỐ,Lái xe,Tên tour,Ngày đi,Ngày về\n", "doc_luc": "x", "loi_tai": None, "ban_cu": False})
     assert client.post("/api/v1/fleet/robot/lich-xe-gui-tuan").status_code == 401
     r = client.post("/api/v1/fleet/robot/lich-xe-gui-tuan", headers={"X-Robot-Token": "rt-vh9"})
     assert r.status_code == 200 and r.json()["da_gui"], r.text
