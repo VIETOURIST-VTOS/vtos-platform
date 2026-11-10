@@ -2944,6 +2944,10 @@ def lich_xe_gui_tuan(db: Session = Depends(get_db)):
     ref = f"tuan:{y}-W{w:02d}"
     if db.execute(select(Alert).where(Alert.kind == "xe_trong_tuan", Alert.ref == ref)).scalars().first():
         return {"da_gui": False, "ly_do": "Tuần này đã gửi", "ref": ref}
+    # VH-15: không đủ dữ liệu thì KHÔNG gửi «xe trống» — gửi là bảo Kinh doanh bán ngày xe đã có khách.
+    ly_do = LX.chua_du_du_lieu(LX.bang(db, _d.today(), 30))
+    if ly_do:
+        return {"da_gui": False, "ly_do": ly_do, "ref": ref}
     db.add(Alert(kind="xe_trong_tuan", level="info", ref=ref, message=LX.tin_tuan(db),
                  to_roles=",".join(LX.NGUOI_NHAN_TUAN)))
     R.audit(db, "robot", "robot", "gui_lich_xe_trong_tuan", ref, after={"nguoi_nhan": list(LX.NGUOI_NHAN_TUAN)})

@@ -761,3 +761,41 @@ def doi_chieu_chi_phi_thang(db: Session, bang: dict) -> list[dict]:
                                f"{_vnd(g['so_tien'])} (dòng {dong}), VTOS mới có {_vnd(da)}. "
                                f"Thiếu {_vnd(thieu)} — nhập ở Lãi lỗ đội xe → Chi phí kỳ → «{ten}»."})
     return ra
+
+
+def chuyen_trong_khoang(db: Session, tu: date, den: date, tai=_tai) -> dict:
+    """VH-15 (Chủ tịch 11/11/2026): các chuyến trên sheet có ngày nằm trong [tu, den], theo NĂM SỐ CUỐI
+    biển số — để Lịch xe 90 ngày thấy chuyến đội xe đã ghi trước vào sheet (anh xác nhận đội xe ghi trước
+    chuyến sắp chạy). CHỈ ĐỌC; dùng chung đệm 15 phút với màn «Xe đang đi».
+
+    Trả `{"co_link", "loi", "doc_luc", "so_chuyen", "theo_khoa": {nam_so_cuoi: [(di, ve, tour)]}}`. Tab nào
+    hỏng thì NÓI RA ở `loi` — lịch không được im lặng in «trống» khi sheet chưa đọc được."""
+    urls = cac_link(link(db))
+    kq = {"co_link": bool(urls), "loi": None, "doc_luc": None, "so_chuyen": 0, "theo_khoa": {}}
+    if not urls:
+        return kq
+    ds = []
+    for u in urls:
+        if not link_hop_le(u):
+            kq["loi"] = "Link sheet xe không phải link CSV «Công bố lên web»."
+            return kq
+        d = doc(u, tai=tai)
+        if d["noi_dung"] is None:
+            kq["loi"] = d["loi_tai"]
+            return kq
+        b = doc_bang(d["noi_dung"], kiem_chuoi=False)
+        if b["loi"]:
+            kq["loi"] = b["loi"]
+            return kq
+        ds.append(b)
+        if kq["doc_luc"] is None or (d["doc_luc"] or "") < kq["doc_luc"]:
+            kq["doc_luc"] = d["doc_luc"]
+    bang = gop_bang(ds)
+    khoa = {k["khoi"]: k["khoa"] for k in bang["khoi"]}
+    for t in bang["chuyen"]:
+        di, ve = t["di"] or t["ve"], t["ve"] or t["di"]
+        if di is None or ve < tu or di > den or not khoa.get(t["khoi"]):
+            continue
+        kq["theo_khoa"].setdefault(khoa[t["khoi"]], []).append((di, ve, t["tour"]))
+        kq["so_chuyen"] += 1
+    return kq
