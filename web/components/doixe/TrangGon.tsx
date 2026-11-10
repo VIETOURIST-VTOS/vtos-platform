@@ -21,9 +21,9 @@ function useDoc<T>(duong: string) {
 }
 const O3 = ({ ds }: { ds: [string, React.ReactNode, string?][] }) => (
   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10, margin: "10px 0" }}>
-    {ds.map(([n, v, p]) => <div key={n} style={{ border: "1px solid #dce3ec", borderRadius: 10, padding: "10px 12px" }}>
+    {ds.map(([n, v, p]) => <div key={n} style={{ border: "1px solid #d6dfeb", borderRadius: 12, padding: "10px 12px", boxShadow: "0 4px 14px #1b3a6214", background: "#fff" }}>
       <span className="muted">{n}</span>
-      <strong style={{ display: "block", fontSize: "1.45em", fontVariantNumeric: "tabular-nums" }}>{v}</strong>
+      <strong style={{ display: "block", fontSize: "1.45em", fontVariantNumeric: "tabular-nums", color: "var(--xe-nhan, #2c5fa2)" }}>{v}</strong>
       {p && <span className="muted" style={{ fontSize: 12.5 }}>{p}</span>}</div>)}
   </div>);
 const Dong = ({ t, p, tag, cls, nut, onNut, chinh, do: laDo }: { t: React.ReactNode; p?: React.ReactNode; tag?: string; cls?: string; nut?: string; onNut?: () => void; chinh?: boolean; do?: boolean }) => (

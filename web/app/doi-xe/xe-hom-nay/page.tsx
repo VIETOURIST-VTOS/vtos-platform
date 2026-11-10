@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import MauDoiXe from "@/components/doixe/MauDoiXe";
 
 /** XS-1 · XE HÔM NAY THEO SHEET ĐỘI XE — Chủ tịch duyệt bản xem thử 25/10/2026.
  *
@@ -135,4 +136,4 @@ function XeHomNay() {
   </>);
 }
 
-export default function Page() { return <Shell><XeHomNay /></Shell>; }
+export default function Page() { return <Shell><MauDoiXe><XeHomNay /></MauDoiXe></Shell>; }

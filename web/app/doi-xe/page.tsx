@@ -7,6 +7,7 @@ import BonBuocDeXuatChi from "@/components/doixe/BonBuocDeXuatChi";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, fmtDT, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import MauDoiXe from "@/components/doixe/MauDoiXe";
 
 /** Hồ sơ đội xe Vietrip – Đợt 1.
  *
@@ -272,9 +273,11 @@ function DoiXe() {
     {tq.thieu_trong_o_dem > 0 && <p className="cb-do">Có <b>{tq.thieu_trong_o_dem}</b> xe không nằm
       trong ô đếm nào ở trên — nghĩa là máy chủ xếp chúng vào một mức mà dãy ô này chưa in. Đừng đọc
       các con số trên như đã đủ; báo CNTT.</p>}
-    <p className="muted">{tq.ghi_chu}{tq.chan_khi_thieu_giay ? " Đang BẬT chế độ chặn khi thiếu giấy tờ." : " Chế độ chặn khi thiếu giấy tờ đang TẮT – thiếu hồ sơ chỉ cảnh báo, chưa dừng lệnh điều xe."}</p>
+    {/* VH-5 (Chủ tịch duyệt 10/11/2026): bỏ đoạn giải thích ô đếm dài; giữ câu chế độ chặn — nó đổi việc
+        người điều xe được làm. */}
+    <p className="muted">{tq.chan_khi_thieu_giay ? "Đang BẬT chế độ chặn khi thiếu giấy tờ." : "Chế độ chặn khi thiếu giấy tờ đang TẮT – thiếu hồ sơ chỉ cảnh báo."}</p>
 
-    <div style={{ display: "flex", gap: 8, margin: "10px 0" }}>
+    <div className="dx-tabs">
       {([["xe", "Hồ sơ xe"], ["chuyen", `Nhật trình chuyến (${chuyen.length})`], ["giaodich", `Đối soát nguồn ngoài (${gd?.rows?.length || 0})`], ["quyettoan", `Chủ xe & quyết toán (${chuXe.length})`], ["congno", "Công nợ đội xe"], ["baoduong", bd ? `Bảo dưỡng (${(bd.theo_muc?.BLOCK || 0) + (bd.theo_muc?.REVIEW || 0)} cần xếp lịch)` : "Bảo dưỡng"], ["baohong", bh ? `Báo hỏng (${bh.dem?.dang_mo || 0} đang mở)` : "Báo hỏng"],
         ["nhinlai", "Nhìn lại"]] as const)
         .map(([k, ten]) => <button key={k} className={`act ${tab === k ? "teal" : "grey"}`} onClick={() => setTab(k as any)}>{ten}</button>)}
@@ -351,7 +354,7 @@ function DoiXe() {
           chưa được rà lại.</p>
       </div>}
       <div className="panel wrap"><h2>Nhật trình chuyến</h2>
-      <p className="muted">Km để trống nghĩa là <b>chưa đo</b>, không phải bằng 0. Cột &quot;Vietourist tạm ứng&quot; và &quot;Chủ xe chịu&quot; tách theo quy tắc chốt 07/9/2026: Vietourist tạm ứng nhiên liệu, cầu đường, công tác phí, bãi xe.</p>
+      <p className="muted">Km để trống là <b>chưa đo</b>, không phải 0.</p>
       {canNhap && !form && <div style={{ marginBottom: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button className="act teal" onClick={() => setForm({ ngay_di: "", ngay_ve: "" })}>+ Nhập phiếu chi phí xe</button>
         {/* Cờ được tính lúc GHI rồi lưu vào dòng. Đo trên hệ thật 07/10/2026: cả 24 chuyến in rõ
@@ -965,7 +968,7 @@ function DoiXe() {
   </>);
 }
 
-export default function Page() { return <Shell><DoiXe /></Shell>; }
+export default function Page() { return <Shell><MauDoiXe><DoiXe /></MauDoiXe></Shell>; }
 
 /* TK-1d (Chủ tịch 04/11/2026) · ĐƠN GIÁ NGÀY XE NHÀ. Tạm tính tour đoàn khách tự thiết kế lấy giá xe theo tuyến trước;
    hành trình không trùng tuyến nào thì lấy đơn giá ngày của xe nhà nhỏ nhất đủ chỗ × số ngày. Đội xe nhập ở đây. */

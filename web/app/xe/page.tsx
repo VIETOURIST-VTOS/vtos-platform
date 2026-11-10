@@ -45,13 +45,6 @@ import SanSangVanHanh from "@/components/doixe/SanSangVanHanh";
  *  CHƯA NHẬP ≠ BẰNG 0 — khoản thiếu đeo nhãn vàng, không bao giờ hiện 0. Luật này đã cứu tháng 10
  *  khỏi đọc sai 84,5 tr (KS-36) và 77 tr lương (KS-41). */
 
-const MAU: Record<string, { cham: string; chu: string }> = {
-  do:    { cham: "#be2f2f", chu: "#be2f2f" },
-  cam:   { cham: "#a66a00", chu: "#a66a00" },
-  vang:  { cham: "#c9a227", chu: "#6b5415" },
-  trang: { cham: "#fff",    chu: "#5b6b82" },
-};
-
 /** Đổi kỳ bằng SỐ THÁNG — không đi qua chuỗi gõ dở. */
 function doiKy(ky: string, buoc: number) {
   let [n, t] = ky.split("-").map(Number);
@@ -184,6 +177,9 @@ const QUYEN_GD: [string, string][] = [
   ["Bảng giá vận tải", "Chưa có quyền"],
   ["Đổi thông tin ngân hàng", "Không — Kế toán"],
 ];
+
+/** Nhãn viền màu của thẻ việc theo mức máy chủ trả. */
+const NHAN_MUC: Record<string, string> = { do: "Đỏ", cam: "Cam", vang: "Vàng", trang: "Chờ người khác" };
 
 /** Việc của hàng đợi ↔ dòng của bảng sẵn sàng nói CÙNG một chuyện. Hàng đợi giữ, bảng sẵn sàng bỏ. */
 const TRUNG_SAN_SANG: Record<string, string[]> = {
@@ -355,22 +351,25 @@ function BanLamViecXe() {
 
         {hd.viec.length === 0
           ? <p className="muted">Không có việc nào đang mở.</p>
-          : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 440px), 1fr))", columnGap: 28 }}>
-          {hd.viec.map((v: any) => (
-            <div key={v.ma} className={"xe-it" + (v.muc === "do" ? " xe-do" : "")}>
-              <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: "50%",
-                flex: "0 0 10px", background: (MAU[v.muc] || MAU.vang).cham,
-                border: v.muc === "trang" ? "2px solid #afbcce" : undefined }} />
-              <span style={{ flex: "999 1 320px", minWidth: 0 }}>
-                <strong style={{ display: "block" }}>{v.tieu_de}</strong>
-                <span className="muted">{v.mo_ta}</span>
-              </span>
+          : <div className="xe-the-luoi">
+          {/* VH-5 · kiểu thẻ (Chủ tịch duyệt 10/11/2026): mỗi việc một thẻ — mã việc nhỏ góc trái, nhãn viền
+              màu góc phải, tên việc, mô tả, nút ở đáy. */}
+          {hd.viec.map((v: any, i: number) => (
+            <div key={v.ma} className={"xe-the" + (v.muc === "do" ? " xe-the-do" : "")}>
+              <div className="xe-the-dau">
+                <span className="xe-the-ma">VIỆC {String(i + 1).padStart(2, "0")}</span>
+                <span className={"xe-pill xe-pill-" + (v.muc in NHAN_MUC ? v.muc : "vang")}>{(NHAN_MUC[v.muc] || NHAN_MUC.vang)}</span>
+              </div>
+              <strong className="xe-the-ten">{v.tieu_de}</strong>
+              <span className="muted" style={{ fontSize: 13 }}>{v.mo_ta}</span>
               {/* Quyền ẩn NÚT, không ẩn VIỆC: giám đốc vẫn thấy tiền đang treo kể cả khi chưa
                   được bấm. Giấu việc đi thì tiền treo biến mất khỏi tầm mắt người duy nhất
                   quan tâm đến nó. */}
-              {v.bam_duoc && v.ngan_keo
-                ? <button type="button" className={v.muc === "do" ? "xe-nut-chinh" : undefined} onClick={() => setKeo(v.ngan_keo)}>{v.nhan_nut}</button>
-                : <span className="muted"><strong>{v.nhan_nut}</strong></span>}
+              <div className="xe-the-day">
+                {v.bam_duoc && v.ngan_keo
+                  ? <button type="button" className={v.muc === "do" ? "xe-nut-chinh" : undefined} onClick={() => setKeo(v.ngan_keo)}>{v.nhan_nut}</button>
+                  : <span className="muted"><strong>{v.nhan_nut}</strong></span>}
+              </div>
             </div>))}</div>}
 
         {hd.bo_do_hong?.length > 0 && <p style={{ color: "#a66a00" }}>
@@ -504,6 +503,18 @@ const RONG = <style>{`main{max-width:none!important}
 .xe-blk .xe-do{margin:0;border-radius:8px;padding:10px 12px}
 .xe-thanh{height:6px;border-radius:99px;background:var(--xe-vien);overflow:hidden;margin-top:6px}
 .xe-thanh i{display:block;height:100%;background:var(--xe-nhan)}
+/* VH-5 · kiểu thẻ: bo góc 12px, viền mảnh, bóng nhẹ; nhãn viền màu; mã nhỏ chữ đơn cách */
+.xe-the-luoi{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:12px;padding:6px 0 10px}
+.xe-the{background:#fff;border:1px solid #d6dfeb;border-radius:12px;box-shadow:0 4px 14px #1b3a6214;padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.xe-the-do{border-color:#efc3cc}
+.xe-the-dau{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.xe-the-ma{font-family:var(--vtos-font-mono,ui-monospace,monospace);font-size:12px;color:#5b6876;letter-spacing:.5px}
+.xe-the-ten{font-size:15.5px;color:var(--xe-dam)}
+.xe-the-do .xe-the-ten{color:var(--xe-do)}
+.xe-the-day{margin-top:auto;padding-top:4px;display:flex;justify-content:flex-end}
+.xe-pill{font-size:12px;font-weight:600;border-radius:999px;padding:1px 10px;border:1.5px solid currentColor;white-space:nowrap}
+.xe-pill-do{color:var(--xe-do)}.xe-pill-cam{color:#a66a00}.xe-pill-vang{color:#885b08}.xe-pill-trang{color:#5b6876}
+.xe-cua,.xe-blk,#hieu-qua-doi-xe{border-radius:12px!important;box-shadow:0 4px 14px #1b3a6214}
 button.act.teal{background:var(--xe-nhan)!important;border-color:var(--xe-nhan)!important;color:#fff!important}
 `}</style>;
 

@@ -503,8 +503,10 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet, chuaKhop, gon }: {
   ];
   return (
     <section className="panel" id="hieu-qua-doi-xe" aria-busy={dangNap}>
-      <div className="mh01-dau">
-        <h2>Hiệu quả đội xe</h2>
+      {/* VH-5 (10/11/2026): trên điện thoại tên khối, nhãn kỳ, ba nút kỳ và ô thời điểm không vừa một
+          hàng — cho xuống hàng thay vì tràn ngang. Sửa tại chỗ, không đụng `.mh01-dau` chung trong globals.css. */}
+      <div className="mh01-dau" style={{ flexWrap: "wrap", rowGap: 6 }}>
+        <h2 style={{ whiteSpace: "nowrap" }}>Hiệu quả đội xe</h2>
         {/* Nút chọn kỳ nằm ngay đầu khối, cạnh tên — không giấu dưới đáy: nó đổi ý nghĩa của MỌI
             con số trong khối, nên người đọc phải thấy mình đang xem kỳ nào trước khi đọc số. */}
         {o.nhan && <span className="muted" style={{ fontSize: ".85em", marginRight: 8 }}>{o.nhan}</span>}
@@ -693,7 +695,7 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet, chuaKhop, gon }: {
           màn hình hỏng. Nút nhảy đưa thẳng sang kỳ máy chủ bảo là còn số. */}
       {coNguonKy && o.trong_vi_sao && (
         <p className="v14-ghi">
-          <span className="tag">{o.trong_vi_sao}</span>
+          <span className="tag" style={{ whiteSpace: "normal" }}>{o.trong_vi_sao}</span>
           {theo_ky?.mac_dinh && theo_ky.mac_dinh !== ky && (
             <button type="button" className="v14-ky-nut" style={{ marginLeft: 8 }}
               onClick={() => setKy(theo_ky.mac_dinh!)}>
@@ -710,7 +712,7 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet, chuaKhop, gon }: {
       </p>}
       {o.so_sanh && <p className="v14-ghi muted">Mũi tên {o.so_sanh.nhan}.</p>}
       {coNguonKy && !o.so_sanh && o.chua_so_sanh_vi && !o.trong_vi_sao &&
-        <p className="v14-ghi"><span className="tag">{o.chua_so_sanh_vi}</span></p>}
+        <p className="v14-ghi"><span className="tag" style={{ whiteSpace: "normal" }}>{o.chua_so_sanh_vi}</span></p>}
       {/* Tiêu hao: con số LUÔN in ra, ngưỡng thì chờ người khai. Giấu con số đi vì chưa có ngưỡng
           là lặp lại đúng lỗi vòng HQ-1 đã sửa — tính sẵn một câu trả lời rồi không in nó ra. */}
       {o.tieu_hao_l100 != null && o.tieu_hao_nguong_thieu && (
