@@ -2,6 +2,9 @@
 
 Mọi con số đọc từ thứ ĐÃ CÓ trong hệ thống, không ai phải nhập thêm:
   · ngày có lệnh  = lệnh điều xe chưa huỷ phủ ngày ấy (DispatchOrder.date_from..date_to);
+  · ngày theo sheet = chuyến đội xe đã ghi trước vào Google Sheet xe (VH-15, Chủ tịch 11/11/2026: đội xe
+                    ghi trước chuyến sắp chạy; VTOS chưa có lệnh nào nên chỉ đọc lệnh thì cả đội «trống
+                    100%»). Ngày có lệnh VTOS thì lệnh thắng; sheet chỉ lấp ngày chưa có lệnh;
   · xe bị chặn    = báo hỏng mức «phải dừng xe» chưa đóng — KHÔNG biết ngày xong, nên xe ấy KHÔNG được tính là
                     trống ngày nào cả (tính là trống thì Kinh doanh bán một chiếc xe đang nằm xưởng);
   · đề nghị chờ   = đề nghị xe chưa có lệnh. Đề nghị chưa gắn xe, nên nó là SỐ XE ĐANG ĐƯỢC HỎI theo ngày, không
@@ -31,7 +34,7 @@ def _xe_khai_thac(db: Session) -> list[Vehicle]:
             if getattr(v, "active", True) and (getattr(v, "lifecycle", "") or "dang_khai_thac") == "dang_khai_thac"]
 
 
-def bang(db: Session, tu: date | None = None, so_ngay: int = SO_NGAY) -> dict:
+def bang(db: Session, tu: date | None = None, so_ngay: int = SO_NGAY, tai_sheet=None) -> dict:
     tu = tu or date.today()
     so_ngay = max(7, min(int(so_ngay or SO_NGAY), 180))
     ngay = [tu + timedelta(days=i) for i in range(so_ngay)]
@@ -54,6 +57,20 @@ def bang(db: Session, tu: date | None = None, so_ngay: int = SO_NGAY) -> dict:
         for i in range(max(0, (d.date_from - tu).days), min(so_ngay - 1, (d.date_to - tu).days) + 1):
             lenh[d.vehicle_id].add(i)
 
+    # VH-15 · chuyến ghi trước trên Google Sheet xe — khớp xe theo NĂM SỐ CUỐI biển số (cách sheet ghi xe).
+    from app.services import xe_theo_sheet as XS
+    sh = XS.chuyen_trong_khoang(db, tu, den, **({"tai": tai_sheet} if tai_sheet else {}))
+    theo_sheet: dict[int, dict[int, str]] = {v.id: {} for v in xe}
+    khoa_xe = {XS.nam_so_cuoi(v.plate): v.id for v in xe if XS.nam_so_cuoi(v.plate)}
+    for k, ds in sh["theo_khoa"].items():
+        vid = khoa_xe.get(k)
+        if vid is None:
+            continue
+        for di, ve, tour in ds:
+            for i in range(max(0, (di - tu).days), min(so_ngay - 1, (ve - tu).days) + 1):
+                if i not in lenh[vid]:
+                    theo_sheet[vid][i] = tour
+
     hoi = [0] * so_ngay           # số xe đang được hỏi (đề nghị chờ lệnh) theo ngày
     so_de_nghi, ngay_xe_hoi = 0, 0
     for dn in db.execute(select(DeNghiXe).where(DeNghiXe.trang_thai == "cho_lap_lenh",
@@ -66,9 +83,11 @@ def bang(db: Session, tu: date | None = None, so_ngay: int = SO_NGAY) -> dict:
     hang, khoang = [], []
     for v in xe:
         bi_chan = v.id in chan
-        o = ["chan" if bi_chan else ("lenh" if i in lenh[v.id] else "") for i in range(so_ngay)]
-        dung = len(lenh[v.id])
+        o = ["chan" if bi_chan else ("lenh" if i in lenh[v.id] else ("sheet" if i in theo_sheet[v.id] else ""))
+             for i in range(so_ngay)]
+        dung = len(lenh[v.id]) + len(theo_sheet[v.id])
         hang.append({"id": v.id, "xe": v.plate, "ma": v.code or "", "so_cho": v.seats or 0, "o": o,
+                     "tour_sheet": {str(i): t for i, t in theo_sheet[v.id].items()},
                      "bi_chan": chan.get(v.id, ""),
                      "cong_suat": None if bi_chan else round(dung * 100 / so_ngay)})
         if bi_chan:
@@ -94,7 +113,7 @@ def bang(db: Session, tu: date | None = None, so_ngay: int = SO_NGAY) -> dict:
         tong = len(kha_dung) * (b - a)
         if tong <= 0:
             return None
-        return round(sum(1 for h in kha_dung for i in range(a, b) if h["o"][i] == "lenh") * 100 / tong)
+        return round(sum(1 for h in kha_dung for i in range(a, b) if h["o"][i] in ("lenh", "sheet")) * 100 / tong)
 
     tuan = []
     for a in range(0, so_ngay, 7):
@@ -110,6 +129,8 @@ def bang(db: Session, tu: date | None = None, so_ngay: int = SO_NGAY) -> dict:
         "de_nghi_cho": so_de_nghi, "ngay_xe_de_nghi": ngay_xe_hoi,
         "tuan": tuan, "nguong_thap": NGUONG_THAP, "khoang_trong": khoang,
         "ghi_chu": "Xe đang có báo hỏng «phải dừng xe» không tính là trống ngày nào — chưa biết ngày sửa xong.",
+        "sheet": {"co_link": sh["co_link"], "loi": sh["loi"], "doc_luc": sh["doc_luc"], "so_chuyen": sh["so_chuyen"]},
+        "so_ngay_lenh": sum(1 for h in hang for x in h["o"] if x == "lenh"),
     }
 
 
@@ -117,7 +138,17 @@ def khoang_trong_cho_kinh_doanh(db: Session, tu: date | None = None) -> dict:
     """Phần phòng Kinh doanh được xem: khoảng trống và công suất theo tuần — không tên tour, không giá."""
     b = bang(db, tu)
     return {"tu": b["tu"], "den": b["den"], "khoang_trong": b["khoang_trong"], "tuan": b["tuan"],
-            "nguong_thap": b["nguong_thap"], "cong_suat_30": b["cong_suat_30"]}
+            "nguong_thap": b["nguong_thap"], "cong_suat_30": b["cong_suat_30"], "sheet": b["sheet"]}
+
+
+def chua_du_du_lieu(b: dict) -> str | None:
+    """VH-15: lý do KHÔNG được báo «xe trống» — sheet đọc hỏng, hoặc chưa có link sheet mà cũng chưa có lệnh
+    nào. Báo trống trong hai trường hợp ấy là bảo Kinh doanh bán những ngày xe đã có khách."""
+    if b["sheet"]["loi"]:
+        return f"Chưa đọc được Sheet xe: {b['sheet']['loi']}"
+    if not b["sheet"]["co_link"] and not b["so_ngay_lenh"]:
+        return "Chưa có lệnh điều xe nào trên VTOS và chưa dán link Sheet xe — chưa biết xe nào bận."
+    return None
 
 
 def tin_tuan(db: Session, tu: date | None = None) -> str:
