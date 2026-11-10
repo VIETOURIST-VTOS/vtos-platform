@@ -680,10 +680,11 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet, chuaKhop, gon }: {
 
       {/* Cửa sang bảng từng xe. Bản vẽ xếp nó thành một khối trong khối này, nhưng bảng ấy đã có
           trang riêng dựng trên `fleet_lai_lo`; in lại ở đây là hai chỗ cùng một con số. */}
-      <p className="v14-ghi">
+      {/* VH-8: /xe (gon) bỏ các dòng ghi chú dưới khối — Chủ tịch dặn 11/11/2026. Màn Chủ tịch giữ nguyên. */}
+      {!gon && <p className="v14-ghi">
         <span className="muted">Doanh thu, chi phí và lợi nhuận của TỪNG xe ·{" "}</span>
         <Link className="the-cua" href="/lai-lo-doi-xe">Bảng lãi lỗ từng xe →</Link>
-      </p>
+      </p>}
 
       {!coNguonKy && (
         <p className="v14-ghi">
@@ -707,16 +708,17 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet, chuaKhop, gon }: {
       )}
       {/* Hai câu phải nằm TRÊN màn hình, không nằm trong mã: người đọc so con số này với màn hình
           Điều hành xe và cần biết hai ô «thời điểm» ấy làm hai việc khác nhau. */}
-      {moc && <p className="v14-ghi muted">
+      {moc && !gon && <p className="v14-ghi muted">
         Số của kỳ đã chọn được <b>tính lại</b> từ sổ sách hiện có, không phải bản chụp. Đội xe nạp
         bù chuyến của kỳ ấy thì con số ở đây <b>sẽ đổi</b> — đó là đúng.
       </p>}
-      {o.so_sanh && <p className="v14-ghi muted">Mũi tên {o.so_sanh.nhan}.</p>}
+      {o.so_sanh && !gon && <p className="v14-ghi muted">Mũi tên {o.so_sanh.nhan}.</p>}
       {coNguonKy && !o.so_sanh && o.chua_so_sanh_vi && !o.trong_vi_sao &&
         <p className="v14-ghi"><span className="tag" style={{ whiteSpace: "normal" }}>{o.chua_so_sanh_vi}</span></p>}
       {/* Tiêu hao: con số LUÔN in ra, ngưỡng thì chờ người khai. Giấu con số đi vì chưa có ngưỡng
           là lặp lại đúng lỗi vòng HQ-1 đã sửa — tính sẵn một câu trả lời rồi không in nó ra. */}
-      {o.tieu_hao_l100 != null && o.tieu_hao_nguong_thieu && (
+      {/* /xe (gon): thiếu định mức dầu đã có dòng riêng ở «Sẵn sàng vận hành» — không nhắc lại ở đây. */}
+      {o.tieu_hao_l100 != null && o.tieu_hao_nguong_thieu && !gon && (
         <p className="v14-ghi">
           <span className="tag warn">chưa có định mức dầu</span>{" "}
           <span className="muted">Chưa biết {o.tieu_hao_l100} L/100km là cao hay thấp ·{" "}

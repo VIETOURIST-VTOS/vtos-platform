@@ -22,7 +22,8 @@ def test_1_nam_nhom_la_nut_navy_khong_cat_chu():
     s = _w("app", "xe", "page.tsx")
     assert 'className="xe-nhom"' in s
     css = s.split("const RONG", 1)[1]
-    assert re.search(r"\.xe-nhom\{display:flex;flex-wrap:wrap", css)
+    # VH-8 (Chủ tịch 11/11/2026): năm nút chia đều cả hàng, màn hẹp xuống hai cột — vẫn không cắt chữ.
+    assert re.search(r"\.xe-nhom\{display:grid;grid-template-columns:repeat\(5,minmax\(0,1fr\)\)", css)
     assert "white-space:nowrap" in css and "--xe-nhan:#2c5fa2" in css
 
 
