@@ -112,7 +112,7 @@ const MAN_GON: Record<string, (p: GonProps) => React.ReactNode> = {
   "lich": (p) => <G.LichLenhGon mo={p.mo} />,
   "lich-90": (p) => <LichXe90 mo={p.mo} />,
   "ho-so-xe": (p) => <G.HoSoXeGon mo={p.mo} />,
-  "bao-cao-xe": (p) => <G.BaoCaoXeGon mo={p.mo} onNhap={p.onNhap} />,
+  "bao-cao-xe": (p) => <G.BaoCaoXeGon mo={p.mo} onNhap={p.onNhap} ky={p.ky} />,
   "quyet-toan": (p) => <G.QuyetToanGon mo={p.mo} ky={p.ky} />,
   "cong-no": (p) => <G.CongNoGon mo={p.mo} />,
   "bao-duong": (p) => <G.BaoDuongGon mo={p.mo} />,
@@ -404,7 +404,11 @@ function BanLamViecXe() {
           const Gon: ((p: GonProps) => React.ReactNode) | undefined = MAN_GON[trangMo.ma];
           const moCT = (toi: string) => setChiTiet(toi);
           if (Gon && !chiTiet && !moSan) return Gon({ mo: moCT, ky, onNhap: () => setMoSan("phieu-chi-phi") });
-          const toi = chiTiet || trangMo.toi;
+          // VH-13: trang nhúng có bảng theo kỳ (Xếp hạng, Lãi lỗ) đọc ĐÚNG tháng đang chọn ở ‹ › đầu /xe,
+          // để màn và tệp Excel xuất ra cùng một kỳ — không có ô chọn kỳ thứ hai.
+          const TRANG_THEO_KY = ["hieu-qua", "lai-lo"];
+          const toi = chiTiet || (TRANG_THEO_KY.includes(trangMo.ma)
+            ? trangMo.toi + (trangMo.toi.includes("?") ? "&" : "?") + `ky=${ky}` : trangMo.toi);
           const coGon = trangMo.ma in MAN_GON;
           return <>
             {coGon && <p style={{ margin: "0 0 8px" }}><button type="button"

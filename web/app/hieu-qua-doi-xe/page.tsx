@@ -1,4 +1,5 @@
 "use client";
+import NutExcel from "@/components/doixe/NutExcel";
 import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtDT, vnd, pct } from "@/lib/api";
@@ -29,8 +30,12 @@ function HieuQua() {
      và Kết quả kỳ — hai khối ấy đã có trên bàn làm việc đội xe, không lặp. */
   const [chiXepHang, setChiXepHang] = useState(false);
   useEffect(() => {
-    const x = new URLSearchParams(window.location.search).get("chi") === "xep-hang";
+    const q = new URLSearchParams(window.location.search);
+    const x = q.get("chi") === "xep-hang";
     setChiXepHang(x);
+    // VH-13: /xe truyền tháng đang chọn ở ‹ › đầu màn — dùng nó, không có ô chọn kỳ thứ hai.
+    const k = q.get("ky");
+    if (k && /^\d{4}-\d{2}$/.test(k)) setKy(k);
     if (!x) api("/fleet/ban-tin-sang").then(setBt).catch(() => {});
   }, []);
 
@@ -50,10 +55,10 @@ function HieuQua() {
       <p className="muted">{bt.ghi_chu}</p>
     </div>}
 
-    <div className="panel"><h2>Kỳ đánh giá</h2>
+    {!chiXepHang && <div className="panel"><h2>Kỳ đánh giá</h2>
       <label>Tháng<input type="month" value={ky} onChange={(e) => setKy(e.target.value)} /></label>
       <button className="act teal" onClick={chay} disabled={busy}>{busy ? "Đang tính…" : "Chạy lại"}</button>
-    </div>
+    </div>}
 
     {d && <>
       {/* CẢNH BÁO TRƯỚC SỐ. Một con số sai mà không ai biết nó sai thì tệ hơn một con số thiếu. */}
@@ -100,7 +105,10 @@ function HieuQua() {
         </p>}
       </div>}
 
-      <div className="panel wrap"><h2>Hiệu quả từng xe – kỳ {d.ky} ({d.tap_so_sanh_xe} xe)</h2>
+      <div className="panel wrap"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <h2 style={{ margin: 0 }}>Hiệu quả từng xe – kỳ {d.ky} ({d.tap_so_sanh_xe} xe)</h2>
+        {/* VH-13: một nút cho cả hai bảng — tệp có trang tính «Xe» và «Tài xế». */}
+        <NutExcel duong={`/fleet/hieu-qua.xlsx?ky=${ky}`} ten={`XEP_HANG_XE_TAI_XE_${ky.replace("-", "")}.xlsx`} /></div>
         <p className="muted">{d.ghi_chu}</p>
         <table><thead><tr><th>Hạng</th><th>Xe</th><th>Chuyến</th><th>Ngày khai thác</th><th>Km</th><th>Doanh thu</th><th>Chi phí</th><th>trong đó chi phí kỳ</th><th>Lợi nhuận</th><th>LN/ngày</th><th>Dầu đ/km</th><th>km/lít</th><th>Sửa chữa/km</th></tr></thead>
           <tbody>{d.xe.length ? d.xe.map((r: any) => <tr key={r.vehicle_id}>
