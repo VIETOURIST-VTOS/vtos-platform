@@ -1,4 +1,5 @@
 "use client";
+import NutExcel from "@/components/doixe/NutExcel";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
@@ -32,6 +33,12 @@ function LaiLo() {
     } catch (e) { toast(errMsg(e), true); }
   }, [ky, phanBo, toast]);
   useEffect(() => { load(); }, [load]);
+  /* VH-13: mở từ /xe thì /xe truyền tháng đang chọn ở ‹ › — dùng nó và giấu ô Kỳ của trang (không lặp). */
+  const [kyTuXe, setKyTuXe] = useState(false);
+  useEffect(() => {
+    const k = new URLSearchParams(window.location.search).get("ky");
+    if (k && /^\d{4}-\d{2}$/.test(k)) { setKy(k); setKyTuXe(true); }
+  }, []);
 
   if (!d) return <p className="muted">Đang tải…</p>;
   const t = d.tong;
@@ -46,8 +53,11 @@ function LaiLo() {
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "8px 0" }}>
       {TABS.map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")}
         style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}
-      <label style={{ marginLeft: "auto" }}>Kỳ
-        <input type="month" value={ky} onChange={(e) => setKy(e.target.value)} /></label>
+      <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        {/* VH-13: một nút — tệp có ba trang tính: Tổng kỳ, Theo xe, Theo chuyến. */}
+        <NutExcel duong={`/fleet/lai-lo.xlsx?ky=${ky}`} ten={`LAI_LO_DOI_XE_${ky.replace("-", "")}.xlsx`} />
+        {!kyTuXe && <label>Kỳ
+          <input type="month" value={ky} onChange={(e) => setKy(e.target.value)} /></label>}</span>
     </div>
 
     {tab === "tong" && <>

@@ -1,4 +1,5 @@
 "use client";
+import NutExcel from "@/components/doixe/NutExcel";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
@@ -82,7 +83,7 @@ export function HoSoXeGon({ mo }: { mo: Mo }) {
 }
 
 /* ───────── Báo cáo & chi phí › Báo cáo từng xe ───────── */
-export function BaoCaoXeGon({ mo, onNhap }: { mo: Mo; onNhap: () => void }) {
+export function BaoCaoXeGon({ mo, onNhap, ky: kyChon }: { mo: Mo; onNhap: () => void; ky: string }) {
   const { d, loi } = useDoc<any[]>("/fleet/chuyen");
   const ky = useDoc<any>("/fleet/quyet-toan-chuyen/cho-toi-ky");
   const [loc, setLoc] = useState("all");
@@ -101,7 +102,10 @@ export function BaoCaoXeGon({ mo, onNhap }: { mo: Mo; onNhap: () => void }) {
   return <>
     <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
       <h2 style={{ margin: 0 }}>Báo cáo từng xe</h2>
-      <button type="button" className="act teal" style={{ margin: 0 }} onClick={onNhap}>Nhập báo cáo từng xe</button></div>
+      <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {/* VH-13: một nút Excel — mọi chuyến khởi hành trong tháng đang chọn ở đầu /xe. */}
+        <NutExcel duong={`/fleet/chuyen.xlsx?ky=${kyChon}`} ten={`BAO_CAO_TUNG_XE_${kyChon.replace("-", "")}.xlsx`} />
+        <button type="button" className="act teal" style={{ margin: 0 }} onClick={onNhap}>Nhập báo cáo từng xe</button></span></div>
     <ChoToiKy mo={mo} d={ky.d} />
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "8px 0" }}>
       {NHOM.map(([k, t, g]) => <Chip key={k} on={loc === k} t={`${t} · ${d.filter(g).length}`} onClick={() => setLoc(k)} />)}</div>
