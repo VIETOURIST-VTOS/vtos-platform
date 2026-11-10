@@ -140,7 +140,7 @@ const CUA_NHAP: { nhan: string; ten: string; buoc: string; trang: string; mo: st
 /** VH-6 (Chủ tịch dặn 10/11/2026): «bấm vào chi tiết thì nhảy qua màn hình tổng CRM — không phải thao tác
  *  trên màn hình riêng». Mọi đường dẫn có tiền tố dưới đây là màn của đội xe: bấm ở /xe hay bấm trong khung
  *  nhúng đều MỞ TẠI CHỖ trong /xe, không sang trang có thanh dọc CRM, không mở tab mới. Lối ra duy nhất là
- *  «Trang tổng CRM →». */
+ *  chữ «HỆ THỐNG ĐIỀU HÀNH» trên thanh đầu (VH-8). */
 const DUONG_DOI_XE = ["/doi-xe", "/lai-lo-doi-xe", "/lenh-dieu-xe", "/tai-xe", "/hieu-qua-doi-xe", "/su-co-tour", "/nap-du-lieu"];
 const laDoiXe = (href: string) => DUONG_DOI_XE.some((t) => href === t || href.startsWith(t + "/") || href.startsWith(t + "?"));
 
@@ -261,6 +261,17 @@ function BanLamViecXe() {
     return () => window.removeEventListener("keydown", esc);
   }, [keo]);
 
+  /* VH-8 (Chủ tịch 11/11/2026): gộp «Trang tổng CRM» vào chữ «HỆ THỐNG ĐIỀU HÀNH» trên thanh đầu. Thanh đầu là
+     Shell.tsx (làn R2 giữ) nên không sửa ở đó: /xe gắn một lối bấm vào chính chữ ấy khi màn này đang mở. Logo bên
+     cạnh vẫn về tổng quan /xe như cũ. */
+  useEffect(() => {
+    const chu = document.querySelector("a.brand small") as HTMLElement | null;
+    if (!chu) return;
+    const ve = (e: Event) => { e.preventDefault(); e.stopPropagation(); window.location.assign("/"); };
+    chu.title = "Về trang tổng CRM";
+    chu.addEventListener("click", ve, true);
+    return () => { chu.removeEventListener("click", ve, true); chu.removeAttribute("title"); };
+  }, []);
   const hd = d?.hang_doi, sk = d?.so_ky, xe = d?.xe_hom_nay;
   /** «Mỗi nút một chỗ» (Chủ tịch dặn 10/11/2026): việc nào «Việc cần xử lý» đã nói thì bảng sẵn sàng
    *  không nói lại. Khoá là mã việc của hàng đợi → mã dòng / mã nhóm của bảng sẵn sàng. */
@@ -317,7 +328,6 @@ function BanLamViecXe() {
       <div>
         <span className="xe-dau-eb">Đội xe · Công ty TNHH Vận tải Vietrip</span>
         <h1>Bàn làm việc Giám đốc đội xe</h1>
-        <p className="muted">Chỉ dữ liệu đội xe</p>
       </div>
       <div className="xe-ky">
         <button type="button" className="xe-ky-quyen" onClick={() => setQuyen(!quyen)} aria-expanded={quyen}>Quyền của tôi</button>
@@ -339,7 +349,6 @@ function BanLamViecXe() {
           <svg viewBox="0 0 24 24" aria-hidden="true">{ICON_NHOM[n.ma]}</svg>
           {n.ten}
         </button>))}
-      <Link href="/" className="xe-ra">Trang tổng CRM →</Link>
     </nav>
 
     {/* ② THANH CON — chỉ hiện khi nhóm có nhiều hơn một trang (v3.3). */}
@@ -440,9 +449,9 @@ function BanLamViecXe() {
           <button key={c.trang} type="button"
                 onClick={() => { setNhom("finance"); setTrang(c.trang); setMoSan(c.mo); }}
                 className="xe-cua">
-            <small className="muted" style={{ display: "block", letterSpacing: ".04em" }}>{c.nhan}</small>
-            <strong style={{ display: "block", fontSize: "1.1em", margin: "2px 0" }}>{c.ten}</strong>
-            <span className="muted">{c.buoc}</span>
+            {/* VH-8: chữ canh giữa thẻ, bỏ dòng các bước, tên cửa nhập to và đậm. */}
+            <small className="muted">{c.nhan}</small>
+            <strong>{c.ten}</strong>
           </button>))}
       </div>
 
@@ -561,14 +570,15 @@ main .panel{background:#fff;border:0!important;border-radius:16px!important;box-
 /* VH-4 · điểm nhấn navy sáng trên nền trắng (Chủ tịch duyệt bản xem trước 10/11/2026). Chỉ sống khi /xe
    đang mở; không thêm vào globals.css hay Shell.tsx. */
 :root{--xe-nhan:#2c5fa2;--xe-dam:#183c69;--xe-nhat:#edf3fc;--xe-vien:#e1e7ef;--xe-do:#b72f45;--xe-do-nen:#fff0f3}
-.xe-nhom{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+/* VH-8: năm nút chia đều cả hàng; màn hẹp thì xuống hai cột. */
+.xe-nhom{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:stretch;margin-bottom:8px}
+@media (max-width:900px){.xe-nhom{grid-template-columns:repeat(2,minmax(0,1fr))}.xe-nhom button:last-child{grid-column:span 2}}
 .xe-nhom button{flex:1 1 auto;white-space:nowrap;font:inherit;font-size:14.5px;font-weight:600;color:#fff;
   background:var(--xe-nhan);border:0;border-radius:10px;min-height:46px;padding:8px 14px;cursor:pointer;box-shadow:0 2px 6px #2c5fa230}
 .xe-nhom button:hover{background:#3a6fb5}
 .xe-nhom button[aria-pressed=true]{background:var(--xe-dam);box-shadow:0 0 0 3px #9fc0ec}
 .xe-nhom button:focus-visible{outline:3px solid #719ee1;outline-offset:2px}
-.xe-ra{padding:8px 4px;white-space:nowrap}
-@media (max-width:520px){.xe-nhom button{flex:1 1 40%;font-size:14px}}
+@media (max-width:520px){.xe-nhom button{font-size:14px}}
 .xe-con{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 14px}
 .xe-con button{font:inherit;font-size:13.5px;border:1px solid var(--xe-vien);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer}
 .xe-con button[aria-pressed=true]{background:var(--xe-nhan);border-color:var(--xe-nhan);color:#fff;font-weight:600}
@@ -604,7 +614,13 @@ main .panel{background:#fff;border:0!important;border-radius:16px!important;box-
 .xe-pill{font-size:12px;font-weight:600;border-radius:999px;padding:1px 10px;border:1.5px solid currentColor;white-space:nowrap}
 .xe-pill-do{color:var(--xe-do)}.xe-pill-cam{color:#a66a00}.xe-pill-vang{color:#885b08}.xe-pill-trang{color:#5b6876}
 .xe-cua,.xe-blk,#hieu-qua-doi-xe{border:0!important;border-radius:16px!important;box-shadow:var(--xe-b1)!important;background:#fff}
-.xe-cua{border-top:4px solid var(--xe-nhan)!important;transition:transform .15s,box-shadow .15s}
+.xe-cua{border-top:4px solid var(--xe-nhan)!important;transition:transform .15s,box-shadow .15s;
+  display:flex!important;flex-direction:column;align-items:center;justify-content:center;text-align:center!important;gap:4px;min-height:104px}
+.xe-cua small{display:block;font-size:11.5px;letter-spacing:1.2px;text-transform:uppercase}
+.xe-cua strong{display:block;font-size:23px;font-weight:800;letter-spacing:.2px;color:var(--xe-nhan)}
+/* VH-8: «HỆ THỐNG ĐIỀU HÀNH» trên thanh đầu là lối về trang tổng CRM (thay nút «Trang tổng CRM →»). */
+a.brand small{cursor:pointer;border-radius:6px;padding:2px 6px;transition:background .15s}
+a.brand small:hover{background:#ffffff26;text-decoration:underline}
 .xe-cua:hover{transform:translateY(-2px);box-shadow:var(--xe-b2)!important}
 button.act.teal{background:var(--xe-nhan)!important;border-color:var(--xe-nhan)!important;color:#fff!important}
 `}</style>;
