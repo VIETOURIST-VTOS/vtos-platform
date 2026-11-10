@@ -193,7 +193,8 @@ def test_11_noi_dung_doi_tai_cho_va_bo_muc_luc():
     assert "<KhungNhung" in s and "<DeXuatChiTaiCho" in s
     assert "TrangPhanHe" not in s                                       # khối mục lục «04 Điều hành xe» đã gỡ
     assert "Quyền của tôi" in s and "Số tiền theo" in s
-    assert "main{max-width:none!important}" in s and "vtos-nhung" in s     # trải bề ngang, khung nhúng giấu thanh
+    # VH-7 (Chủ tịch duyệt 11/11/2026): /xe thu gọn tối đa 1180px canh giữa như màn Nhà hàng / Khách sạn.
+    assert "main{max-width:1180px!important;margin:0 auto!important}" in s and "vtos-nhung" in s
 
 
 def test_12_o_so_theo_v33():

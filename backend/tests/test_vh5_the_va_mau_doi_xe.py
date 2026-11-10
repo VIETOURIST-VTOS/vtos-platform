@@ -34,7 +34,7 @@ def test_3_tab_doi_xe_xuong_hang_khong_cat_chu():
 def test_4_viec_can_xu_ly_la_the():
     s = _w("app", "xe", "page.tsx")
     assert 'className="xe-the-luoi"' in s and "xe-the-ma" in s and "NHAN_MUC" in s
-    assert ".xe-the{background:#fff;border:1px solid #d6dfeb;border-radius:12px" in s
+    assert ".xe-the{background:#fbfcfe;border:1px solid #d6dfeb;border-radius:13px" in s     # VH-7: thẻ trên nền thẻ trắng
 
 
 def test_5_khoi_hieu_qua_xuong_hang_tren_dien_thoai():
