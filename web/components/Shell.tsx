@@ -425,6 +425,11 @@ export const GROUPS: Group[] = [
     // hằng tuần là Kinh doanh và Điều hành; trang KHÁCH tự chấm nằm ở /y-kien/<mã>, ngoài
     // thanh điều hướng — khách không có tài khoản và không nên thấy sơ đồ phân hệ của công ty.
     ["Đánh giá sau tour", "/danh-gia"],
+    // XE-KD-1 · 11/11/2026 — Chủ tịch duyệt. ĐẶT Ở «Kinh doanh» chứ không ở «Điều hành»:
+    // người mở màn này là người ĐI BÁN, không phải người điều xe. Giám đốc đội xe vẫn có
+    // nguyên lưới xe 90 ngày đầy đủ ở `/xe` › Điều xe; màn này là phần hẹp của nó, cắt bỏ
+    // lưới xe, tên tour và mọi con số tiền, để mở được cho một phòng khác.
+    ["Lịch xe trống để bán", "/lich-xe-trong"],
     ["Hộp thư", "/inbox"],
     ["Khách hàng & nguồn khách", "/leads?tab=leads"],
     // KH-3 · 26/10/2026: VTD Rewards — tra điểm khách, áp voucher khách đổi ở cổng vào booking.

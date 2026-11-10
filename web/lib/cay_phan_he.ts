@@ -168,6 +168,11 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
     tom_tat: "Bán lẻ · Bán đoàn · Hộp thư và hồ sơ khách",
     con: [
       { ma: "3.1", ten: "Hộp thư", href: "/inbox" },
+      // XE-KD-1 · 11/11/2026 · `them: true` vì màn này sinh sau bản vẽ V1.3. Có mặt ở đây
+      // là BẮT BUỘC, không phải cho đẹp: `test_trang_phan_he` đối chiếu mục menu với cây,
+      // mục nào có trên thanh mà không có trong cây thì đỏ — đúng hàng rào đã bắt được hai
+      // món nợ của đợt PH-1 và MKT-1 ngày 09/11.
+      { ma: "3.1b", ten: "Lịch xe trống để bán", href: "/lich-xe-trong", them: true },
       { ma: "3.2", ten: "Khách hàng",
         con: [
           { ma: "3.2.1", ten: "Hồ sơ khách hàng", href: "/leads?tab=leads" },

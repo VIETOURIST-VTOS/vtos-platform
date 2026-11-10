@@ -68,6 +68,17 @@ CHI_XEM = {
                    "nằm ở từng chuyến (/tours/<id>), và anh Tuấn chốt 18/9/2026 là KHÔNG dựng cửa "
                    "đóng hàng loạt ở đây vì đóng sổ là việc khó lùi.",
                    ("/so-con-no",)),
+    # XE-KD-1 · 11/11/2026 — chỗ trống CUỐI CÙNG của danh sách này, và nó được tiêu vào
+    # đúng câu hỏi mà danh sách này sinh ra để hỏi: «con số ấy vào hệ thống bằng cửa nào».
+    # Màn này trả lời được từng cửa một, nên nó thuộc đây chứ không cần một nhóm mới.
+    "/lich-xe-trong": ("Lịch xe trống để bán: khoảng trống và công suất tuần của đội xe, cho "
+                       "phòng Kinh doanh đẩy bán. Không sở hữu con số nào của riêng mình — "
+                       "ngày có lệnh đọc từ lệnh điều xe (cửa: Lệnh điều xe → Lập lệnh), đề "
+                       "nghị chờ từ đề nghị xe (cửa: Lệnh điều xe → Đề nghị xe), xe bị chặn "
+                       "từ báo hỏng mức phải dừng xe (cửa: Đội xe → tab Báo hỏng), biển số và "
+                       "số chỗ từ hồ sơ xe (cửa: Đội xe → Hồ sơ xe). Cả bốn cửa đều ở màn của "
+                       "ĐỘI XE, và dựng thêm một cửa ở đây là để hai nơi lệch nhau.",
+                       ("/fleet/lich-xe-tuong-lai/khoang-trong",)),
 }
 
 # ── BÀN LÀM VIỆC THEO VAI — nhóm ĐẾM RIÊNG, mở ngày 24/9/2026 ───────────────────────────────────
