@@ -252,6 +252,13 @@ function BanLamViecXe() {
   }, [toast]);
 
   useEffect(() => { if (!khongCoQuyen) doc(ky); }, [ky, doc, khongCoQuyen]);
+  /* VH-10: số ngày-xe còn trống trong 30 ngày tới, in trên nút vàng «Lịch xe 90 ngày». Gọi riêng, không
+     chờ; hỏng thì nút vẫn hiện, chỉ thiếu con số. */
+  const [trong30, setTrong30] = useState<number | null>(null);
+  useEffect(() => {
+    if (khongCoQuyen) return;
+    api("/fleet/lich-xe-tuong-lai?so_ngay=30").then((r: any) => setTrong30(r?.ngay_xe_trong ?? null)).catch(() => {});
+  }, [khongCoQuyen]);
   /* Cửa này nặng — HQ-6 đo 10–30 giây vì nó tính lại ba kỳ, kỳ liền trước để so, và 12 cột của
      hình. Nên gọi RIÊNG một lần, không gộp vào cửa bàn làm việc: gộp thì cả màn phải chờ nó. */
   useEffect(() => {
@@ -441,7 +448,16 @@ function BanLamViecXe() {
       {/* HAI CỬA NHẬP — chỉ xuất hiện MỘT lần trên cả màn (v3.3). */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center",
                     justifyContent: "space-between", marginBottom: 10 }}>
-        <strong>THÁNG {kyDoc(ky)}</strong>
+        {/* VH-10 (Chủ tịch duyệt 11/11/2026): bỏ chữ «THÁNG …» lặp ô chọn kỳ; chỗ ấy là nút vàng nổi bật
+            nhất màn, mở Lịch xe 90 ngày tại chỗ — xe nào còn trống để ưu tiên bán tour. */}
+        <button type="button" className="xe-n90"
+              onClick={() => { setNhom("dispatch"); setTrang("lich-90"); setMoSan(""); setChiTiet(null); }}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2" />
+            <path d="M3 9h18M8 2v4M16 2v4M8 14h2M14 14h2M8 17h2" /></svg>
+          <span><span className="xe-n90-t">Lịch xe 90 ngày</span>
+            <span className="xe-n90-p">Xe nào còn trống · ưu tiên bán tour</span></span>
+          {trong30 !== null && <span className="xe-n90-so">{trong30} ngày-xe trống</span>}
+        </button>
         <label className="muted">Số tiền theo{" "}
           <select value={theoTien} onChange={(e) => setTheoTien(e.target.value as any)}>
             <option value="qt">Chuyến đã quyết toán</option>
@@ -554,6 +570,23 @@ body,.shell{background:#eaf0f7!important}
 .xe-ky button{font:inherit;border:0;background:var(--xe-nhat);color:var(--xe-nhan);min-width:34px;height:34px;border-radius:9px;font-weight:700;cursor:pointer}
 .xe-ky .xe-ky-quyen{background:#fff;border:1px solid #c9d6e8;padding:0 12px;font-weight:600}
 .xe-ky strong{min-width:92px;text-align:center;color:var(--xe-dam);font-variant-numeric:tabular-nums}
+/* VH-10 · nút vàng Lịch xe 90 ngày — khác hẳn dàn nút navy; quầng sáng thở + vệt sáng lướt. */
+.xe-n90{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:14px;border:0;cursor:pointer;
+  padding:12px 22px 12px 16px;border-radius:14px;color:#3b2300;font:inherit;text-align:left;
+  background:linear-gradient(135deg,#ffd76a 0%,#ffb627 55%,#ff9a1f 100%);
+  box-shadow:0 0 0 3px #ffe7a8,0 6px 22px #ff9f1f66;animation:xe-tho 2.4s ease-in-out infinite;transition:transform .15s}
+.xe-n90::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(110deg,transparent 35%,#ffffffb0 50%,transparent 65%);transform:translateX(-120%);animation:xe-luot 3.2s ease-in-out infinite}
+.xe-n90:hover{transform:translateY(-2px)}
+.xe-n90:focus-visible{outline:3px solid #b86b00;outline-offset:3px}
+.xe-n90 svg{width:30px;height:30px;flex:none;fill:none;stroke:#5a3500;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.xe-n90-t{display:block;font-size:19px;font-weight:800;letter-spacing:.4px;text-transform:uppercase}
+.xe-n90-p{display:block;font-size:13px;font-weight:600;opacity:.85}
+.xe-n90-so{margin-left:6px;background:#3b2300;color:#ffd76a;border-radius:999px;padding:4px 11px;font-weight:800;font-size:13.5px;white-space:nowrap}
+@keyframes xe-tho{0%,100%{box-shadow:0 0 0 3px #ffe7a8,0 6px 22px #ff9f1f55}50%{box-shadow:0 0 0 5px #ffe7a8,0 8px 34px #ff9f1fa0}}
+@keyframes xe-luot{0%,55%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+@media (prefers-reduced-motion:reduce){.xe-n90,.xe-n90::after{animation:none}}
+@media (max-width:900px){.xe-n90{width:100%}.xe-n90-so{margin-left:auto}}
 .xe-nhom-dinh{position:sticky;top:0;z-index:5;background:#eaf0f7;padding:6px 0 2px;margin-bottom:8px}
 .xe-nhom button{display:inline-flex;gap:9px;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s,background .15s}
 .xe-nhom button svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
