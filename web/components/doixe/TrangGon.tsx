@@ -99,6 +99,7 @@ export function BaoCaoXeGon({ mo, onNhap }: { mo: Mo; onNhap: () => void }) {
     <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
       <h2 style={{ margin: 0 }}>Báo cáo từng xe</h2>
       <button type="button" className="act teal" style={{ margin: 0 }} onClick={onNhap}>Nhập báo cáo từng xe</button></div>
+    <ChoToiKy mo={mo} />
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "8px 0" }}>
       {NHOM.map(([k, t, g]) => <Chip key={k} on={loc === k} t={`${t} · ${d.filter(g).length}`} onClick={() => setLoc(k)} />)}</div>
     {ds.map((x) => <Dong key={x.id} t={`${x.ma_phieu || "#" + x.id} · ${x.xe}`}
@@ -189,4 +190,130 @@ export function DauGon({ mo }: { mo: Mo }) {
                n.l_100km == null ? "thiếu định mức thì chưa kết luận vượt" : ""] as [string, React.ReactNode, string])]} />
     <p><button type="button" onClick={() => mo("/doi-xe/gia-dau")}>Mở giá dầu & định mức</button></p>
   </>;
+}
+
+/* ═════════ VH-3 · màn gọn cho năm trang điều xe còn lại + ô «Chờ tôi ký» (Chủ tịch duyệt 10/11/2026) ═════════ */
+const ngayVN = (s?: string | null) => (s ? String(s).slice(0, 10).split("-").reverse().slice(0, 2).join("/") : "—");
+const isoHom = () => new Date().toISOString().slice(0, 10);
+
+/* ───────── Điều xe › Đề nghị xe ───────── */
+export function DeNghiXeGon({ mo }: { mo: Mo }) {
+  // «Không còn xe» mở màn đề nghị đầy đủ — cửa từ chối kèm lý do nằm ở đó. Màn gọn chỉ đọc, không ghi.
+  const { d, loi } = useDoc<any>("/de-nghi-xe");
+  if (!d) return <Loi loi={loi} />;
+  const rows: any[] = d.rows || [];
+  const cho = rows.filter((x) => x.trang_thai === "cho_lap_lenh").sort((a, b) => a.ngay_di.localeCompare(b.ngay_di));
+  const thang = isoHom().slice(0, 7);
+  const coLenh = rows.filter((x) => x.trang_thai === "da_lap_lenh" && (x.xu_ly_luc || x.luc || "").slice(0, 7) === thang).length;
+  const conNgay = (s: string) => Math.round((new Date(s).getTime() - new Date(isoHom()).getTime()) / 864e5);
+  return <>
+    <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+      <h2 style={{ margin: 0 }}>Đề nghị xe</h2><span className="muted">Điều hành gửi sang · Đội xe lập lệnh</span></div>
+    <O3 ds={[["Chờ lập lệnh", d.dem?.cho_lap_lenh ?? cho.length], ["Đã có lệnh tháng này", coLenh],
+             ["Đội xe từ chối", d.dem?.tu_choi ?? 0, "Điều hành thấy lý do và thuê xe ngoài"]]} />
+    {cho.map((x) => { const n = conNgay(x.ngay_di);
+      return <div key={x.id} style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", padding: "9px 0", borderBottom: "1px solid #e6eaf0" }}>
+        <span style={{ flex: "1 1 260px", minWidth: 0 }}><strong>{x.ma_tour} · {x.ten_tour}</strong><br />
+          <span className="muted">{ngayVN(x.ngay_di)}→{ngayVN(x.ngay_ve)} · {x.so_khach} khách · {x.so_xe_can} xe · {x.nguoi_de_nghi}</span></span>
+        {n <= 3 && <span className={"tag " + (n < 0 ? "cb-do" : "cb-vang")}>{n < 0 ? "đã qua ngày đi" : `còn ${n} ngày`}</span>}
+        <button type="button" className="act teal" style={{ margin: 0 }} onClick={() => mo(`/lenh-dieu-xe/lap-lenh?de_nghi=${x.id}`)}>Lập lệnh</button>
+        <button type="button" onClick={() => mo("/lenh-dieu-xe/de-nghi")}>Không còn xe</button>
+      </div>; })}
+    {!cho.length && <p className="muted">Không có đề nghị nào đang chờ lập lệnh.</p>}
+    <p><button type="button" onClick={() => mo("/lenh-dieu-xe/de-nghi")}>Mở danh sách đề nghị đầy đủ</button></p>
+  </>;
+}
+
+/* ───────── Điều xe › Lập lệnh điều xe ───────── */
+const NHAN: Record<string, [string, string]> = { da_nhan: ["tài xế đã nhận", "ok"], chua_nhan: ["chưa nhận", "warn"],
+  qua_han: ["quá hạn chưa nhận", "red"], tu_choi: ["tài xế báo không nhận", "red"] };
+export function LapLenhGon({ mo }: { mo: Mo }) {
+  const l = useDoc<any[]>("/fleet/lenh-dieu-xe"), dn = useDoc<any>("/de-nghi-xe?trang_thai=cho_lap_lenh");
+  if (!l.d || !dn.d) return <Loi loi={l.loi || dn.loi} />;
+  const hom = isoHom(), toi = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+  const sap = l.d.filter((x) => x.status !== "huy" && x.date_from >= hom && x.date_from <= toi)
+    .sort((a, b) => String(a.date_from).localeCompare(String(b.date_from)));
+  return <>
+    <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+      <h2 style={{ margin: 0 }}>Lập lệnh điều xe</h2>
+      <button type="button" className="act teal" style={{ margin: 0 }} onClick={() => mo("/lenh-dieu-xe/lap-lenh")}>Mở màn tìm phương án</button></div>
+    <p className="muted">Màn tìm phương án (lọc cứng, xếp hạng, chốt lệnh) giữ nguyên. Ở đây chỉ là việc trước mắt.</p>
+    <Dong t="Đề nghị đang chờ lệnh" tag={String((dn.d.rows || []).length)} cls="warn" />
+    <Dong t="Lệnh chạy trong 7 ngày tới" tag={String(sap.length)} />
+    {sap.map((x) => { const [t, c] = NHAN[x.trang_thai_nhan] || ["—", ""];
+      return <Dong key={x.id} t={`${x.xe} · ${x.tour || "—"} · ${ngayVN(x.date_from)}`} p={x.tai_xe || "chưa có tài xế"}
+        tag={x.trang_thai_nhan === "chua_nhan" && x.han_nhan ? `${t} · hạn ${ngayVN(x.han_nhan)}` : t} cls={c} />; })}
+    {!sap.length && <p className="muted">7 ngày tới chưa có lệnh VTOS nào.</p>}
+  </>;
+}
+
+/* ───────── Điều xe › Xe hôm nay ───────── */
+export function XeHomNayGon({ mo }: { mo: Mo }) {
+  const { d, loi } = useDoc<any>("/fleet/xe-hom-nay-gon");
+  if (!d) return <Loi loi={loi} />;
+  return <>
+    <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+      <h2 style={{ margin: 0 }}>Xe hôm nay</h2><span className="muted">{ngayVN(d.ngay)}/{String(d.ngay).slice(0, 4)}</span></div>
+    <O3 ds={[["Đang đi tour", d.dang_di.length], ["Ở bãi", d.o_bai.length], ["Đang sửa / bị chặn", d.bi_chan.length, "báo hỏng mức phải dừng xe"]]} />
+    {d.bi_chan.map((x: any) => <Dong key={"c" + x.id} t={x.xe} p={`báo hỏng «${x.ly_do}»`} tag="bị chặn" cls="red" />)}
+    {d.dang_di.map((x: any) => <Dong key={"d" + x.id} t={`${x.xe} · ${x.tour || "—"}`} p={`về ${ngayVN(x.ve)} · ${x.tai_xe || "chưa có tài xế"}`} tag="đang đi" />)}
+    <p className="muted">{d.ghi_chu}</p>
+    <p><button type="button" onClick={() => mo("/doi-xe/xe-hom-nay")}>Mở bảng theo sheet</button></p>
+  </>;
+}
+
+/* ───────── Xe & tài xế › Tài xế ───────── */
+export function TaiXeGon({ mo }: { mo: Mo }) {
+  const { d, loi } = useDoc<any>("/tai-xe");
+  const [loc, setLoc] = useState("all");
+  if (!d) return <Loi loi={loi} />;
+  const rows: any[] = (d.rows || []).filter((x: any) => x.dang_lam);
+  const thieuBang = (x: any) => !x.gplx_so && !x.gplx_het_han;
+  const NH: [string, string, (x: any) => boolean][] = [
+    ["all", "Tất cả", () => true], ["bang", "Thiếu bằng lái", thieuBang],
+    ["sap", "Bằng sắp hết hạn", (x) => x.sap_het_han], ["tk", "Chưa có tài khoản", (x) => !x.co_tai_khoan]];
+  const f = NH.find((n) => n[0] === loc)![2];
+  return <>
+    <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+      <h2 style={{ margin: 0 }}>Tài xế</h2><span className="muted">{rows.length} người đang làm</span></div>
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "8px 0" }}>
+      {NH.map(([k, t, g]) => <Chip key={k} on={loc === k} t={`${t} · ${rows.filter(g).length}`} onClick={() => setLoc(k)} />)}</div>
+    {rows.filter(f).map((x) => {
+      const tag = !x.co_tai_khoan ? ["chưa có tài khoản", "red"] : thieuBang(x) ? ["thiếu bằng lái", "warn"]
+        : x.sap_het_han ? ["bằng sắp hết hạn", "warn"] : x.du_dieu_kien ? ["đủ điều kiện", "ok"] : [x.thieu?.[0] || "thiếu dữ liệu", "warn"];
+      return <Dong key={x.id} t={x.full_name}
+        p={[(x.xe_dang_dung_ten || []).map((v: any) => v.bien).join(", ") || "chưa gán xe", `${x.so_chuyen_90_ngay} chuyến/90 ngày`].join(" · ")}
+        tag={tag[0]} cls={tag[1]} nut="Mở hồ sơ" onNut={() => mo("/tai-xe")} />; })}
+    <p className="muted">Chưa có tài khoản thì tài xế không bấm nhận lệnh, không ghi chuyến trên điện thoại được — báo HCNS tạo tài khoản gắn mã nhân viên.</p>
+  </>;
+}
+
+/* ───────── Xe & tài xế › Chủ xe & hợp đồng ───────── */
+export function ChuXeGon({ mo }: { mo: Mo }) {
+  const { d, loi } = useDoc<any>("/fleet/cong-no");
+  if (!d) return <Loi loi={loi} />;
+  const ds: any[] = d.voi_chu_xe?.chi_tiet || [];
+  return <>
+    <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+      <h2 style={{ margin: 0 }}>Chủ xe & hợp đồng</h2><span className="muted">xe hợp tác</span></div>
+    <O3 ds={[["Chủ xe", ds.length], ["Xe hợp tác", ds.reduce((a, c) => a + (c.so_xe || 0), 0)],
+             ["Công ty phải trả", tr(d.voi_chu_xe?.cong_ty_phai_tra), "chỉ tính kỳ đã chốt"]]} />
+    {ds.map((c) => { const k = (c.cac_ky || []).slice(-1)[0];
+      return <Dong key={c.partner_id} t={c.ho_ten} p={`${c.so_xe} xe${c.xe?.length ? " · " + c.xe.map((v: any) => v.plate).join(", ") : ""}`}
+        tag={k ? `kỳ ${k.ky} ${k.da_chot ? "đã chốt" : "chưa chốt"}` : "chưa có bảng quyết toán"} cls={k?.da_chot ? "ok" : "warn"}
+        nut="Mở" onNut={() => mo("/doi-xe?tab=quyettoan")} />; })}
+    {!ds.length && <p className="muted">Chưa có chủ xe hợp tác nào.</p>}
+  </>;
+}
+
+/* ───────── Báo cáo từng xe › ô «Chờ tôi ký» ───────── */
+export function ChoToiKy({ mo }: { mo: Mo }) {
+  const { d } = useDoc<any>("/fleet/quyet-toan-chuyen/cho-toi-ky");
+  if (!d || !d.rows?.length) return null;
+  return <div style={{ border: "1.5px solid #1d5bbf", background: "#eef3fb", borderRadius: 8, padding: "10px 12px", margin: "10px 0" }}>
+    <strong>{d.rows[0].buoc_ten} · {d.tong} tờ</strong>
+    {d.rows.map((x: any) => <Dong key={x.id} t={`QT-${x.id} · ${x.xe} · ${x.tour || x.ten_tour || "—"}`}
+      p={`${ngayVN(x.ngay_di)}→${ngayVN(x.ngay_ve)} · doanh thu ${vnd(x.doanh_thu)}`} nut="Mở tờ để ký"
+      onNut={() => mo(`/doi-xe?tab=chuyen&chuyen=${x.id}`)} />)}
+  </div>;
 }

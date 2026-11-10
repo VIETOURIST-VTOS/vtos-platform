@@ -28,7 +28,9 @@ def test_man_gon_chi_doc_cua_co_san():
     s = _web("components", "doixe", "TrangGon.tsx")
     cua = set(re.findall(r'useDoc<[^>]*>\(\s*[`"](/[a-z\-/]+)', s))
     assert cua == {"/fleet/lenh-dieu-xe", "/fleet/xe", "/fleet/chuyen", "/fleet/lai-lo", "/fleet/cong-no",
-                   "/fleet/bao-duong/theo-xe", "/fleet/bao-hong", "/fleet/gia-dau", "/fleet/dinh-muc-dau"}, cua
+                   "/fleet/bao-duong/theo-xe", "/fleet/bao-hong", "/fleet/gia-dau", "/fleet/dinh-muc-dau",
+                   # VH-3 · 10/11/2026: năm màn gọn điều xe + ô «Chờ tôi ký» — vẫn chỉ đọc.
+                   "/de-nghi-xe", "/fleet/xe-hom-nay-gon", "/tai-xe", "/fleet/quyet-toan-chuyen/cho-toi-ky"}, cua
     assert "method:" not in s                          # màn gọn không ghi gì
     assert "Chưa có số" in s and "Thiếu dữ liệu" in s and "Đang bị chặn" in s
 

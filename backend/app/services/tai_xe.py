@@ -56,7 +56,7 @@ def _gplx_moi_nhat(db: Session, ids: list[int]) -> dict[int, VehicleDocument]:
 
 
 def _mot_nguoi(e: Employee, g: VehicleDocument | None, xe: list[Vehicle],
-               so_chuyen: int, hom_nay: date) -> dict:
+               so_chuyen: int, hom_nay: date, co_tai_khoan: bool = False) -> dict:
     con = (g.expires_on - hom_nay).days if (g and g.expires_on) else None
     toi_da, ly_do_hang = so_cho_toi_da(g.hang, g.issued_on) if g else (-1, "chưa có bằng lái trong hồ sơ")
 
@@ -96,11 +96,25 @@ def _mot_nguoi(e: Employee, g: VehicleDocument | None, xe: list[Vehicle],
         "so_cho_toi_da": toi_da, "ly_do_hang": ly_do_hang,
         "xe_dang_dung_ten": [{"ma": v.code, "bien": v.plate, "so_cho": v.seats} for v in xe],
         "so_chuyen_90_ngay": so_chuyen,
+        # VH-3 · 10/11/2026: tài xế không có tài khoản thì không bấm nhận lệnh, không ghi chuyến
+        # trên điện thoại được — cả luồng VH-1 dừng ở người ấy. Màn gọn đếm riêng nhóm này.
+        "co_tai_khoan": co_tai_khoan,
         "du_dieu_kien": not thieu,
         "chua_du_du_lieu": chua_biet,
         "khong_dat": khong_dat,
         "thieu": thieu,
     }
+
+
+def _co_tai_khoan(db: Session, nguoi: list[Employee]) -> set[int]:
+    """Người nào đăng nhập được. Cùng luật nối với /xe-hdv/cua-toi: `Employee.user_id`, hoặc mã
+    nhân viên trùng `User.staff_code`. Tài khoản đã khoá không tính — khoá rồi thì không nhận lệnh."""
+    from app.models.core import User
+    users = list(db.execute(select(User.id, User.staff_code).where(User.active == True)))  # noqa: E712
+    uid = {r[0] for r in users}
+    ma = {(r[1] or "").strip() for r in users if (r[1] or "").strip()}
+    return {e.id for e in nguoi
+            if (getattr(e, "user_id", None) in uid) or ((e.code or "").strip() in ma)}
 
 
 def danh_sach(db: Session, hom_nay: date | None = None) -> dict:
@@ -124,8 +138,9 @@ def danh_sach(db: Session, hom_nay: date | None = None) -> dict:
                                                        Trip.ngay_di >= tu_ngay)
             .group_by(Trip.driver_id))}
 
+    co_tk = _co_tai_khoan(db, nguoi)
     ds = [_mot_nguoi(e, gplx.get(e.id), xe_theo_nguoi.get(e.id, []),
-                     chuyen.get(e.id, 0), hom_nay) for e in nguoi]
+                     chuyen.get(e.id, 0), hom_nay, e.id in co_tk) for e in nguoi]
     dang_lam = [x for x in ds if x["dang_lam"]]
     return {
         "rows": ds,
@@ -136,6 +151,7 @@ def danh_sach(db: Session, hom_nay: date | None = None) -> dict:
         "khong_dat": sum(1 for x in dang_lam if x["khong_dat"]),
         "bang_sap_het_han": sum(1 for x in dang_lam if x["sap_het_han"]),
         "chua_gan_xe": sum(1 for x in dang_lam if not x["xe_dang_dung_ten"]),
+        "chua_co_tai_khoan": sum(1 for x in dang_lam if not x["co_tai_khoan"]),
         "ghi_chu": ("Đủ điều kiện nghĩa là bằng lái có trong hồ sơ, còn hạn, và đọc được hạng. "
                     "Thiếu một trong ba thì ô này KHÔNG đếm – thiếu dữ liệu không phải là đạt. "
                     "Hạng bằng có đủ cho số chỗ của chiếc xe cụ thể hay không thì cổng điều xe "
