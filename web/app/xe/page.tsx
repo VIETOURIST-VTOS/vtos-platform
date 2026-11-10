@@ -9,6 +9,7 @@ import ChiPhiKyPanel from "@/components/doixe/ChiPhiKyPanel";
 import DeXuatChiTaiCho from "@/components/doixe/DeXuatChiTaiCho";
 import * as G from "@/components/doixe/TrangGon";
 import SanSangVanHanh from "@/components/doixe/SanSangVanHanh";
+import LichXe90 from "@/components/doixe/LichXe90";
 
 /** Bàn làm việc Giám đốc đội xe — màn `/xe`. Bố cục v3.3, bản vẽ anh Tuấn gửi 09/11/2026.
  *
@@ -71,6 +72,8 @@ type Trang = { ma: string; ten: string; toi: string; ghi?: string };
 const NHOM: { ma: string; ten: string; tom: string; trang: Trang[] }[] = [
   { ma: "dispatch", ten: "Điều xe", tom: "Đề nghị xe · lịch và lệnh · tài xế nhận lệnh", trang: [
     { ma: "lich", ten: "Lịch & lệnh điều xe", toi: "/lenh-dieu-xe" },
+    // VH-9 (Chủ tịch duyệt 11/11/2026): lịch 90 ngày tới — công suất và khoảng trống để Kinh doanh đẩy bán.
+    { ma: "lich-90", ten: "Lịch xe 90 ngày", toi: "/lenh-dieu-xe" },
     { ma: "de-nghi", ten: "Đề nghị xe", toi: "/lenh-dieu-xe/de-nghi",
       ghi: "Điều hành tour gửi sang sau khi dự toán được duyệt" },
     { ma: "lap-lenh", ten: "Lập lệnh điều xe", toi: "/lenh-dieu-xe/lap-lenh" },
@@ -107,6 +110,7 @@ const NHOM: { ma: string; ten: string; tom: string; trang: Trang[] }[] = [
 type GonProps = { mo: (toi: string) => void; ky: string; onNhap: () => void };
 const MAN_GON: Record<string, (p: GonProps) => React.ReactNode> = {
   "lich": (p) => <G.LichLenhGon mo={p.mo} />,
+  "lich-90": (p) => <LichXe90 mo={p.mo} />,
   "ho-so-xe": (p) => <G.HoSoXeGon mo={p.mo} />,
   "bao-cao-xe": (p) => <G.BaoCaoXeGon mo={p.mo} onNhap={p.onNhap} />,
   "quyet-toan": (p) => <G.QuyetToanGon mo={p.mo} ky={p.ky} />,

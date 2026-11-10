@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.api.deps import require_roles
+from app.api.deps import require_roles, robot_auth
 from app.models.core import User, Company
 from app.models.hr import Vehicle, Employee
 from app.models.fleet import (VehiclePlate, VehicleDocument, FleetVerification, LIFECYCLE, OP_RIGHT,
@@ -2914,3 +2914,38 @@ def dan_link_sheet(v: LinkSheetVao, u: User = Depends(require_roles(*GHI_LINK_SH
     db.commit()
     return {"doc_thu": thu, "da_trinh": True, "id": p.id,
             "message": "Đã trình link — chờ Chủ tịch ký ở màn Chính sách & định mức. Ký xong robot mới đọc."}
+
+
+# ══════════════════ VH-9 · LỊCH XE 90 NGÀY TỚI (Chủ tịch duyệt 11/11/2026) ══════════════════
+from app.services import lich_xe_tuong_lai as LX                       # noqa: E402
+# Phòng Kinh doanh và Ban lãnh đạo xem KHOẢNG TRỐNG để đẩy bán — không thấy tên tour, giá nội bộ.
+KHOANG_TRONG_XEM = tuple(sorted(set(READ) | {"chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh",
+                                             "gd_kd", "tp_kd", "cntt"}))
+
+
+@router.get("/lich-xe-tuong-lai")
+def lich_xe_tuong_lai(so_ngay: int = 90, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    """Lưới xe × ngày 90 ngày tới, công suất, khoảng trống. Chỉ đọc lệnh, đề nghị, báo hỏng đã có."""
+    return LX.bang(db, so_ngay=so_ngay)
+
+
+@router.get("/lich-xe-tuong-lai/khoang-trong")
+def lich_xe_khoang_trong(u: User = Depends(require_roles(*KHOANG_TRONG_XEM)), db: Session = Depends(get_db)):
+    return LX.khoang_trong_cho_kinh_doanh(db)
+
+
+@router.post("/robot/lich-xe-gui-tuan", dependencies=[Depends(robot_auth)])
+def lich_xe_gui_tuan(db: Session = Depends(get_db)):
+    """Robot gọi sáng thứ Hai (n8n): một tin «xe còn trống 30 ngày tới» cho Ban lãnh đạo, Điều hành, Kinh doanh,
+    Marketing, Đoàn. Mỗi tuần MỘT tin (ref theo tuần ISO) — robot gọi lại trong tuần thì không đẻ tin thứ hai."""
+    from datetime import date as _d
+    from app.models.core import Alert
+    y, w, _ = _d.today().isocalendar()
+    ref = f"tuan:{y}-W{w:02d}"
+    if db.execute(select(Alert).where(Alert.kind == "xe_trong_tuan", Alert.ref == ref)).scalars().first():
+        return {"da_gui": False, "ly_do": "Tuần này đã gửi", "ref": ref}
+    db.add(Alert(kind="xe_trong_tuan", level="info", ref=ref, message=LX.tin_tuan(db),
+                 to_roles=",".join(LX.NGUOI_NHAN_TUAN)))
+    R.audit(db, "robot", "robot", "gui_lich_xe_trong_tuan", ref, after={"nguoi_nhan": list(LX.NGUOI_NHAN_TUAN)})
+    db.commit()
+    return {"da_gui": True, "ref": ref, "nguoi_nhan": list(LX.NGUOI_NHAN_TUAN)}
