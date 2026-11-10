@@ -84,6 +84,8 @@ NHAN = {
     "r9_gd_cho_khop": Loai("Giao dịch ngân hàng chờ khớp",
                            nguon_khai="chu_canh_bao.CO_Y_KHONG_CHU"),
     "thieu_du_toan": Loai("Chuyến chưa có dự toán", nguon_khai="Alert(kind='thieu_du_toan')"),
+    "xe_trong_tuan": Loai("Xe còn trống 30 ngày tới – đẩy bán tour",
+                          nguon_khai="lich_xe_tuong_lai.tin_tuan (VH-9), gửi sáng thứ Hai"),
     "zalo_token_hong": Loai("Khoá kết nối Zalo OA hỏng",
                             nguon_khai="Alert(kind='zalo_token_hong')"),
     "qt_tra_lai": Loai("Kế toán trả lại quyết toán – cần sửa",
