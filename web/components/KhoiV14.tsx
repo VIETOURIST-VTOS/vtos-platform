@@ -546,7 +546,8 @@ export function KhoiHieuQuaXe({ d, theo_ky, xe, sheet, chuaKhop, gon }: {
                     gridTemplateColumns: "repeat(auto-fit, minmax(168px, 1fr))",
                     opacity: dangNap ? 0.45 : 1, transition: "opacity .15s" }}>
         {chu.map(([nhan, gt, khoa]) => (
-          <div key={nhan} style={O_CHU}>
+          // VH-8: /xe (gon) tô ba ô chủ thành ba thẻ màu nổi — lớp `xe-so-chu` chỉ /xe khai kiểu.
+          <div key={nhan} style={O_CHU} className={gon ? "xe-so-chu" : undefined}>
             <div className="v14-o-nhan">{nhan}</div>
             <div className="v14-o-so" style={{ fontSize: "calc(26/14*1rem)", lineHeight: 1.15 }}>
               {gt ?? "—"}</div>

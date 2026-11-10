@@ -196,6 +196,15 @@ const QUYEN_GD: [string, string][] = [
   ["Đổi thông tin ngân hàng", "Không — Kế toán"],
 ];
 
+/** VH-8 · biểu tượng năm nhóm — nét mảnh, màu theo chữ của nút. */
+const ICON_NHOM: Record<string, React.ReactNode> = {
+  dispatch: <><rect x="3" y="7" width="13" height="9" rx="2" /><path d="M16 10h3l2 3v3h-5" /><circle cx="7" cy="17" r="2" /><circle cx="17" cy="17" r="2" /></>,
+  fleet: <><circle cx="12" cy="8" r="4" /><path d="M4 21c1-4 4-6 8-6s7 2 8 6" /></>,
+  finance: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
+  technical: <path d="M14 7l3-3 3 3-3 3M17 4v6M4 20l7-7M9 9l6 6" />,
+  performance: <path d="M3 17l6-6 4 4 8-8M15 7h6v6" />,
+};
+
 /** Nhãn viền màu của thẻ việc theo mức máy chủ trả. */
 const NHAN_MUC: Record<string, string> = { do: "Đỏ", cam: "Cam", vang: "Vàng", trang: "Chờ người khác" };
 
@@ -303,16 +312,31 @@ function BanLamViecXe() {
   );
 
   return (<div onClickCapture={giuTaiCho}>
-    {/* ① NĂM MỤC NGHIỆP VỤ — một hàng ngang, KHÔNG có mục "Bàn làm việc" (v3.3).
-        Lối về tổng quan là chữ VTOS ở đầu trang; lối ra khỏi đội xe nằm cuối hàng, vì màn
-        này ẩn thanh dọc nên nếu đây không có thì người dùng chỉ còn nút Back. */}
-    {/* VH-4 (Chủ tịch duyệt 10/11/2026): mỗi nhóm một nút navy sáng riêng; nút rộng theo chữ, thiếu chỗ
-        thì cả nút xuống hàng — không cắt chữ, không đè nhau. */}
+    {/* VH-8 (Chủ tịch duyệt bản xem trước 11/11/2026): TIÊU ĐỀ LÊN ĐẦU, in hoa đậm; năm nhóm xuống dưới. */}
+    <div className="xe-dau">
+      <div>
+        <span className="xe-dau-eb">Đội xe · Công ty TNHH Vận tải Vietrip</span>
+        <h1>Bàn làm việc Giám đốc đội xe</h1>
+        <p className="muted">Chỉ dữ liệu đội xe</p>
+      </div>
+      <div className="xe-ky">
+        <button type="button" className="xe-ky-quyen" onClick={() => setQuyen(!quyen)} aria-expanded={quyen}>Quyền của tôi</button>
+        <button type="button" aria-label="Kỳ trước" onClick={() => setKy(doiKy(ky, -1))}>‹</button>
+        <strong>{kyDoc(ky)}</strong>
+        <button type="button" aria-label="Kỳ sau" onClick={() => setKy(doiKy(ky, 1))}>›</button>
+      </div>
+    </div>
+
+    {/* ① NĂM MỤC NGHIỆP VỤ — một hàng ngang, KHÔNG có mục "Bàn làm việc" (v3.3). Lối ra khỏi đội xe nằm
+        cuối hàng, vì màn này ẩn thanh dọc. VH-4: mỗi nhóm một nút navy sáng riêng, rộng theo chữ, thiếu chỗ
+        thì cả nút xuống hàng. VH-8: có biểu tượng, và dính ở đầu màn khi cuộn. */}
+    <div className="xe-nhom-dinh">
     <nav aria-label="Nghiệp vụ đội xe" className="xe-nhom">
       {NHOM.map((n) => (
         <button key={n.ma} type="button" title={n.tom}
           onClick={() => { setNhom(nhom === n.ma ? null : n.ma); setTrang(null); setMoSan(""); setChiTiet(null); }}
           aria-pressed={nhom === n.ma}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">{ICON_NHOM[n.ma]}</svg>
           {n.ten}
         </button>))}
       <Link href="/" className="xe-ra">Trang tổng CRM →</Link>
@@ -326,22 +350,6 @@ function BanLamViecXe() {
           {t.ten}
         </button>))}
     </nav>}
-
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-end",
-                  justifyContent: "space-between", margin: "14px 0 18px" }}>
-      <div>
-        <h1 style={{ margin: "0 0 4px" }}>Bàn làm việc Giám đốc đội xe</h1>
-        <p className="muted" style={{ margin: 0 }}>
-          Công ty TNHH Vận tải Vietrip · chỉ dữ liệu đội xe
-        </p>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <button type="button" onClick={() => setQuyen(!quyen)} aria-expanded={quyen}>Quyền của tôi</button>
-        <span className="muted">Kỳ</span>
-        <button type="button" aria-label="Kỳ trước" onClick={() => setKy(doiKy(ky, -1))}>‹</button>
-        <strong style={{ minWidth: 92, textAlign: "center" }}>{kyDoc(ky)}</strong>
-        <button type="button" aria-label="Kỳ sau" onClick={() => setKy(doiKy(ky, 1))}>›</button>
-      </div>
     </div>
 
     {quyen && <section className="panel" aria-label="Quyền của tôi">
@@ -375,7 +383,7 @@ function BanLamViecXe() {
 
     {/* ④ TỔNG QUAN */}
     {!nhomMo && <>
-      {dang && !d && <p className="muted">Đang đọc số…</p>}
+      {dang && !d && <div className="xe-cho" aria-busy="true" aria-label="Đang đọc số"><i /><i /><i /><i /></div>}
 
       {/* ⑥ HÀNG ĐỢI VIỆC — VH-4 (Chủ tịch duyệt 10/11/2026): LÊN ĐẦU tổng quan, viền navy; mục đỏ nền đỏ nhạt. */}
       {hd && <section className="xe-uu" aria-label="Việc cần xử lý">
@@ -442,7 +450,7 @@ function BanLamViecXe() {
           Doanh thu · lợi nhuận · biên · ngày xe · tiêu hao · km rỗng · công suất · xe đang đi,
           ô chọn kỳ Tháng/Quý/Năm, và hình diễn biến 12 kỳ — tất cả đã có sẵn, không viết lại.
           Số của nó đi qua `fleet_lai_lo.bao_cao`, cùng phép tính với màn Lãi lỗ đội xe. */}
-      {!boKy && <p className="muted">Đang tính khối hiệu quả đội xe…</p>}
+      {!boKy && <div className="xe-cho xe-cho-3" aria-busy="true" aria-label="Đang tính khối hiệu quả đội xe"><i /><i /><i /></div>}
       <KhoiHieuQuaXe gon theo_ky={boKy} xe={d?.xe_lenh} sheet={xe}
         chuaKhop={xe?.canh_bao ? { sheet: xe.dang_di ?? 0, nhat_trinh: xe.vtos_dang_chay ?? 0 } : null} />
       {/* «Số tiền theo: tất cả chuyến ghi nhận» — lợi nhuận vẫn chỉ đếm chuyến đã quyết toán (KS-65): chuyến chưa
@@ -513,7 +521,43 @@ function BanLamViecXe() {
 
 /* Màn không thanh dọc trải hết bề ngang — bản vẽ v3.3: biểu đồ chiếm toàn hàng. Thẻ style của riêng màn
    này (chỉ sống khi /xe đang mở), không thêm lớp vào globals.css hay Shell.tsx (nhiều làn cùng giữ). */
-const RONG = <style>{`main{max-width:none!important}
+const RONG = <style>{`main{max-width:1440px!important;margin:0 auto!important}
+/* VH-8 · HAI TẦNG: nền xám xanh (tầng 1), thẻ trắng có bóng nổi lên (tầng 2). Chỉ sống khi /xe đang mở. */
+body,.shell{background:#eaf0f7!important}
+:root{--xe-b1:0 1px 2px #12305414,0 4px 12px #1230541a;--xe-b2:0 2px 4px #12305414,0 10px 24px #12305421}
+.xe-dau{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:6px 0 16px}
+.xe-dau-eb{display:block;font-size:11.5px;letter-spacing:1.6px;text-transform:uppercase;font-weight:700;color:var(--xe-nhan);margin-bottom:4px}
+/* Tiêu đề nổi bật + hiệu ứng sáng (Chủ tịch dặn 11/11/2026): chữ chuyển màu navy → xanh sáng, một vệt sáng
+   lướt qua chậm, quầng sáng nhẹ quanh chữ. Người tắt chuyển động thì chữ đứng yên, vẫn chuyển màu. */
+.xe-dau h1{margin:0;font-size:34px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;line-height:1.15;color:var(--xe-dam);
+  background:linear-gradient(100deg,#183c69 0%,#2c5fa2 35%,#8cc4ff 50%,#2c5fa2 65%,#183c69 100%);background-size:220% 100%;
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 2px 10px #2c5fa240);animation:xe-sang 5s ease-in-out infinite}
+@keyframes xe-sang{0%,100%{background-position:100% 0}50%{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){.xe-dau h1{animation:none;background-position:50% 0}}
+.xe-dau p{margin:6px 0 0}
+@media (max-width:640px){.xe-dau h1{font-size:23px}}
+.xe-ky{display:flex;align-items:center;gap:6px;background:#fff;border-radius:12px;padding:6px;box-shadow:var(--xe-b1)}
+.xe-ky button{font:inherit;border:0;background:var(--xe-nhat);color:var(--xe-nhan);min-width:34px;height:34px;border-radius:9px;font-weight:700;cursor:pointer}
+.xe-ky .xe-ky-quyen{background:#fff;border:1px solid #c9d6e8;padding:0 12px;font-weight:600}
+.xe-ky strong{min-width:92px;text-align:center;color:var(--xe-dam);font-variant-numeric:tabular-nums}
+.xe-nhom-dinh{position:sticky;top:0;z-index:5;background:#eaf0f7;padding:6px 0 2px;margin-bottom:8px}
+.xe-nhom button{display:inline-flex;gap:9px;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s,background .15s}
+.xe-nhom button svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.xe-nhom button:hover{transform:translateY(-1px);box-shadow:var(--xe-b2)}
+main .panel{background:#fff;border:0!important;border-radius:16px!important;box-shadow:var(--xe-b1)!important}
+.xe-cho{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:6px 0 16px}
+.xe-cho-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.xe-cho i{display:block;height:96px;border-radius:14px;background:linear-gradient(90deg,#dfe7f1 25%,#eef3f9 50%,#dfe7f1 75%);background-size:200% 100%;animation:xe-nhay 1.2s linear infinite}
+@keyframes xe-nhay{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.xe-cho i{animation:none}.xe-the,.xe-cua,.xe-nhom button{transition:none!important}}
+.xe-so-chu{position:relative;border:0!important;border-radius:16px!important;padding:18px 20px!important;box-shadow:var(--xe-b2)!important;
+  background:linear-gradient(135deg,#2c5fa2,#214c82)!important;color:#fff}
+.xe-so-chu:nth-child(2){background:linear-gradient(135deg,#1f7a63,#14604e)!important}
+.xe-so-chu:nth-child(3){background:linear-gradient(135deg,#3b4f7a,#2b3b5e)!important}
+.xe-so-chu .v14-o-nhan{color:#fff!important;opacity:.85;text-transform:uppercase;letter-spacing:.8px;font-size:12.5px}
+.xe-so-chu .v14-o-so{color:#fff!important;font-size:40px!important;font-weight:600}
+.xe-so-chu *{color:#fff}
 /* VH-4 · điểm nhấn navy sáng trên nền trắng (Chủ tịch duyệt bản xem trước 10/11/2026). Chỉ sống khi /xe
    đang mở; không thêm vào globals.css hay Shell.tsx. */
 :root{--xe-nhan:#2c5fa2;--xe-dam:#183c69;--xe-nhat:#edf3fc;--xe-vien:#e1e7ef;--xe-do:#b72f45;--xe-do-nen:#fff0f3}
@@ -528,7 +572,7 @@ const RONG = <style>{`main{max-width:none!important}
 .xe-con{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 14px}
 .xe-con button{font:inherit;font-size:13.5px;border:1px solid var(--xe-vien);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer}
 .xe-con button[aria-pressed=true]{background:var(--xe-nhan);border-color:var(--xe-nhan);color:#fff;font-weight:600}
-.xe-uu{border:2px solid var(--xe-nhan);border-radius:12px;background:#fff;padding:10px 15px 6px;margin-bottom:16px}
+.xe-uu{border:0;border-radius:16px;background:#fff;padding:16px 20px 10px;margin-bottom:18px;box-shadow:var(--xe-b1)}
 .xe-uu h2{color:var(--xe-dam)}
 .xe-it{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #eef2f7}
 .xe-it:last-child{border-bottom:0}
@@ -543,8 +587,14 @@ const RONG = <style>{`main{max-width:none!important}
 .xe-thanh{height:6px;border-radius:99px;background:var(--xe-vien);overflow:hidden;margin-top:6px}
 .xe-thanh i{display:block;height:100%;background:var(--xe-nhan)}
 /* VH-5 · kiểu thẻ: bo góc 12px, viền mảnh, bóng nhẹ; nhãn viền màu; mã nhỏ chữ đơn cách */
-.xe-the-luoi{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:12px;padding:6px 0 10px}
-.xe-the{background:#fff;border:1px solid #d6dfeb;border-radius:12px;box-shadow:0 4px 14px #1b3a6214;padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.xe-the-luoi{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:14px;padding:6px 0 10px}
+.xe-the{background:#fbfcfe;border:1px solid #d6dfeb;border-radius:13px;padding:14px;display:flex;flex-direction:column;gap:6px;min-width:0;transition:transform .15s,box-shadow .15s,background .15s}
+.xe-the:hover{transform:translateY(-2px);box-shadow:var(--xe-b2);background:#fff}
+.xe-the-do{background:#fffafb}
+/* nút nhỏ một cỡ một kiểu */
+.xe-the-day button,.xe-it button,.xe-blk button{font:inherit;font-size:13px;font-weight:600;border-radius:9px;padding:7px 13px;cursor:pointer;
+  border:1px solid #c9d6e8;background:#fff;color:var(--xe-nhan);margin:0}
+.xe-the-day button:hover,.xe-it button:hover,.xe-blk button:hover{background:var(--xe-nhat)}
 .xe-the-do{border-color:#efc3cc}
 .xe-the-dau{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .xe-the-ma{font-family:var(--vtos-font-mono,ui-monospace,monospace);font-size:12px;color:#5b6876;letter-spacing:.5px}
@@ -553,7 +603,9 @@ const RONG = <style>{`main{max-width:none!important}
 .xe-the-day{margin-top:auto;padding-top:4px;display:flex;justify-content:flex-end}
 .xe-pill{font-size:12px;font-weight:600;border-radius:999px;padding:1px 10px;border:1.5px solid currentColor;white-space:nowrap}
 .xe-pill-do{color:var(--xe-do)}.xe-pill-cam{color:#a66a00}.xe-pill-vang{color:#885b08}.xe-pill-trang{color:#5b6876}
-.xe-cua,.xe-blk,#hieu-qua-doi-xe{border-radius:12px!important;box-shadow:0 4px 14px #1b3a6214}
+.xe-cua,.xe-blk,#hieu-qua-doi-xe{border:0!important;border-radius:16px!important;box-shadow:var(--xe-b1)!important;background:#fff}
+.xe-cua{border-top:4px solid var(--xe-nhan)!important;transition:transform .15s,box-shadow .15s}
+.xe-cua:hover{transform:translateY(-2px);box-shadow:var(--xe-b2)!important}
 button.act.teal{background:var(--xe-nhan)!important;border-color:var(--xe-nhan)!important;color:#fff!important}
 `}</style>;
 
