@@ -25,12 +25,19 @@ function HieuQua() {
     setBusy(false);
   }, [ky, toast]);
   useEffect(() => { chay(); }, [chay]);
-  useEffect(() => { api("/fleet/ban-tin-sang").then(setBt).catch(() => {}); }, []);
+  /* VH-11: mở từ /xe › Báo cáo & chi phí › «Xếp hạng xe & tài xế» (`?chi=xep-hang`) thì giấu Bản tin sáng
+     và Kết quả kỳ — hai khối ấy đã có trên bàn làm việc đội xe, không lặp. */
+  const [chiXepHang, setChiXepHang] = useState(false);
+  useEffect(() => {
+    const x = new URLSearchParams(window.location.search).get("chi") === "xep-hang";
+    setChiXepHang(x);
+    if (!x) api("/fleet/ban-tin-sang").then(setBt).catch(() => {});
+  }, []);
 
   return (<>
     <h1>Chi phí & hiệu quả đội xe</h1>
 
-    {bt && <div className="panel" style={{ borderColor: bt.canh_bao_do?.length ? "var(--red)" : undefined }}>
+    {bt && !chiXepHang && <div className="panel" style={{ borderColor: bt.canh_bao_do?.length ? "var(--red)" : undefined }}>
       <h2>Bản tin sáng · {bt.ngay}</h2>
       {bt.canh_bao_do?.length > 0 && <div style={{ marginBottom: 8 }}>
         {bt.canh_bao_do.map((a: any) => <div key={a.id}><Tag cls="red">{a.kind}</Tag> {a.message}</div>)}
@@ -58,7 +65,7 @@ function HieuQua() {
       {/* KẾT QUẢ CỦA KỲ — do máy chủ tính, KHÔNG cộng tay từ bảng dưới.
           Cộng tay các hàng xe sẽ bỏ sót chi phí phạm vi ĐỘI (bãi xe, lãi vay, BHXH) vì nó không
           thuộc hàng xe nào — đúng chỗ làm lợi nhuận đội xe cao hơn thực tế gần như suốt năm. */}
-      {d.tong && <div className="panel"><h2>Kết quả kỳ {d.ky}</h2>
+      {d.tong && !chiXepHang && <div className="panel"><h2>Kết quả kỳ {d.ky}</h2>
         <table><tbody>
           <tr><td>Doanh thu</td><td className="num"><b>{vnd(d.tong.doanh_thu)}</b></td></tr>
           <tr><td>Chi phí của các xe (chuyến + bảo dưỡng + chi phí kỳ theo xe)</td>

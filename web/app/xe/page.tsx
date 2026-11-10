@@ -93,16 +93,16 @@ const NHOM: { ma: string; ten: string; tom: string; trang: Trang[] }[] = [
     { ma: "quyet-toan", ten: "Quyết toán", toi: "/doi-xe?tab=quyettoan" },
     { ma: "cong-no", ten: "Công nợ", toi: "/doi-xe?tab=congno" },
     { ma: "lai-lo", ten: "Lãi lỗ đội xe", toi: "/lai-lo-doi-xe", ghi: "Ba tầng chi phí và chi phí kỳ" },
+    // VH-11 (Chủ tịch duyệt 11/11/2026): nút «Hiệu quả» bỏ — tổng kết kỳ và bản tin sáng trùng bàn làm
+    // việc; hai phần KHÔNG trùng chuyển về đây. `chi=xep-hang` giấu hai khối trùng của trang cũ.
+    { ma: "hieu-qua", ten: "Xếp hạng xe & tài xế", toi: "/hieu-qua-doi-xe?chi=xep-hang" },
+    { ma: "nhin-lai", ten: "Nhìn lại thuê xe ngoài", toi: "/doi-xe?tab=nhin-lai" },
   ] },
   { ma: "technical", ten: "Bảo dưỡng & sự cố", tom: "Bảo dưỡng · báo hỏng · dầu và định mức", trang: [
     { ma: "bao-duong", ten: "Bảo dưỡng", toi: "/doi-xe?tab=bao-duong" },
     { ma: "bao-hong", ten: "Báo hỏng", toi: "/doi-xe?tab=bao-hong" },
     { ma: "dau", ten: "Dầu & định mức", toi: "/doi-xe/gia-dau" },
     { ma: "su-co", ten: "Sự cố tour", toi: "/su-co-tour" },
-  ] },
-  { ma: "performance", ten: "Hiệu quả", tom: "Công suất · tiêu hao · kết quả từng xe", trang: [
-    { ma: "hieu-qua", ten: "Hiệu quả khai thác", toi: "/hieu-qua-doi-xe" },
-    { ma: "nhin-lai", ten: "Nhìn lại — thuê xe ngoài khi xe nhà đậu", toi: "/doi-xe?tab=nhin-lai" },
   ] },
 ];
 
@@ -206,7 +206,6 @@ const ICON_NHOM: Record<string, React.ReactNode> = {
   fleet: <><circle cx="12" cy="8" r="4" /><path d="M4 21c1-4 4-6 8-6s7 2 8 6" /></>,
   finance: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
   technical: <path d="M14 7l3-3 3 3-3 3M17 4v6M4 20l7-7M9 9l6 6" />,
-  performance: <path d="M3 17l6-6 4 4 8-8M15 7h6v6" />,
 };
 
 /** Nhãn viền màu của thẻ việc theo mức máy chủ trả. */
@@ -283,6 +282,16 @@ function BanLamViecXe() {
     chu.addEventListener("click", ve, true);
     return () => { chu.removeEventListener("click", ve, true); chu.removeAttribute("title"); };
   }, []);
+  /* VH-12 (Chủ tịch duyệt 11/11/2026): logo nổi bật trên ô nền trắng bo tròn — cần bản chữ navy cho nền sáng
+     (`khoachu-holdings-ngang.svg`). Đổi ảnh khi /xe mở, trả lại khi rời màn; Shell.tsx không sửa. */
+  useEffect(() => {
+    const img = document.querySelector("a.brand img.brand-logo") as HTMLImageElement | null;
+    if (!img) return;
+    const cu = img.getAttribute("src") || "";
+    img.setAttribute("src", "/thuong-hieu/v2/khoachu-holdings-ngang.svg");
+    img.classList.add("xe-logo-o");
+    return () => { img.setAttribute("src", cu); img.classList.remove("xe-logo-o"); };
+  }, []);
   const hd = d?.hang_doi, sk = d?.so_ky, xe = d?.xe_hom_nay;
   /** «Mỗi nút một chỗ» (Chủ tịch dặn 10/11/2026): việc nào «Việc cần xử lý» đã nói thì bảng sẵn sàng
    *  không nói lại. Khoá là mã việc của hàng đợi → mã dòng / mã nhóm của bảng sẵn sàng. */
@@ -353,6 +362,12 @@ function BanLamViecXe() {
         thì cả nút xuống hàng. VH-8: có biểu tượng, và dính ở đầu màn khi cuộn. */}
     <div className="xe-nhom-dinh">
     <nav aria-label="Nghiệp vụ đội xe" className="xe-nhom">
+      {/* VH-11: «Trang chủ» đầu dòng — đóng nhóm/trang con đang mở, về đầu bàn làm việc, không rời /xe. */}
+      <button type="button" title="Về bàn làm việc Giám đốc đội xe" aria-pressed={nhom === null}
+        onClick={() => { setNhom(null); setTrang(null); setMoSan(""); setChiTiet(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10" /></svg>
+        Trang chủ
+      </button>
       {NHOM.map((n) => (
         <button key={n.ma} type="button" title={n.tom}
           onClick={() => { setNhom(nhom === n.ma ? null : n.ma); setTrang(null); setMoSan(""); setChiTiet(null); }}
@@ -656,6 +671,18 @@ main .panel{background:#fff;border:0!important;border-radius:16px!important;box-
 .xe-cua small{display:block;font-size:11.5px;letter-spacing:1.2px;text-transform:uppercase}
 .xe-cua strong{display:block;font-size:23px;font-weight:800;letter-spacing:.2px;color:var(--xe-nhan)}
 /* VH-8: «HỆ THỐNG ĐIỀU HÀNH» trên thanh đầu là lối về trang tổng CRM (thay nút «Trang tổng CRM →»). */
+/* VH-12 · logo trên ô trắng bo tròn: viền ba màu logo chạy chậm (lớp border-box), vệt sáng lướt (lớp
+   padding-box, nằm dưới nét logo), quầng sáng xanh quanh ô. */
+a.brand img.xe-logo-o{box-sizing:content-box;height:46px;width:auto;padding:7px 18px;border:2px solid transparent;border-radius:16px;
+  background:linear-gradient(110deg,#fff 40%,#eef5ff 50%,#fff 60%) padding-box,
+    linear-gradient(120deg,#5A9BD4,#FF6F96,#5FAE66,#5A9BD4) border-box;
+  background-size:250% 100%,300% 100%;box-shadow:0 0 0 4px #8cc4ff40,0 6px 20px #0a234866;
+  animation:xe-logo-vien 6s linear infinite;transition:transform .2s,box-shadow .2s}
+a.brand:hover img.xe-logo-o{transform:translateY(-1px);box-shadow:0 0 0 6px #8cc4ff70,0 10px 26px #0a234888}
+@keyframes xe-logo-vien{from{background-position:120% 0,0 0}to{background-position:-120% 0,300% 0}}
+@media (prefers-reduced-motion:reduce){a.brand img.xe-logo-o{animation:none}}
+@media (max-width:640px){a.brand img.xe-logo-o{height:32px;padding:5px 12px;border-radius:12px}}
+a.brand:has(img.xe-logo-o) small{font-size:12px;font-weight:700;letter-spacing:.18em;opacity:1;text-shadow:0 0 12px #8cc4ff99}
 a.brand small{cursor:pointer;border-radius:6px;padding:2px 6px;transition:background .15s}
 a.brand small:hover{background:#ffffff26;text-decoration:underline}
 .xe-cua:hover{transform:translateY(-2px);box-shadow:var(--xe-b2)!important}
