@@ -196,6 +196,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .top .bar .so-bao{min-width:24px;height:22px;padding:0 7px;border-radius:11px;background:var(--vtos-danger);
   color:#fff;font-size:calc(13/14*1rem);font-weight:600;display:inline-flex;align-items:center;
   justify-content:center;margin-left:-2px}
+/* VH-24 · danh sách xổ của hai nút «Công việc» / «Chờ duyệt». */
+.top .bar .nv-goc{position:relative;display:inline-flex}
+.top .bar .nv-xo{position:absolute;top:calc(100% + 8px);right:0;width:min(420px,92vw);max-height:70vh;overflow:auto;
+  background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 12px 32px rgba(18,48,84,.25);z-index:60;text-align:left}
+.top .bar .nv-dau{padding:12px 14px 8px;font-weight:700;font-family:var(--vtos-font-display);color:var(--navy)}
+.top .bar .nv-xo a.nv-dong{display:block;padding:10px 14px;border-top:1px solid var(--line);color:var(--ink);
+  background:none;border-radius:0;white-space:normal;font-size:calc(13.5/14*1rem)}
+.top .bar .nv-xo a.nv-dong:hover{background:var(--panel2)}
+.top .bar .nv-xo a.nv-doc{color:var(--ink2)}
+.top .bar .nv-nhom{padding:8px 14px 4px;font-size:calc(13/14*1rem);font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--ink2);background:var(--panel2);border-top:1px solid var(--line)}
+.top .bar .nv-trong{padding:10px 14px 14px;color:var(--ink2)}
 /* Ô tròn chữ đầu. Tên và vai vẫn hiện bên cạnh trên màn rộng – ô tròn KHÔNG thay cho tên, vì một
    hệ thống nhiều vai mà chỉ còn hai chữ cái thì không ai biết mình đang đứng ở vai nào. */
 .top .bar .who{display:inline-flex;align-items:center;gap:8px;height:34px}
@@ -476,6 +489,18 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 
    Thanh này KHÔNG phải một `.panel`: nó không mang con số nào, nên nó phải nhẹ hơn mọi khối số ở
    dưới. Nền card + một viền mảnh là đủ để nó tách khỏi hình nền mà không tranh chỗ. */
+/* VH-24 · đầu trang chủ chỉ còn TÊN BÀN + ô ngày (Chủ tịch 12/11/2026) — cùng kiểu tiêu đề phát sáng của /xe. */
+.mh01-ban{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:4px 0 18px}
+.mh01-ban-ten{margin:0;font-size:calc(34/14*1rem);font-weight:800;letter-spacing:.6px;text-transform:uppercase;line-height:1.15;
+  color:var(--navy);background:linear-gradient(100deg,var(--vtos-tieude-dam) 0%,var(--vtos-tieude-giua) 35%,var(--vtos-tieude-sang) 50%,var(--vtos-tieude-giua) 65%,var(--vtos-tieude-dam) 100%);
+  background-size:220% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 2px 10px var(--vtos-tieude-quang));animation:mh01-sang 5s ease-in-out infinite}
+@keyframes mh01-sang{0%,100%{background-position:100% 0}50%{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){.mh01-ban-ten{animation:none;background-position:50% 0}}
+@media (max-width:640px){.mh01-ban-ten{font-size:calc(23/14*1rem)}}
+.mh01-ban-ngay{background:var(--panel);border-radius:12px;padding:8px 14px;box-shadow:0 1px 2px rgba(18,48,84,.08),0 4px 12px rgba(18,48,84,.1);
+  font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}
+.mh01-ban-ngay span{display:block;font-size:calc(11/14*1rem);font-weight:600;color:var(--ink2);letter-spacing:.06em;text-transform:uppercase}
 .mh01-thanh{display:flex;flex-wrap:wrap;align-items:center;gap:0 14px;margin:0 0 14px;
   padding:9px 14px;background:var(--vtos-card);border:1px solid var(--vtos-line);
   border-radius:var(--vtos-radius-md);font-size:calc(13/14*1rem)}
@@ -732,6 +757,8 @@ table.bang-doc{width:100%}
 
    `--vtos-text-mute` (#9BB2C6) CỐ Ý không giữ: trên giấy trắng nó chỉ đạt 2,19. */
 @media print{
+  /* VH-24: tiêu đề phát sáng về chữ đặc khi in — chữ chuyển màu cắt theo nền in ra trắng trơn. */
+  .mh01-ban-ten{-webkit-text-fill-color:var(--vtos-tieude-dam);background:none;filter:none;animation:none}
   /* TC-67: phải thắng cả `:root[data-nen="sang"]` của tokens.css, nếu không thì người
      đang để nền sáng in ra giấy bằng bảng màu màn hình chứ không bằng bảng màu giấy. */
   :root,:root[data-nen]{
@@ -1685,3 +1712,4 @@ html{font-size:var(--vtos-co-chu,16px)}
 .gd-mau-navy{background:var(--vtos-mau-nut-a);box-shadow:inset 0 0 0 1px var(--vtos-mau-nut-a-vien)}
 .gd-mau-sang{background:var(--vtos-mau-nut-b)}
 .gd-goi-y{display:block;margin-top:4px;font-size:calc(11/14*1rem);color:var(--vtos-text-mute)}
+

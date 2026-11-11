@@ -213,3 +213,12 @@
   --vtos-n90-quang-2:  #ff9f1fa0;
   --vtos-n90-vet:      #ffffffb0;
 }
+
+/* VH-24 · 12/11/2026 — TIÊU ĐỀ PHÁT SÁNG của bàn làm việc trang chủ (Chủ tịch: «to rõ, hiệu ứng ánh sáng giống
+ * của giám đốc đội xe»). Cùng bộ màu chuyển của tiêu đề /xe (VH-8). */
+:root {
+  --vtos-tieude-dam:   #183c69;
+  --vtos-tieude-giua:  #2c5fa2;
+  --vtos-tieude-sang:  #8cc4ff;
+  --vtos-tieude-quang: #2c5fa240;
+}

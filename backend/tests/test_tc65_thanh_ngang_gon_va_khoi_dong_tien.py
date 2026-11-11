@@ -56,24 +56,16 @@ def _css() -> str:
 # ───────────── 1 · VIỆC CHỜ QUYẾT VẪN TRÊN MÀN HÌNH, CHỈ MẤT KHUNG ─────────────
 
 def test_hang_viec_cho_quyet_van_con_va_di_du_khong_cat():
-    """Chỗ hỏng số 1 và số 2 — canh cùng một chỗ vì chúng hỏng cùng một lúc.
-
-    Bỏ khối riêng là điều anh Tuấn chốt. Bỏ luôn DANH SÁCH thì màn hình vẫn trông sạch sẽ, không
-    lỗi nào báo, và việc duy nhất Chủ tịch phải bấm biến mất. Nên canh cả ba vế: thanh nhận được
-    danh sách, thanh bày ra từng mục, và thanh không cắt bớt mục nào.
-    """
-    trang = _ma(TRANG)
-    assert "quyet_dinh={d.approvals" in trang, (
-        "Thanh ngang không nhận danh sách hồ sơ chờ quyết — việc duy nhất Chủ tịch phải bấm đã "
-        "biến mất khỏi màn hình."
-    )
-    than = _than(_ma(DAU), "TieuDe")
-    assert "cho.map(" in than, "Thanh ngang không bày danh sách hồ sơ chờ quyết."
-    assert "mh01-qd-nut" in than, "Mỗi hồ sơ phải là một nút bấm được, không phải một dòng chữ."
-    assert "slice(" not in than, (
-        "Danh sách hồ sơ chờ quyết đang bị cắt bớt. Luật 13/9/2026: hồ sơ thứ sáu nằm ngoài tầm "
-        "mắt người DUY NHẤT được quyết nó, mà thứ tự ưu tiên thì máy chủ chưa xếp."
-    )
+    """Bỏ hàng nút trên đầu trang thì việc chờ Chủ tịch phải SỐNG ở chỗ khác, không được biến mất.
+    VH-24 (Chủ tịch 12/11/2026, chốt «1.1.1»): đầu trang chủ chỉ còn TÊN BÀN + ô ngày; việc chờ lên hai nút
+    «Công việc» / «Chờ duyệt» trên thanh ngang (Shell + `GET /dashboard/dem`); bỏ «Quý và năm →» và nút In
+    (in bằng Ctrl+P, kiểu in giữ nguyên). Luật cũ còn sống được canh lại ở `test_vh24_ban_chu_tich.py`."""
+    import pathlib
+    shell = (pathlib.Path(GOC) / "web" / "components" / "Shell.tsx").read_text(encoding="utf-8")
+    assert '"/dashboard/dem"' in shell, "Nút «Chờ duyệt» không đọc danh sách việc — việc chờ Chủ tịch biến mất."
+    than = shell[shell.index("function NutViec"):shell.index("// Trạng thái THU/BUNG")]
+    assert "ds.map(" in than and "<Link" in than, "Mỗi việc phải là một dòng bấm được."
+    assert "slice(" not in than, "Danh sách việc chờ quyết đang bị cắt bớt (luật 13/9/2026)."
 
 
 def test_khong_con_khoi_rieng_va_khong_con_ba_dong_chu_gioi_thieu():
