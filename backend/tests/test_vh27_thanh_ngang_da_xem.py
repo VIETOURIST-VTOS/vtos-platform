@@ -51,7 +51,7 @@ def test_bam_dong_thi_so_giam_va_may_chu_nho():
     # Dựng sẵn danh sách trong bản nhớ để phép thử không phụ thuộc dữ liệu mẫu.
     RT._DEM_CACHE[uid] = (RT._DEM_CACHE[uid][0], {**d, "cho_duyet": [
         {"label": "3 tờ quyết toán chờ CHỦ TỊCH duyệt", "href": "/xe", "so": 3},
-        {"label": "DC2611-0001 · đề xuất chi", "href": "/xe", "so": 1}], "so_cho_duyet": 4,
+        {"label": "Đề xuất chi đội xe · phiếu thử", "href": "/xe", "so": 1}], "so_cho_duyet": 4,
         "cong_viec": [{"label": "Ký chạy tour · T1", "href": "/tours/1", "so": 1}], "so_cong_viec": 1})
     d = client.get("/api/v1/dashboard/dem", headers=hd).json()
     assert d["so_cho_duyet"] == 4 and d["so_cong_viec"] == 1

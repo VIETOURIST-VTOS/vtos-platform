@@ -276,6 +276,11 @@ TU_PHUC_VU: dict[str, str] = {
         "về mặc định. Xoá chứ không ghi đè bằng giá trị mặc định, vì rỗng nghĩa là CHƯA CHỌN và "
         "khác với ĐÃ CHỌN đúng giá trị mặc định. Cũng không nhận mã người dùng, nên cũng không có "
         "đường nào xoá lựa chọn của người khác."),
+    # VH-27 · 12/11/2026 — Chủ tịch duyệt: bấm một dòng của «Công việc» / «Chờ duyệt» thì số giảm.
+    "POST /api/v1/dashboard/da-xem": (
+        "Người đánh dấu ĐÃ XEM một dòng trong danh sách việc của CHÍNH MÌNH. Cửa không nhận mã người "
+        "dùng, chỉ ghi vào cột users.viec_da_xem của người đang cầm phiếu đăng nhập; không đổi trạng "
+        "thái hồ sơ nào, không duyệt gì — chỉ đổi con số hiện trên nút. Mọi vai trò đều được."),
 }
 
 # --------------------------------------------------------------------------- HỞ THẬT
@@ -311,7 +316,9 @@ TRAN = {
     "CONG_KHAI": 10,
     "TOKEN_VIET_TAY": 6,
     "CHAN_TAI_CHO": 10,
-    "TU_PHUC_VU": 10,
+    # 10 → 11 ngày 12/11/2026 (VH-27): Chủ tịch duyệt «bấm một dòng việc thì số giảm». POST /dashboard/da-xem
+    # cùng HÌNH với /auth/giao-dien — ghi vào chính bản ghi của người đăng nhập, không nhận mã người khác.
+    "TU_PHUC_VU": 11,
     "HO_QUYEN": 3,
 }
 
