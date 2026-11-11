@@ -73,19 +73,19 @@ a{color:var(--navy);font-weight:600}
    AI CHỌN GIẢM CHUYỂN ĐỘNG thì viền đứng yên — vẫn đủ ba màu, chỉ không chạy. */
 .top .brand .brand-logo{box-sizing:content-box;height:46px;width:auto;display:block;
   padding:7px 18px;border:2px solid transparent;border-radius:16px;
-  background:linear-gradient(110deg,#fff 40%,#eef5ff 50%,#fff 60%) padding-box,
-             linear-gradient(120deg,#5A9BD4,#FF6F96,#5FAE66,#5A9BD4) border-box;
+  background:linear-gradient(110deg,#fff 40%,var(--vtos-logo-vet-sang) 50%,#fff 60%) padding-box,
+             linear-gradient(120deg,var(--vtos-logo-xanh),var(--vtos-logo-hong),var(--vtos-logo-la),var(--vtos-logo-xanh)) border-box;
   background-size:250% 100%,300% 100%;
-  box-shadow:0 0 0 4px #8cc4ff40,0 6px 20px #0a234866;
+  box-shadow:0 0 0 4px var(--vtos-logo-quang),0 6px 20px var(--vtos-logo-bong);
   animation:vtos-logo-vien 6s linear infinite;transition:transform .2s,box-shadow .2s}
 .top .brand:hover .brand-logo{transform:translateY(-1px);
-  box-shadow:0 0 0 6px #8cc4ff70,0 10px 26px #0a234888}
+  box-shadow:0 0 0 6px var(--vtos-logo-quang-dam),0 10px 26px var(--vtos-logo-bong-dam)}
 @keyframes vtos-logo-vien{from{background-position:120% 0,0 0}to{background-position:-120% 0,300% 0}}
 @media (prefers-reduced-motion:reduce){.top .brand .brand-logo{animation:none}}
 /* LOGO-1: chữ «HỆ THỐNG ĐIỀU HÀNH» đậm và sáng hơn để đứng ngang hàng với ô trắng bên cạnh —
    ô trắng kéo hết mắt người đọc, chữ mờ 78% bên cạnh nó đọc như một dòng bị bỏ quên. */
-.top .brand small{font-weight:700;font-size:12px;letter-spacing:.18em;opacity:1;white-space:nowrap;
-  text-shadow:0 0 12px #8cc4ff99;
+.top .brand small{font-weight:700;font-size:calc(12/14*1rem);letter-spacing:.18em;opacity:1;white-space:nowrap;
+  text-shadow:0 0 12px var(--vtos-logo-chu-sang);
   border-left:1px solid rgba(255,255,255,.35);padding-left:12px;font-family:var(--vtos-font-text)}
 /* LOGO-1 · điện thoại: ô trắng nhỏ lại theo logo, và `--top-h` TRẢ VỀ 64px — ở cỡ này
    32 + đệm 5×2 + viền 2×2 = 46, cộng đệm 6×2 là 58px, để 76 thì thừa một khoảng trống. */
@@ -166,8 +166,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .top .bar .bar-muc.ai{color:var(--vtos-navy-light)}
 .top .bar .bar-muc.ai:hover{color:#fff}
 .top .bar .soon.bar-muc{opacity:.55}
-/* Ô tìm kiếm: nền chìm, viền không, con trỏ chữ – trông như một ô nhập chứ không như một nút. */
-.top .bar .o-tim{display:inline-flex;align-items:center;gap:8px;height:34px;flex:1 1 240px;min-width:150px;max-width:560px;padding:0 12px;
+/* Ô tìm kiếm: nền chìm, viền không, con trỏ chữ – trông như một ô nhập chứ không như một nút.
+   TOP-1 · 11/11/2026 (Chủ tịch duyệt bản xem trước): THU HẸP còn vừa đủ (tối đa 320px, không giãn ăn hết
+   chỗ như bản vẽ cũ) và ĐẶT GIỮA khoảng trống bằng `margin:0 auto` — cụm Công việc · Chờ duyệt · chuông ·
+   Giao diện · tên người dùng dồn về sát phải, thanh ngang cân đối. Dưới 900px vẫn giãn trọn dòng như cũ. */
+.top .bar .o-tim{display:inline-flex;align-items:center;gap:8px;height:34px;flex:0 1 320px;min-width:150px;max-width:320px;margin:0 auto;padding:0 12px;
   background:rgba(255,255,255,.10);border-radius:6px;color:rgba(255,255,255,.62);font-size:calc(13/14*1rem);font-weight:400;
   justify-content:flex-start;opacity:1}
 .top .bar .o-tim:hover{background:rgba(255,255,255,.16)}
@@ -184,7 +187,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media (max-width:900px){
   .top{flex-wrap:wrap}
   .top .bar{flex-wrap:wrap}
-  .top .bar .o-tim{flex:1 1 100%}
+  .top .bar .o-tim{flex:1 1 100%;max-width:none;margin:0}
   .top .bar .bar-muc span,.top .bar .o-tim span,.top .bar .who-ten{position:absolute;width:1px;
     height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 }
