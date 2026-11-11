@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import DinhKem from "@/components/DinhKem";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtDT } from "@/lib/api";
@@ -18,6 +18,9 @@ function Expenses() {
   const role = user?.role || "";
   const [tab, setTab] = useState("requests");
   const [tepDN, setTepDN] = useState("");   // mã đề nghị chi đang mở chứng từ
+  // VH-22 (Chủ tịch duyệt bản xem trước 11/11/2026 23:27): «Xem chi tiết» mở NGAY DƯỚI dòng — đủ nội dung,
+  // tuyến ký và chứng từ đính kèm. Thay nút «Chứng từ» cũ (mở khối tệp tận cuối trang, người duyệt không thấy).
+  const [moCT, setMoCT] = useState<number | null>(null);
   const [tepUnc, setTepUnc] = useState(false);   // KS-16d: ô đang mở là ô tải UNC (Kế toán, lệnh chi chờ)
   const [filter, setFilter] = useState("cho_tp,cho_kt,cho_duyet,cho_chi,tra_bo_sung");
   const [rows, setRows] = useState<any[]>([]);
@@ -217,21 +220,37 @@ function Expenses() {
         </>}
       </div><button className="act" disabled={!f.supplier_name || !f.description || (f.tien_te ? !(f.so_tien_ngoai_te && f.ty_gia && f.ngay_ty_gia) : !f.amount)} onClick={() => post("/payment-requests", { ...f, tour_id: f.tour_id ? Number(f.tour_id) : null, amount: f.tien_te ? 0 : Number(f.amount), tien_te: f.tien_te, so_tien_ngoai_te: f.tien_te && f.so_tien_ngoai_te ? Number(f.so_tien_ngoai_te) : null, ty_gia: f.tien_te && f.ty_gia ? Number(f.ty_gia) : null, ngay_ty_gia: f.tien_te && f.ngay_ty_gia ? f.ngay_ty_gia : null, ngay_den_han: f.ngay_den_han || null, marketing_muc: f.category === "marketing" ? f.marketing_muc : "", campaign_id: f.category === "marketing" && f.campaign_id ? Number(f.campaign_id) : null }).then((r) => r && setF({ ...f, supplier_name: "", amount: "", description: "", document_ref: "", has_document: false, ngay_den_han: "", marketing_muc: "", campaign_id: "", so_tien_ngoai_te: "", ty_gia: "", ngay_ty_gia: "" }))}>Lập đề nghị</button></div>}
       <div>{[["cho_tp,cho_kt,cho_duyet,cho_chi,tra_bo_sung", "Đang xử lý"], ["cho_chi", "Lệnh chi chờ"], ["tra_bo_sung", "Trả bổ sung"], ["da_chi", "Đã chi"], ["tu_choi", "Từ chối"], ["", "Tất cả"]].map(([v, l]) => <button key={v} className={"act " + (filter === v ? "" : "grey")} onClick={() => setFilter(v)}>{l}</button>)}</div>
-      <div className="panel wrap"><table><thead><tr><th>Số ĐN</th><th>Loại / Tour</th><th>NCC</th><th style={{ textAlign: "right" }}>Số tiền</th><th>Nội dung</th><th>Hạn trả</th><th>Cờ R3</th><th>Trạng thái → bước tiếp</th><th>Người</th><th></th></tr></thead>
-        <tbody>{rows.length ? rows.map((r) => <tr key={r.id}><td><b>{r.code}</b><div className="muted">{fmtDT(r.created_at)}</div></td><td>{CAT[r.category]}<div className="muted">{r.tour_code}</div></td><td>{r.supplier_name}<div className="muted">{r.supplier_tax_code || <Tag cls="warn">chưa MST</Tag>}</div></td><td style={{ textAlign: "right" }}><b>{vnd(r.amount)}</b>{r.ngoai_te_loi_nhan && <div className="muted">{r.ngoai_te_loi_nhan}</div>}</td><td>{r.description}<div className="muted">{r.document_ref || <Tag cls="warn">thiếu chứng từ</Tag>}{!r.has_invoice && !["hoan_tien", "tam_ung", "tam_ung_tai_xe"].includes(r.category) && <Tag cls="warn">không HĐ</Tag>}</div></td>
+      <div className="panel wrap"><table><thead><tr><th>Số ĐN</th><th>Loại / Tour</th><th>NCC</th><th style={{ textAlign: "right" }}>Số tiền</th><th>Nội dung</th><th>Hạn trả</th><th>Cờ R3</th><th>Trạng thái → bước tiếp</th><th>Người</th><th style={{ position: "sticky", right: 0, background: "var(--panel)", zIndex: 1 }}>Việc của anh</th></tr></thead>
+        <tbody>{rows.length ? rows.map((r) => <React.Fragment key={r.id}><tr><td><b>{r.code}</b><div className="muted">{fmtDT(r.created_at)}</div></td><td>{CAT[r.category]}<div className="muted">{r.tour_code}</div></td><td>{r.supplier_name}<div className="muted">{r.supplier_tax_code || <Tag cls="warn">chưa MST</Tag>}</div></td><td style={{ textAlign: "right" }}><b>{vnd(r.amount)}</b>{r.ngoai_te_loi_nhan && <div className="muted">{r.ngoai_te_loi_nhan}</div>}</td><td><div className="dn-nd" title={r.description}>{r.description}</div><div className="muted">{r.document_ref || <Tag cls="warn">thiếu chứng từ</Tag>}{!r.has_invoice && !["hoan_tien", "tam_ung", "tam_ung_tai_xe"].includes(r.category) && <Tag cls="warn">không HĐ</Tag>}</div></td>
           <td>{r.ngay_den_han ? <b>{String(r.ngay_den_han).slice(0, 10).split("-").reverse().join("/")}</b> : <Tag cls="warn">Chưa có hạn</Tag>}
             <div className="muted">{r.ngay_den_han_boi ? `${r.ngay_den_han_boi} gõ` : ""}{!["da_chi", "tu_choi"].includes(r.status) && <> <button className="act grey" style={{ margin: 0, padding: "1px 6px", fontSize: 11 }} onClick={() => datNgay(r)}>{r.ngay_den_han ? "Sửa" : "Gõ hạn"}</button></>}</div></td>
           <td>{r.over_budget && <Tag cls="red">Ngoài dự toán</Tag>}{r.two_signatures && <Tag cls="navy">2 chữ ký</Tag>}</td><td><Tag cls={r.chi_mot_phan ? "warn" : ST[r.status]?.[1]}>{r.chi_mot_phan ? "Đã chi một phần" : ST[r.status]?.[0]}</Tag><div className="muted">{r.next}{r.two_signatures && r.status === "cho_duyet" && ` (CT ${r.signed_chutich ? "✔" : "…"} · TGĐ ${r.signed_tgd ? "✔" : "…"})`}{r.reject_reason && ` – ${r.reject_reason}`}{r.paid_ref && ` – ${r.paid_ref}`}</div>
             {r.robot_ghi_chu && <div style={{ fontSize: 12, color: "#9a5b00" }}>{r.robot_ghi_chu}</div>}
             {r.status === "cho_chi" && !r.co_unc && <div style={{ fontSize: 12 }}><Tag cls="warn">Chưa có UNC</Tag> CK xong tải UNC rồi bấm «Đã chi»</div>}</td>
           <td className="muted">{r.created_by}{r.tp_by && ` → ${r.tp_by}`}{r.kt_by && ` → ${r.kt_by}`}{r.approved_by && ` → ${r.approved_by}`}</td>
-          <td>{actions(r).map(([l, a, c]) => <button key={a} className={"act " + c} style={{ margin: "0 4px 4px 0" }} disabled={a === "pay" && (r.so_unc ?? (r.co_unc ? 1 : 0)) <= (r.lan_chi || []).length} title={a === "pay" && (r.so_unc ?? 0) <= (r.lan_chi || []).length ? "Tải UNC cho lần chi này trước" : ""} onClick={() => { if (a === "unc") { setTepUnc(true); setTepDN(r.code); return; } if (a === "robot") { post(`/payment-requests/${r.id}/robot-kiem`); return; } if (a === "gui_lai") { setSua({ r, supplier_name: r.supplier_name, supplier_tax_code: r.supplier_tax_code, supplier_bank: r.supplier_bank, description: r.description, document_ref: r.document_ref, amount: r.amount, has_document: r.has_document, has_invoice: r.has_invoice }); return; } let reason = ""; if (a === "reject" || a === "tra_bo_sung") { reason = prompt(a === "reject" ? "Lý do từ chối (bắt buộc):" : "Trả bổ sung — người lập cần bổ sung gì? (bắt buộc)") || ""; if (!reason) return; } if (a === "pay") { setChi({ r, hinh_thuc_tt: "", ma: "", so_tien: String(r.con_phai_chi ?? r.amount) }); return; } step(r, a, reason); }}>{l}</button>)}
-            {" "}<button className="act grey" style={{ margin: "0 4px 4px 0" }} title="Chứng từ kèm theo" onClick={() => { setTepUnc(false); setTepDN(r.code); }}>Chứng từ</button></td></tr>) : <tr><td colSpan={10} className="muted">Không có đề nghị chi.</td></tr>}</tbody></table></div>
+          <td className="dn-nut">{actions(r).map(([l, a, c]) => <button key={a} className={"act " + c} style={{ margin: "0 4px 4px 0" }} disabled={a === "pay" && (r.so_unc ?? (r.co_unc ? 1 : 0)) <= (r.lan_chi || []).length} title={a === "pay" && (r.so_unc ?? 0) <= (r.lan_chi || []).length ? "Tải UNC cho lần chi này trước" : ""} onClick={() => { if (a === "unc") { setTepUnc(true); setTepDN(r.code); return; } if (a === "robot") { post(`/payment-requests/${r.id}/robot-kiem`); return; } if (a === "gui_lai") { setSua({ r, supplier_name: r.supplier_name, supplier_tax_code: r.supplier_tax_code, supplier_bank: r.supplier_bank, description: r.description, document_ref: r.document_ref, amount: r.amount, has_document: r.has_document, has_invoice: r.has_invoice }); return; } let reason = ""; if (a === "reject" || a === "tra_bo_sung") { reason = prompt(a === "reject" ? "Lý do từ chối (bắt buộc):" : "Trả bổ sung — người lập cần bổ sung gì? (bắt buộc)") || ""; if (!reason) return; } if (a === "pay") { setChi({ r, hinh_thuc_tt: "", ma: "", so_tien: String(r.con_phai_chi ?? r.amount) }); return; } step(r, a, reason); }}>{l}</button>)}
+            {" "}<button className="act grey dn-xem" style={{ margin: "0 4px 4px 0" }} aria-expanded={moCT === r.id}
+              onClick={() => setMoCT(moCT === r.id ? null : r.id)}>{moCT === r.id ? "Ẩn chi tiết" : "Xem chi tiết"}</button></td></tr>
+          {moCT === r.id && <tr className="dn-ct"><td colSpan={10}>
+            <dl className="dn-luoi">
+              <div className="dai"><dt>Nội dung đầy đủ</dt><dd>{r.description}</dd></div>
+              <div><dt>Loại</dt><dd>{CAT[r.category] || r.category}{r.tour_code ? ` · ${r.tour_code}` : ""}</dd></div>
+              <div><dt>Bên nhận</dt><dd>{r.supplier_name}{r.supplier_tax_code ? ` · MST ${r.supplier_tax_code}` : ""}</dd></div>
+              <div><dt>Số tiền</dt><dd><b>{vnd(r.amount)}</b>{r.da_chi_tien > 0 ? ` · đã chi ${vnd(r.da_chi_tien)}` : ""}</dd></div>
+              <div><dt>Số chứng từ</dt><dd>{r.document_ref || "—"}</dd></div>
+              <div><dt>Lập lúc</dt><dd>{fmtDT(r.created_at)} · {r.created_by}</dd></div>
+              <div><dt>Bước tiếp</dt><dd>{r.next || ST[r.status]?.[0]}</dd></div>
+              <div className="dai"><dt>Tuyến ký</dt><dd>{[r.created_by && `Lập: ${r.created_by}`, r.tp_by && `Xác nhận: ${r.tp_by}`,
+                r.kt_by && `Kế toán: ${r.kt_by}`, r.approved_by && `Ký lệnh chi: ${r.approved_by}`].filter(Boolean).join(" → ")}</dd></div>
+              {r.robot_ghi_chu && <div className="dai"><dt>Robot ghi chú</dt><dd>{r.robot_ghi_chu}</dd></div>}
+              {r.reject_reason && <div className="dai"><dt>Lý do trả / từ chối</dt><dd>{r.reject_reason}</dd></div>}
+            </dl>
+            <DinhKem key={`ct-${r.code}`} doiTuong="de_nghi_chi" doiTuongId={r.code} tieuDe={`Chứng từ của ${r.code}`}
+              goi="Hóa đơn, hợp đồng, báo giá, ủy nhiệm chi — người duyệt nhìn đúng chứng từ mình đang duyệt." />
+          </td></tr>}</React.Fragment>) : <tr><td colSpan={10} className="muted">Không có đề nghị chi.</td></tr>}</tbody></table></div>
+      <style>{DN_CSS}</style>
       {tepDN && tepUnc && <DinhKem key={`unc-${tepDN}`} doiTuong="de_nghi_chi" doiTuongId={tepDN} loai="unc" tieuDe={`Tải UNC / phiếu chi của ${tepDN}`}
         goi="Chuyển khoản xong trên ngân hàng → tải ủy nhiệm chi (UNC) hoặc phiếu chi tiền mặt lên đây → nút «Đã chi» mở." onDoi={load} />}
-      {tepDN && !tepUnc && <DinhKem key={`ct-${tepDN}`} doiTuong="de_nghi_chi" doiTuongId={tepDN} tieuDe={`Chứng từ của đề nghị chi ${tepDN}`}
-        goi={"Hóa đơn, hợp đồng, báo giá, ủy nhiệm chi. Người duyệt nhìn thấy đúng chứng từ mình đang " +
-             "duyệt thay vì tin vào một dòng mô tả."} />}
     </>}
 
     {tab === "thieu_ngay" && <div className="panel wrap">
@@ -257,3 +276,14 @@ function Expenses() {
   </>);
 }
 export default function Page() { return <Shell><Expenses /></Shell>; }
+
+/* VH-22 · nội dung hai dòng, cột nút DÍNH bên phải (luôn thấy dù bảng rộng), ngăn chi tiết dưới dòng. */
+const DN_CSS = `
+.dn-nd{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:46ch}
+td.dn-nut{position:sticky;right:0;background:var(--panel);box-shadow:-8px 0 10px -8px rgba(18,48,84,.25);min-width:170px;z-index:1}
+tr.dn-ct td{background:var(--panel2);padding:14px 16px}
+.dn-luoi{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 24px;margin:0 0 10px}
+.dn-luoi>div{min-width:0}.dn-luoi .dai{grid-column:1/-1}
+.dn-luoi dt{font-size:calc(11/14*1rem);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+.dn-luoi dd{margin:2px 0 0;white-space:pre-wrap}
+`;
