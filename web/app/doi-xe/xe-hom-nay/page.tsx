@@ -30,6 +30,8 @@ const TEN_LOAI: Record<string, string> = {
 
 function XeHomNay() {
   const { toast } = useShell();
+  const [toanTrang, setToanTrang] = useState(false);   // VH-33: false khi nằm trong khung bàn GĐ đội xe
+  useEffect(() => { try { setToanTrang(window.self === window.top); } catch { /* khác nguồn: coi như trong khung */ } }, []);
   const [d, setD] = useState<any>(undefined);
   const [dang, setDang] = useState(false);
   const [link, setLink] = useState("");
@@ -116,7 +118,8 @@ function XeHomNay() {
       <div className="panel">
         <h2>Link sheet Đội xe</h2>
         {d.cho_ky && <p><Tag cls="warn">Chờ Chủ tịch ký</Tag> link do {d.cho_ky.boi} trình, hiệu lực từ {fmtD(d.cho_ky.hieu_luc)}.
-          {" "}<a href="/params">Màn Chính sách &amp; định mức →</a></p>}
+          {/* VH-33: trong khung bàn GĐ đội xe không mở được màn Tham số — chỉ hiện khi xem toàn trang. */}
+          {toanTrang && <>{" "}<a href="/params">Màn Chính sách &amp; định mức →</a></>}</p>}
         {d.duoc_dan && <>
           <label htmlFor="xs-link">Link CSV «Công bố lên web» của trang «Quyết Toán dữ liệu xe»</label>
           <input id="xs-link" type="url" value={link} onChange={(e) => setLink(e.target.value)}

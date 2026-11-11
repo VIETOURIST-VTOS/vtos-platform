@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import Shell, { useShell } from "@/components/Shell";
+import Shell, { useShell, CA_NHAN } from "@/components/Shell";
 import { api } from "@/lib/api";
 import { errMsg } from "@/components/ui";
 import { KhoiHieuQuaXe } from "@/components/KhoiV14";
@@ -161,7 +161,10 @@ function KhungNhung({ toi, ten, mo }: { toi: string; ten: string; mo?: string })
         st.id = "vtos-nhung";
         st.textContent = ".top,aside.side{display:none!important}main{max-width:none!important;padding:0!important;margin:0!important}body{background:transparent!important}"
           // VH-6: vụn đường «VTOS · Đội xe · …» dẫn về trang chủ CRM — trong /xe thì giấu, cùng mũi tên «mở tab mới».
-          + ".thanh-viec .tv-duong,.thanh-viec .tv-mui{display:none!important}";
+          + ".thanh-viec .tv-duong,.thanh-viec .tv-mui{display:none!important}"
+          // VH-33: trong khung chỉ giữ việc CHÍNH của màn (vd «Ghi phạt mới»); «‹ Lên một cấp» và lối sang màn khác
+          // của đội xe đã có trên thanh nghiệp vụ /xe — giữ lại là lặp nút trên một màn. Thanh trống thì giấu.
+          + ".thanh-viec a.tv:not(.chinh),.thanh-viec .tv-nhan{display:none!important}.thanh-viec:not(:has(a.tv.chinh)){display:none!important}";
         doc.head.appendChild(st);
         // VH-6: liên kết trong khung — màn đội xe mở NGAY TRONG KHUNG (kể cả nút ↗ vốn mở tab mới);
         // liên kết về trang chủ / phân hệ CRM thì không đi đâu cả.
@@ -290,6 +293,22 @@ function BanLamViecXe() {
     document.documentElement.classList.add("xe-chuc-tat");
     return () => document.documentElement.classList.remove("xe-chuc-tat");
   }, [user?.role]);
+  /* VH-33 (Chủ tịch 12/11/2026 «nút phiếu lương của tôi vẫn chạy về màn hình CRM tổng»): ba mục của menu cá
+     nhân (báo cáo công việc, phiếu lương, đổi mật khẩu) mở NGAY TRONG bàn này, trong khung — không rời /xe.
+     «Thoát» giữ nguyên. Menu là Shell.tsx (dùng chung) nên chỉ bắt cú bấm ở đây, không sửa Shell. */
+  const [caNhan, setCaNhan] = useState<{ href: string; ten: string } | null>(null);
+  useEffect(() => {
+    const bat = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement | null)?.closest?.(".menu-toi a[href]") as HTMLAnchorElement | null;
+      const h = a?.getAttribute("href") || "";
+      if (!a || !CA_NHAN.some(([, x]) => x === h) || e.ctrlKey || e.metaKey) return;
+      e.preventDefault();          // không chặn lan truyền: Shell còn phải đóng hộp menu
+      setCaNhan({ href: h, ten: a.innerText.trim() }); setNhom(null); setTrang(null); setChiTiet(null); setMoSan("");
+      try { window.scrollTo({ top: 0 }); } catch { /* thôi */ }
+    };
+    document.addEventListener("click", bat, true);
+    return () => document.removeEventListener("click", bat, true);
+  }, []);
   /* VH-12 đã về thanh đầu dùng chung (LOGO-1 của làn R2, PR #788) — lớp ghi đè tạm ở /xe gỡ ở VH-14. */
   const hd = d?.hang_doi, sk = d?.so_ky, xe = d?.xe_hom_nay;
   /** «Mỗi nút một chỗ» (Chủ tịch dặn 10/11/2026): việc nào «Việc cần xử lý» đã nói thì bảng sẵn sàng
@@ -318,7 +337,7 @@ function BanLamViecXe() {
     }
     // Không khớp trang con nào (vd. /nap-du-lieu — cửa nạp hồ sơ xe): đặt dưới «Hồ sơ xe».
     setNhom(tot ? tot.n : "fleet"); setTrang(tot ? tot.t : "ho-so-xe"); setMoSan(""); setChiTiet(href);
-    setKeo(null);
+    setKeo(null); setCaNhan(null);
     try { window.scrollTo({ top: 0 }); } catch { /* không cuộn được thì thôi */ }
   };
   const giuTaiCho = (e: React.MouseEvent) => {
@@ -363,13 +382,13 @@ function BanLamViecXe() {
     <nav aria-label="Nghiệp vụ đội xe" className="xe-nhom">
       {/* VH-11: «Trang chủ» đầu dòng — đóng nhóm/trang con đang mở, về đầu bàn làm việc, không rời /xe. */}
       <button type="button" title="Về bàn làm việc Giám đốc đội xe" aria-pressed={nhom === null}
-        onClick={() => { setNhom(null); setTrang(null); setMoSan(""); setChiTiet(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+        onClick={() => { setNhom(null); setTrang(null); setMoSan(""); setChiTiet(null); setCaNhan(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10" /></svg>
         Trang chủ
       </button>
       {NHOM.map((n) => (
         <button key={n.ma} type="button" title={n.tom}
-          onClick={() => { setNhom(nhom === n.ma ? null : n.ma); setTrang(null); setMoSan(""); setChiTiet(null); }}
+          onClick={() => { setNhom(nhom === n.ma ? null : n.ma); setTrang(null); setMoSan(""); setChiTiet(null); setCaNhan(null); }}
           aria-pressed={nhom === n.ma}>
           <svg viewBox="0 0 24 24" aria-hidden="true">{ICON_NHOM[n.ma]}</svg>
           {n.ten}
@@ -410,17 +429,23 @@ function BanLamViecXe() {
             ? trangMo.toi + (trangMo.toi.includes("?") ? "&" : "?") + `ky=${ky}` : trangMo.toi);
           const coGon = trangMo.ma in MAN_GON;
           return <>
-            {coGon && <p style={{ margin: "0 0 8px" }}><button type="button"
+            {coGon && <p style={{ margin: "0 0 8px" }}><button type="button" className="act grey" style={{ margin: 0 }}
               onClick={() => { setChiTiet(null); setMoSan(""); }}>← Về màn gọn {trangMo.ten}</button></p>}
-            {!coGon && <h2 style={{ marginTop: 0 }}>{trangMo.ten}</h2>}
-            {!coGon && trangMo.ghi && <p className="muted">{trangMo.ghi}</p>}
+            {/* VH-33: không in tên trang con ở đây — trang trong khung đã có tiêu đề riêng (trước lặp hai lần). */}
             <KhungNhung key={toi + moSan} toi={toi} ten={trangMo.ten} mo={moSan || undefined} />
           </>;
         })()}
     </section>}
 
+    {/* VH-33: mục của menu cá nhân mở tại chỗ. */}
+    {!nhomMo && caNhan && <section className="panel">
+      <p style={{ margin: "0 0 8px" }}><button type="button" className="act grey" style={{ margin: 0 }}
+        onClick={() => setCaNhan(null)}>← Về bàn làm việc</button></p>
+      <KhungNhung key={caNhan.href} toi={caNhan.href} ten={caNhan.ten} />
+    </section>}
+
     {/* ④ TỔNG QUAN */}
-    {!nhomMo && <>
+    {!nhomMo && !caNhan && <>
       {dang && !d && <div className="xe-cho" aria-busy="true" aria-label="Đang đọc số"><i /><i /><i /><i /></div>}
 
       {/* ⑥ HÀNG ĐỢI VIỆC — VH-4 (Chủ tịch duyệt 10/11/2026): LÊN ĐẦU tổng quan, viền navy; mục đỏ nền đỏ nhạt. */}
