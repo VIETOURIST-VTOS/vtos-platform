@@ -620,7 +620,23 @@ export type PhanHeCon = {
 export const PHAN_HE_CON: PhanHeCon[] = [
   { khoa: "kdle", cha: "khachhang", ten: "Kinh doanh lẻ",
     tom_tat: "Lịch khởi hành · Booking lẻ · Dịch vụ riêng lẻ · Chính sách bán",
-    lay: ["3.1", "3.2", "3.3", "3.5", "3.6", "3.7", "3.8"], chung: ["3.1", "3.2", "3.5", "3.6", "3.7"] },
+    // XE-KD-4 · 11/11/2026 — NHẬN "3.1b" VÀO `lay`, VÀ CỐ Ý KHÔNG VÀO `chung`.
+    // Phân hệ cha `khachhang` mất lối vào từ thanh dọc từ TC-70 (18/9/2026), nên nhánh
+    // nào không phân hệ con nào nhận thì không còn chỗ nào hiện ra — không báo lỗi, không
+    // để lại dấu vết, chỉ là không tồn tại nữa với người dùng. XE-KD-1 thêm nhánh ấy vào
+    // cây và vào menu mà quên bảng nhận này. Cả hai phòng cùng lấy: lịch xe trống phục vụ
+    // cả bán lẻ lẫn bán đoàn.
+    // VÌ SAO KHÔNG ĐÁNH CỜ `chung`: đợt XE-KD-3 có khai, và `test_tc70` chặn đúng chỗ ấy.
+    // Danh sách dùng chung đã chốt ở NĂM nhánh, và chính phép thử ấy dặn sẵn rằng nhánh
+    // thứ sáu không nên đi tiếp đường này mà phải ĐẢO cờ — đánh dấu hai nhánh RIÊNG (3.3
+    // Lẻ, 3.4 Đoàn) thay vì đánh dấu phần dùng chung, vì một cái cờ dán lên đa số thì
+    // không còn cảnh báo được ai. Đảo cờ là một quyết định phải có người chốt, không phải
+    // một lần nới nữa, nên đợt này không tự đảo. Nhánh vẫn tới được từ cả hai phòng vì nó
+    // nằm trong `lay` của cả hai; chỉ là màn hình không gắn nhãn «dùng chung» cho nó.
+    // GIỮ NGUYÊN MỘT DÒNG như mọi mục khác của bảng này: `lay` và `chung` của mỗi phân
+    // hệ con nằm cùng một dòng ở khắp tệp, và bẻ đôi một dòng chỉ để cho đẹp là đánh cược
+    // rằng không phép thử nào đọc tệp này theo dòng. Không đáng cược.
+    lay: ["3.1", "3.1b", "3.2", "3.3", "3.5", "3.6", "3.7", "3.8"], chung: ["3.1", "3.2", "3.5", "3.6", "3.7"] },
   { khoa: "kddoan", cha: "khachhang", ten: "Kinh doanh đoàn",
     tom_tat: "Cơ hội · Hồ sơ đoàn · Báo giá · Hợp đồng",
     lay: ["3.1", "3.1b", "3.2", "3.4", "3.5", "3.6", "3.7", "3.9"], chung: ["3.1", "3.2", "3.5", "3.6", "3.7"] },
