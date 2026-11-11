@@ -203,16 +203,24 @@
 /* VH-17 · 11/11/2026 — NÚT VÀNG «Lịch xe 90 ngày» (thanh ngang của lãnh đạo, /xe). Cùng bộ màu hổ phách đã
  * duyệt cho nút lớn trên /xe (VH-10): khác hẳn dàn nút navy để mắt bắt ngay. */
 :root {
-  /* VH-27 (Chủ tịch 12/11/2026): nút «Lịch xe 90 ngày» đổi sang vàng-xanh nhạt sáng. */
-  --vtos-n90-a:        #f6fbb4;
-  --vtos-n90-b:        #e4f69c;
-  --vtos-n90-c:        #cbed80;
-  --vtos-n90-chu:      #2e4100;
-  --vtos-n90-net:      #3e5a00;
-  --vtos-n90-vien:     #f4fcd2;
-  --vtos-n90-quang:    #b5e05a66;
-  --vtos-n90-quang-2:  #b5e05aa0;
-  --vtos-n90-vet:      #ffffffc8;
+  /* VH-27 (Chủ tịch 12/11/2026): nút «Lịch xe 90 ngày» vàng-xanh nhạt sáng.
+  VH-30 (Chủ tịch 12/11/2026): nút cùng NAVY SÁNG với thanh đầu bàn (Chủ tịch 03:26), viền trắng để tách khỏi nền; số «trống» trên HỒNG đúng tệp logo v2 (#FC4D7A) làm điểm nhấn. */
+  /* VH-30 · thanh đầu bàn làm việc nền navy sáng (Chủ tịch chọn A, 12/11/2026). */
+  --vtos-ban-a:        #2a6db5;
+  --vtos-ban-b:        #1f5fa8;
+  --vtos-ban-c:        #2f78c4;
+  --vtos-ban-chu-a:    #dbe9fb;
+  --vtos-ban-chu-b:    #bcd8ff;
+  --vtos-n90-a:        #3b82d0;
+  --vtos-n90-b:        #2f78c4;
+  --vtos-n90-c:        #2a6db5;
+  --vtos-n90-chu:      #ffffff;
+  --vtos-n90-net:      #ffffff;
+  --vtos-n90-vien:     #ffffff8c;
+  --vtos-n90-quang:    #0b2a5066;
+  --vtos-n90-quang-2:  #0b2a50a0;
+  --vtos-n90-so:       #fc4d7a;
+  --vtos-n90-vet:      #ffffff8c;
 }
 
 /* VH-24 · 12/11/2026 — TIÊU ĐỀ PHÁT SÁNG của bàn làm việc trang chủ (Chủ tịch: «to rõ, hiệu ứng ánh sáng giống
