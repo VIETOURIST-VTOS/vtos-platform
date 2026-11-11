@@ -190,8 +190,12 @@ def bao_cao(db: Session, ky: str, phan_bo: str = "khong") -> dict:
     # quyết toán — xe đã chạy là đã khai thác, dù tiền chưa chốt (tài liệu v3.3 mục 8). Tiền thì vẫn chỉ
     # chuyến đã quyết toán (KS-65); hai luật khác nhau vì hai câu hỏi khác nhau.
     ngay_ghi_nhan: dict[int, set] = {}
-    for c in theo_chuyen(db, ky):
-        t = db.get(Trip, c["trip_id"])
+    # NHANH-1 (11/11/2026): đọc các chuyến MỘT lần thay vì `db.get` từng chuyến — trên bản thật mỗi lượt hỏi
+    # CSDL tốn vài mili-giây, và màn «Hiệu quả đội xe» gọi hàm này cho nhiều kỳ (đo 4–10 giây).
+    _tc = theo_chuyen(db, ky)
+    _tm = {t.id: t for t in db.execute(select(Trip).where(Trip.id.in_([c["trip_id"] for c in _tc]))).scalars()} if _tc else {}
+    for c in _tc:
+        t = _tm[c["trip_id"]]
         if t.vehicle_id and t.ngay_di and t.ngay_ve:
             ngay_ghi_nhan.setdefault(t.vehicle_id, set()).update(
                 t.ngay_di + timedelta(days=i) for i in range((t.ngay_ve - t.ngay_di).days + 1))
