@@ -170,28 +170,35 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
    TOP-1 · 11/11/2026 (Chủ tịch duyệt bản xem trước): THU HẸP còn vừa đủ (tối đa 320px, không giãn ăn hết
    chỗ như bản vẽ cũ) và ĐẶT GIỮA khoảng trống bằng `margin:0 auto` — cụm Công việc · Chờ duyệt · chuông ·
    Giao diện · tên người dùng dồn về sát phải, thanh ngang cân đối. Dưới 900px vẫn giãn trọn dòng như cũ. */
-.top .bar .o-tim{display:inline-flex;align-items:center;gap:8px;height:34px;flex:0 1 320px;min-width:150px;max-width:320px;margin:0 auto;padding:0 12px;
+.top .bar .o-tim{display:inline-flex;align-items:center;gap:8px;height:34px;flex:0 1 320px;min-width:120px;max-width:320px;margin:0 auto;padding:0 12px;
   background:rgba(255,255,255,.10);border-radius:6px;color:rgba(255,255,255,.62);font-size:calc(13/14*1rem);font-weight:400;
   justify-content:flex-start;opacity:1}
 .top .bar .o-tim:hover{background:rgba(255,255,255,.16)}
 /* VH-17 · nút vàng NHỎ «Lịch xe 90 ngày» trên thanh ngang của lãnh đạo và trưởng phòng (Chủ tịch duyệt
    11/11/2026). Quầng sáng thở + vệt sáng lướt như nút lớn trên /xe; tắt khi người dùng chọn giảm chuyển
    động. Màu lấy từ tokens.css (--vtos-n90-*), không gõ thẳng. Dưới 900px chỉ còn biểu tượng và số. */
-.top .bar .n90s{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;
+.n90s{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;
   border-radius:10px;flex:0 0 auto;white-space:nowrap;text-decoration:none;font-weight:800;font-size:calc(13/14*1rem);
   color:var(--vtos-n90-chu);background:linear-gradient(135deg,var(--vtos-n90-a),var(--vtos-n90-b) 55%,var(--vtos-n90-c));
   box-shadow:0 0 0 2px var(--vtos-n90-vien),0 4px 14px var(--vtos-n90-quang);animation:vtos-n90-tho 2.4s ease-in-out infinite}
-.top .bar .n90s::after{content:"";position:absolute;inset:0;pointer-events:none;
+.n90s::after{content:"";position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(110deg,transparent 35%,var(--vtos-n90-vet) 50%,transparent 65%);
   transform:translateX(-120%);animation:vtos-n90-luot 3.2s ease-in-out infinite}
-.top .bar .n90s svg{width:17px;height:17px;flex:none;fill:none;stroke:var(--vtos-n90-net);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.top .bar .n90s b{background:var(--vtos-n90-chu);color:var(--vtos-n90-a);border-radius:999px;padding:1px 8px;font-size:calc(13/14*1rem)}
-.top .bar .n90s:hover{color:var(--vtos-n90-chu);transform:translateY(-1px)}
+.n90s svg{width:17px;height:17px;flex:none;fill:none;stroke:var(--vtos-n90-net);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.n90s b{background:var(--vtos-n90-chu);color:var(--vtos-n90-a);border-radius:999px;padding:1px 8px;font-size:calc(13/14*1rem)}
+.n90s:hover{color:var(--vtos-n90-chu);transform:translateY(-1px)}
 @keyframes vtos-n90-tho{0%,100%{box-shadow:0 0 0 2px var(--vtos-n90-vien),0 4px 14px var(--vtos-n90-quang)}
   50%{box-shadow:0 0 0 3px var(--vtos-n90-vien),0 6px 22px var(--vtos-n90-quang-2)}}
 @keyframes vtos-n90-luot{0%,55%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
-@media (prefers-reduced-motion:reduce){.top .bar .n90s,.top .bar .n90s::after{animation:none}}
-@media (max-width:900px){.top .bar .n90s span{display:none}}
+@media (prefers-reduced-motion:reduce){.n90s,.n90s::after{animation:none}}
+/* VH-27 · 12/11/2026: nút nằm ở đầu bàn làm việc, cạnh ô ngày — cao bằng ô ngày, chữ không ẩn. */
+.mh01-ban-cum{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.mh01-ban-cum .n90s{height:36px;padding:0 12px;border-radius:10px;font-size:calc(13/14*1rem)}
+/* Vạch mảnh tách nhóm việc chung (Công việc · Chờ duyệt · Trợ lý AI) khỏi nhóm của riêng người dùng. */
+.top .bar .bar-ngan{flex:none;width:1px;height:24px;background:rgba(255,255,255,.28);margin:0 4px}
+/* VH-27 · màn ≤1400px (laptop 13–14"): «Trợ lý AI» (chưa chạy) chỉ còn biểu tượng để thanh không tràn đè lên
+   chữ «Hệ thống điều hành» — đo 1280px: tràn 65px. Rê chuột vẫn thấy tên (title). */
+@media (max-width:1400px){.top .bar .bar-muc.ai span{display:none}.top .bar .bar-muc.ai{padding:0 8px}}
 /* Viên số cảnh báo. Nền vàng chữ sẫm để đọc được cả khi in đen trắng, không chỉ dựa vào màu. */
 .top .bar .so-bao{min-width:24px;height:22px;padding:0 7px;border-radius:11px;background:var(--vtos-danger);
   color:#fff;font-size:calc(13/14*1rem);font-weight:600;display:inline-flex;align-items:center;
@@ -206,6 +213,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   background:none;border-radius:0;white-space:normal;font-size:calc(13.5/14*1rem)}
 .top .bar .nv-xo a.nv-dong:hover{background:var(--panel2)}
 .top .bar .nv-xo a.nv-doc{color:var(--ink2)}
+.top .bar .nv-xo a.nv-da{color:var(--ink2);font-weight:400}
+.top .bar .nv-xo a.nv-da::after{content:" · đã xem";font-size:calc(13/14*1rem)}
 .top .bar .nv-nhom{padding:8px 14px 4px;font-size:calc(13/14*1rem);font-weight:600;letter-spacing:.06em;
   text-transform:uppercase;color:var(--ink2);background:var(--panel2);border-top:1px solid var(--line)}
 .top .bar .nv-trong{padding:10px 14px 14px;color:var(--ink2)}
@@ -491,7 +500,7 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
    dưới. Nền card + một viền mảnh là đủ để nó tách khỏi hình nền mà không tranh chỗ. */
 /* VH-24 · đầu trang chủ chỉ còn TÊN BÀN + ô ngày (Chủ tịch 12/11/2026) — cùng kiểu tiêu đề phát sáng của /xe. */
 .mh01-ban{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:4px 0 18px}
-.mh01-ban-ten{margin:0;font-size:calc(34/14*1rem);font-weight:800;letter-spacing:.6px;text-transform:uppercase;line-height:1.15;
+.mh01-ban-ten{margin:0;font-size:calc(28/14*1rem);font-weight:800;letter-spacing:.6px;text-transform:uppercase;line-height:1.15;
   color:var(--navy);background:linear-gradient(100deg,var(--vtos-tieude-dam) 0%,var(--vtos-tieude-giua) 35%,var(--vtos-tieude-sang) 50%,var(--vtos-tieude-giua) 65%,var(--vtos-tieude-dam) 100%);
   background-size:220% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
   filter:drop-shadow(0 2px 10px var(--vtos-tieude-quang));animation:mh01-sang 5s ease-in-out infinite}

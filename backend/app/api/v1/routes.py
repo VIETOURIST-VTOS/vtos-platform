@@ -298,7 +298,7 @@ def dashboard_dem(u: User = Depends(current_user), db: Session = Depends(get_db)
     from app.services import dashboard as _DB
     hit = _DEM_CACHE.get(u.id)
     if hit and _t.time() - hit[0] < 60:
-        return hit[1]
+        return _tru_da_xem(hit[1], u)
     cho, xem = [], []
     for a in _DB.viec_cho_duyet(db, u):
         la_xem = bool(a.get("chi_tiet")) or "để xem" in a["label"] or a["label"].startswith("ĐANG MỞ LẠI") \
@@ -313,7 +313,51 @@ def dashboard_dem(u: User = Depends(current_user), db: Session = Depends(get_db)
     kq = {"cho_duyet": cho, "so_cho_duyet": sum(d["so"] for d in cho), "de_xem": xem,
           "cong_viec": viec, "so_cong_viec": len(viec)}
     _DEM_CACHE[u.id] = (_t.time(), kq)
-    return kq
+    return _tru_da_xem(kq, u)
+
+
+def _tru_da_xem(kq: dict, u: User) -> dict:
+    """VH-27 (Chủ tịch 12/11/2026): dòng đã bấm xem thì đánh dấu `da_xem` và KHÔNG cộng vào số trên nút. Khoá là
+    nhãn dòng — nhãn mang số («3 tờ quyết toán…»), nên có việc mới thì nhãn đổi, dòng hiện lại và số tăng lại.
+    Bản nhớ 60 giây giữ danh sách gốc; phép trừ chạy mỗi lần gọi, nên bấm xong là số giảm ngay."""
+    da = u.viec_da_xem or {}
+    dv, dd = set(da.get("viec") or []), set(da.get("duyet") or [])
+    viec = [{**d, "da_xem": d["label"] in dv} for d in kq["cong_viec"]]
+    cho = [{**d, "da_xem": d["label"] in dd} for d in kq["cho_duyet"]]
+    return {**kq, "cong_viec": viec, "cho_duyet": cho,
+            "so_cong_viec": sum(d["so"] for d in viec if not d["da_xem"]),
+            "so_cho_duyet": sum(d["so"] for d in cho if not d["da_xem"])}
+
+
+class DaXemVao(BaseModel):
+    loai: str          # "viec" | "duyet"
+    label: str
+
+
+@router.post("/dashboard/da-xem", tags=["dashboard"])
+def dashboard_da_xem(data: DaXemVao, u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """VH-27: ghi nhận người dùng đã bấm một dòng của nút «Công việc» / «Chờ duyệt». Chỉ giữ khoá của các dòng
+    ĐANG có trong danh sách (bản nhớ của cửa đếm) cộng dòng vừa bấm — sổ không phình theo thời gian."""
+    if data.loai not in ("viec", "duyet"):
+        raise HTTPException(422, "loai phải là viec hoặc duyet")
+    nhan = (data.label or "").strip()
+    if not nhan or len(nhan) > 300:
+        raise HTTPException(422, "Nhãn dòng trống hoặc quá dài")
+    da = dict(u.viec_da_xem or {})
+    hit = _DEM_CACHE.get(u.id)
+    con = None
+    if hit:
+        con = {d["label"] for d in hit[1]["cong_viec" if data.loai == "viec" else "cho_duyet"]}
+    cu = [k for k in (da.get(data.loai) or []) if con is None or k in con]
+    if nhan not in cu:
+        cu.append(nhan)
+    while len(cu) > 200:
+        cu.pop(0)
+    da[data.loai] = cu
+    u.viec_da_xem = da
+    db.add(u)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/dashboard", tags=["dashboard"])
