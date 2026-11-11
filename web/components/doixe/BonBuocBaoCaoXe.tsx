@@ -70,6 +70,9 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
   const dat = (k: string, v: any) => setData({ ...d, [k]: v });
   /** Lệnh điều xe của xe đang chọn, kèm phiếu chuyến đã có (phiếu tài xế ghi trên điện thoại). */
   const [lenhDs, setLenhDs] = useState<any[] | null>(null);
+  /** VH-19 · danh sách tài xế — cửa `/fleet/tai-xe-chon` cùng nhóm fleet với màn này (không vỡ hàng rào quyền). */
+  const [taiXeDs, setTaiXeDs] = useState<any[]>([]);
+  useEffect(() => { api<any>("/fleet/tai-xe-chon").then((r) => setTaiXeDs(r?.rows || [])).catch(() => setTaiXeDs([])); }, []);
   useEffect(() => {
     if (!d.vehicle_id) { setLenhDs(null); return; }
     api<any>(`/fleet/lenh-cho-bao-cao?xe_id=${d.vehicle_id}`).then((r) => setLenhDs(r.rows || [])).catch(() => setLenhDs([]));
@@ -125,6 +128,9 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
       if (!d.ten_tour.trim()) t.push("Ghi tour / khách hàng.");
       if (!d.ngay_di) t.push("Chọn ngày đi.");
       if (!d.ngay_ve) t.push("Chọn ngày về.");
+      // VH-19 (thử trên bản thật 11/11/2026): phiếu không qua lệnh trước đây KHÔNG ghi tài xế — chuyến rơi
+      // khỏi bảng xếp hạng tài xế và quyết toán không biết trả cho ai. Mọi chuyến đều có người lái.
+      if (!d.driver_id) t.push("Chọn tài xế.");
       if (d.ngay_di && d.ngay_ve && d.ngay_ve < d.ngay_di) t.push("Ngày về trước ngày đi – kiểm lại.");
       if (d.phieu && !d.phieu.tai_xe_da_gui) t.push(d.phieu.tu_tai_xe
         ? `Tài xế đang ghi phiếu #${d.phieu.id} trên điện thoại, chưa gửi – chờ tài xế bấm «Kết thúc chuyến».`
@@ -154,6 +160,7 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
         ? { ...(await api<any>(`/fleet/chuyen/${d.phieu.id}`, { method: "PUT", json: {
             phien_ban: d.phieu.phien_ban, ten_tour: d.ten_tour.trim(), ngay_di: d.ngay_di, ngay_ve: d.ngay_ve,
             km_dau: kd, km_cuoi: kc, km_gps: gps, km_nguon: d.km_nguon || "anh_dong_ho", doanh_thu: dt,
+            ...(d.driver_id ? { driver_id: Number(d.driver_id) } : {}),
             ...(ghiChu ? { note: ghiChu } : {}) } })), id: d.phieu.id }
         : await api<any>("/fleet/chuyen", { method: "POST", json: {
         vehicle_id: Number(d.vehicle_id), ten_tour: d.ten_tour.trim(),
@@ -230,6 +237,11 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
               {l.phieu ? (l.phieu.tai_xe_da_gui ? " · tài xế đã gửi số" : l.phieu.tu_tai_xe ? " · tài xế đang ghi" : ` · đã có báo cáo #${l.phieu.id}`) : ""}
             </option>)}
           </select></label>
+        <label>Tài xế <span aria-hidden="true">*</span>
+          <select value={d.driver_id} onChange={(e) => dat("driver_id", e.target.value)}>
+            <option value="">— chọn tài xế —</option>
+            {taiXeDs.map((x: any) => <option key={x.id} value={x.id}>{x.ho_ten}{x.code ? ` · ${x.code}` : ""}</option>)}
+          </select></label>
         <label>Tour / khách hàng <span aria-hidden="true">*</span>
           <input value={d.ten_tour} onChange={(e) => dat("ten_tour", e.target.value)} placeholder="Đà Lạt (lẻ)" /></label>
         <label>Ngày đi <span aria-hidden="true">*</span>
@@ -239,7 +251,7 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
       </div>
       {d.phieu?.tai_xe_da_gui && <p className="muted">Tài xế đã gửi phiếu #{d.phieu.id}: km {d.phieu.km_dau ?? "?"} → {d.phieu.km_cuoi ?? "?"},
         {" "}{d.phieu.khoan.length} khoản kèm ảnh hoá đơn. Anh kiểm số và thêm doanh thu — không nhập lại các khoản tài xế đã ghi.</p>}
-      {!d.dispatch_id && d.vehicle_id && <p className="muted">Không chọn lệnh thì phiếu ghi là <b>không qua lệnh</b>: không đối chiếu được với lệnh, tài xế và tour.</p>}
+      {!d.dispatch_id && d.vehicle_id && <p className="muted">Không chọn lệnh thì phiếu ghi là <b>không qua lệnh</b>: không đối chiếu được với lệnh và tour — tài xế chọn tay ở ô trên.</p>}
       <label style={{ display: "block", marginTop: 8 }}>Ghi chú chuyến
         <input value={d.note} onChange={(e) => dat("note", e.target.value)} /></label>
       <p className="muted">Biển số đối chiếu theo <b>ngày chuyến</b>: mã xe theo chiếc xe suốt vòng đời, đổi biển
@@ -304,6 +316,7 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
       <h3>Kiểm tra báo cáo trước khi gửi</h3>
       <KhoiXem>
         <Cap nhan="Xe" value={xe.find((v: any) => String(v.id) === String(d.vehicle_id))?.plate} />
+        <Cap nhan="Tài xế" value={taiXeDs.find((x: any) => String(x.id) === String(d.driver_id))?.ho_ten} />
         <Cap nhan="Tour / khách hàng" value={d.ten_tour.trim()} />
         <Cap nhan="Thời gian" value={d.ngay_di && d.ngay_ve ? `${d.ngay_di} → ${d.ngay_ve}` : undefined} />
         <Cap nhan="Km sử dụng" value={kmDung === null ? undefined : `${kmDung.toLocaleString("vi-VN")} km · ${kmNguon?.[d.km_nguon] || d.km_nguon}`} />

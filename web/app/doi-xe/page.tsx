@@ -64,6 +64,9 @@ function DoiXe() {
     setMoSan(null);
   }, [moSan, canNhap]);
   const [form, setForm] = useState<any>(null);      // form nhật trình chuyến (thêm / sửa)
+  // VH-19 · tài xế để chọn khi sửa phiếu — chỉ nạp khi mở một phiếu, không nạp mỗi lần vào /doi-xe.
+  const [taiXe, setTaiXe] = useState<any[]>([]);
+  useEffect(() => { if (form?.id && !taiXe.length) api<any>("/fleet/tai-xe-chon").then((r) => setTaiXe(r?.rows || [])).catch(() => {}); }, [form?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [formDX, setFormDX] = useState<any>(null);  // form đề xuất chi
   const [formNga, setFormNga] = useState<any>(null); // form định tuyến một giao dịch nguồn ngoài
   const [dangLuu, setDangLuu] = useState(false);
@@ -221,7 +224,8 @@ function DoiXe() {
       await api(`/fleet/chuyen/${form.id}`, { method: "PUT", json: {
         ten_tour: form.ten_tour, ngay_di: form.ngay_di, ngay_ve: form.ngay_ve,
         km_dau: form.km_dau, km_cuoi: form.km_cuoi, km_gps: form.km_gps,
-        km_nguon: form.km_nguon || "", doanh_thu: form.doanh_thu, note: form.note } });
+        km_nguon: form.km_nguon || "", doanh_thu: form.doanh_thu, note: form.note,
+        ...(form.driver_id ? { driver_id: Number(form.driver_id) } : {}) } });
       toast("Đã cập nhật phiếu chuyến");
       setForm(null); load();
     } catch (e) { toast(errMsg(e), true); } finally { setDangLuu(false); }
@@ -316,6 +320,12 @@ function DoiXe() {
             <select value={form.vehicle_id || ""} onChange={(e) => setForm({ ...form, vehicle_id: Number(e.target.value) })} disabled={!!form.id}>
               <option value="">— chọn xe —</option>
               {xe.map((v: any) => <option key={v.id} value={v.id}>{v.plate}{v.code ? ` · ${v.code}` : ""}</option>)}
+            </select></label>
+          <label>Tài xế
+            {/* VH-19: phiếu nhập không qua lệnh trước đây không ghi được tài xế — sửa bổ sung ở đây. */}
+            <select value={form.driver_id || ""} onChange={(e) => setForm({ ...form, driver_id: e.target.value })}>
+              <option value="">— chưa ghi tài xế —</option>
+              {taiXe.map((x: any) => <option key={x.id} value={x.id}>{x.ho_ten}{x.code ? ` · ${x.code}` : ""}</option>)}
             </select></label>
           <label>Tour / khách hàng
             <input value={form.ten_tour || ""} onChange={(e) => setForm({ ...form, ten_tour: e.target.value })} placeholder="Đà Lạt (lẻ)" /></label>
