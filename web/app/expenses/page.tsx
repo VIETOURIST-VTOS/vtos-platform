@@ -245,7 +245,7 @@ function Expenses() {
               {r.robot_ghi_chu && <div className="dai"><dt>Robot ghi chú</dt><dd>{r.robot_ghi_chu}</dd></div>}
               {r.reject_reason && <div className="dai"><dt>Lý do trả / từ chối</dt><dd>{r.reject_reason}</dd></div>}
             </dl>
-            <DinhKem key={`ct-${r.code}`} doiTuong="de_nghi_chi" doiTuongId={r.code} tieuDe={`Chứng từ của ${r.code}`}
+            <DinhKem key={`ct-${r.code}`} doiTuong={r.category === "chi_doi_xe" ? "de_xuat_chi_xe" : "de_nghi_chi"} doiTuongId={r.code} tieuDe={`Chứng từ của ${r.code}`}
               goi="Hóa đơn, hợp đồng, báo giá, ủy nhiệm chi — người duyệt nhìn đúng chứng từ mình đang duyệt." />
           </td></tr>}</React.Fragment>) : <tr><td colSpan={10} className="muted">Không có đề nghị chi.</td></tr>}</tbody></table></div>
       <style>{DN_CSS}</style>

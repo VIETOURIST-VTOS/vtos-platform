@@ -2247,8 +2247,110 @@ def ds_de_nghi_chi_xe(u: User = Depends(require_roles(*READ)), db: Session = Dep
                    "loai": O.LOAI_DOI_XE.get(x.get("loai") or "", ""), "trang_thai": r.status, "buoc": buoc,
                    "ly_do_tu_choi": r.reject_reason or "", "nguoi_lap": r.created_by,
                    "da_chi_tien": float(r.da_chi_tien or 0), "ma_so_thue": r.supplier_tax_code or "",
-                   "can_cu": x.get("can_cu") or ""})
-    return {"de_nghi": ra}
+                   "can_cu": x.get("can_cu") or "",
+                   **_dxc_chi_tiet(db, u, r, x)})
+    # VH-23: danh mục hình thức thanh toán cho ô «Đã chi» của Kế toán ngay trên màn /xe — cùng bảng tĩnh
+    # mà /expenses đọc qua `/hach-toan/bang`; trả kèm ở đây để màn /xe không phải gọi sang nhóm khác.
+    from app.models.hach_toan import HINH_THUC_TT
+    return {"de_nghi": ra, "hinh_thuc_tt": HINH_THUC_TT if u.role in O.VAI_GHI_DA_CHI else {}}
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+# VH-23 · ĐỀ XUẤT CHI ĐỘI XE BẢN 2, ĐỢT 1 (Chủ tịch duyệt bản xem trước 12/11/2026 00:04).
+#
+# Một màn trong /xe cho cả người lập (GĐ đội xe), người ký (Chủ tịch) và người chi (Kế toán). Hai luật:
+#   · NÚT DO MÁY CHỦ TRẢ (`viec`). Màn hình chỉ vẽ đúng các việc này — không tự suy vai nào bấm được gì.
+#     Máy chủ vẫn chặn thật ở `services/ops.py::step`; `viec` chỉ để không vẽ ra một nút bấm vào là lỗi
+#     và không giấu đi một nút đáng lẽ phải có (bài học F1, 10/10/2026).
+#   · KIỂM HIỆN RA (`kiem`): những gì máy đã soát, xanh / đỏ / vàng, để người ký đọc trước khi ký.
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+def _dxc_chi_tiet(db: Session, u: User, r, x: dict) -> dict:
+    from app.services import ops as O
+    viec: list[list[str]] = []
+    st, chi = r.status, float(r.da_chi_tien or 0)
+    if st == "cho_duyet":
+        if u.role in O.vai_ky_duoc(db, r) and u.username != r.created_by:
+            viec.append(["approve", "Ký lệnh chi"])
+        if O._ai_tra_duoc(db, u, r):
+            viec.append(["tra_bo_sung", "Trả bổ sung"])
+    if st == "cho_chi":
+        if u.role in O.VAI_GHI_DA_CHI:
+            viec.append(["pay", "Đã chi"])
+        if chi <= 0 and O._ai_tra_duoc(db, u, r):
+            viec.append(["tra_bo_sung", "Trả bổ sung"])
+    if st not in ("da_chi", "tu_choi") and chi <= 0 and u.role in ("chutich", "tgd", "ketoan") \
+            and (st != "cho_chi" or u.role == "ketoan") and u.username != r.created_by:
+        viec.append(["reject", "Từ chối"])
+    if st == "tra_bo_sung" and u.username == r.created_by:
+        viec.append(["gui_lai", "Bổ sung & gửi lại"])
+    # ── máy đã kiểm ──
+    kiem: list[dict] = []
+    # Tệp THẬT trong kho «de_xuat_chi_xe», không phải một số chứng từ gõ tay: người ký cần nhìn thấy giấy.
+    co_tep = O.co_tep_doi_xe(db, r)
+    if co_tep:
+        kiem.append({"muc": "ok", "chu": "Đã đính tệp chứng từ"})
+    else:
+        kiem.append({"muc": "vang", "chu": (f"Có số chứng từ «{r.document_ref}» nhưng chưa đính tệp chứng từ"
+                                            if (r.document_ref or "").strip() else "Chưa đính tệp chứng từ")
+                     + " — người ký chưa nhìn thấy giấy"})
+    kg_ma = (x.get("ma_khoan_goc") or "").strip()
+    kg = O.khoan_goc(db, kg_ma) if kg_ma else None
+    if kg:
+        goc = float(kg["so_tien"] or 0)
+        xin = float(r.amount or 0)
+        if goc > 0 and xin > goc + 0.5:
+            kiem.append({"muc": "do", "chu": f"Xin {xin:,.0f} đ, khoản gốc gắn chỉ {goc:,.0f} đ — vượt "
+                                            f"{xin - goc:,.0f} đ (luật VH-21: không chi vượt khoản gốc)"})
+        else:
+            kiem.append({"muc": "ok", "chu": f"Số tiền khớp khoản gốc {kg['ten']} ({goc:,.0f} đ)"})
+    elif x.get("loai") != "tam_ung" and not (x.get("nhom") or "").startswith("Nạp quỹ"):
+        kiem.append({"muc": "vang", "chu": "Không gắn khoản gốc — máy không đối chiếu được với phiếu chuyến / bảo dưỡng"})
+    trung = O.chung_tu_trung(db, r.document_ref, r.id) if (r.document_ref or "").strip() else []
+    if trung:
+        kiem.append({"muc": "vang", "chu": f"Số chứng từ {r.document_ref} cũng có ở {', '.join(trung)}"})
+    can_mst = x.get("loai") == "thanh_toan" and (x.get("nhom") or "") not in O.NHOM_DOI_XE_KHONG_MST
+    if can_mst and not (r.supplier_tax_code or "").strip():
+        kiem.append({"muc": "vang", "chu": "Bên nhận chưa có mã số thuế — Kế toán cần trước khi chi"})
+    if r.created_by and r.approved_by and r.created_by == r.approved_by:
+        kiem.append({"muc": "do", "chu": "Người lập trùng người ký"})
+    return {"viec": viec, "kiem": kiem, "can_mst": can_mst, "chung_tu": r.document_ref or "",
+            "co_tep": co_tep, "co_unc": O.co_unc(db, r) if st == "cho_chi" else None,
+            "con_phai_chi": max(0.0, float(r.amount or 0) - chi),
+            "khoan_goc": ({"ma": kg_ma, "ten": kg["ten"], "so_tien": float(kg["so_tien"] or 0)} if kg else None),
+            "ghi_chu_kiem_tra": x.get("ghi_chu_kiem_tra") or "", "hen_bo_sung": x.get("hen_bo_sung") or "",
+            "luc_lap": r.created_at.isoformat() if r.created_at else None,
+            "tuyen": [b for b in (
+                {"buoc": "Lập", "nguoi": r.created_by, "luc": r.created_at.isoformat() if r.created_at else None},
+                {"buoc": "Ký lệnh chi", "nguoi": r.approved_by or "", "luc": r.approved_at.isoformat() if r.approved_at else None},
+                {"buoc": "Đã chi", "nguoi": "", "luc": r.paid_at.isoformat() if getattr(r, "paid_at", None) else None})]}
+
+
+class BuocDxcIn(BaseModel):
+    action: str
+    reason: str = ""
+    hinh_thuc_tt: str = ""
+    so_tien: float | None = None
+
+
+@router.post("/de-nghi-chi/{rid}/buoc")
+def buoc_de_nghi_chi_xe(rid: int, data: BuocDxcIn, u: User = Depends(require_roles(*READ)),
+                        db: Session = Depends(get_db)):
+    """VH-23 · Ký / trả bổ sung / từ chối / ghi đã chi một đề xuất chi đội xe NGAY TRÊN màn /xe. Cửa mỏng: chỉ
+    nhận ba loại chi của đội xe, rồi gọi ĐÚNG hàm bước của đề nghị chi (`services/ops.py::step`) — mọi luật
+    (ai ký, tách người, UNC trước «Đã chi», kiểm chứng từ và MST) vẫn nằm một chỗ ở đó."""
+    from app.models.ops import PaymentRequest
+    from app.services import ops as O
+    r = db.get(PaymentRequest, rid)
+    if r is None or r.category not in LOAI_CHI_XE:
+        raise HTTPException(404, "Không có đề xuất chi đội xe này")
+    if data.action not in ("approve", "tra_bo_sung", "reject", "pay"):
+        raise HTTPException(422, "Việc không hợp lệ")
+    try:
+        msg = O.step(db, u, r, data.action, data.reason, data.hinh_thuc_tt, data.so_tien)
+    except ValueError as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    return {"message": msg, "trang_thai": r.status}
 
 
 class GuiLaiXeIn(BaseModel):

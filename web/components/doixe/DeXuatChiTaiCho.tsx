@@ -1,7 +1,8 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { errMsg } from "@/components/ui";
+import DinhKem from "@/components/DinhKem";
 import BonBuocDeXuatChi from "./BonBuocDeXuatChi";
 
 /** Đội xe v3.3 · thanh con «Đề xuất chi» trên màn /xe — nội dung đổi TẠI CHỖ (Chủ tịch duyệt 10/11/2026).
@@ -27,9 +28,35 @@ export default function DeXuatChiTaiCho({ vai, toast, moSan = false }: {
     } catch (e) { toast(errMsg(e), true); }
   };
   const lap = vai === "gd_doi_xe" || vai === "cntt";
+  /* VH-23 · bản 2 đợt 1 (Chủ tịch duyệt 12/11/2026): tab theo trạng thái, «Việc của tôi» do máy chủ trả
+     (`viec`), ngăn chi tiết dưới dòng, ký / trả / từ chối / đã chi ngay tại đây qua `/fleet/de-nghi-chi/{id}/buoc`. */
+  const [tab, setTab] = useState("viec");
+  const [moCT, setMoCT] = useState<number | null>(null);
+  const [httt, setHttt] = useState<Record<string, string>>({});
+  const [chi, setChi] = useState<any>(null);       // phiếu đang ghi «Đã chi»
+  const [dang, setDang] = useState(false);
+  const buoc = async (x: any, action: string, them: any = {}) => {
+    let reason = "";
+    if (action === "reject" || action === "tra_bo_sung") {
+      reason = window.prompt(action === "reject" ? `Lý do từ chối ${x.code} (bắt buộc):`
+        : `Trả ${x.code} về người lập — cần bổ sung gì? (bắt buộc)`) || "";
+      if (!reason.trim()) return;
+    }
+    if (action === "approve" && !window.confirm(`Ký lệnh chi ${x.code} — ${vnd(x.so_tien)} đ cho ${x.ben_nhan}?`)) return;
+    setDang(true);
+    try {
+      const r = await api<any>(`/fleet/de-nghi-chi/${x.id}/buoc`, { method: "POST", json: { action, reason, ...them } });
+      toast(r.message); setChi(null); doc();
+    } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+  const lamViec = (x: any, action: string) => {
+    if (action === "gui_lai") { setSua({ ...x }); return; }
+    if (action === "pay") { setMoCT(x.id); setChi({ x, hinh_thuc_tt: "", so_tien: String(x.con_phai_chi ?? x.so_tien) }); return; }
+    buoc(x, action);
+  };
 
   const doc = useCallback(async () => {
-    try { setDs((await api<any>("/fleet/de-nghi-chi")).de_nghi); }
+    try { const d = await api<any>("/fleet/de-nghi-chi"); setDs(d.de_nghi); setHttt(d.hinh_thuc_tt || {}); }
     catch (e) { setDs([]); toast(errMsg(e), true); }
   }, [toast]);
   useEffect(() => { doc(); }, [doc]);
@@ -61,19 +88,103 @@ export default function DeXuatChiTaiCho({ vai, toast, moSan = false }: {
     </div>}
     {ds === null ? <p className="muted">Đang đọc danh sách…</p>
       : ds.length === 0 ? <p className="muted">Chưa có đề nghị chi nào của đội xe. Đây là số thật, không phải thiếu nguồn.</p>
-      : <div className="wrap" style={{ overflowX: "auto" }}><table style={{ minWidth: 720 }}>
-        <thead><tr><th>Mã</th><th>Nội dung · bên nhận</th><th>Xe / phạm vi</th><th style={{ textAlign: "right" }}>Số tiền</th><th>Đang ở bước</th></tr></thead>
-        <tbody>{ds.map((x) => <tr key={x.id}>
-          <td>{x.code}<div className="muted" style={{ fontSize: 12 }}>{x.ngay}</div></td>
-          <td>{x.noi_dung}<div className="muted" style={{ fontSize: 12 }}>{[x.ben_nhan, x.nhom, x.loai].filter(Boolean).join(" · ")}</div></td>
+      : <>
+      <div className="dxc-tab" role="tablist">{TAB.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k}
+        className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l} <span>{ds.filter((x) => hop(x, k)).length}</span></button>)}</div>
+      <div className="dxc-bang"><table>
+        <thead><tr><th>Mã</th><th>Xe / phạm vi</th><th>Bên nhận</th><th style={{ textAlign: "right" }}>Số tiền</th><th>Nội dung</th>
+          <th>Kiểm</th><th>Đang ở</th><th className="dxc-viec">Việc của anh</th></tr></thead>
+        <tbody>{ds.filter((x) => hop(x, tab)).map((x) => <Fragment key={x.id}><tr className={moCT === x.id ? "mo" : ""}>
+          <td><b>{x.code}</b><div className="muted" style={{ fontSize: 12 }}>{x.ngay}</div></td>
           <td>{x.bien_so || (x.pham_vi === "doi" ? "Toàn đội" : "—")}</td>
-          <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{vnd(x.so_tien)}</td>
+          <td>{x.ben_nhan}<div className="muted" style={{ fontSize: 12 }}>{x.can_mst ? (x.ma_so_thue ? `MST ${x.ma_so_thue}` : "chưa MST") : (x.nhom || "")}</div></td>
+          <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}><b>{vnd(x.so_tien)}</b></td>
+          <td><div className="dxc-nd" title={x.noi_dung}>{x.noi_dung}</div></td>
+          <td>{(() => { const d = (x.kiem || []).filter((k: any) => k.muc === "do").length, v = (x.kiem || []).filter((k: any) => k.muc === "vang").length;
+            return d ? <span className="tag red">{d} chặn</span> : v ? <span className="tag warn">{v} lưu ý</span> : <span className="tag ok">đủ</span>; })()}</td>
           <td><span className={`tag ${mau(x.trang_thai)}`}>{x.buoc}</span>
-            {x.ly_do_tu_choi && <div className="muted" style={{ fontSize: 12 }}>{x.ly_do_tu_choi}</div>}
-            {x.trang_thai === "tra_bo_sung" && lap && <button type="button" style={{ marginTop: 4 }}
-              onClick={() => setSua({ ...x })}>Bổ sung & gửi lại</button>}</td>
-        </tr>)}</tbody></table></div>}
+            {x.ly_do_tu_choi && <div className="muted" style={{ fontSize: 12 }}>{x.ly_do_tu_choi}</div>}</td>
+          <td className="dxc-viec"><div className="dxc-nut">
+            {(x.viec || []).map(([a, l]: [string, string]) => <button key={a} type="button" disabled={dang}
+              className={"act " + (a === "approve" || a === "pay" ? "teal" : a === "gui_lai" ? "teal" : "grey")}
+              onClick={() => lamViec(x, a)}>{l}</button>)}
+            <button type="button" className="act grey" aria-expanded={moCT === x.id}
+              onClick={() => { setMoCT(moCT === x.id ? null : x.id); setChi(null); }}>{moCT === x.id ? "Ẩn" : "Chi tiết"}</button>
+          </div></td></tr>
+          {moCT === x.id && <tr className="dxc-ct"><td colSpan={8}>
+            <div className="dxc-ngan">
+              <dl>
+                <div className="dai"><dt>Nội dung</dt><dd>{x.noi_dung}</dd></div>
+                <div><dt>Loại · nhóm</dt><dd>{[x.loai, x.nhom].filter(Boolean).join(" · ") || "—"}</dd></div>
+                <div><dt>Bên nhận</dt><dd>{x.ben_nhan}{x.ma_so_thue ? ` · MST ${x.ma_so_thue}` : ""}</dd></div>
+                <div><dt>Căn cứ số tiền</dt><dd>{x.can_cu || "—"}</dd></div>
+                <div><dt>Số chứng từ</dt><dd>{x.chung_tu || "—"}</dd></div>
+                <div className="dai"><dt>Khoản gốc</dt><dd>{x.khoan_goc ? `${x.khoan_goc.ten} · ${vnd(x.khoan_goc.so_tien)} đ` : "Không gắn"}</dd></div>
+                {x.ghi_chu_kiem_tra && <div className="dai"><dt>Ghi chú cho người kiểm</dt><dd>{x.ghi_chu_kiem_tra}</dd></div>}
+                {x.hen_bo_sung && <div className="dai"><dt>Hẹn bổ sung</dt><dd>{x.hen_bo_sung}</dd></div>}
+                <div className="dai"><dt>Tuyến ký</dt><dd className="dxc-tuyen">{(x.tuyen || []).map((t: any) =>
+                  <span key={t.buoc} className={t.luc ? "xong" : ""}>{t.buoc}{t.nguoi ? ` · ${t.nguoi}` : ""}{t.luc ? ` · ${String(t.luc).slice(11, 16)} ${String(t.luc).slice(8, 10)}/${String(t.luc).slice(5, 7)}` : ""}</span>)}
+                  {x.trang_thai !== "da_chi" && x.trang_thai !== "tu_choi" && <span className="nay">Đang: {x.buoc}</span>}</dd></div>
+                {x.da_chi_tien > 0 && <div><dt>Đã chi</dt><dd>{vnd(x.da_chi_tien)} đ · còn {vnd(x.con_phai_chi)} đ</dd></div>}
+              </dl>
+              <div className="dxc-kiem"><b>Máy đã kiểm</b><ul>{(x.kiem || []).map((k: any, i: number) =>
+                <li key={i}><span className={"dau " + k.muc}>{k.muc === "ok" ? "✓" : k.muc === "do" ? "!" : "i"}</span>{k.chu}</li>)}</ul></div>
+            </div>
+            {chi && chi.x.id === x.id && <div className="dxc-chi">
+              <b>Ghi nhận đã chi – {x.code}</b>
+              {!x.co_unc && <p className="muted" style={{ margin: "4px 0" }}>Tải UNC / phiếu chi ở ô dưới trước — máy chủ chặn «Đã chi» khi chưa có UNC.</p>}
+              <label>Hình thức thanh toán<select value={chi.hinh_thuc_tt} onChange={(e) => setChi({ ...chi, hinh_thuc_tt: e.target.value })}>
+                <option value="">— chọn —</option>{Object.entries(httt).filter(([k]) => k && k !== "chua_tt").map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></label>
+              <label>Số tiền chi lần này (đ)<input type="number" value={chi.so_tien} onChange={(e) => setChi({ ...chi, so_tien: e.target.value })} /></label>
+              <label>Mã giao dịch / số chứng từ<input value={chi.ma || ""} onChange={(e) => setChi({ ...chi, ma: e.target.value })} /></label>
+              <div><button type="button" className="act teal" disabled={dang || !chi.hinh_thuc_tt}
+                onClick={() => buoc(x, "pay", { hinh_thuc_tt: chi.hinh_thuc_tt, so_tien: chi.so_tien === "" ? null : Number(chi.so_tien), reason: chi.ma || "" })}>Ghi nhận đã chi</button>
+                <button type="button" className="act grey" onClick={() => setChi(null)}>Thôi</button></div>
+              <DinhKem doiTuong="de_nghi_chi" doiTuongId={x.code} loai="unc" tieuDe={`UNC / phiếu chi của ${x.code}`} onDoi={doc} />
+            </div>}
+            <DinhKem key={`dxc-${x.code}`} doiTuong="de_xuat_chi_xe" doiTuongId={x.code} tieuDe={`Chứng từ của ${x.code}`}
+              chiXem={!(lap && ["cho_duyet", "tra_bo_sung"].includes(x.trang_thai))}
+              goi="Hoá đơn, báo giá, phiếu sửa chữa, ảnh hiện trạng — người ký nhìn đúng giấy mình đang ký." onDoi={doc} />
+          </td></tr>}</Fragment>)}</tbody></table></div>
+      {!ds.some((x) => hop(x, tab)) && <p className="muted">{tab === "viec" ? "Không có phiếu nào đang chờ anh/chị." : "Không có phiếu ở mục này."}</p>}
+      <style>{DXC_CSS}</style></>}
     <p className="muted" style={{ marginBottom: 0 }}>Cùng danh sách dù mở từ nút trên tổng quan, từ thanh con hay từ hồ sơ xe.
       Tuyến: GĐ đội xe gửi → Chủ tịch duyệt → Kế toán kiểm chứng từ và chi.</p>
   </>;
 }
+
+const TAB: [string, string][] = [["viec", "Việc của tôi"], ["dang", "Đang xử lý"], ["tra_bo_sung", "Trả bổ sung"],
+  ["da_chi", "Đã chi"], ["tu_choi", "Từ chối"], ["", "Tất cả"]];
+function hop(x: any, tab: string): boolean {
+  if (tab === "viec") return (x.viec || []).length > 0;
+  if (tab === "dang") return ["cho_tp", "cho_kt", "cho_duyet", "cho_chi"].includes(x.trang_thai);
+  return !tab || x.trang_thai === tab;
+}
+const DXC_CSS = `
+.dxc-tab{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.dxc-tab button{font:inherit;font-size:calc(13/14*1rem);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer;margin:0}
+.dxc-tab button span{font-weight:700;margin-left:4px;opacity:.75}
+.dxc-tab button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.dxc-bang{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.dxc-bang table{min-width:900px;width:100%}
+.dxc-viec{position:sticky;right:0;background:var(--panel);box-shadow:-8px 0 10px -8px rgba(18,48,84,.25);min-width:170px;z-index:1}
+.dxc-nut{display:flex;flex-wrap:wrap;gap:6px}.dxc-nut .act{margin:0}
+.dxc-nd{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:40ch}
+tr.mo>td{background:var(--panel2)}
+tr.dxc-ct>td{background:var(--panel2);padding:14px 16px}
+.dxc-ngan{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;margin-bottom:10px}
+@media (max-width:760px){.dxc-ngan{grid-template-columns:1fr}}
+.dxc-ngan dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px 18px;margin:0}
+.dxc-ngan dl>div{min-width:0}.dxc-ngan .dai{grid-column:1/-1}
+.dxc-ngan dt{font-size:calc(11/14*1rem);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+.dxc-ngan dd{margin:1px 0 0;white-space:pre-wrap}
+.dxc-tuyen{display:flex;flex-wrap:wrap;gap:6px}
+.dxc-tuyen span{font-size:calc(12/14*1rem);border:1px solid var(--line);border-radius:999px;padding:1px 9px;background:var(--panel)}
+.dxc-tuyen span.xong{background:#2f8a57;border-color:#2f8a57;color:#fff}
+.dxc-tuyen span.nay{background:var(--navy);border-color:var(--navy);color:#fff}
+.dxc-kiem ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.dxc-kiem li{display:flex;gap:8px;align-items:flex-start;font-size:calc(13/14*1rem)}
+.dxc-kiem .dau{flex:none;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff;background:#c27a00}
+.dxc-kiem .dau.ok{background:#2f8a57}.dxc-kiem .dau.do{background:#b72f45}
+.dxc-chi{border:1px solid #0f6f5c;border-radius:8px;padding:12px;margin:0 0 10px;display:flex;flex-direction:column;gap:8px;max-width:520px;background:var(--panel)}
+`;
