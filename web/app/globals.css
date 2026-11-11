@@ -195,10 +195,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .mh01-ban-cum{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .mh01-ban-cum .n90s{height:36px;padding:0 12px;border-radius:10px;font-size:calc(13/14*1rem)}
 /* Vạch mảnh tách nhóm việc chung (Công việc · Chờ duyệt · Trợ lý AI) khỏi nhóm của riêng người dùng. */
-.top .bar .bar-ngan{flex:none;width:1px;height:24px;background:rgba(255,255,255,.28);margin:0 4px}
+.top .bar .bar-ngan{flex:none;width:1px;height:24px;background:rgba(255,255,255,.28);margin:0}
+/* VH-30 (Chủ tịch 12/11/2026 «chỉnh lại các nút này khoảng trống đều nhau»): mọi mục bên phải cùng một kiểu —
+   cao 32, đệm 0 10px, không nền riêng — để khoảng giữa các mục chỉ còn là `gap` của thanh, đều nhau.
+   «Giao diện» trước có nền viên thuốc riêng nên trông lệch; «Trợ lý AI» (chưa chạy) chỉ còn biểu tượng. */
+.top .bar .gd-nut{height:32px;padding:0 10px;background:none;color:rgba(255,255,255,.86);font-weight:500;border-radius:6px}
+.top .bar .gd-nut:hover{background:rgba(255,255,255,.10);color:#fff}
+.top .bar .bar-muc.ai span{display:none}.top .bar .bar-muc.ai{padding:0 8px;color:rgba(255,255,255,.86)}
 /* VH-27 · màn ≤1400px (laptop 13–14"): «Trợ lý AI» (chưa chạy) chỉ còn biểu tượng để thanh không tràn đè lên
    chữ «Hệ thống điều hành» — đo 1280px: tràn 65px. Rê chuột vẫn thấy tên (title). */
-@media (max-width:1400px){.top .bar .bar-muc.ai span{display:none}.top .bar .bar-muc.ai{padding:0 8px}}
 /* Viên số cảnh báo. Nền vàng chữ sẫm để đọc được cả khi in đen trắng, không chỉ dựa vào màu. */
 .top .bar .so-bao{min-width:24px;height:22px;padding:0 7px;border-radius:11px;background:var(--vtos-danger);
   color:#fff;font-size:calc(13/14*1rem);font-weight:600;display:inline-flex;align-items:center;
@@ -499,7 +504,12 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
    Thanh này KHÔNG phải một `.panel`: nó không mang con số nào, nên nó phải nhẹ hơn mọi khối số ở
    dưới. Nền card + một viền mảnh là đủ để nó tách khỏi hình nền mà không tranh chỗ. */
 /* VH-24 · đầu trang chủ chỉ còn TÊN BÀN + ô ngày (Chủ tịch 12/11/2026) — cùng kiểu tiêu đề phát sáng của /xe. */
-.mh01-ban{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:4px 0 18px}
+/* VH-30 (Chủ tịch 12/11/2026): tên bàn · ô ngày · Lịch xe 90 ngày xếp MỘT HÀNG trong một thanh riêng, bo tròn,
+   nổi lên khỏi hình nền. Màn hẹp thì xuống dòng. */
+.mh01-ban{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:nowrap;margin:4px 0 18px;
+  padding:12px 18px;background:var(--panel);border:1px solid var(--line);border-radius:18px;
+  box-shadow:0 2px 4px rgba(2,11,24,.18),0 14px 32px rgba(2,11,24,.22)}
+@media (max-width:900px){.mh01-ban{flex-wrap:wrap}}
 .mh01-ban-ten{margin:0;font-size:calc(28/14*1rem);font-weight:800;letter-spacing:.6px;text-transform:uppercase;line-height:1.15;
   color:var(--navy);background:linear-gradient(100deg,var(--vtos-tieude-dam) 0%,var(--vtos-tieude-giua) 35%,var(--vtos-tieude-sang) 50%,var(--vtos-tieude-giua) 65%,var(--vtos-tieude-dam) 100%);
   background-size:220% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
@@ -507,7 +517,7 @@ a.cay-dong:hover{background:var(--vtos-info-bg)}
 @keyframes mh01-sang{0%,100%{background-position:100% 0}50%{background-position:0 0}}
 @media (prefers-reduced-motion:reduce){.mh01-ban-ten{animation:none;background-position:50% 0}}
 @media (max-width:640px){.mh01-ban-ten{font-size:calc(23/14*1rem)}}
-.mh01-ban-ngay{background:var(--panel);border-radius:12px;padding:8px 14px;box-shadow:0 1px 2px rgba(18,48,84,.08),0 4px 12px rgba(18,48,84,.1);
+.mh01-ban-ngay{background:var(--panel2);border-radius:12px;padding:6px 14px;white-space:nowrap;
   font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}
 .mh01-ban-ngay span{display:block;font-size:calc(11/14*1rem);font-weight:600;color:var(--ink2);letter-spacing:.06em;text-transform:uppercase}
 .mh01-thanh{display:flex;flex-wrap:wrap;align-items:center;gap:0 14px;margin:0 0 14px;
