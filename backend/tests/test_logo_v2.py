@@ -38,7 +38,9 @@ def test_moi_thanh_tren_dung_logo_vietourist_v2():
               ("components", "cong", "co-dong", "CoDong.tsx"), ("components", "cong", "ncc", "CongNcc.tsx"),
               ("components", "cong", "manh.ts")):
         s = _doc(*p)
-        assert logo in s, p
+        # LOGO-1 · 11/11/2026 (Chủ tịch duyệt): thanh đầu CRM đổi sang bản chữ navy trên ô trắng.
+        # Các cổng ngoài (khách, đối tác, cổ đông, NCC) vẫn dùng bản nền trong trên thanh navy.
+        assert (("/thuong-hieu/v2/khoachu-holdings-ngang.svg" if p == ("components", "Shell.tsx") else logo) in s), p
         assert "/cong/logo.png" not in s and "VTD<small>" not in s and "VIET<em>OURIST" not in s, p
 
 

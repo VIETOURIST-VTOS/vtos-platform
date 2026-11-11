@@ -242,8 +242,8 @@ def test_logo_va_favicon_dung_bo_moi():
 
     shell = _doc(os.path.join(ROOT, "web", "components", "Shell.tsx"))
     # Logo v2 (07/11/2026): thanh ngang dùng logo Vietourist Holdings bản nền tối, nền trong suốt.
-    assert "/thuong-hieu/v2/khoachu-holdings-nen-trong.svg" in shell, "thanh ngang phải dùng logo Vietourist Holdings v2"
-    assert os.path.exists(os.path.join(ROOT, "web", "public", "thuong-hieu", "v2", "khoachu-holdings-nen-trong.svg"))
+    assert "/thuong-hieu/v2/khoachu-holdings-ngang.svg" in shell, "thanh ngang phải dùng logo Vietourist Holdings v2 (LOGO-1 11/11/2026: bản chữ navy trên ô trắng)"
+    assert os.path.exists(os.path.join(ROOT, "web", "public", "thuong-hieu", "v2", "khoachu-holdings-ngang.svg"))
     m = re.search(r'\.top \.brand \.brand-logo\{[^}]*height:(\d+)px', _doc(CSS))
     assert m and int(m.group(1)) >= 22, f"logo cao {m.group(1) if m else '?'}px – quy tắc 6 đòi ≥ 22px"
 

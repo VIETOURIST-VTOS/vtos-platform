@@ -2920,7 +2920,7 @@ def dan_link_sheet(v: LinkSheetVao, u: User = Depends(require_roles(*GHI_LINK_SH
 from app.services import lich_xe_tuong_lai as LX                       # noqa: E402
 # Phòng Kinh doanh và Ban lãnh đạo xem KHOẢNG TRỐNG để đẩy bán — không thấy tên tour, giá nội bộ.
 KHOANG_TRONG_XEM = tuple(sorted(set(READ) | {"chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh",
-                                             "gd_kd", "tp_kd", "cntt"}))
+                                             "gd_kd", "tp_kd", "cntt", "robot_ks"}))   # robot_ks = bks, chỉ đọc
 
 
 @router.get("/lich-xe-tuong-lai")

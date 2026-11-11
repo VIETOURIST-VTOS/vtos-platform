@@ -614,13 +614,16 @@ export type PhanHeCon = {
   chung?: string[];  // mã nào trong `lay` là nhánh dùng chung với phân hệ con anh em
 };
 
+// 3.1b «Lịch xe trống để bán» (XE-KD-1, 11/11/2026) về Kinh doanh ĐOÀN — khoảng trống bán được là cả chiếc xe
+// nhiều ngày liền, đúng hàng của tour đoàn. Không gắn cờ «dùng chung»: test_tc70 dặn nhánh thứ sáu không đi
+// đường ấy nữa. Gắn vào một phân hệ con là đủ để nhánh không mồ côi (test_tc70).
 export const PHAN_HE_CON: PhanHeCon[] = [
   { khoa: "kdle", cha: "khachhang", ten: "Kinh doanh lẻ",
     tom_tat: "Lịch khởi hành · Booking lẻ · Dịch vụ riêng lẻ · Chính sách bán",
     lay: ["3.1", "3.2", "3.3", "3.5", "3.6", "3.7", "3.8"], chung: ["3.1", "3.2", "3.5", "3.6", "3.7"] },
   { khoa: "kddoan", cha: "khachhang", ten: "Kinh doanh đoàn",
     tom_tat: "Cơ hội · Hồ sơ đoàn · Báo giá · Hợp đồng",
-    lay: ["3.1", "3.2", "3.4", "3.5", "3.6", "3.7", "3.9"], chung: ["3.1", "3.2", "3.5", "3.6", "3.7"] },
+    lay: ["3.1", "3.1b", "3.2", "3.4", "3.5", "3.6", "3.7", "3.9"], chung: ["3.1", "3.2", "3.5", "3.6", "3.7"] },
 
   // 4.1–4.8 ở lại Điều hành tour: sản phẩm, chuyến, quyết toán, sự cố, hiệu quả và dịch vụ – toàn
   // bộ phần việc chạy quanh CHUYẾN. Xe và hướng dẫn viên tách ra vì đã là hai đơn vị riêng từ
