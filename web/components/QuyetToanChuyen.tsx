@@ -9,6 +9,9 @@
  *   · 50F-034.71 (07–11/10): ô «TỔNG TÀI XẾ CHI» viết tay 1.360.000, trong khi công thức IN NGAY
  *     CẠNH NÓ là "phí gửi xe + phí khác" = 360.000. Người viết cộng nhầm cả công tác phí – mà công
  *     tác phí đã nằm ở «TỔNG CÔNG TY CHI» bên dưới. Tổng cuối vẫn đúng nên không ai thấy.
+ *     VH-20 (Chủ tịch chốt 11/11/2026 10:29, «có tính ctp»): mẫu giấy MỚI ghi «Tổng chi cho lái xe =
+ *     phí gửi xe + phí khác + công tác phí» — TỔNG TÀI XẾ CHI có tính công tác phí. Máy vẫn cộng
+ *     theo cột «Trả bằng»: công tác phí khai «Tài xế ứng tiền mặt» thì vào tổng tài xế.
  *
  *   · 50F-046.22 (06–12/10): tờ giấy ghi km đầu 197.935; ảnh đồng hồ và tin Zalo của tài xế đều
  *     197.435. 199.768 − 197.435 = 2.333 km, đúng bằng «TỔNG KM TOUR» ghi trên CHÍNH TỜ ẤY.
@@ -198,7 +201,7 @@ export default function QuyetToanChuyen({ tripId, toast }: {
       <h3>Tài xế ứng tiền mặt</h3>
       <div className="grid2">
         <OMay nhan="TỔNG TÀI XẾ CHI" gt={vnd(t.tai_xe_chi)}
-          duoi="cộng các khoản khai là tài xế ứng tiền mặt – không cộng công tác phí" />
+          duoi="cộng các khoản khai là tài xế ứng tiền mặt – CÓ tính công tác phí (khai «Tài xế ứng tiền mặt»)" />
         <OMay nhan="Tài xế còn được nhận" gt={vnd(t.tai_xe_con_nhan)}
           duoi="tài xế chi + chi thêm − tạm ứng − hoàn trả (số âm = tài xế còn nợ công ty)" />
         <label>Tạm ứng<input type="number" {...o("tam_ung")} /></label>
