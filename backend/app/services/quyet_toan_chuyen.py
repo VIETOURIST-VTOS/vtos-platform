@@ -20,6 +20,8 @@ Hai bộ hồ sơ thật, đo ngày 13/10/2026, mỗi bộ 8 trang gồm tờ qu
     công thức IN NGAY CẠNH NÓ là "phí gửi xe + phí khác" = 360.000. Người viết cộng nhầm cả công
     tác phí 1.000.000 — mà công tác phí đã nằm ở "TỔNG CÔNG TY CHI" bên dưới. Tổng cuối vẫn đúng,
     nên không ai thấy.
+    VH-20 (Chủ tịch chốt 11/11/2026): mẫu giấy MỚI tính công tác phí vào "Tổng chi cho lái xe". Phép
+    cộng ở `tong()` theo cột `tra_bang` nên không đổi: công tác phí khai tài xế ứng thì vào tổng tài xế.
 
 Hai lỗi khác loại nhau nhưng cùng một gốc: **một con số CỘNG RA ĐƯỢC mà vẫn để người gõ**. Nên
 luật ở đây là: ô nào suy ra được thì máy suy, và máy ĐỐI CHIẾU với con số trên giấy chứ không im.
