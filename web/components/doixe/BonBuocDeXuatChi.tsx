@@ -49,7 +49,7 @@ const rong = () => ({
   pham_vi: "xe", bien_so: "", loai: "thanh_toan", nhom: "", noi_dung: "", nguoi_thu_huong: "",
   so_tien: "" as any, ngay: new Date().toISOString().slice(0, 10), can_cu_so_tien: "",
   ma_khoan_goc: "", ma_khoan_goc_ds: [] as string[], chung_tu: "", hen_bo_sung: "", ghi_chu_kiem_tra: "", ma_so_thue: "",
-  so_tai_khoan: "", ngan_hang: "", ok: false, chuyen_ngoai: "",
+  so_tai_khoan: "", ngan_hang: "", ok: false, chuyen_ngoai: "", ben_nhan_ma: "",
 });
 /** Giá trị đặc biệt của ô khoản gốc: chuyến KHÔNG có trên VTOS (xe thuê ngoài…) — GĐ đội xe tự ghi mã tour. */
 const NGOAI = "__ngoai";
@@ -136,7 +136,7 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
         nhom: d.nhom, ma_so_thue: d.ma_so_thue.trim(),
         nguoi_thu_huong: d.nguoi_thu_huong.trim(), chung_tu: d.chung_tu.trim(),
         pham_vi: d.pham_vi, loai: d.loai, can_cu_so_tien: d.can_cu_so_tien,
-        ma_khoan_goc: "", ma_khoan_goc_ds: dsKg, hen_bo_sung: canHoaDon ? "" : d.hen_bo_sung.trim(),
+        ma_khoan_goc: "", ma_khoan_goc_ds: dsKg, ben_nhan_ma: d.ben_nhan_ma || "", hen_bo_sung: canHoaDon ? "" : d.hen_bo_sung.trim(),
         ghi_chu_kiem_tra: [d.ma_khoan_goc === NGOAI && d.chuyen_ngoai.trim() ? `Chuyến ngoài VTOS (xe thuê ngoài): ${d.chuyen_ngoai.trim()}.` : "",
           d.ghi_chu_kiem_tra.trim()].filter(Boolean).join(" "), cho_phep_trung: choTrung,
       };
@@ -223,7 +223,7 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
         <input value={d.nguoi_thu_huong} list="dxc-ben-nhan" placeholder="Gõ vài chữ để chọn tài xế / nhà cung cấp"
           onChange={(e) => {
             const v = e.target.value, b = dmBenNhan.find((x) => x.ten === v);
-            setData({ ...d, nguoi_thu_huong: v, ma_so_thue: b?.ma_so_thue ? b.ma_so_thue : d.ma_so_thue });
+            setData({ ...d, nguoi_thu_huong: v, ben_nhan_ma: b?.ma || "", ma_so_thue: b?.ma_so_thue ? b.ma_so_thue : d.ma_so_thue });
           }} /></label>
       <datalist id="dxc-ben-nhan">{dmBenNhan.map((b, i) => <option key={i} value={b.ten}>{b.loai}{b.ma ? ` · ${b.ma}` : ""}</option>)}</datalist>
       {d.nguoi_thu_huong.trim() && dmBenNhan.length > 0 && <p className="muted" style={{ margin: "4px 0 0" }}>

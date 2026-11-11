@@ -36,6 +36,8 @@ function XeHdv() {
   const [formUng, setFormUng] = useState<any>({ mo: false, amount: "", description: "" });
   /** Báo hư hỏng của CHÍNH mình. Máy chủ lọc theo người báo; màn hình không gửi bộ lọc nào. */
   const [hong, setHong] = useState<any>(null);
+  // VH-34 (Chủ tịch duyệt 12/11/2026): tài xế XEM đề xuất chi đội xe trả cho chính mình — chỉ xem.
+  const [tien, setTien] = useState<any>(null);
   const [formHong, setFormHong] = useState<any>({ mo: false, vehicle_id: "", hien_tuong: "", muc_do: "con_chay_duoc", odo_km: "", noi_xay_ra: "" });
   /** Đơn nghỉ / ốm / vắng việc nay là MỘT thành phần dùng chung `components/DonNghiPhep` — cùng
    *  thành phần ấy đứng trên màn hình /cham-cong của cả mười một phòng. Khung này trước nằm thẳng ở
@@ -45,6 +47,7 @@ function XeHdv() {
     api("/xe-hdv/cua-toi").then(setD).catch((x) => { setErr(errMsg(x)); toast(errMsg(x), true); });
     api<any[]>("/payment-requests").then(setUng).catch(() => setUng([]));
     api<any>("/fleet/bao-hong").then(setHong).catch(() => setHong(null));
+    if (laTaiXe) api<any>("/nhan-lenh/tien-cua-toi").then(setTien).catch(() => setTien(null));
   };
   useEffect(() => { tai(); }, []); // eslint-disable-line
 
@@ -164,6 +167,17 @@ function XeHdv() {
     {(d.lenh_dieu_xe || []).filter((x: any) => x.trang_thai_nhan === "da_nhan" && x.status !== "huy"
         && new Date(x.date_to).getTime() >= Date.now() - 7 * 86400000)
       .map((x: any) => <TaiXeGhiChuyen key={`gc${x.id}`} lenh={x} toast={toast} />)}
+
+    {laTaiXe && tien && <div className="panel"><h2>Tiền công ty trả cho tôi</h2>
+      {tien.ghi && <p className="muted">{tien.ghi}</p>}
+      {!tien.ghi && !(tien.rows || []).length && <p className="muted">Chưa có đề xuất chi nào trả cho anh.</p>}
+      {(tien.rows || []).map((r: any) => <div key={r.code} style={{ display: "flex", justifyContent: "space-between", gap: 10,
+        padding: "8px 0", borderTop: "1px solid var(--line)" }}>
+        <div style={{ minWidth: 0 }}><b>{r.code}</b><div className="muted">{r.noi_dung}</div></div>
+        <div style={{ textAlign: "right", whiteSpace: "nowrap" }}><b>{Number(r.so_tien).toLocaleString("vi-VN")} đ</b>
+          <div><Tag cls={r.trang_thai === "da_chi" ? "ok" : r.trang_thai === "tu_choi" ? "red" : "warn"}>{r.buoc}</Tag></div></div>
+      </div>)}
+    </div>}
 
     {/* Ô lý do. BẮT BUỘC: đây là thứ duy nhất trả lời được câu hỏi của tháng sau — vì sao chuyến ấy
         phải đổi xe, hoặc phải thuê xe ngoài. */}

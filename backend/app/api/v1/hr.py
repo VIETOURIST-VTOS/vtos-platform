@@ -2404,6 +2404,37 @@ async def tai_xe_ket_thuc(did: int, km_cuoi: int = Form(...), tep: UploadFile | 
     return {"message": "Đã gửi cho Giám đốc đội xe. Phiếu khoá với tài xế; cần sửa thì báo đội xe.", **TX.ra(db, d)}
 
 
+@router.get("/nhan-lenh/tien-cua-toi")
+def nhan_lenh_tien_cua_toi(u: User = Depends(require_roles("tai_xe")), db: Session = Depends(get_db)):
+    """VH-34 · đề xuất chi bản 2 đợt 3 (Chủ tịch duyệt 12/11/2026): tài xế XEM các đề xuất chi đội xe trả cho
+    CHÍNH MÌNH — mã, nội dung, số tiền, đang ở bước nào. Không thấy phiếu của người khác.
+
+    Nối qua `Employee.user_id` (như `nhan_lenh._la_tai_xe_cua_lenh`), rồi khớp phiếu theo MÃ NHÂN VIÊN lưu lúc
+    GĐ đội xe chọn bên nhận từ danh mục (`doi_xe.ben_nhan_ma`). Phiếu cũ chưa có mã thì đối chiếu HỌ TÊN ĐẦY ĐỦ
+    (bỏ phần trong ngoặc như «(tài xế)»)."""
+    import re as _re
+    from app.models.ops import PaymentRequest
+    e = db.execute(select(Employee).where(Employee.user_id == u.id)).scalars().first()
+    if e is None:
+        return {"rows": [], "ghi": "Tài khoản chưa gắn hồ sơ nhân viên — báo HCNS."}
+    chuan = lambda t: " ".join(_re.sub(r"\(.*?\)", " ", t or "").lower().split())  # noqa: E731
+    ten = chuan(e.full_name)
+    BUOC = {"cho_tp": "Đang kiểm", "cho_kt": "Kế toán kiểm", "cho_duyet": "Chờ Chủ tịch ký", "cho_chi": "Chờ Kế toán chi",
+            "da_chi": "Đã chi", "tu_choi": "Từ chối", "tra_bo_sung": "Đội xe đang bổ sung"}
+    ra = []
+    for r in db.execute(select(PaymentRequest).where(PaymentRequest.category == "chi_doi_xe")
+                        .order_by(PaymentRequest.id.desc()).limit(500)).scalars():
+        ma = ((r.doi_xe or {}).get("ben_nhan_ma") or "").strip()
+        if not ((ma and ma == (e.code or "")) or (not ma and ten and chuan(r.supplier_name) == ten)):
+            continue
+        ra.append({"code": r.code, "noi_dung": r.description, "so_tien": float(r.amount or 0),
+                   "da_chi": float(r.da_chi_tien or 0), "trang_thai": r.status,
+                   "buoc": BUOC.get(r.status, r.status),
+                   "ngay": r.created_at.date().isoformat() if r.created_at else None,
+                   "luc_chi": r.paid_at.isoformat(timespec="minutes") if getattr(r, "paid_at", None) else None})
+    return {"rows": ra}
+
+
 @router.get("/nhan-lenh/can-biet")
 def nhan_lenh_can_biet(u: User = Depends(require_roles(*_XEM_NHAN)), db: Session = Depends(get_db)):
     """Lệnh quá hạn chưa nhận và lệnh tài xế đã báo không nhận được — cho Giám đốc đội xe."""

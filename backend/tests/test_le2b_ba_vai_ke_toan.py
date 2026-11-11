@@ -55,6 +55,10 @@ CHO_DA_KHAI_BA_VAI = [
     #   router, nên ba vai thấy menu rồi nhận 403. Chính phép thử f1 dưới đây bắt dòng này khi
     #   em thêm nó mà chưa khai — đúng việc nó sinh ra để làm.
     "api/v1/hach_toan.py: ketoan_truong",
+    # ── VH-34, 12/11/2026 ─────────────────────────────────────────────────────────────────
+    # `api/v1/fleet.py` — Chủ tịch chọn: Kế toán trưởng TỪ CHỐI được đề xuất chi đội xe như Kế toán (nút trong
+    #   `_dxc_chi_tiet`). «Đã chi» KHÔNG mở — anh giữ luật NL-2 (Kế toán trưởng ký, thủ quỹ cầm tiền).
+    "api/v1/fleet.py: ketoan_truong",
     "services/ops.py: ketoan_truong",
     "services/ops.py: ketoan_tt",
     "services/ops.py: thu_quy",

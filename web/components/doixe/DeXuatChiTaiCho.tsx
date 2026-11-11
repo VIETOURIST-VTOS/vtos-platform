@@ -127,6 +127,15 @@ export default function DeXuatChiTaiCho({ vai, toast, moSan = false }: {
                 <div className="dai"><dt>Tuyến ký</dt><dd className="dxc-tuyen">{(x.tuyen || []).map((t: any) =>
                   <span key={t.buoc} className={t.luc ? "xong" : ""}>{t.buoc}{t.nguoi ? ` · ${t.nguoi}` : ""}{t.luc ? ` · ${String(t.luc).slice(11, 16)} ${String(t.luc).slice(8, 10)}/${String(t.luc).slice(5, 7)}` : ""}</span>)}
                   {x.trang_thai !== "da_chi" && x.trang_thai !== "tu_choi" && <span className="nay">Đang: {x.buoc}</span>}</dd></div>
+                {/* VH-34 · lịch sử phiên bản: bản 1 → trả bổ sung (ai, lý do) → bản 2 gửi lại (ô nào đổi, cũ → mới). */}
+                {(x.phien_ban || []).length > 1 && <div className="dai"><dt>Lịch sử phiên bản</dt><dd><ol className="dxc-pb">
+                  {x.phien_ban.map((p: any, i: number) => <li key={i} className={p.loai}>
+                    <b>{p.loai === "lap" ? `Bản ${p.ban} · lập` : p.loai === "tra" ? "Trả bổ sung" : `Bản ${p.ban} · gửi lại`}</b>
+                    <span className="muted"> · {p.nguoi}{p.luc ? ` · ${String(p.luc).slice(11, 16)} ${String(p.luc).slice(8, 10)}/${String(p.luc).slice(5, 7)}` : ""}</span>
+                    {p.ly_do && <div className="muted">«{p.ly_do}»</div>}
+                    {(p.doi || []).map((o: any, j: number) => <div key={j}>{o.o}: <s>{typeof o.cu === "number" ? vnd(o.cu) : String(o.cu ?? "—")}</s>
+                      {" → "}<b>{typeof o.moi === "number" ? vnd(o.moi) : String(o.moi ?? "—")}</b></div>)}
+                  </li>)}</ol></dd></div>}
                 {x.da_chi_tien > 0 && <div><dt>Đã chi</dt><dd>{vnd(x.da_chi_tien)} đ · còn {vnd(x.con_phai_chi)} đ</dd></div>}
               </dl>
               <div className="dxc-kiem"><b>Máy đã kiểm</b><ul>{(x.kiem || []).map((k: any, i: number) =>
@@ -182,6 +191,11 @@ tr.dxc-ct>td{background:var(--panel2);padding:14px 16px;white-space:normal}
 .dxc-ngan dt{font-size:calc(11/14*1rem);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
 .dxc-ngan dd{margin:1px 0 0;white-space:pre-wrap}
 .dxc-tuyen{display:flex;flex-wrap:wrap;gap:6px}
+.dxc-pb{list-style:none;margin:2px 0 0;padding:0 0 0 14px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.dxc-pb li{position:relative}
+.dxc-pb li::before{content:"";position:absolute;left:-20px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--navy)}
+.dxc-pb li.tra::before{background:var(--red)}.dxc-pb li.gui_lai::before{background:var(--teal)}
+.dxc-pb s{color:var(--red)}
 .dxc-tuyen span{font-size:calc(12/14*1rem);border:1px solid var(--line);border-radius:999px;padding:1px 9px;background:var(--panel)}
 .dxc-tuyen span.xong{background:#2f8a57;border-color:#2f8a57;color:#fff}
 .dxc-tuyen span.nay{background:var(--navy);border-color:var(--navy);color:#fff}
