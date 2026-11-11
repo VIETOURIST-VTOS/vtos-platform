@@ -2200,22 +2200,32 @@ def lap_de_nghi_chi_xe(data: DeNghiChiXeIn, u: User = Depends(require_roles("gd_
 
 
 @router.get("/khoan-goc")
-def ds_khoan_goc(xe_id: int, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+def ds_khoan_goc(xe_id: int, q: str = "", u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
     """Danh sách khoản đã ghi của MỘT xe để chọn làm «khoản gốc» của đề xuất chi (Chủ tịch duyệt 10/11/2026):
     dòng chi phí chuyến và phiếu bảo dưỡng / sửa chữa, kèm đề nghị chi đã gắn — khoản đã có đề nghị chi thì
     màn hình hiện mã DC và không cho chọn lại."""
     from app.services import ops as O
+    # VH-26 (Chủ tịch 12/11/2026): tour quá nhiều → `q` tìm theo mã phiếu chuyến / tên tour / mã tour trong
+    # TOÀN BỘ sổ của xe (không cắt ở 120 dòng mới nhất). Có `q` thì chỉ trả chi phí chuyến khớp + bảo dưỡng khớp.
+    from app.models.core import Tour
     da = O.de_nghi_theo_khoan_goc(db)
     ra = []
-    for c, t in db.execute(select(TripCost, Trip).join(Trip, Trip.id == TripCost.trip_id)
-                           .where(Trip.vehicle_id == xe_id).order_by(Trip.ngay_di.desc(), TripCost.id.desc())
-                           .limit(120)).all():
+    q = (q or "").strip()[:60]
+    cau = (select(TripCost, Trip).join(Trip, Trip.id == TripCost.trip_id).outerjoin(Tour, Tour.id == Trip.tour_id)
+           .where(Trip.vehicle_id == xe_id))
+    if q:
+        mau = f"%{q}%"
+        cau = cau.where(Trip.ma_phieu.ilike(mau) | Trip.ten_tour.ilike(mau) | Tour.code.ilike(mau)
+                        | (Trip.id == (int(q) if q.isdigit() else -1)))
+    for c, t in db.execute(cau.order_by(Trip.ngay_di.desc(), TripCost.id.desc()).limit(120)).all():
         ma = f"tc:{c.id}"
         ra.append({"ma": ma, "loai": "Chi phí chuyến", "ngay": t.ngay_di,
                    "ten": f"{t.ma_phieu or 'Chuyến ' + str(t.id)} · {COST_KINDS.get(c.kind, c.kind)}",
                    "so_tien": c.amount, "chung_tu": c.chung_tu or "", "de_nghi_chi": da.get(ma)})
-    for b in db.execute(select(Maintenance).where(Maintenance.vehicle_id == xe_id)
-                        .order_by(Maintenance.ngay.desc()).limit(60)).scalars():
+    cau_bd = select(Maintenance).where(Maintenance.vehicle_id == xe_id)
+    if q:
+        cau_bd = cau_bd.where(Maintenance.noi_dung.ilike(f"%{q}%"))
+    for b in db.execute(cau_bd.order_by(Maintenance.ngay.desc()).limit(60)).scalars():
         ma = f"bd:{b.id}"
         ra.append({"ma": ma, "loai": "Bảo dưỡng / sửa chữa", "ngay": b.ngay, "ten": (b.noi_dung or b.kind)[:80],
                    "so_tien": b.so_tien, "chung_tu": b.chung_tu or "", "de_nghi_chi": da.get(ma)})

@@ -49,22 +49,30 @@ const rong = () => ({
   pham_vi: "xe", bien_so: "", loai: "thanh_toan", nhom: "", noi_dung: "", nguoi_thu_huong: "",
   so_tien: "" as any, ngay: new Date().toISOString().slice(0, 10), can_cu_so_tien: "",
   ma_khoan_goc: "", chung_tu: "", hen_bo_sung: "", ghi_chu_kiem_tra: "", ma_so_thue: "",
-  so_tai_khoan: "", ngan_hang: "", ok: false,
+  so_tai_khoan: "", ngan_hang: "", ok: false, chuyen_ngoai: "",
 });
+/** Giá trị đặc biệt của ô khoản gốc: chuyến KHÔNG có trên VTOS (xe thuê ngoài…) — GĐ đội xe tự ghi mã tour. */
+const NGOAI = "__ngoai";
 
 export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong, onDong }: {
   xe: any[]; vai: string; nguongChungTu?: number | null;
   toast: (s: string, loi?: boolean) => void; onXong: () => void; onDong: () => void;
 }) {
-  const { data: d, setData, xoaNhap, coNhapCu } = useNhap("vtos.doixe.de-xuat-chi.nhap", rong);
+  const { data: d, setData, xoaNhap } = useNhap("vtos.doixe.de-xuat-chi.nhap", rong);
   const [buoc, setBuoc] = useState(0);
   // Chống ghi chi phí hai lần (Chủ tịch duyệt 10/11/2026): khoản gốc CHỌN từ sổ của chính xe, không gõ tay.
   const xeChon = xe.find((v) => v.plate === d.bien_so);
   const [kg, setKg] = useState<any[] | null>(null);
+  // VH-26 (Chủ tịch 12/11/2026): tour quá nhiều → ô TÌM theo mã tour / mã phiếu; máy chủ tìm trong cả sổ của xe.
+  const [timKg, setTimKg] = useState("");
   useEffect(() => {
     if (d.pham_vi !== "xe" || !xeChon) { setKg(null); return; }
-    api<any>(`/fleet/khoan-goc?xe_id=${xeChon.id}`).then((r) => setKg(r.rows || [])).catch(() => setKg([]));
-  }, [d.pham_vi, xeChon?.id]); // eslint-disable-line
+    const t = setTimeout(() => {
+      api<any>(`/fleet/khoan-goc?xe_id=${xeChon.id}${timKg.trim() ? `&q=${encodeURIComponent(timKg.trim())}` : ""}`)
+        .then((r) => setKg(r.rows || [])).catch(() => setKg([]));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [d.pham_vi, xeChon?.id, timKg]); // eslint-disable-line
   const [dang, setDang] = useState(false);
   const [daLuu, setDaLuu] = useState<{ ma_gd: string } | null>(null);   // ma_gd = mã đề nghị chi DC…
   const [choTrung, setChoTrung] = useState(false);
@@ -74,10 +82,11 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
   // hỏi một ô rồi bị từ chối lúc gửi là cách tệ nhất để nói một quy tắc.
   const hienNganHang = vai !== "gd_doi_xe";
   const soTien = d.so_tien === "" || d.so_tien === null ? null : Number(d.so_tien);
-  const vuotNguong = !!nguongChungTu && soTien !== null && soTien >= nguongChungTu;
   const nhomKhongPhaiChiPhi = d.nhom.startsWith("Nạp quỹ");
   // Điều chuyển nội bộ không phải một đề nghị chi (Chủ tịch 10/11/2026) — Kế toán lập bút toán điều chuyển.
   const nhomDieuChuyen = d.nhom.startsWith("Điều chuyển");
+  // VH-26: số hoá đơn BẮT BUỘC; trừ tạm ứng / nạp quỹ — tiền chưa tiêu thì chưa có hoá đơn.
+  const canHoaDon = d.loai !== "tam_ung" && !nhomKhongPhaiChiPhi;
 
   const thieu = (b: number): string[] => {
     const t: string[] = [];
@@ -92,8 +101,8 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
       if (soTien === null || !(soTien > 0)) t.push("Nhập số tiền đề nghị lớn hơn 0.");
       if (!d.ngay) t.push("Chọn ngày cần xử lý.");
       if (!d.can_cu_so_tien) t.push("Chọn căn cứ số tiền – VTOS không tự cộng VAT, nên con số này phải nói rõ nó đã gồm gì.");
-      if (vuotNguong && !d.chung_tu.trim() && !nhomKhongPhaiChiPhi && d.loai === "thanh_toan")
-        t.push(`Khoản từ ${nguongChungTu!.toLocaleString("vi-VN")} đ bắt buộc ghi số chứng từ gốc (chặn cứng B6) – máy chủ sẽ từ chối nếu để trống.`);
+      if (canHoaDon && !d.chung_tu.trim()) t.push("Ghi số hoá đơn — bắt buộc (Chủ tịch 12/11/2026).");
+      if (d.ma_khoan_goc === NGOAI && !d.chuyen_ngoai.trim()) t.push("Ghi mã tour / chuyến của xe thuê ngoài.");
     }
     if (b >= 2 && !d.ok) t.push("Xác nhận đã đối chiếu số tiền, chứng từ và khoản chi gốc.");
     return t;
@@ -109,8 +118,9 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
         nhom: d.nhom, ma_so_thue: d.ma_so_thue.trim(),
         nguoi_thu_huong: d.nguoi_thu_huong.trim(), chung_tu: d.chung_tu.trim(),
         pham_vi: d.pham_vi, loai: d.loai, can_cu_so_tien: d.can_cu_so_tien,
-        ma_khoan_goc: d.ma_khoan_goc.trim(), hen_bo_sung: d.hen_bo_sung.trim(),
-        ghi_chu_kiem_tra: d.ghi_chu_kiem_tra.trim(), cho_phep_trung: choTrung,
+        ma_khoan_goc: d.ma_khoan_goc === NGOAI ? "" : d.ma_khoan_goc.trim(), hen_bo_sung: canHoaDon ? "" : d.hen_bo_sung.trim(),
+        ghi_chu_kiem_tra: [d.ma_khoan_goc === NGOAI && d.chuyen_ngoai.trim() ? `Chuyến ngoài VTOS (xe thuê ngoài): ${d.chuyen_ngoai.trim()}.` : "",
+          d.ghi_chu_kiem_tra.trim()].filter(Boolean).join(" "), cho_phep_trung: choTrung,
       };
       if (hienNganHang) { json.so_tai_khoan = d.so_tai_khoan.trim(); json.ngan_hang = d.ngan_hang.trim(); }
       const r = await api<any>("/fleet/de-nghi-chi", { method: "POST", json });
@@ -149,9 +159,6 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
   return <div className="panel">
     <h2>Lập đề xuất chi</h2>
     <ThanhBuoc ten={TEN_BUOC} buoc={buoc} veBuoc={setBuoc} />
-    {coNhapCu && buoc === 0 && <p className="muted">Đang mở lại <b>nháp lưu trong máy này</b> từ lần gõ trước.
-      Nháp không nằm trên máy chủ: đổi máy hoặc xoá dữ liệu trình duyệt là mất.
-      {" "}<button className="act grey" style={{ margin: 0 }} onClick={() => { xoaNhap(); setBuoc(0); }}>Bỏ nháp, gõ lại từ đầu</button></p>}
     <ConThieu ds={thieuNay} />
 
     {buoc === 0 && <>
@@ -205,15 +212,23 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
             <option value="">— chọn căn cứ —</option>
             {CAN_CU.map((c) => <option key={c} value={c}>{c}</option>)}
           </select></label>
-        <label>Khoản gốc đã ghi nhận (nếu có)
+        <div>
+          <label>Khoản gốc đã ghi nhận (nếu có)
+            <input value={timKg} onChange={(e) => setTimKg(e.target.value)} disabled={d.pham_vi !== "xe" || !xeChon}
+              placeholder="Tìm theo mã tour / mã phiếu chuyến…" aria-label="Tìm khoản gốc theo mã tour" /></label>
           <select value={d.ma_khoan_goc} onChange={(e) => dat("ma_khoan_goc", e.target.value)}
-            disabled={d.pham_vi !== "xe" || !xeChon}>
+            disabled={d.pham_vi !== "xe" || !xeChon} aria-label="Khoản gốc" style={{ marginTop: 6 }}>
             <option value="">{d.pham_vi !== "xe" ? "— chi phí toàn đội: không gắn —" : !xeChon ? "— chọn xe trước —" : "— không gắn khoản gốc —"}</option>
+            <option value={NGOAI}>Xe thuê ngoài — tự ghi mã tour</option>
             {(kg || []).map((k) => <option key={k.ma} value={k.ma} disabled={!!k.de_nghi_chi}>
               {`${k.loai} · ${k.ten} · ${k.so_tien != null ? tien(k.so_tien) : "chưa có số"}`}{k.de_nghi_chi ? ` — đã có ${k.de_nghi_chi}` : ""}
             </option>)}
-          </select></label>
-        <label>Số chứng từ
+            {kg && kg.length === 0 && timKg.trim() && <option value="" disabled>Không tìm thấy «{timKg.trim()}»</option>}
+          </select>
+          {d.ma_khoan_goc === NGOAI && <input style={{ marginTop: 6 }} value={d.chuyen_ngoai}
+            onChange={(e) => dat("chuyen_ngoai", e.target.value)} placeholder="Mã tour xe thuê ngoài *" aria-label="Mã tour xe thuê ngoài" />}
+        </div>
+        <label>Số hoá đơn {canHoaDon && <span aria-hidden="true">*</span>}
           <input value={d.chung_tu} onChange={(e) => dat("chung_tu", e.target.value)} placeholder="HĐ 0000xxxx" /></label>
         {hienNganHang && <label>Số tài khoản bên nhận
           <input value={d.so_tai_khoan} onChange={(e) => dat("so_tai_khoan", e.target.value)} /></label>}
@@ -224,17 +239,11 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
         là chỗ nói ra con số ấy đã gồm những gì.</p>
       {!hienNganHang && <p className="muted">Số tài khoản và ngân hàng của bên nhận <b>do Kế toán kiểm soát</b>,
         không nhập ở màn Giám đốc đội xe (v3.3 §2, §7). Ghi tên bên nhận ở bước 1 là đủ.</p>}
-      {!d.chung_tu.trim() && <label style={{ display: "block", marginTop: 8 }}>Hẹn bổ sung chứng từ
+      {!canHoaDon && !d.chung_tu.trim() && <label style={{ display: "block", marginTop: 8 }}>Hẹn bổ sung hoá đơn
         <input value={d.hen_bo_sung} onChange={(e) => dat("hen_bo_sung", e.target.value)}
-          placeholder="VD: hoá đơn garage trả ngày 15/11 – đã có phiếu sửa chữa" /></label>}
-      {!d.chung_tu.trim() && <p className="muted">Lời hẹn này <b>được ghi vào sổ</b> để sau còn tra khoản nào đang
-        nợ giấy, nhưng nó <b>không mở ngưỡng</b> chứng từ bắt buộc
-        {nguongChungTu ? <> ({nguongChungTu.toLocaleString("vi-VN")} đ)</> : null} — ai được miễn và miễn tới mức nào
-        là việc anh Tuấn chốt, không phải việc một dòng lý do gõ tay.</p>}
+          placeholder="VD: hoá đơn nộp sau khi hoàn ứng" /></label>}
       <label style={{ display: "block", marginTop: 8 }}>Ghi chú cho người kiểm tra
         <textarea rows={2} value={d.ghi_chu_kiem_tra} onChange={(e) => dat("ghi_chu_kiem_tra", e.target.value)} /></label>
-      <p className="muted">Tệp chứng từ (ảnh hoá đơn, báo giá) <b>mở ngay sau khi lưu phiếu</b> — kho hồ sơ gắn tệp
-        theo mã phiếu, mà mã chỉ có sau khi máy chủ sinh ra.</p>
     </>}
 
     {(buoc === 2 || buoc === 3) && <>
@@ -250,23 +259,19 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
         <Cap nhan="Căn cứ số tiền" value={d.can_cu_so_tien} />
         <Cap nhan="Ngày cần xử lý" value={d.ngay} />
         {hienNganHang && <Cap nhan="Tài khoản bên nhận" value={[d.so_tai_khoan.trim(), d.ngan_hang.trim()].filter(Boolean).join(" · ")} />}
-        <Cap nhan="Chứng từ" value={d.chung_tu.trim()} />
+        <Cap nhan="Số hoá đơn" value={d.chung_tu.trim()} />
         {!d.chung_tu.trim() && <Cap nhan="Hẹn bổ sung" value={d.hen_bo_sung.trim()} />}
-        <Cap nhan="Liên kết khoản gốc" value={d.ma_khoan_goc.trim()
-          ? ((kg || []).find((k) => k.ma === d.ma_khoan_goc)?.ten || d.ma_khoan_goc) : ""} />
+        <Cap nhan="Liên kết khoản gốc" value={d.ma_khoan_goc === NGOAI ? `Xe thuê ngoài · ${d.chuyen_ngoai.trim()}`
+          : d.ma_khoan_goc.trim() ? ((kg || []).find((k) => k.ma === d.ma_khoan_goc)?.ten || d.ma_khoan_goc) : ""} />
       </KhoiXem>
       {buoc === 2 && <>
-        <p className="muted">Đề nghị chi <b>chưa phải chi phí đã ghi sổ</b>, cũng chưa phải tiền đã thanh toán.
-          Khoản đã có trên phiếu chuyến thì phải gắn <b>mã khoản gốc</b> để không bị cộng hai lần.</p>
         <OXacNhan cho={d.ok} doi={(v) => dat("ok", v)}
           chu="Tôi đã kiểm tra số tiền, chứng từ và khoản chi gốc; đề nghị chuyển đúng người có quyền duyệt." />
       </>}
       {buoc === 3 && <>
-        <TuyenDuyet tuyen={TUYEN} ghi={"Phiếu là một đề nghị chi 05-TT: lên thẳng Chủ tịch duyệt, rồi Kế toán kiểm " +
-          "chứng từ và chi. Người lập không tự duyệt hay tự xác nhận đã chi. Đề nghị chi chưa phải chi phí đã chốt kỳ " +
-          "và chưa phải tiền đã trả."} />
-        <label className="bb-ok"><input type="checkbox" checked={choTrung} onChange={(e) => setChoTrung(e.target.checked)} />
-          <span>Vẫn gửi dù hệ thống báo trùng phiếu <span className="muted">— chỉ tích khi đã xem phiếu cũ và chắc đây là khoản khác.</span></span></label>
+        <TuyenDuyet tuyen={TUYEN} ghi="" />
+        <button type="button" className={"act " + (choTrung ? "teal" : "grey")} aria-pressed={choTrung}
+          onClick={() => setChoTrung(!choTrung)}>{choTrung ? "✓ Vẫn gửi dù trùng phiếu" : "Vẫn gửi dù trùng phiếu"}</button>
       </>}
     </>}
 
@@ -277,7 +282,6 @@ export default function BonBuocDeXuatChi({ xe, vai, nguongChungTu, toast, onXong
       {buoc === 3 && <button className="act teal" disabled={dang || thieu(2).length > 0} onClick={gui}>
         {dang ? "Đang gửi…" : "Gửi đề nghị"}</button>}
       <button className="act grey" onClick={onDong}>Đóng</button>
-      <span className="bb-nhap">Nháp tự lưu trong máy này</span>
     </div>
   </div>;
 }
