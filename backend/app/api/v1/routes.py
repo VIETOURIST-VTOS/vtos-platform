@@ -279,6 +279,43 @@ def dashboard_qua_han_qt(trang: int = 1, co: int = 50,
     return {**kq, "luc": _dt.now().isoformat(timespec="seconds")}
 
 
+_DEM_CACHE: dict = {}
+_TEN_VIEC = {"confirm": "Xác nhận", "sign": "Ký chạy tour", "approve": "Duyệt dự toán", "close": "Đóng sổ",
+             "kt_confirm": "Kế toán xác nhận", "cntt_check": "CNTT đối chiếu"}
+
+
+@router.get("/dashboard/dem", tags=["dashboard"])
+def dashboard_dem(u: User = Depends(current_user), db: Session = Depends(get_db)):
+    """VH-24 · Cửa ĐẾM NHẸ cho hai nút «Công việc» và «Chờ duyệt» trên thanh ngang (Chủ tịch duyệt 12/11/2026).
+
+    Gọi từ MỌI màn hình, mỗi phút một lần — nên không dựng cả bảng điều hành: chỉ hai danh sách, nhớ 60 giây
+    theo người. Ai đăng nhập cũng gọi được: mỗi người chỉ ra đúng việc của mình (cùng hàm với bảng điều hành).
+
+    Số trên «Chờ duyệt» CHỈ đếm việc phải bấm. Dòng «để xem» (đề nghị chi phía bên kia mốc, bảng ký quyền)
+    trả trong `de_xem`, không cộng vào số — gộp vào là báo 47 việc chờ ký trong khi chỉ có 2 (làn R2 đo 11/11)."""
+    import re as _re
+    import time as _t
+    from app.services import dashboard as _DB
+    hit = _DEM_CACHE.get(u.id)
+    if hit and _t.time() - hit[0] < 60:
+        return hit[1]
+    cho, xem = [], []
+    for a in _DB.viec_cho_duyet(db, u):
+        la_xem = bool(a.get("chi_tiet")) or "để xem" in a["label"] or a["label"].startswith("ĐANG MỞ LẠI") \
+            or "KHÔNG DUYỆT ĐƯỢC" in a["label"] or "Bảng ký quyền" in a["label"]
+        m = _re.match(r"\s*(\d+)", a["label"])
+        dong = {"label": a["label"], "href": a.get("href") or ("/#ky-quyen" if a.get("chi_tiet") else "/"),
+                "so": int(m.group(1)) if m else 1}
+        (xem if la_xem else cho).append(dong)
+    viec = [{"label": f"{_TEN_VIEC.get(v['action'], v['action'])} · {v['code']} {v['name']}",
+             "href": f"/tours/{v['tour_id']}", "so": 1}
+            for v in _viec_cho_toi(db, u) if v["action"] != "approve"]   # duyệt dự toán đã nằm ở «Chờ duyệt»
+    kq = {"cho_duyet": cho, "so_cho_duyet": sum(d["so"] for d in cho), "de_xem": xem,
+          "cong_viec": viec, "so_cong_viec": len(viec)}
+    _DEM_CACHE[u.id] = (_t.time(), kq)
+    return kq
+
+
 @router.get("/dashboard", tags=["dashboard"])
 def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Session = Depends(get_db)):
     import time
@@ -305,11 +342,9 @@ def dashboard(refresh: bool = False, u: User = Depends(current_user), db: Sessio
     return build_dashboard(db, u)
 
 
-def _dashboard_payload(db: Session, u: User) -> dict:
-    import time as _t
-    _m = {"_": _t.time()}; do = {}
-    def _cham(ten):
-        now = _t.time(); do[ten] = int((now - _m["_"]) * 1000); _m["_"] = now
+def _viec_cho_toi(db: Session, u: User) -> list[dict]:
+    """Tour chờ chính người này bấm (xác nhận, ký chạy, duyệt, đóng…). Tách ra để nút «Công việc» trên thanh
+    ngang (VH-24) đọc đúng phép tính của bảng điều hành, không chép."""
     # việc chờ tôi xử lý: chỉ xét tour đang trong luồng (không quét tour đã kết thúc / đã duyệt hàng loạt)
     active = db.execute(select(Tour).where(Tour.status.in_(["nhap", "cho_xac_nhan", "cho_duyet", "da_dong_so", "kt_xac_nhan"]))).scalars().all()
     if u.role in ("chutich", "tp_dh"):
@@ -325,6 +360,15 @@ def _dashboard_payload(db: Session, u: User) -> dict:
         for a in T.allowed_actions(db, t, u):
             if a in ("confirm", "sign", "approve", "close", "kt_confirm", "cntt_check"):
                 todo.append({"tour_id": t.id, "code": t.code, "name": t.name, "action": a})
+    return todo
+
+
+def _dashboard_payload(db: Session, u: User) -> dict:
+    import time as _t
+    _m = {"_": _t.time()}; do = {}
+    def _cham(ten):
+        now = _t.time(); do[ten] = int((now - _m["_"]) * 1000); _m["_"] = now
+    todo = _viec_cho_toi(db, u)
     _cham("viec_cho_toi")
     counts = {st: n for st, n in db.execute(select(Tour.status, func.count()).group_by(Tour.status)).all()}
     alerts = [a for a in db.execute(select(Alert).where(Alert.resolved == False).order_by(desc(Alert.created_at)).limit(300)).scalars()

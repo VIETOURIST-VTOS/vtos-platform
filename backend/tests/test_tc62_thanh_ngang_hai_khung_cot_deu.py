@@ -49,30 +49,17 @@ def _css() -> str:
 # ───────────────────── 1 · THANH NGANG MANG ĐỦ BỐN THỨ ─────────────────────
 
 def test_thanh_ngang_mang_du_bon_thu_cua_dau_trang():
-    """Gộp ba tầng thành một thanh là để BỚT CHỮ, không phải để bớt câu trả lời.
-
-    Bốn thứ dưới đây mỗi thứ trả lời được câu "bỏ đi thì ai mất gì": tên trang, kỳ báo cáo (và cửa
-    sang quý/năm), phạm vi, ngày báo cáo — ngày báo cáo là mốc phân nhóm của mọi bảng theo hạn ở
-    dưới, nên thiếu nó thì người đọc phải đoán "quá hạn" là quá so với ngày nào.
-    """
+    """Gộp/bớt là để BỚT CHỮ, không bớt câu trả lời. VH-24 (Chủ tịch 12/11/2026, chốt «1.1.1»): đầu trang chủ chỉ còn TÊN BÀN + ô ngày; việc chờ lên hai nút
+    «Công việc» / «Chờ duyệt» trên thanh ngang (Shell + `GET /dashboard/dem`); bỏ «Quý và năm →» và nút In
+    (in bằng Ctrl+P, kiểu in giữ nguyên). Luật cũ còn sống được canh lại ở `test_vh24_ban_chu_tich.py`.
+    Câu trả lời còn lại trên đầu trang: tên bàn (kèm phạm vi ở chỗ rê chuột) và ngày hôm nay; việc chờ
+    quyết đi lên thanh ngang — canh ở test_vh24."""
     ma = _ma(DAU)
     than = ma[ma.index("export function TieuDe"):]
     than = than[:than.index("export function", 1)]
-    # TC-65 (18/9/2026) · DANH SÁCH DÀI RA MỘT MỤC, VÀ MỘT MỤC ĐỔI CHỖ BÁM.
-    #   · Phạm vi: anh Tuấn chốt "bỏ Vietourist công ty mẹ" khỏi thanh, nên nhãn rê chuột chuyển
-    #     sang bám vào TÊN TRANG. Câu trả lời không mất khỏi hệ thống, chỉ đổi chỗ.
-    #   · Việc chờ quyết: khối riêng "Cần Chủ tịch quyết định" nhập vào thanh, nên thanh phải
-    #     BÀY ĐƯỢC danh sách ấy. Thiếu chỗ này thì việc chờ Chủ tịch biến mất mà không lỗi nào báo.
-    # Luật của phép thử không đổi: thanh gộp lại là để BỚT CHỮ, không phải để bớt câu trả lời.
-    for can, vi in (
-        ("mh01-thanh-ten", "tên trang"),
-        ('title="Kỳ báo cáo"', "kỳ báo cáo"),
-        ("Quý và năm →", "cửa sang quý và năm"),
-        ('title="Phạm vi: Vietourist — công ty mẹ"', "phạm vi"),
-        ('title="Ngày báo cáo"', "ngày báo cáo"),
-        ("cho.map(", "hàng nút việc chờ quyết"),
-    ):
-        assert can in than, f"Thanh ngang thiếu {vi}."
+    for can, vi in (("mh01-ban-ten", "tên bàn"), ('title="Phạm vi: Vietourist — công ty mẹ"', "phạm vi"),
+                    ("mh01-ban-ngay", "ngày hôm nay")):
+        assert can in than, f"Đầu trang thiếu {vi}."
 
 
 # ───────────────────── 2 · BA CÂU ĐỌC HỘ CÒN SỐNG, CHỈ ĐỔI CHỖ ─────────────────────

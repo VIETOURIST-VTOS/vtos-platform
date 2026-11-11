@@ -95,26 +95,13 @@ def _than_ham(ma: str, ten: str) -> str:
 
 
 def test_nut_in_dung_cung_hang_voi_ky_dang_chon():
-    """LUẬT KHÔNG ĐỔI, CHỖ ĐỨNG ĐỔI TÊN — ghi cả hai mặt để vòng sau không lật ngược nhầm.
-
-    MẶT CŨ (TC-31 → TC-35, 16/9/2026): nút In từng nằm cạnh tiêu đề. Sai, vì In là thao tác TRÊN
-    KỲ ĐANG CHỌN — in đúng cái kỳ ghi bên cạnh. Nên nó bị dời xuống hàng lọc `DongLoc`, và phép
-    thử này canh "nút In nằm trong `DongLoc`".
-
-    MẶT MỚI (TC-62, 18/9/2026): anh Tuấn chốt "gộp thành 1 thanh ngang". `DongLoc` bị xoá, kỳ báo
-    cáo chuyển lên chính `TieuDe`, và `TieuDe` bây giờ CHÍNH LÀ hàng lọc. Nút In theo kỳ mà đi.
-
-    Cái phép thử canh không phải TÊN CỦA HÀM, mà là RÀNG BUỘC: nút In phải đứng cùng thân hàm với
-    kỳ báo cáo. Đứng tách ra là nó lại thành một nút trôi nổi, không ai biết nó in kỳ nào.
-    """
+    """VH-24 (Chủ tịch 12/11/2026, chốt «1.1.1»): đầu trang chủ chỉ còn TÊN BÀN + ô ngày; việc chờ lên hai nút
+    «Công việc» / «Chờ duyệt» trên thanh ngang (Shell + `GET /dashboard/dem`); bỏ «Quý và năm →» và nút In
+    (in bằng Ctrl+P, kiểu in giữ nguyên). Luật cũ còn sống được canh lại ở `test_vh24_ban_chu_tich.py`.
+    Không còn nút In nên không còn ràng buộc «In đứng cạnh kỳ»; đầu trang chỉ mang tên bàn và ngày."""
     ma = _bo_chu_thich_tsx(_doc(DAU))
     than = _than_ham(ma, "TieuDe")
-    assert "In / Lưu PDF" in than and "window.print()" in than, (
-        "Nút In / Lưu PDF phải nằm cùng thân hàm với kỳ báo cáo — nay là `TieuDe`."
-    )
-    assert "tenThang()" in than, (
-        "Kỳ báo cáo phải nằm cùng hàm với nút In; tách ra là nút In mất cái nó in."
-    )
+    assert "window.print()" not in than and "mh01-ban-ngay" in than
 
 
 def test_khong_con_hang_loc_rieng():
@@ -131,8 +118,11 @@ def test_khong_con_hang_loc_rieng():
 
 
 def test_chi_co_mot_nut_in_tren_man_hinh():
+    """VH-24 (Chủ tịch 12/11/2026, chốt «1.1.1»): đầu trang chủ chỉ còn TÊN BÀN + ô ngày; việc chờ lên hai nút
+    «Công việc» / «Chờ duyệt» trên thanh ngang (Shell + `GET /dashboard/dem`); bỏ «Quý và năm →» và nút In
+    (in bằng Ctrl+P, kiểu in giữ nguyên). Luật cũ còn sống được canh lại ở `test_vh24_ban_chu_tich.py`."""
     ma = _bo_chu_thich_tsx(_doc(DAU))
-    assert ma.count("In / Lưu PDF") == 1, "Màn hình đang có nhiều hơn một nút In."
+    assert ma.count("In / Lưu PDF") == 0, "Nút In sống lại trên màn hình 01."
 
 
 # ─────────────── 3 · KHỐI DÀI CUỘN TRONG KHUNG, KHÔNG CẮT DÒNG ───────────────

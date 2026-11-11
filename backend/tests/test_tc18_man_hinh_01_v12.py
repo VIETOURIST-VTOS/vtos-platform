@@ -166,37 +166,17 @@ def test_the_chua_co_nguon_phai_co_cua_nhap():
 
 
 def test_o_chon_ky_chi_mo_khi_co_so_that_dang_sau():
-    """SỬA 16/9/2026 (TC-42) — QUYẾT ĐỊNH 13/9 BỊ THAY, VÀ ĐÂY LÀ LÝ DO.
-
-    Bản 13/9 cấm ô chọn Tháng/Quý/Năm trên màn hình 01, vì lúc ấy máy chủ mới tính theo tháng: một
-    ô chọn ba kỳ mà bấm vào lại báo "chưa có nguồn" là lời hứa suông ngay trên màn hình đầu tiên.
-    Cái bị cấm là LỜI HỨA SUÔNG, không phải ô chọn.
-
-    Nay `services/xu_huong.doc_theo_ky` cộng được quý và năm từ chính các tháng, nên đằng sau ô
-    chọn có số thật — và anh Tuấn chốt 16/9 là "doanh thu và lợi nhuận phân ra theo tháng, quý,
-    năm". Luật giữ nguyên, chỉ sự thật đổi.
-
-    Phép thử nay canh đúng cái luật ấy: có ô chọn thì phải có nguồn, và hàng lọc vẫn phải chỉ ra
-    chỗ xem báo cáo đầy đủ.
-    """
-    dau = _ma(DAU)
-    assert "tenThang" in dau, "hàng lọc phải in tháng báo cáo lấy từ lịch máy"
-    assert 'href="/phan-he/baocao"' in dau, "thiếu đường dẫn sang chỗ xem theo quý và năm"
-
-    # SỬA 16/9/2026 lần hai (TC-44): ô chọn ba kỳ chuyển sang khối Kết quả kinh doanh, và cách nó
-    # lấy số đổi hẳn — không còn chọn nhánh trong một gói `ba_ky` dựng sẵn, mà HỎI máy chủ đúng kỳ
-    # đang chọn. Nhờ vậy lối lui về bộ số của tháng không còn chỗ tồn tại: gửi sai bề rộng thì máy
-    # chủ từ chối bằng 422 chứ không trả bừa. Luật y nguyên, chỗ canh đi theo nó.
+    """VH-24 (Chủ tịch 12/11/2026, chốt «1.1.1»): đầu trang chủ chỉ còn TÊN BÀN + ô ngày; việc chờ lên hai nút
+    «Công việc» / «Chờ duyệt» trên thanh ngang (Shell + `GET /dashboard/dem`); bỏ «Quý và năm →» và nút In
+    (in bằng Ctrl+P, kiểu in giữ nguyên). Luật cũ còn sống được canh lại ở `test_vh24_ban_chu_tich.py`.
+    Ô chọn quý/năm vẫn phải có NGUỒN THẬT ở khối Kết quả kinh doanh (TC-44) — phần ấy không đổi."""
     import pathlib
     goc = pathlib.Path(ROOT)
+    dau = _ma(DAU)
+    assert "Quý và năm →" not in dau[dau.index("export function TieuDe"):], "«Quý và năm →» sống lại trên đầu trang (VH-24 đã bỏ)"
     khoi = (goc / "web" / "components" / "KhoiKetQuaKinhDoanh.tsx").read_text(encoding="utf-8")
     assert '{ ma: "quy", ten: "Quý" }' in khoi, "ô chọn ba kỳ phải nằm ở khối Kết quả kinh doanh"
-    assert "ket-qua-kinh-doanh?kind=" in khoi, (
-        "Mỗi kỳ phải HỎI máy chủ đúng kỳ ấy. Lấy chuỗi tháng làm lối lui cho quý là nói dối bằng "
-        "giao diện — người đọc kết luận quý bằng tháng, chứ không kết luận là chưa có số."
-    )
-    kq = (goc / "backend" / "app" / "services" / "ket_qua_kinh_doanh.py").read_text(encoding="utf-8")
-    assert "không phải bề rộng" in kq, "máy chủ phải TỪ CHỐI mã kỳ sai bề rộng, không đoán hộ"
+    assert "ket-qua-kinh-doanh?kind=" in khoi
     xh = (goc / "backend" / "app" / "services" / "xu_huong.py").read_text(encoding="utf-8")
     assert "def doc_theo_ky" in xh, "nguồn số của quý và năm phải có thật ở máy chủ"
 
@@ -222,7 +202,7 @@ def test_ban_tgd_doi_ten_trang_chu_khong_cat_dong_o_trinh_duyet():
     """
     s = _ma(DAU)
     assert '"Bảng điều hành Tổng giám đốc"' in s, "thiếu tên trang của bản TGĐ"
-    assert '"Bảng điều hành Chủ tịch"' in s, "thiếu tên trang của bản Chủ tịch"
+    assert '"Bàn làm việc Chủ tịch HĐQT"' in s, "thiếu tên trang của bản Chủ tịch"
     # Không có nhánh nào lọc DỮ LIỆU theo vai. Đổi nhãn thì được, lọc số thì không.
     for xau in re.findall(r'vai === "\w+"', s):
         i = s.index(xau)
@@ -232,27 +212,15 @@ def test_ban_tgd_doi_ten_trang_chu_khong_cat_dong_o_trinh_duyet():
 
 
 def test_khong_gioi_han_so_ho_so_can_quyet_dinh():
-    """Anh Tuấn chốt 13/9: KHÔNG giới hạn hồ sơ. Bản vẽ V1.2 ghi "tối đa 5", nhưng cắt ở năm nghĩa
-    là hồ sơ thứ sáu nằm ngoài tầm mắt đúng người được quyền quyết nó – mà máy chủ chưa xếp thứ tự
-    ưu tiên, nên "năm cái đầu" chỉ là năm cái ngẫu nhiên.
-
-    SỬA 16/9/2026 (TC-41) — LUẬT GIỮ NGUYÊN, PHÉP SOÁT THU HẸP LẠI ĐÚNG CHỖ NÓ CANH.
-    Bản cũ cấm chuỗi "slice(" trong TOÀN BỘ tệp DauManHinh01.tsx. Tệp ấy nay còn chứa
-    `docHoKeHoach`, nơi kê tên hai pháp nhân đầu rồi đếm phần còn lại — một phép cắt hoàn toàn
-    chính đáng trên một DÒNG CHỮ, không phải trên danh sách hồ sơ chờ quyết.
-
-    Đây đúng kiểu phép soát tự bắt oan mình: nó cấm một chuỗi ký tự thay vì cấm một hành vi, nên
-    lần đầu có người viết `slice` cho việc khác là nó báo đỏ. Nay chỉ soi THÂN HÀM KhoiQuyetDinh.
-    """
-    # TC-65 (18/9/2026) · CHỖ SOÁT ĐỔI, LUẬT KHÔNG ĐỔI. Hàng nút chờ quyết nhập vào `TieuDe`, nên
-    # thân hàm phải soi là `TieuDe`. Và thẻ nhãn "{co.length} hồ sơ đang chờ" đã bỏ theo chốt của
-    # anh Tuấn ("bỏ chữ chờ chủ tịch quyết") — nó đếm đúng số nút đứng ngay cạnh nó, tức nói lại
-    # một điều mắt đã thấy. Luật CÒN NGUYÊN và là luật quan trọng hơn: KHÔNG CẮT BỚT hồ sơ.
-    s = _ma(DAU)
-    i = s.index("export function TieuDe")
-    than = s[i: s.index("export function", i + 10)]
-    assert "slice(" not in than, "hàng nút Cần quyết định không được cắt bớt hồ sơ"
-    assert "cho.map(" in than, "phải bày TOÀN BỘ danh sách hồ sơ chờ quyết, không cắt"
-    assert "hồ sơ đang chờ" not in s, (
-        "Thẻ nhãn đếm hồ sơ sống lại — nó đếm đúng số nút đứng ngay cạnh (TC-65)."
-    )
+    """Anh Tuấn chốt 13/9: KHÔNG giới hạn hồ sơ chờ quyết. VH-24 (Chủ tịch 12/11/2026, chốt «1.1.1»): đầu trang chủ chỉ còn TÊN BÀN + ô ngày; việc chờ lên hai nút
+    «Công việc» / «Chờ duyệt» trên thanh ngang (Shell + `GET /dashboard/dem`); bỏ «Quý và năm →» và nút In
+    (in bằng Ctrl+P, kiểu in giữ nguyên). Luật cũ còn sống được canh lại ở `test_vh24_ban_chu_tich.py`.
+    Nên chỗ canh đi theo danh sách: nút «Chờ duyệt» bày đủ, máy chủ không cắt."""
+    import pathlib
+    goc = pathlib.Path(ROOT)
+    shell = (goc / "web" / "components" / "Shell.tsx").read_text(encoding="utf-8")
+    than = shell[shell.index("function NutViec"):shell.index("// Trạng thái THU/BUNG")]
+    assert "ds.map(" in than and "slice(" not in than, "nút «Chờ duyệt» phải bày TOÀN BỘ danh sách, không cắt"
+    r = (goc / "backend" / "app" / "api" / "v1" / "routes.py").read_text(encoding="utf-8")
+    ep = r[r.index("def dashboard_dem"):r.index('@router.get("/dashboard", tags')]
+    assert "[:" not in ep, "cửa đếm không được cắt bớt danh sách việc"

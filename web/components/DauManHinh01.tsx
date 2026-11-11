@@ -20,7 +20,7 @@ import { vnd } from "@/lib/api";
 
 /** Tên trang theo vai. Bản vẽ V1.2 vẽ cho Chủ tịch; anh Tuấn chốt 12/9 làm luôn bản TGĐ. */
 const TEN_TRANG: Record<string, string> = {
-  chutich: "Bảng điều hành Chủ tịch",
+  chutich: "Bàn làm việc Chủ tịch HĐQT",
   tgd: "Bảng điều hành Tổng giám đốc",
 };
 
@@ -222,53 +222,30 @@ export function TieuDe({ vai, ten_vai, quyet_dinh }: {
   const ten = TEN_TRANG[vai || ""] || `Bảng điều hành · ${ten_vai || ""}`;
   const cho = quyet_dinh || [];
   const homNay = useHomNay();
-  const [thang, setThang] = useState("");
-  // ĐỢT E12 — dòng nào đang xổ ra. `null` là không dòng nào; bấm lại chính nó thì đóng.
+  /* ══ VH-24 · 12/11/2026 — Chủ tịch duyệt bản xem trước, chốt «1.1.1» ═══════════════════════════════
+     "duyệt chi và công việc em đưa toàn bộ về [thanh ngang], hiện theo số khi có đề nghị mới; [đầu trang]
+      em chỉ giữ BÀN LÀM VIỆC CHỦ TỊCH HĐQT to rõ và hiệu ứng ánh sáng giống của giám đốc đội xe, các ghi
+      chú khác em bỏ hết"
+     Nên đầu trang chỉ còn TÊN BÀN (in hoa, chuyển màu, vệt sáng lướt — cùng kiểu `/xe`) và MỘT ô ngày.
+     Hàng nút việc chờ (TC-65), ô tháng, cửa sang quý/năm và nút in rời khỏi đây:
+       · việc chờ lên hai nút «Công việc» / «Chờ duyệt» trên thanh ngang (Shell, `GET /dashboard/dem`);
+       · in vẫn bằng Ctrl+P — kiểu in viết sẵn ở globals.css không đổi.
+     Bảng ký quyền (dòng mang `chi_tiet`) là dòng ĐỂ ĐỌC: nút «Chờ duyệt» dẫn về `/#ky-quyen`, và khối đọc
+     ấy mở ra ngay dưới tiêu đề khi địa chỉ mang neo đó. */
   const [xo, setXo] = useState<number | null>(null);
-  useEffect(() => setThang(tenThang()), []);
+  useEffect(() => {
+    const doc = () => {
+      const i = window.location.hash === "#ky-quyen" ? cho.findIndex((a) => a.chi_tiet) : -1;
+      setXo(i >= 0 ? i : null);
+    };
+    doc();
+    window.addEventListener("hashchange", doc);
+    return () => window.removeEventListener("hashchange", doc);
+  }, [cho]);
   return (<>
-    <div className="mh01-thanh">
-      {/* TC-65 · PHẠM VI XUỐNG CHỖ RÊ CHUỘT — anh Tuấn: "bỏ Vietourist công ty mẹ".
-          Câu trả lời KHÔNG mất, nó đi theo tên trang: rê chuột lên "Bảng điều hành Chủ tịch" là
-          đọc được màn hình này đang nói về công ty nào. TC-55 đặt ra luật "phạm vi là một câu trả
-          lời, không phải một ô chọn" — luật ấy còn nguyên, chỉ chỗ đứng đổi. KHÔNG dẫn sang Báo
-          cáo tài chính hợp nhất: màn hình ấy CHƯA DỰNG, và chỉ vào chỗ trống là kiểu sai khó chịu
-          nhất (bài học 13/9 ngay trong tệp này). */}
-      <span className="mh01-thanh-ten" title="Phạm vi: Vietourist — công ty mẹ">{ten}</span>
-      {/* NHÃN NẰM Ở CHỖ RÊ CHUỘT, KHÔNG NẰM TRÊN THANH. Ba chữ "Kỳ báo cáo · Phạm vi · Ngày báo
-          cáo" dài gần bằng chính ba giá trị chúng giới thiệu; bỏ đi thì thanh còn một hàng, mà ai
-          chưa quen vẫn tra được bằng cách rê chuột. */}
-      <b title="Kỳ báo cáo">{thang || "…"}</b>
-      {/* Quý và năm KHÔNG nằm trên màn hình này. Dẫn thẳng sang chỗ xem được, chứ không để một ô
-          chọn bấm vào lại báo "chưa có nguồn". */}
-      <Link className="the-cua" href="/phan-he/baocao">Quý và năm →</Link>
-      {/* Ngày báo cáo là mốc phân nhóm của mọi bảng theo hạn ở dưới – ghi ra để không ai phải đoán. */}
-      <b className="mh01-thanh-ngay" title="Ngày báo cáo">{homNay || "…"}</b>
-      <span className="mh01-thanh-day" />
-
-      {/* ═══ TC-65 · VIỆC CHỜ QUYẾT NẰM NGAY TRÊN THANH ══════════════════════════════════════
-          "gom lại thành 1 thanh ngang, bỏ chữ chờ chủ tịch quyết"      — anh Tuấn, 18/9/2026
-
-          Trước vòng này đây là một `.panel` riêng mang tiêu đề "Cần Chủ tịch quyết định" và một
-          thẻ nhãn "N hồ sơ đang chờ" — ba dòng chữ để giới thiệu một hàng nút. Chính mấy cái nút
-          đã nói đủ ("1 dự toán tour chờ duyệt"), nên chữ giới thiệu chúng là chữ thừa.
-
-          KHÔNG CÓ HỒ SƠ THÌ KHÔNG VẼ GÌ, và đây là chỗ phải nói rõ vì nó trông giống "rỗng khác
-          không" nhưng không phải: đây KHÔNG phải một con số bị bỏ trống, nó là một DANH SÁCH
-          VIỆC. Danh sách việc rỗng thì đúng nghĩa là không có việc — in thêm câu "không có hồ sơ
-          nào đang chờ" mỗi ngày chỉ dạy người ta thôi đọc chỗ này. */}
-      {cho.map((a, i) => (
-        a.chi_tiet
-          ? <button key={i} type="button" className="mh01-qd-nut" onClick={() => setXo(xo === i ? null : i)}>
-              {a.label} {xo === i ? "▴" : "▾"}
-            </button>
-          : <Link key={i} href={a.href} className="mh01-qd-nut">{a.label}</Link>
-      ))}
-      {/* TC-35 · Nút In là một THAO TÁC TRÊN KỲ ĐANG CHỌN — in đúng cái kỳ ghi bên trái — nên nó
-          đứng cùng thanh với kỳ; đứng riêng cạnh tiêu đề thì nó chỉ là một nút trôi nổi. */}
-      <button type="button" className="act grey mh01-in" onClick={() => window.print()}>
-        In / Lưu PDF
-      </button>
+    <div className="mh01-ban">
+      <h1 className="mh01-ban-ten" title="Phạm vi: Vietourist — công ty mẹ">{ten}</h1>
+      <div className="mh01-ban-ngay"><span>Hôm nay</span>{homNay || "…"}</div>
     </div>
 
     {/* ĐỢT E12 13/10/2026 — khối xổ ra của dòng đang mở. Nằm NGOÀI thanh ngang vì nó là một BẢNG,

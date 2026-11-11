@@ -702,6 +702,34 @@ function NutLich90() {
   </Link>;
 }
 
+/* VH-24 · 12/11/2026 (Chủ tịch duyệt bản xem trước, chốt 1.1.1) — hai nút «Công việc» và «Chờ duyệt» trên
+   thanh ngang thôi trỏ vào hai neo không có (neo «viec-cua-toi», «cho-toi-duyet» — bấm chỉ về trang chủ rồi
+   đứng im). Nay là nút xổ danh sách, có SỐ khi có việc. Nguồn: `GET /dashboard/dem` — cửa đếm nhẹ, cùng hàm
+   với bảng điều hành, máy chủ nhớ 60 giây; màn hình hỏi lại mỗi phút. Số đỏ trên «Chờ duyệt» CHỈ đếm việc phải
+   bấm; dòng «để xem» nằm cuối danh sách, không cộng vào số. */
+type DemViec = { cho_duyet: any[]; so_cho_duyet: number; de_xem: any[]; cong_viec: any[]; so_cong_viec: number };
+function NutViec({ dem, loai, mo, datMo, children }: { dem: DemViec | null; loai: "viec" | "duyet"; mo: boolean;
+                                             datMo: (v: boolean) => void; children: string }) {
+  const so = loai === "viec" ? dem?.so_cong_viec ?? 0 : dem?.so_cho_duyet ?? 0;
+  const ds = loai === "viec" ? dem?.cong_viec ?? [] : dem?.cho_duyet ?? [];
+  const xem = loai === "duyet" ? dem?.de_xem ?? [] : [];
+  const ten = children;
+  return <span className="nv-goc">
+    <button type="button" className="bar-muc" aria-expanded={mo} aria-haspopup="true"
+      onClick={(e) => { e.stopPropagation(); datMo(!mo); }} title={so ? `${so} ${loai === "viec" ? "việc" : "việc chờ anh/chị bấm"}` : ten}>
+      <Bt d={loai === "viec" ? "viec" : "duyet"} /><span>{ten}</span>{so > 0 && <b className="so-bao">{so}</b>}
+    </button>
+    {mo && <div className="nv-xo" role="menu" onClick={(e) => e.stopPropagation()}>
+      <div className="nv-dau">{loai === "viec" ? "Công việc của tôi" : "Chờ tôi duyệt"}{so > 0 ? ` · ${so}` : ""}</div>
+      {dem === null ? <div className="nv-trong">Đang đếm…</div>
+        : ds.length === 0 && xem.length === 0 ? <div className="nv-trong">Không có việc nào đang chờ.</div> : null}
+      {ds.map((d: any, i: number) => <Link key={i} href={d.href} className="nv-dong" onClick={() => datMo(false)}>{d.label}</Link>)}
+      {xem.length > 0 && <div className="nv-nhom">Để xem, không phải để bấm</div>}
+      {xem.map((d: any, i: number) => <Link key={`x${i}`} href={d.href} className="nv-dong nv-doc" onClick={() => datMo(false)}>{d.label}</Link>)}
+    </div>}
+  </span>;
+}
+
 // Trạng thái THU/BUNG của thanh dọc, nhớ theo từng người dùng. Khoá "vtos_menu_mo" (nhóm nào đang
 // ghim mở) đã bỏ cùng lối ghim mở, khi bấm thanh phân hệ chuyển thành đi tới trang phân hệ (13/9).
 const KHOA_THU = "vtos_menu_thu";
@@ -720,6 +748,9 @@ export default function Shell({ children, khongThanhBen = false }:
   const [menuToi, setMenuToi] = useState(false);       // menu cá nhân trên thanh ngang
   const [thu, setThu] = useState(false);               // thanh dọc thu còn một cột biểu tượng
   const [alerts, setAlerts] = useState(0);
+  // VH-24: số việc của hai nút «Công việc» / «Chờ duyệt»; nút nào đang xổ danh sách.
+  const [dem, setDem] = useState<DemViec | null>(null);
+  const [xoViec, setXoViec] = useState<"" | "viec" | "duyet">("");
   const path = usePathname();
   const router = useRouter();
 
@@ -745,6 +776,22 @@ export default function Shell({ children, khongThanhBen = false }:
     }).catch(() => {});
     fetch("/api/v1/alerts", { headers: h }).then((r) => r.ok ? r.json() : null).then((a) => { if (Array.isArray(a)) setAlerts(a.length); else if (a?.rows) setAlerts(a.tong ?? a.rows.length); }).catch(() => {});
   }, [router, path]);
+
+  // VH-24: đếm lại mỗi phút và mỗi lần đổi trang — có đề nghị mới thì số trên nút đổi theo.
+  useEffect(() => {
+    if (!user) return;
+    let dung = false;
+    const doc = () => api<DemViec>("/dashboard/dem").then((d) => { if (!dung) setDem(d); }).catch(() => {});
+    doc();
+    const id = setInterval(doc, 60_000);
+    return () => { dung = true; clearInterval(id); };
+  }, [user, path]);
+  useEffect(() => {
+    if (!xoViec) return;
+    const dong = () => setXoViec("");
+    document.addEventListener("click", dong);
+    return () => document.removeEventListener("click", dong);
+  }, [xoViec]);
 
   const toast = useCallback((msg: string, err?: boolean) => { setT({ msg, err }); setTimeout(() => setT(null), err ? 6500 : 4000); }, []);
 
@@ -859,8 +906,8 @@ export default function Shell({ children, khongThanhBen = false }:
               đạo và trưởng phòng, ở MỌI bàn làm việc của họ. GĐ đội xe không có nút này: /xe đã có nút
               vàng lớn, hai nút một màn là lặp (Chủ tịch dặn 10/11). Số trên nút = ngày-xe trống 30 ngày. */}
           {user && VAI_NUT_LICH_90.includes(user.role) && <NutLich90 />}
-          <Link href="/#viec-cua-toi" className="bar-muc"><Bt d="viec" /><span>Công việc</span></Link>
-          <Link href="/#cho-toi-duyet" className="bar-muc"><Bt d="duyet" /><span>Chờ duyệt</span></Link>
+          <NutViec dem={dem} loai="viec" mo={xoViec === "viec"} datMo={(v) => setXoViec(v ? "viec" : "")}>Công việc</NutViec>
+          <NutViec dem={dem} loai="duyet" mo={xoViec === "duyet"} datMo={(v) => setXoViec(v ? "duyet" : "")}>Chờ duyệt</NutViec>
           {/* THỨ TỰ theo bản vẽ 12/9: … Công việc · Chờ duyệt · Trợ lý AI · chuông · Tài khoản.
               Chuông đứng sát ô tài khoản vì hai thứ ấy đều là của riêng người đang đăng nhập. */}
           <button type="button" className="bar-muc ai soon" title="Sắp có" onClick={() => toast("Trợ lý AI: đang xây dựng")}>

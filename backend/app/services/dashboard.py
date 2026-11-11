@@ -121,19 +121,13 @@ def _so_du_no_vay_phai_thu(db: Session, p: str) -> dict:
     return k
 
 
-def build(db: Session, u: User) -> dict:
-    """Số liệu dashboard theo vai trò – chỉ đọc, tính từ dữ liệu hiện có."""
-    today = date.today(); p = f"{today:%Y-%m}"
+def viec_cho_duyet(db: Session, u: User) -> list[dict]:
+    """Việc chờ duyệt của MỘT người, mọi phân hệ — dùng chung cho bảng điều hành và nút «Chờ duyệt» trên
+    thanh ngang (VH-24, Chủ tịch duyệt 12/11/2026). Tách ra từ `build` nguyên văn: hai chỗ đọc một danh sách
+    thì phải là MỘT hàm, không chép."""
+    today = date.today(); p = f"{today:%Y-%m}"  # noqa: F841 — các khối dưới dùng `today`
     role = u.role
-    out: dict = {"role": role, "as_of": datetime.now(), "approvals": [], "kpis": {}, "sections": {}}
-    # KS-NHANH bước 2 (07/11/2026): đo từng khối để tìm khối ăn 38 giây trên crm thật. Chỉ ghi số
-    # mili-giây vào `do_ms`, không đổi phép tính nào.
-    import time as _t
-    _m = {"_": _t.time()}; _do = out["do_ms"] = {}
-    def _cham(ten):
-        now = _t.time(); _do[ten] = int((now - _m["_"]) * 1000); _m["_"] = now
-    # --- việc chờ duyệt của tôi (mọi phân hệ) ---
-    ap = out["approvals"]
+    ap: list[dict] = []
     if role in ("chutich", "tgd"):
         n = db.execute(select(func.count()).select_from(Param).where(Param.status == "pending")).scalar()
         if n: ap.append({"label": f"{n} tham số chính sách chờ ký", "href": "/params"})
@@ -270,6 +264,27 @@ def build(db: Session, u: User) -> dict:
         n = db.execute(select(func.count()).select_from(ServiceRequest).where(ServiceRequest.booking_id == None)).scalar()
         if n: ap.append({"label": f"{n} yêu cầu chờ tạo booking (≤ 2 giờ)", "href": "/requests"})
 
+    # VH-24: tờ quyết toán chuyến xe chờ Chủ tịch duyệt (Đội xe v3.3) — trước đây không nằm ở đâu trên bàn.
+    if role == "chutich":
+        from app.models.fleet import Trip as _Trip
+        n = db.execute(select(func.count()).select_from(_Trip).where(_Trip.qt_trang_thai == "cho_tgd")).scalar()
+        if n: ap.append({"label": f"{n} tờ quyết toán chuyến xe chờ CHỦ TỊCH duyệt", "href": "/xe"})
+    return ap
+
+
+def build(db: Session, u: User) -> dict:
+    """Số liệu dashboard theo vai trò – chỉ đọc, tính từ dữ liệu hiện có."""
+    today = date.today(); p = f"{today:%Y-%m}"
+    role = u.role
+    out: dict = {"role": role, "as_of": datetime.now(), "approvals": [], "kpis": {}, "sections": {}}
+    # KS-NHANH bước 2 (07/11/2026): đo từng khối để tìm khối ăn 38 giây trên crm thật. Chỉ ghi số
+    # mili-giây vào `do_ms`, không đổi phép tính nào.
+    import time as _t
+    _m = {"_": _t.time()}; _do = out["do_ms"] = {}
+    def _cham(ten):
+        now = _t.time(); _do[ten] = int((now - _m["_"]) * 1000); _m["_"] = now
+    # --- việc chờ duyệt của tôi (mọi phân hệ) ---
+    out["approvals"] = viec_cho_duyet(db, u)
     _cham("viec_cho_duyet")
     # --- KPI theo cấp ---
     k = out["kpis"]

@@ -177,62 +177,34 @@ def test_hai_khoi_rieng_da_go_khong_quay_lai():
 # ───────────────────────── 2 · ĐẦU TRANG THEO BẢN VẼ ─────────────────────────
 
 def test_dau_trang_la_mot_thanh_ngang_khong_con_duong_dan_va_dong_phu():
-    """LUẬT BỊ ĐẢO CHIỀU — ghi cả hai mặt để vòng sau biết đây là một quyết định, không phải sót.
-
-    MẶT CŨ (TC-31, 15/9/2026): bản vẽ V1.4 mở đầu bằng đường dẫn "VTOS / Không gian lãnh đạo / …"
-    và một dòng phụ "Kết quả · Phải thu · Phải trả · Dòng tiền · Quyết định". Cả hai là định hướng
-    cho người mở trang lần đầu, và phép thử này canh chúng còn đủ.
-
-    MẶT MỚI (TC-62, 18/9/2026): anh Tuấn chốt "gộp thành 1 thanh ngang, bỏ bớt chú thích không
-    quan trọng". Đo lại trên bản chạy thật thì ba tầng chữ ấy cao gần bằng một khối số, mà không
-    tầng nào mang một con số nào — và cả hai đều nói lại thứ đã có ngay bên dưới: chặng cuối của
-    đường dẫn chính là tên trang ở dòng kế tiếp, còn dòng phụ liệt kê đúng các khối mà cuộn xuống
-    là thấy.
-
-    Phép thử canh chiều NGƯỢC LẠI, vì không canh gì cả thì một vòng sau người ta dựng lại đường dẫn
-    "cho giống bản vẽ" mà không biết nó đã bị bỏ có lý do.
-    """
+    """Đường dẫn và dòng phụ bị bỏ có lý do (TC-62) — không dựng lại. VH-24 (Chủ tịch 12/11/2026, chốt «1.1.1»): đầu trang chủ chỉ còn TÊN BÀN + ô ngày; việc chờ lên hai nút
+    «Công việc» / «Chờ duyệt» trên thanh ngang (Shell + `GET /dashboard/dem`); bỏ «Quý và năm →» và nút In
+    (in bằng Ctrl+P, kiểu in giữ nguyên). Luật cũ còn sống được canh lại ở `test_vh24_ban_chu_tich.py`."""
     ma = _bo_chu_thich_tsx(_doc(DAU))
     assert "mh01-duong" not in ma, "Đường dẫn (breadcrumb) sống lại ở đầu trang."
     assert "Kết quả · Phải thu · Phải trả · Dòng tiền · Quyết định" not in ma, "Dòng phụ sống lại."
-    assert "mh01-thanh" in ma, "Đầu trang phải là MỘT thanh ngang `.mh01-thanh`."
+    assert "mh01-ban-ten" in ma, "Đầu trang phải là tên bàn `.mh01-ban-ten` (VH-24)."
     css = _bo_chu_thich_css(_doc(CSS))
-    assert ".mh01-thanh{" in css, "Thiếu kiểu `.mh01-thanh`."
+    assert ".mh01-ban{" in css and ".mh01-ban-ten{" in css, "Thiếu kiểu đầu trang VH-24."
     for lop in (".mh01-duong", ".mh01-trang", ".mh01-phu"):
-        assert lop not in css, (
-            f"Kiểu {lop} còn trong globals.css nhưng không ai dùng — lớp mồ côi là cách vòng sau "
-            f"dựng lại bố cục cũ mà không đọc lý do (bài học TC-60)."
-        )
+        assert lop not in css, f"Kiểu {lop} còn trong globals.css nhưng không ai dùng."
 
 
 def test_dau_trang_khong_dung_lai_ten_lop_cua_dau_khoi():
-    """ĐẦU TRANG và ĐẦU KHỐI là hai việc khác nhau, phải mang hai tên lớp khác nhau.
-
-    .mh01-dau đã có từ trước và là đầu KHỐI: một h2 kèm một thẻ nhãn, dùng ở cả sáu khối V14, khối
-    Tồn đọng và khối Cần quyết định. Nếu đầu trang đặt lại đúng tên ấy thì quy tắc viết sau đè quy
-    tắc viết trước — cùng một mức ưu tiên, khác nhau ở thứ tự — và mọi đầu khối trên màn hình nhận
-    justify-content:space-between, thẻ nhãn văng sang mép phải panel.
-
-    Đây là lỗi đã xảy ra thật khi dựng TC-31: dựng thử bằng trình duyệt chỉ soi đầu trang nên không
-    thấy, vì chỗ hỏng nằm ở tám chỗ KHÁC. Phép thử này canh ngay trong mã nguồn.
-    """
+    """ĐẦU TRANG và ĐẦU KHỐI phải mang hai tên lớp khác nhau — `.mh01-dau` là của đầu KHỐI (lỗi thật TC-31).
+    VH-24 (Chủ tịch 12/11/2026, chốt «1.1.1»): đầu trang chủ chỉ còn TÊN BÀN + ô ngày; việc chờ lên hai nút
+    «Công việc» / «Chờ duyệt» trên thanh ngang (Shell + `GET /dashboard/dem`); bỏ «Quý và năm →» và nút In
+    (in bằng Ctrl+P, kiểu in giữ nguyên). Luật cũ còn sống được canh lại ở `test_vh24_ban_chu_tich.py`."""
     dau = _bo_chu_thich_tsx(_doc(DAU))
     khoi_dau_trang = dau[dau.index("export function TieuDe"):]
     khoi_dau_trang = khoi_dau_trang[:khoi_dau_trang.index("export function", 1)]
-    # SỬA 18/9/2026 (TC-62): tên lớp riêng của đầu trang đổi từ `.mh01-trang` sang `.mh01-thanh`
-    # khi ba tầng gộp thành một thanh ngang. LUẬT thì không đổi một chữ — vẫn là "đầu TRANG phải
-    # mang tên riêng, không được mượn `.mh01-dau` của đầu KHỐI" — và lý do dưới đây vẫn nguyên.
-    assert "mh01-dau" not in khoi_dau_trang, (
+    assert 'className="mh01-dau"' not in khoi_dau_trang and "mh01-dau-" not in khoi_dau_trang, (
         "Đầu trang đang dùng lại lớp .mh01-dau của đầu khối — đè kiểu lên mọi đầu khối khác."
     )
-    assert "mh01-thanh" in khoi_dau_trang, "Đầu trang phải mang lớp riêng .mh01-thanh."
-
-    # Và trong CSS, .mh01-dau chỉ được khai MỘT LẦN (không kể quy tắc con "…-dau h2").
+    assert "mh01-ban" in khoi_dau_trang, "Đầu trang phải mang lớp riêng .mh01-ban."
     css = _bo_chu_thich_css(_doc(CSS))
     lan = len(re.findall(r"(?m)^\.mh01-dau\s*\{", css))
-    assert lan == 1, (
-        f".mh01-dau được khai {lan} lần trong globals.css — hai lần là một lần đè lần kia."
-    )
+    assert lan == 1, f".mh01-dau được khai {lan} lần trong globals.css — hai lần là một lần đè lần kia."
 
 
 def test_duong_dan_khong_mang_ten_cua_ban_ve():
@@ -249,9 +221,13 @@ def test_duong_dan_khong_mang_ten_cua_ban_ve():
 # ───────────────────────── 3 · NÚT IN / LƯU PDF LÀ VIỆC THẬT ─────────────────────────
 
 def test_co_nut_in_va_no_in_that():
+    """VH-24 (Chủ tịch 12/11/2026, chốt «1.1.1»): đầu trang chủ chỉ còn TÊN BÀN + ô ngày; việc chờ lên hai nút
+    «Công việc» / «Chờ duyệt» trên thanh ngang (Shell + `GET /dashboard/dem`); bỏ «Quý và năm →» và nút In
+    (in bằng Ctrl+P, kiểu in giữ nguyên). Luật cũ còn sống được canh lại ở `test_vh24_ban_chu_tich.py`.
+    Nút In bỏ khỏi đầu trang; kiểu in (@media print) phải còn để Ctrl+P ra đúng bản."""
     ma = _bo_chu_thich_tsx(_doc(DAU))
-    assert "In / Lưu PDF" in ma, "Thiếu nút In / Lưu PDF của bản vẽ."
-    assert "window.print()" in ma, "Nút In chưa nối gì — một nút hứa rồi không làm còn tệ hơn không có nút."
+    assert "In / Lưu PDF" not in ma, "Nút In sống lại trên đầu trang (VH-24 đã bỏ, Chủ tịch chốt 12/11/2026)."
+    assert "@media print" in _doc(CSS), "Kiểu in mất — Ctrl+P sẽ in cả thanh dọc và thanh ngang."
 
 
 def test_co_kieu_in_va_giay_khong_in_nen_toi():
