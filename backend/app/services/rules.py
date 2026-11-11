@@ -627,6 +627,45 @@ DEFAULT_PARAMS += _tk_tham_so()
 # nên cửa nhập ngày im lặng không bao giờ chạy: mã trông đủ, hàng rào thì không có.
 THAM_SO_NGAY = ("ngay_van_hanh_that", "ngay_du_lieu_that_vietrip", "bao_cao_ngay_han_0h_tu", "d06_hieu_luc_tu", "rewards_hieu_luc_tu", "rewards_v3_tu", "d06_v3_tu")
 
+# Tham số mang giá trị CHỮ. CÙNG MỘT LOẠI HỎNG VỚI KHỐI NGÀY NGAY TRÊN, chỉ khác là chín
+# tháng không ai thử nên không ai biết: `propose_param` kiểm bằng float(), nên một danh sách
+# từ hay một mẫu tin nhắn bị trả về "Giá trị phải là số" và KHÔNG CÓ ĐƯỜNG NÀO nhập được.
+#
+# ĐO ĐƯỢC 11/11/2026 BẰNG MỘT LẦN BẤM THẬT. Chủ tịch bấm Trình trên màn Tham số để ký lại
+# `pr_tu_do` của đợt MKT-9, và cửa chặn lại đúng câu ấy. Đếm trên bảng: 12 trên 152 tham số
+# mang chữ, và chưa một tham số nào trong số đó từng đổi được kể từ ngày mở màn hình — gồm
+# danh sách từ đỏ, kênh báo động khủng hoảng, vai người phát ngôn, bảng hệ số thang F, hai
+# mẫu tin nhắn gửi khách và hai đường dẫn đánh giá.
+#
+# Chú thích của chính `pr_tu_do` hứa "sửa được ở màn hình này, không phải bằng một bản nâng
+# cấp". Lời hứa ấy cho tới hôm nay chưa đúng.
+#
+# KHAI TÊN chứ không đoán theo giá trị đang có. Đoán thì một con số gõ nhầm thành chữ cũng
+# lọt qua cửa, và cái lọt ấy không ai thấy. Phép thử `test_mkt10_cua_tham_so_chu` TỰ ĐẾM lại
+# từ chính bảng tham số, nên quên khai một tham số chữ mới là không gộp được.
+THAM_SO_CHU = ("pr_vai_phat_ngon", "pr_tu_do", "pr_cum_bo_qua", "pr_kenh_bao_dong",
+               "thuong_hieu_vai_ky", "nd_vai_tro_ky_2", "thang_f_bang", "xe_sua_chua_ben_chiu",
+               "khao_sat_mau_tin", "khao_sat_mau_nhac", "khao_sat_link_goc",
+               "link_danh_gia_google")
+
+# ĐÃ ĐO ĐƯỢC LÀ CHƯA CÓ CỬA, VÀ CỐ Ý ĐỂ LẠI — xem sổ đợt MKT-10.
+#
+# HAI THAM SỐ HÌNH DẠNG NGÀY mà không nằm trong `THAM_SO_NGAY`: chúng là mốc vận hành của
+# Tài chính và Đội xe. Khai thêm vào danh sách ngày là đổi cách đọc mốc của hai phòng khác
+# trong một đợt của Marketing, nên để làn giữ phần ấy quyết.
+#
+# NĂM THAM SỐ GIÁ TRỊ TRỐNG: một ô trống không nói được nó là số hay chữ, nên máy không phân
+# loại hộ được — khác hẳn một ô có giá trị, nơi nhìn giá trị là biết. Và một trong số ấy,
+# `cong_qr_tai_khoan`, định tuyến tiền khách trả: nó phải được mở bằng một quyết định có tên
+# chứ không bằng một dòng kèm theo của đợt khác.
+#
+# Ba ô trống CÒN LẠI của bảng — nguong_chu_tich_duyet_chi, bhxh_cty, ty_le_tip_cong_ty — cố ý
+# KHÔNG nằm ở đây: đơn vị của chúng là đồng và tỷ lệ, tức là số, nên cửa số hiện tại đúng cho
+# chúng. Chúng trống vì CHƯA AI KÝ con số, không phải vì thiếu cửa.
+THAM_SO_CHUA_CO_CUA = ("xe_ky_quyet_toan_ap_dung_tu", "tach_ty_gia_tu_ngay",
+                       "cong_qr_tai_khoan", "xe_sheet_csv_url", "chu_ho_so_doan",
+                       "tncn_luy_tien_tu_ky", "gtgt_ky_ke_khai")
+
 
 
 # Bộ nhớ đệm tham số. get_param bị gọi hàng nghìn lần trong một lần dựng bảng điều khiển –
