@@ -149,7 +149,11 @@ function Marketing() {
   // ở phía sổ, không nằm ở đây.
   const doiSoatDuoc = ["nv_kd", "tn_kd", "tp_kd", "gd_kd", "nv_mkt", "ptgd_mkt", "cntt", "tgd", "tp_dh"].includes(role);
 
-  const [tab, setTab] = useState("chiendich");
+  // MKT-6 · 11/11/2026 — Đ1: MỞ MÀN VÀO TỔNG QUAN. Mặc định cũ là danh sách chiến
+  // dịch, tức là người mở màn gặp ngay một bảng thay vì gặp tình hình của phòng.
+  // `hienTab` vẫn đưa về "chiendich" khi một nhóm bị khoá — Tổng quan luôn mở được
+  // nên nhánh ấy không bao giờ chạm vào dòng này.
+  const [tab, setTab] = useState("tongquan");
   const [sub, setSub] = useState("chiendich");          // trong tab "chiendich": chiendich | ngansach
 
   // ── chiến dịch & ngân sách (giữ nguyên từ bản trước, không sửa logic) ──
@@ -238,6 +242,27 @@ function Marketing() {
       setTab("muc-luc");
     load();
   }, [load]);
+
+  /** MKT-6 · 11/11/2026 — Đ2: GHI NHÓM ĐANG MỞ VÀO ĐƯỜNG DẪN.
+   *
+   *  Màn này ĐỌC `?tab=` lúc tải từ lâu nhưng chưa bao giờ GHI lại, nên gửi đường dẫn
+   *  cho nhau hay bấm tải lại là rơi về nhóm mặc định — người nhận không mở đúng chỗ
+   *  người gửi đang đứng, mà cả hai đều không biết.
+   *
+   *  `replaceState` CHỨ KHÔNG `pushState`: đẩy vào lịch sử thì nút Lùi của trình duyệt
+   *  phải bấm tám lần mới ra khỏi màn, và người dùng đọc đó là màn hình bị kẹt.
+   *
+   *  GHI "ngansach" KHI ĐANG Ở NGĂN ẤY, giữ đúng phép ánh xạ hai chiều mà đoạn đọc ở
+   *  trên đã có: `?tab=ngansach` mở tab Chiến dịch với ngăn Ngân sách. Ghi trống một
+   *  bên thì đường dẫn copy ra lại mở về ngăn Chiến dịch.
+   */
+  useEffect(() => {
+    const ghi = (tab === "chiendich" && sub === "ngansach") ? "ngansach" : tab;
+    const u = new URL(window.location.href);
+    if (u.searchParams.get("tab") === ghi) return;
+    u.searchParams.set("tab", ghi);
+    window.history.replaceState(null, "", u.toString());
+  }, [tab, sub]);
 
   // Báo cáo chuyển đổi nuôi CẢ tab Tổng quan lẫn tab Chuyển đổi, nên nạp ngay từ đầu.
   useEffect(() => { api(`/leads/conversion?month=${repThang}`).then(setRep).catch(() => {}); }, [repThang]);
@@ -390,22 +415,37 @@ function Marketing() {
 
         LỐI RA PHẢI CÓ: ẩn thanh dọc là lấy mất đường sang phân hệ khác, nên «Trang tổng CRM»
         đứng cuối hàng. Thiếu nó thì màn này thành một ngõ cụt đẹp. */}
-    <nav aria-label="Màn hình phòng Marketing"
-         style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center",
-                  marginBottom: 14, paddingBottom: 8, borderBottom: "1px solid #e6eaf0" }}>
+    {/* MKT-6 · 11/11/2026 — Đ4: HÀNG NÀY TỰ ẨN KHI ĐANG Ở MỤC LỤC.
+        Chủ tịch dặn 10/11/2026: «các nút chức năng không được lặp lại trên cùng một màn
+        hình — mỗi nút một chỗ». Mục lục liệt kê đúng mười hai mục này rồi, nên để thêm
+        hàng liên kết lên trên nó là hai bảng nút cho cùng một việc. Làn R2 đã áp đúng
+        luật ấy ở đợt PH-2 cùng ngày cho các trang phòng khác; màn này chưa được hưởng
+        vì ở đây mục lục là một NHÓM chứ không phải một trang riêng. */}
+    {tab !== "muc-luc" && <nav aria-label="Màn hình phòng Marketing" className="mkt-man">
       {MUC_PHONG.map(([ten, duong]) => (
-        <Link key={duong + ten} href={duong} className="act grey" style={{ margin: 0 }}>{ten}</Link>
+        <Link key={duong + ten} href={duong}>{ten}</Link>
       ))}
-      <Link href="/" style={{ marginLeft: "auto" }}>Trang tổng CRM →</Link>
-    </nav>
+    </nav>}
+
+    {/* LỐI RA TÁCH RA VÀ LUÔN HIỆN. Chú thích ngay trên đã cảnh báo: ẩn thanh dọc là lấy
+        mất đường sang phân hệ khác, thiếu nó thì màn này thành một ngõ cụt đẹp. Mục lục
+        chỉ liệt kê màn của CHÍNH phòng này, nó không thay được lối ra. */}
+    <nav aria-label="Lối ra" className="mkt-ra"><Link href="/">Trang tổng CRM →</Link></nav>
 
     <h1>Marketing &amp; PR</h1>
 
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+    {/* MKT-6 · 11/11/2026 — HÀNG CHỨC NĂNG, khuôn `.xe-nhom` của màn điều hành đội xe.
+        Hôm nay tám nhóm là tám nút `.act` cùng cỡ chữ với mọi nút khác trên màn, nên
+        không nút nào đọc ra là «chỗ đổi nội dung». Ở `/xe` hàng ấy là năm nút navy đặc
+        và nó đọc ra ngay từ xa. `aria-pressed` thay cho lớp `grey`: nó vừa nói cho
+        trình đọc màn hình biết nút nào đang bật, vừa là chỗ CSS bám vào để tô navy đậm.
+        LỌC THEO QUYỀN GIỮ NGUYÊN `hienTab`: ba nhóm đọc sổ lead tự ẩn với vai không mở
+        được sổ, như từ trước. */}
+    <nav className="mkt-chuc" aria-label="Chức năng của phòng Marketing">
       {TABS.filter(([k]) => hienTab(k)).map(([k, l]) =>
-        <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }}
+        <button key={k} type="button" aria-pressed={tab === k}
           onClick={() => setTab(k)}>{l}</button>)}
-    </div>
+    </nav>
     <p className="muted">{TABS.find(([k]) => k === tab)?.[2]}</p>
 
     {/* ═══════════════ 8 · MỤC LỤC CHỨC NĂNG ═══════════════
@@ -465,9 +505,9 @@ function Marketing() {
       </div>
 
       {(rep?.canh_bao || []).map((c: string, i: number) =>
-        <div className="panel" key={i} style={{ borderColor: "var(--vtos-warning)" }}><b>⚠ {c}</b></div>)}
+        <div className="panel mkt-canh" key={i}><b>⚠ {c}</b></div>)}
 
-      <div className="panel">
+      <div className="panel mkt-thieu">
         <h2>Việc còn thiếu của phòng</h2>
         {/* Danh sách này ĐỌC TỪ SỐ THẬT, không phải một bảng kê viết cứng. Không có việc nào thì nói
             là không có, chứ không ẩn đi cho đẹp. */}
@@ -477,7 +517,12 @@ function Marketing() {
           {!!lechLon && <li><b>{lechLon} dòng kênh × tháng lệch giữa khai báo và số đếm được</b> — tệp nguồn có thể chỉ có phần chi tiết của vài kênh.</li>}
           {!nsKy && <li><b>Chưa lập ngân sách kỳ</b> — không có dự toán thì không có chỗ để so phần đã chi.</li>}
           {!!ndChoDuyet && <li><b>{ndChoDuyet} nội dung đang chờ duyệt</b>.</li>}
-          <li><b>Thương hiệu &amp; PR chưa có sổ</b> — xem tab cuối, chưa có bảng dữ liệu nào để mở màn hình thật.</li>
+          {/* MKT-6 · 11/11/2026 — Đ5: ĐÃ XOÁ dòng «Thương hiệu & PR chưa có sổ».
+              Sai: sổ PR đã chạy — màn «Báo chí, KOL & sự kiện» có hàng đợi tin nghi ngờ
+              và sổ hoạt động PR kèm đồng hồ hai giờ.
+              Và nó là dòng DUY NHẤT viết cứng không điều kiện, nên cũng là dòng duy nhất
+              phạm đúng câu chú thích đứng ngay trên danh sách này. Không thay bằng một
+              dòng viết cứng khác: muốn có một dòng về PR thì phải đọc từ sổ PR trước. */}
         </ul>
       </div>
     </>}
@@ -1004,4 +1049,65 @@ function Marketing() {
 // MKT-3 · 09/11/2026 — `khongThanhBen`: Chủ tịch chốt «bỏ màn hình dọc giống bên đội xe».
 // Màn `/xe` đã làm đúng thế từ 08/11, và lý do giống nhau: đây là trang RIÊNG của một phòng,
 // không phải một chỗ đứng để nhìn sang phòng khác. Thanh chức năng ngang ở trên thay chỗ nó.
-export default function Page() { return <Shell khongThanhBen><Marketing /></Shell>; }
+/* MKT-6 · 11/11/2026 — BẢNG MÀU CỦA RIÊNG MÀN NÀY, chỉ sống khi `/marketing` đang mở.
+   Đúng nếp màn `/xe` đã đặt ra: không thêm một lớp nào vào `globals.css` hay `Shell.tsx`,
+   vì nhiều làn cùng giữ hai tệp ấy. Mã màu lấy NGUYÊN từ khối `:root` của chính màn `/xe`
+   trong `globals.css` — không thêm một mã màu mới nào vào hệ thống. */
+const MAU = <style>{`
+body,.shell{background:#eaf0f7!important}
+:root{--mkt-b1:0 1px 2px #12305414,0 4px 12px #1230541a;
+  --mkt-nhan:#2c5fa2;--mkt-dam:#183c69;--mkt-vien:#e1e7ef}
+main .panel{background:#fff;border:0!important;border-radius:16px!important;
+  box-shadow:var(--mkt-b1)!important}
+main h1{color:var(--mkt-dam)}
+
+/* HÀNG CHỨC NĂNG — khuôn .xe-nhom. Điểm nhấn của màn nằm Ở NÚT, không ở gạch chân: tám nhóm
+   là tám nút navy đặc, nút đang mở navy đậm có vòng sáng. Dính trên cùng như /xe, để cuộn
+   xuống giữa một bảng dài vẫn đổi nhóm được mà không phải cuộn ngược lên. */
+.mkt-chuc{position:sticky;top:0;z-index:5;background:#eaf0f7;padding:6px 0 4px;margin-bottom:10px;
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.mkt-chuc button{display:inline-flex;align-items:center;justify-content:center;gap:8px;margin:0;
+  font:inherit;font-size:13.5px;font-weight:600;color:#fff;background:var(--mkt-nhan);border:0;
+  border-radius:10px;min-height:46px;padding:8px 12px;cursor:pointer;line-height:1.2;
+  text-align:center;box-shadow:0 2px 6px #2c5fa230;transition:background .15s,box-shadow .15s}
+.mkt-chuc button:hover{background:#3a6fb5}
+.mkt-chuc button[aria-pressed=true]{background:var(--mkt-dam);box-shadow:0 0 0 3px #9fc0ec}
+.mkt-chuc button:focus-visible{outline:3px solid #719ee1;outline-offset:2px}
+@media(max-width:980px){.mkt-chuc{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Mười hai màn riêng của phòng: nhạt hơn hàng chức năng một bậc — chúng dẫn ĐI KHỎI màn này,
+   còn hàng chức năng đổi nội dung ngay tại chỗ. Hai việc khác nhau thì không cùng một sức nặng. */
+.mkt-man{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.mkt-man a{font-size:13.5px;border:1px solid var(--mkt-vien);background:#fff;color:#1b2d44;
+  border-radius:8px;padding:6px 12px;text-decoration:none;margin:0}
+.mkt-man a:hover{background:var(--mkt-nhan);border-color:var(--mkt-nhan);color:#fff}
+.mkt-ra{display:flex;margin:0 0 10px}
+.mkt-ra a{margin-left:auto;color:var(--mkt-nhan);font-weight:600;font-size:13.5px}
+
+/* BẢY THẺ — giữ nguyên bộ khung .the-ct của bản vẽ, chỉ đổi nền và bóng cho khớp /xe. */
+.mh01-the .the-ct{background:#fff;border:0;border-radius:14px;box-shadow:var(--mkt-b1);
+  padding:14px 16px 12px}
+.mh01-the .the-ct.rong{background:transparent;box-shadow:none;border:1px dashed var(--mkt-vien)}
+.mh01-the .the-so{color:var(--mkt-nhan)}
+.mh01-the .the-cua{color:var(--mkt-nhan);border-bottom-color:var(--mkt-nhan)}
+
+/* CẢNH BÁO CỦA MÁY CHỦ — khuôn băng vàng .xe-n90. Cùng một dữ liệu rep.canh_bao, chỉ nổi
+   hơn: hôm nay nó là một khung viền vàng nằm lẫn giữa các khung trắng khác. */
+main .panel.mkt-canh{background:linear-gradient(135deg,#ffd76a 0%,#ffb627 55%,#ff9a1f 100%)!important;
+  box-shadow:0 0 0 3px #ffe7a8,0 6px 22px #ff9f1f55!important;color:#3b2300;
+  border-radius:14px!important;padding:13px 18px}
+main .panel.mkt-canh b{font-size:15px}
+
+/* VIỆC CÒN THIẾU — đánh số bằng CSS, không đụng một dòng JSX nào của danh sách. Thứ tự ở đây
+   là thứ tự thật của danh sách, không phải một bảng xếp hạng: dữ liệu KHÔNG có trường mức độ,
+   nên không tô đỏ tô cam dòng nào. Bịa ra một mức là nói với người đọc một điều mình không biết. */
+.mkt-thieu ul{list-style:none;padding:0;margin:0;counter-reset:mktv}
+.mkt-thieu li{counter-increment:mktv;display:block;position:relative;background:#fff;
+  border:1px solid var(--mkt-vien);border-radius:12px;margin:0 0 9px;padding:11px 14px 11px 78px}
+.mkt-thieu li::before{content:"VIỆC " counter(mktv,decimal-leading-zero);position:absolute;
+  left:14px;top:12px;font-family:var(--vtos-font-mono);font-size:11px;letter-spacing:.09em;
+  color:#6b7d92;font-weight:700}
+@media(max-width:560px){.mkt-thieu li{padding:30px 14px 11px 14px}}
+`}</style>;
+
+export default function Page() { return <Shell khongThanhBen>{MAU}<Marketing /></Shell>; }
