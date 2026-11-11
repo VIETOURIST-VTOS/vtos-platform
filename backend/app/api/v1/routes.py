@@ -955,6 +955,32 @@ def propose_param(data: S.ParamPropose, u: User = Depends(require_roles("tp_dh",
         from app.services import moi_truong_du_lieu as _MT
         if _MT.doc_ngay(str(data.value)) is None:
             raise Gate("THAM_SO", f"Giá trị phải là ngày dạng {_MT.DINH_DANG_NGAY}, ví dụ {_MT._VI_DU_NGAY}")
+    # MKT-10 · 11/11/2026 — THAM SỐ MANG CHỮ ĐI QUA CỬA RIÊNG. Cùng một loại hỏng với khối
+    # ngày ngay trên, và đo được y hệt cách ấy: Chủ tịch bấm Trình để ký lại `pr_tu_do` của
+    # đợt MKT-9 thì cửa trả về "Giá trị phải là số". Đếm ra 12 trên 152 tham số mang chữ, và
+    # chưa một cái nào từng đổi được kể từ ngày mở màn hình — trong đó có danh sách từ đỏ và
+    # hai mẫu tin nhắn gửi khách.
+    #
+    # KIỂM THẬT CHỨ KHÔNG BỎ KIỂM, cùng lẽ với khối ngày: rỗng thì không phải một giá trị đã
+    # ký, dài quá thì không phải thứ ai đó gõ có chủ ý, và xuống dòng thì cắt đôi mọi danh
+    # sách ngăn bằng dấu phẩy mà nơi đọc không hề biết.
+    elif data.key in getattr(R, "THAM_SO_CHU", ()):
+        v = str(data.value).strip()
+        if not v:
+            raise Gate("THAM_SO", "Giá trị không được để trống")
+        if len(v) > 2000:
+            raise Gate("THAM_SO", f"Giá trị dài {len(v)} ký tự, quá mức cho phép 2000")
+        if "\n" in v or "\r" in v:
+            raise Gate("THAM_SO", "Giá trị không được xuống dòng – danh sách ngăn bằng dấu phẩy")
+    # NÓI THẬT THAY VÌ NÓI SAI. Bảy tham số chưa phân loại được (xem `THAM_SO_CHUA_CO_CUA`
+    # trong rules.py). Để chúng rơi xuống nhánh số là trả về "Giá trị phải là số" — một câu
+    # SAI, và nó gửi người nhập đi sửa nhầm chỗ: họ sẽ tưởng mình gõ sai giá trị, trong khi
+    # thứ thiếu là cái cửa. Một lời báo sai tốn nhiều thời gian hơn là không có lời báo.
+    elif data.key in getattr(R, "THAM_SO_CHUA_CO_CUA", ()):
+        raise Gate("THAM_SO",
+                   "Tham số này CHƯA CÓ CỬA NHẬP – đây là một việc còn thiếu đã ghi nhận, "
+                   "không phải giá trị gõ sai. Xem sổ đợt MKT-10 để biết vì sao nó được để "
+                   "lại và ai quyết phần ấy.")
     else:
         try: float(data.value)
         except ValueError: raise Gate("THAM_SO", "Giá trị phải là số")
