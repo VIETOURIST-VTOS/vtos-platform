@@ -391,8 +391,12 @@ class ChuyenIn(BaseModel):
 from app.models.fleet import QT_TRANG_THAI as _QT_TEN  # noqa: E402
 
 
-def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict, kg: dict | None = None) -> dict:
-    cps = list(db.execute(select(TripCost).where(TripCost.trip_id == t.id)).scalars())
+def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict, kg: dict | None = None,
+                cps: list | None = None) -> dict:
+    # NHANH-1 (11/11/2026): danh sách chuyến truyền sẵn `cps` đọc MỘT lần cho cả trang — trước đó mỗi chuyến
+    # một truy vấn (500 chuyến = 500 lượt hỏi CSDL, đo trên bản thật 1,2–1,6 giây). Gọi lẻ thì vẫn tự đọc.
+    if cps is None:
+        cps = list(db.execute(select(TripCost).where(TripCost.trip_id == t.id).order_by(TripCost.id)).scalars())
     if kg is None:
         from app.services import ops as _O
         kg = _O.de_nghi_theo_khoan_goc(db)
@@ -440,7 +444,12 @@ def danh_sach_chuyen(vehicle_id: int | None = None, tu: date | None = None, den:
     emps = {e.id: e.full_name for e in db.execute(select(Employee)).scalars()}
     from app.services import ops as _O
     kg = _O.de_nghi_theo_khoan_goc(db)
-    return [_chuyen_out(db, t, veh, emps, kg) for t in db.execute(q.limit(500)).scalars()]
+    trips = list(db.execute(q.limit(500)).scalars())
+    cp_theo: dict[int, list] = {t.id: [] for t in trips}
+    if trips:
+        for c in db.execute(select(TripCost).where(TripCost.trip_id.in_(list(cp_theo))).order_by(TripCost.id)).scalars():
+            cp_theo[c.trip_id].append(c)
+    return [_chuyen_out(db, t, veh, emps, kg, cps=cp_theo[t.id]) for t in trips]
 
 
 @router.post("/chuyen", status_code=201)
