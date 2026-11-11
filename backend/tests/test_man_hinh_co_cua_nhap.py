@@ -78,7 +78,8 @@ CHI_XEM = {
                        "từ báo hỏng mức phải dừng xe (cửa: Đội xe → tab Báo hỏng), biển số và "
                        "số chỗ từ hồ sơ xe (cửa: Đội xe → Hồ sơ xe). Cả bốn cửa đều ở màn của "
                        "ĐỘI XE, và dựng thêm một cửa ở đây là để hai nơi lệch nhau.",
-                       ("/fleet/lich-xe-tuong-lai/khoang-trong",)),
+                       # VH-17: màn nay vẽ lịch 90 ngày đầy đủ (LichXe90) — đọc cửa lịch, vẫn chỉ xem.
+                       ("/fleet/lich-xe-tuong-lai",)),
 }
 
 # ── BÀN LÀM VIỆC THEO VAI — nhóm ĐẾM RIÊNG, mở ngày 24/9/2026 ───────────────────────────────────

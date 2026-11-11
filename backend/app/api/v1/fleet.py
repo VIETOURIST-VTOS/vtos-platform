@@ -2920,13 +2920,22 @@ def dan_link_sheet(v: LinkSheetVao, u: User = Depends(require_roles(*GHI_LINK_SH
 from app.services import lich_xe_tuong_lai as LX                       # noqa: E402
 # Phòng Kinh doanh và Ban lãnh đạo xem KHOẢNG TRỐNG để đẩy bán — không thấy tên tour, giá nội bộ.
 KHOANG_TRONG_XEM = tuple(sorted(set(READ) | {"chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh",
-                                             "gd_kd", "tp_kd", "cntt", "robot_ks"}))   # robot_ks = bks, chỉ đọc
+                                             "gd_kd", "tp_kd", "cntt", "robot_ks", "tp_hd"}))   # robot_ks = bks, chỉ đọc
+# VH-17 · 11/11/2026: cùng nhóm vai này đọc CẢ lưới lịch 90 ngày (/lich-xe-trong nay là màn lịch đầy đủ
+# cho lãnh đạo và trưởng phòng). TRÙNG KHÍT MENU_ROLES["/lich-xe-trong"]; +tp_hd theo «tất cả trưởng phòng».
 
 
 @router.get("/lich-xe-tuong-lai")
-def lich_xe_tuong_lai(so_ngay: int = 90, u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
-    """Lưới xe × ngày 90 ngày tới, công suất, khoảng trống. Chỉ đọc lệnh, đề nghị, báo hỏng đã có."""
-    return LX.bang(db, so_ngay=so_ngay)
+def lich_xe_tuong_lai(so_ngay: int = 90, u: User = Depends(require_roles(*KHOANG_TRONG_XEM)), db: Session = Depends(get_db)):
+    """Lưới xe × ngày 90 ngày tới, công suất, khoảng trống. Chỉ đọc lệnh, đề nghị, báo hỏng đã có.
+
+    VH-17: vai ngoài đội xe (không thuộc READ) thấy ô BẬN nhưng không thấy tên tour trên Sheet — Chủ tịch
+    chốt cho Kinh doanh «không xem tour» (XE-KD-1); cắt ở máy chủ, không giấu ở màn hình."""
+    b = LX.bang(db, so_ngay=so_ngay)
+    if u.role not in READ:
+        for h in b["xe"]:
+            h["tour_sheet"] = {}
+    return b
 
 
 @router.get("/lich-xe-tuong-lai/khoang-trong")

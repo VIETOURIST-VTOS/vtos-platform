@@ -511,7 +511,10 @@ MAN_HINH_API = {
     # Cửa lưới xe đầy đủ "/lich-xe-tuong-lai" KHÔNG nằm trong tiền tố này — nó dài hơn một
     # đoạn — nên Kinh doanh không với tới. Và kể cả với tới thì `require_roles(*READ)` ở
     # router vẫn chặn: hai hàng rào, không phải một.
-    "/lich-xe-trong": ("/api/v1/fleet/lich-xe-tuong-lai/khoang-trong",),
+    # VH-17 · 11/11/2026 (Chủ tịch duyệt) — màn này nay là «Lịch xe 90 ngày» đầy đủ cho lãnh đạo và
+    # trưởng phòng: tiền tố nới từ "/khoang-trong" lên cửa lịch "/lich-xe-tuong-lai" (lưới + khoảng
+    # trống) — vẫn MỘT tiền tố dài, không mở cả "/api/v1/fleet". Tên tour do máy chủ cắt cho vai ngoài đội xe.
+    "/lich-xe-trong": ("/api/v1/fleet/lich-xe-tuong-lai",),
     "/leads": ("/api/v1/leads", "/api/v1/zalo", "/api/v1/dau-quang-cao"),
     "/lenh-dieu-xe": ("/api/v1/fleet", "/api/v1/dispatch", "/api/v1/vehicles", "/api/v1/drivers",
                       # DL-1 (11/10/2026): đề nghị xe là mắt đầu của chuỗi điều xe, và nó ở CÙNG
@@ -1151,8 +1154,9 @@ MENU_ROLES = {
     # có cách nào biết đó là quyền hay là lỗi. Thà dài một dòng.
     # +robot_ks (11/11/2026, làn Phân quyền sửa hộ theo lệnh Chủ tịch): robot Kiểm soát phải nhìn ĐÚNG bằng
     # Ban Kiểm soát (test_p8) — bks có mặt ở đây thì robot_ks cũng phải có; nó chỉ đọc (READ_ONLY_ROLES).
+    # +tp_hd (VH-17 · 11/11/2026): Chủ tịch «tất cả trưởng phòng» xem lịch xe; Kế toán trưởng kế thừa ketoan.
     "/lich-xe-trong": ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "ketoan",
-                       "bks", "robot_ks", "cntt", "hcns", "gd_doi_xe", "gd_kd", "tp_kd"),
+                       "bks", "robot_ks", "cntt", "hcns", "gd_doi_xe", "gd_kd", "tp_kd", "tp_hd"),
     # KS-46 (08/11/2026) — "/xe": màn RIÊNG của đội xe, không cột dọc, không phân hệ
     # phòng khác. HẸP HƠN "/lai-lo-doi-xe" một vai: kế toán không có việc gì trên bàn
     # làm việc của giám đốc, họ đã có màn Lãi lỗ để đọc số. Chủ tịch nằm trong

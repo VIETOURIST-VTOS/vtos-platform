@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, createContext, useContext, useCallback, us
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { getUser, clearSession, type User } from "@/lib/api";
+import { api, getUser, clearSession, type User } from "@/lib/api";
 import { laTenMienCong, phienCong } from "@/lib/cong";
 import ChonDonVi from "@/components/ChonDonVi";
 import ChonGiaoDien from "@/components/ChonGiaoDien";
@@ -685,6 +685,23 @@ const Ctx = createContext<{
 }>({ user: null, toast: () => {}, datChuaLuu: () => {} });
 export const useShell = () => useContext(Ctx);
 
+/** VH-17 · vai thấy nút vàng nhỏ «Lịch xe 90 ngày» trên thanh ngang. Quyền vào trang/cửa do máy chủ giữ
+ *  (MENU_ROLES["/lich-xe-trong"], fleet.KHOANG_TRONG_XEM); danh sách này chỉ quyết ai THẤY NÚT. Nút mở màn
+ *  /lich-xe-trong — nay là lịch 90 ngày đầy đủ (VH-17), cùng thành phần LichXe90 của /xe. */
+const VAI_NUT_LICH_90 = ["chutich", "tgd", "ptgd_doan", "ptgd_mkt", "gd_kd", "tp_dh", "tp_kd", "tp_hd",
+  "ketoan_truong", "hcns"];
+
+function NutLich90() {
+  const [trong, setTrong] = useState<number | null>(null);
+  useEffect(() => {
+    api("/fleet/lich-xe-tuong-lai?so_ngay=30").then((r: any) => setTrong(r?.ngay_xe_trong ?? null)).catch(() => {});
+  }, []);
+  return <Link href="/lich-xe-trong" className="n90s" title="Lịch xe 90 ngày — xe nào còn trống, ưu tiên bán tour">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>
+    <span>Lịch xe 90 ngày</span>{trong !== null && <b>{trong} trống</b>}
+  </Link>;
+}
+
 // Trạng thái THU/BUNG của thanh dọc, nhớ theo từng người dùng. Khoá "vtos_menu_mo" (nhóm nào đang
 // ghim mở) đã bỏ cùng lối ghim mở, khi bấm thanh phân hệ chuyển thành đi tới trang phân hệ (13/9).
 const KHOA_THU = "vtos_menu_thu";
@@ -838,6 +855,10 @@ export default function Shell({ children, khongThanhBen = false }:
             onClick={() => toast("Tìm kiếm: đang xây dựng")}>
             <Bt d="tim" /><span>Tìm kiếm…</span>
           </button>
+          {/* VH-17 · 11/11/2026 (Chủ tịch duyệt bản xem trước) — nút vàng NHỎ «Lịch xe 90 ngày» cho lãnh
+              đạo và trưởng phòng, ở MỌI bàn làm việc của họ. GĐ đội xe không có nút này: /xe đã có nút
+              vàng lớn, hai nút một màn là lặp (Chủ tịch dặn 10/11). Số trên nút = ngày-xe trống 30 ngày. */}
+          {user && VAI_NUT_LICH_90.includes(user.role) && <NutLich90 />}
           <Link href="/#viec-cua-toi" className="bar-muc"><Bt d="viec" /><span>Công việc</span></Link>
           <Link href="/#cho-toi-duyet" className="bar-muc"><Bt d="duyet" /><span>Chờ duyệt</span></Link>
           {/* THỨ TỰ theo bản vẽ 12/9: … Công việc · Chờ duyệt · Trợ lý AI · chuông · Tài khoản.
