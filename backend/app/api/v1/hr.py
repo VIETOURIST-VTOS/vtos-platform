@@ -2081,7 +2081,8 @@ def dispatch_update(did: int, data: DispatchUpdate,
 # không chặn ai. Cửa gắn tay là chỗ người xác nhận một chuyến NGHI KHỚP — máy không tự nối, vì
 # nối nhầm hai chuyến khác nhau thì không có dấu vết nào để lần ngược.
 @router.get("/dispatch/chuoi-lenh-chuyen")
-def dispatch_chuoi(u: User = Depends(require_roles(*HR_READ, "nv_dh")), db: Session = Depends(get_db)):
+def dispatch_chuoi(u: User = Depends(require_roles(*HR_READ, "nv_dh", "gd_doi_xe")), db: Session = Depends(get_db)):
+    # VH-33 (Chủ tịch 12/11/2026 rà bàn GĐ đội xe): GĐ đội xe mở «Lịch & lệnh đầy đủ» bị 403 ở ô đếm này — chỉ ĐỌC.
     from app.services import dong_lenh as DL
     return {"lenh_xong_chua_co_chuyen": DL.lenh_xong_chua_co_chuyen(db),
             "chuyen_chua_gan_lenh": DL.chuyen_chua_gan_lenh(db),

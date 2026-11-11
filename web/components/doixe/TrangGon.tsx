@@ -47,14 +47,13 @@ export function LichLenhGon({ mo }: { mo: Mo }) {
   const homNay = d.filter((x) => x.status !== "huy" && x.date_from <= hom && hom <= x.date_to);
   const chuaXacNhan = d.filter((x) => x.status === "cho_xac_nhan");
   return <>
-    <div className="row" style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-      <h2 style={{ margin: 0 }}>Lịch & lệnh điều xe</h2>
-      <button type="button" className="act teal" style={{ margin: 0 }} onClick={() => mo("/lenh-dieu-xe/lap-lenh")}>Lập lệnh xe</button></div>
+    {/* VH-33: bỏ nút «Lập lệnh xe» — trùng trang con «Lập lệnh điều xe» ngay trên thanh (mỗi nút một chỗ). */}
+    <h2 style={{ margin: 0 }}>Lịch & lệnh điều xe</h2>
     <O3 ds={[["Lệnh VTOS đang chạy hôm nay", homNay.length], ["Tổng lệnh trên VTOS", d.length],
              ["Lệnh chưa xác nhận", chuaXacNhan.length]]} />
     {homNay.map((x) => <Dong key={x.id} t={`${x.xe} · ${x.tour || "—"}`} p={`${x.date_from} → ${x.date_to} · ${x.tai_xe || "chưa có tài xế"}`} />)}
     {!homNay.length && <p className="muted">Hôm nay chưa có lệnh VTOS.</p>}
-    <p><button type="button" onClick={() => mo("/lenh-dieu-xe")}>Mở lịch & lệnh đầy đủ</button></p>
+    <p><button type="button" className="act grey" style={{ margin: 0 }} onClick={() => mo("/lenh-dieu-xe")}>Mở lịch & lệnh đầy đủ</button></p>
   </>;
 }
 
@@ -132,8 +131,8 @@ export function QuyetToanGon({ ky, mo }: { ky: string; mo: Mo }) {
              ["Chuyến đã quyết toán", t.so_chuyen ?? (d.xe || []).reduce((a: number, x: any) => a + (x.so_chuyen || 0), 0)]]} />
     <p className="muted">Doanh thu chưa quyết toán không vào lợi nhuận kỳ.</p>
     <p style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-      <button type="button" onClick={() => mo("/doi-xe?tab=quyettoan")}>Mở bảng quyết toán chủ xe</button>
-      <button type="button" onClick={() => mo("/doi-xe?tab=giaodich")}>Mở đối soát nguồn ngoài</button></p>
+      <button type="button" className="act grey" style={{ margin: 0 }} onClick={() => mo("/doi-xe?tab=quyettoan")}>Mở bảng quyết toán chủ xe</button>
+      <button type="button" className="act grey" style={{ margin: 0 }} onClick={() => mo("/doi-xe?tab=giaodich")}>Mở đối soát nguồn ngoài</button></p>
   </>;
 }
 
@@ -147,7 +146,7 @@ export function CongNoGon({ mo }: { mo: Mo }) {
     <O3 ds={[["Công ty phải trả chủ xe", vnd(d.voi_chu_xe?.cong_ty_phai_tra)],
              ["Chủ xe phải trả công ty", vnd(d.voi_chu_xe?.chu_xe_phai_tra_cong_ty)],
              ["Còn phải thu người mua xe", vnd(d.ban_xe?.con_phai_thu)]]} />
-    <p><button type="button" onClick={() => mo("/doi-xe?tab=congno")}>Mở công nợ chi tiết</button></p>
+    <p><button type="button" className="act grey" style={{ margin: 0 }} onClick={() => mo("/doi-xe?tab=congno")}>Mở công nợ chi tiết</button></p>
   </>;
 }
 
@@ -179,7 +178,7 @@ export function BaoHongGon({ mo }: { mo: Mo }) {
     {mo_.map((r) => <Dong key={r.id} t={`${r.plate} · ${r.hien_tuong}`} p={[String(r.bao_luc || "").slice(0, 10), r.trang_thai_ten, r.nguoi_bao].filter(Boolean).join(" · ")}
       tag={r.muc_do_ten} cls={r.muc_do === "phai_dung_xe" ? "red" : "warn"} do={r.muc_do === "phai_dung_xe"} />)}
     {!mo_.length && <p className="muted">Hiện chưa có báo hỏng đang mở.</p>}
-    <p><button type="button" onClick={() => mo("/doi-xe?tab=bao-hong")}>Mở sổ báo hỏng</button></p>
+    <p><button type="button" className="act grey" style={{ margin: 0 }} onClick={() => mo("/doi-xe?tab=bao-hong")}>Mở sổ báo hỏng</button></p>
   </>;
 }
 
@@ -195,7 +194,7 @@ export function DauGon({ mo }: { mo: Mo }) {
     <O3 ds={[["Giá dầu gần nhất", moi ? vnd(moi.gia_lit) + "/lít" : "Chưa có số", moi ? `${moi.ngay} · ${moi.nguon || "chưa ghi nguồn"}` : "chưa khai ngày nào"],
              ...nhom.map((n) => [`Nhóm ${n.seats} chỗ · ${dem[n.seats] ?? "?"} xe`, n.l_100km != null ? `${n.l_100km} L/100km` : "Chưa khai",
                n.l_100km == null ? "thiếu định mức thì chưa kết luận vượt" : ""] as [string, React.ReactNode, string])]} />
-    <p><button type="button" onClick={() => mo("/doi-xe/gia-dau")}>Mở giá dầu & định mức</button></p>
+    <p><button type="button" className="act grey" style={{ margin: 0 }} onClick={() => mo("/doi-xe/gia-dau")}>Mở giá dầu & định mức</button></p>
   </>;
 }
 
@@ -224,10 +223,10 @@ export function DeNghiXeGon({ mo }: { mo: Mo }) {
           <span className="muted">{ngayVN(x.ngay_di)}→{ngayVN(x.ngay_ve)} · {x.so_khach} khách · {x.so_xe_can} xe · {x.nguoi_de_nghi}</span></span>
         {n <= 3 && <span className={"tag " + (n < 0 ? "cb-do" : "cb-vang")}>{n < 0 ? "đã qua ngày đi" : `còn ${n} ngày`}</span>}
         <button type="button" className="act teal" style={{ margin: 0 }} onClick={() => mo(`/lenh-dieu-xe/lap-lenh?de_nghi=${x.id}`)}>Lập lệnh</button>
-        <button type="button" onClick={() => mo("/lenh-dieu-xe/de-nghi")}>Không còn xe</button>
+        <button type="button" className="act grey" style={{ margin: 0 }} onClick={() => mo("/lenh-dieu-xe/de-nghi")}>Không còn xe</button>
       </div>; })}
     {!cho.length && <p className="muted">Không có đề nghị nào đang chờ lập lệnh.</p>}
-    <p><button type="button" onClick={() => mo("/lenh-dieu-xe/de-nghi")}>Mở danh sách đề nghị đầy đủ</button></p>
+    <p><button type="button" className="act grey" style={{ margin: 0 }} onClick={() => mo("/lenh-dieu-xe/de-nghi")}>Mở danh sách đề nghị đầy đủ</button></p>
   </>;
 }
 
@@ -264,7 +263,7 @@ export function XeHomNayGon({ mo }: { mo: Mo }) {
     {d.bi_chan.map((x: any) => <Dong key={"c" + x.id} t={x.xe} p={`báo hỏng «${x.ly_do}»`} tag="bị chặn" cls="red" do />)}
     {d.dang_di.map((x: any) => <Dong key={"d" + x.id} t={`${x.xe} · ${x.tour || "—"}`} p={`về ${ngayVN(x.ve)} · ${x.tai_xe || "chưa có tài xế"}`} tag="đang đi" />)}
     <p className="muted">{d.ghi_chu}</p>
-    <p><button type="button" onClick={() => mo("/doi-xe/xe-hom-nay")}>Mở bảng theo sheet</button></p>
+    <p><button type="button" className="act grey" style={{ margin: 0 }} onClick={() => mo("/doi-xe/xe-hom-nay")}>Mở bảng theo sheet</button></p>
   </>;
 }
 
