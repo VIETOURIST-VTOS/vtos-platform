@@ -337,7 +337,7 @@ def ket_luan(xid: int, data: KetLuanIn, u: User = Depends(require_roles(*WRITE))
 # ====================== ĐỢT 2: NHẬT TRÌNH, BẢO DƯỠNG, NGUỒN NGOÀI ======================
 from app.models.fleet import (Trip, TripCost, Maintenance, ExternalTxn, BEN_CHIU, COST_KINDS, NGUON_NGOAI,
                               BEN_CHIU_MAC_DINH, TRIP_STATUS, CO, MAINT_KINDS, VI_EPASS, KM_NGUON,
-                              NGA_CHI_PHI, NGA_CUA_DOI_XE, TRA_BANG)
+                              NGA_CHI_PHI, NGA_CUA_DOI_XE, TRA_BANG, TRA_BANG_TAI_XE)
 
 KETOAN = ("ketoan",)
 
@@ -2148,6 +2148,7 @@ class DeNghiChiXeIn(BaseModel):
     nhom: str = ""
     can_cu_so_tien: str = ""
     ma_khoan_goc: str = ""
+    ma_khoan_goc_ds: list[str] = []       # VH-29: nhiều khoản gốc trên một phiếu
     hen_bo_sung: str = ""
     ghi_chu_kiem_tra: str = ""
     cho_phep_trung: bool = False
@@ -2170,13 +2171,16 @@ def lap_de_nghi_chi_xe(data: DeNghiChiXeIn, u: User = Depends(require_roles("gd_
     # VH-21 · Chủ tịch chốt 11/11/2026: số đề nghị KHÔNG ĐƯỢC VƯỢT khoản gốc đã gắn. Thử thật DC2611-0001: xin
     # 630.000 mà khoản gốc (công tác phí) chỉ 600.000 — 30.000 gửi xe đi kèm không có khoản gốc nào đứng sau.
     # Đặt ở cửa này chứ không ở `services/ops.py` vì tệp ấy đang do làn TC-KT giữ chỗ (TT-TBS).
-    kg = O.khoan_goc(db, data.ma_khoan_goc) if (data.ma_khoan_goc or "").strip() else None
+    # VH-29: nhiều khoản gốc → so với TỔNG các khoản đã tick.
+    ds_kg = O.ds_ma_khoan_goc({"ma_khoan_goc_ds": data.ma_khoan_goc_ds, "ma_khoan_goc": data.ma_khoan_goc})
     _xe = db.execute(select(Vehicle).where(Vehicle.plate == (data.bien_so or "").strip())).scalars().first()
-    if kg and _xe is not None and kg["vehicle_id"] != _xe.id:
-        kg = None                  # khoản gốc của xe khác: để `services/ops.py` báo đúng lỗi «xe khác»
-    if kg and float(kg["so_tien"] or 0) > 0 and (data.so_tien or 0) > float(kg["so_tien"]) + 0.5:
-        raise HTTPException(422, f"Số đề nghị {data.so_tien:,.0f} đ vượt khoản gốc {kg['ten']} "
-                                 f"({float(kg['so_tien']):,.0f} đ). Mỗi đề nghị chi chỉ chi tối đa đúng khoản gốc "
+    goc, kgs = O.tong_khoan_goc(db, ds_kg)
+    if _xe is not None and any(k["vehicle_id"] != _xe.id for k in kgs):
+        kgs = []                   # khoản gốc của xe khác: để `services/ops.py` báo đúng lỗi «xe khác»
+    if kgs and goc > 0 and (data.so_tien or 0) > goc + 0.5:
+        ten = kgs[0]["ten"] if len(kgs) == 1 else f"{len(kgs)} khoản đã tick"
+        raise HTTPException(422, f"Số đề nghị {data.so_tien:,.0f} đ vượt khoản gốc {ten} "
+                                 f"({goc:,.0f} đ). Mỗi đề nghị chi chỉ chi tối đa đúng khoản gốc "
                                  "đã gắn — phần còn lại lập phiếu riêng gắn khoản của nó.")
     ngan = " · ".join(x.strip() for x in (data.so_tai_khoan, data.ngan_hang) if x.strip())
     try:
@@ -2188,6 +2192,7 @@ def lap_de_nghi_chi_xe(data: DeNghiChiXeIn, u: User = Depends(require_roles("gd_
             "ngay_den_han": data.ngay, "cho_phep_trung": data.cho_phep_trung,
             "doi_xe": {"pham_vi": data.pham_vi, "bien_so": data.bien_so, "loai": data.loai, "nhom": data.nhom,
                        "can_cu": data.can_cu_so_tien, "ma_khoan_goc": data.ma_khoan_goc,
+                       "ma_khoan_goc_ds": ds_kg,
                        "hen_bo_sung": data.hen_bo_sung, "ghi_chu_kiem_tra": data.ghi_chu_kiem_tra}})
     except ValueError as ex:
         raise HTTPException(422, str(ex))
@@ -2221,7 +2226,10 @@ def ds_khoan_goc(xe_id: int, q: str = "", u: User = Depends(require_roles(*READ)
         ma = f"tc:{c.id}"
         ra.append({"ma": ma, "loai": "Chi phí chuyến", "ngay": t.ngay_di,
                    "ten": f"{t.ma_phieu or 'Chuyến ' + str(t.id)} · {COST_KINDS.get(c.kind, c.kind)}",
-                   "so_tien": c.amount, "chung_tu": c.chung_tu or "", "de_nghi_chi": da.get(ma)})
+                   "so_tien": c.amount, "chung_tu": c.chung_tu or "", "de_nghi_chi": da.get(ma),
+                   # VH-29: thẻ / ePass công ty đã trả → không chọn làm khoản gốc được (máy chủ cũng chặn).
+                   "cong_ty_da_tra": (TRA_BANG.get(c.tra_bang, "") if c.tra_bang and c.tra_bang not in TRA_BANG_TAI_XE
+                                      else "")})
     cau_bd = select(Maintenance).where(Maintenance.vehicle_id == xe_id)
     if q:
         cau_bd = cau_bd.where(Maintenance.noi_dung.ilike(f"%{q}%"))
@@ -2243,6 +2251,7 @@ def ds_de_nghi_chi_xe(u: User = Depends(require_roles(*READ)), db: Session = Dep
             "tra_bo_sung": "Trả bổ sung — sửa rồi gửi lại"}
     ds = db.execute(select(PaymentRequest).where(PaymentRequest.category.in_(LOAI_CHI_XE))
                     .order_by(PaymentRequest.id.desc()).limit(200)).scalars().all()
+    dm = {_chuan_ten(b["ten"]) for b in danh_muc_ben_nhan(db)}
     ra = []
     for r in ds:
         x = r.doi_xe or {}
@@ -2258,7 +2267,7 @@ def ds_de_nghi_chi_xe(u: User = Depends(require_roles(*READ)), db: Session = Dep
                    "ly_do_tu_choi": r.reject_reason or "", "nguoi_lap": r.created_by,
                    "da_chi_tien": float(r.da_chi_tien or 0), "ma_so_thue": r.supplier_tax_code or "",
                    "can_cu": x.get("can_cu") or "",
-                   **_dxc_chi_tiet(db, u, r, x)})
+                   **_dxc_chi_tiet(db, u, r, x, dm)})
     # VH-23: danh mục hình thức thanh toán cho ô «Đã chi» của Kế toán ngay trên màn /xe — cùng bảng tĩnh
     # mà /expenses đọc qua `/hach-toan/bang`; trả kèm ở đây để màn /xe không phải gọi sang nhóm khác.
     from app.models.hach_toan import HINH_THUC_TT
@@ -2274,7 +2283,28 @@ def ds_de_nghi_chi_xe(u: User = Depends(require_roles(*READ)), db: Session = Dep
 #     và không giấu đi một nút đáng lẽ phải có (bài học F1, 10/10/2026).
 #   · KIỂM HIỆN RA (`kiem`): những gì máy đã soát, xanh / đỏ / vàng, để người ký đọc trước khi ký.
 # ══════════════════════════════════════════════════════════════════════════════════════════════════
-def _dxc_chi_tiet(db: Session, u: User, r, x: dict) -> dict:
+def _chuan_ten(t: str | None) -> str:
+    return " ".join((t or "").lower().split())
+
+
+def danh_muc_ben_nhan(db: Session) -> list[dict]:
+    """VH-29: bên nhận để CHỌN khi lập đề xuất chi — tài xế (cùng định nghĩa của ô chọn tài xế) và nhà cung cấp
+    đang hoạt động. Chỉ tên, mã, MST: số tài khoản do Kế toán kiểm soát nên không trả (v3.3 §2, §7)."""
+    from app.models.suppliers import Supplier
+    from app.services import phat_va_gia_dau as PG
+    ra = [{"ten": t["ho_ten"], "loai": "Tài xế", "ma": t.get("code") or "", "ma_so_thue": ""}
+          for t in PG.tai_xe_chon(db)["rows"]]
+    for n in db.execute(select(Supplier).where(Supplier.active == True).order_by(Supplier.ten)).scalars():  # noqa: E712
+        ra.append({"ten": n.ten, "loai": "Nhà cung cấp", "ma": n.code, "ma_so_thue": n.ma_so_thue or ""})
+    return ra
+
+
+@router.get("/ben-nhan-chon")
+def ds_ben_nhan_chon(u: User = Depends(require_roles(*READ)), db: Session = Depends(get_db)):
+    return {"rows": danh_muc_ben_nhan(db)}
+
+
+def _dxc_chi_tiet(db: Session, u: User, r, x: dict, dm: set | None = None) -> dict:
     from app.services import ops as O
     viec: list[list[str]] = []
     st, chi = r.status, float(r.da_chi_tien or 0)
@@ -2303,10 +2333,11 @@ def _dxc_chi_tiet(db: Session, u: User, r, x: dict) -> dict:
         kiem.append({"muc": "vang", "chu": (f"Có số chứng từ «{r.document_ref}» nhưng chưa đính tệp chứng từ"
                                             if (r.document_ref or "").strip() else "Chưa đính tệp chứng từ")
                      + " — người ký chưa nhìn thấy giấy"})
-    kg_ma = (x.get("ma_khoan_goc") or "").strip()
-    kg = O.khoan_goc(db, kg_ma) if kg_ma else None
+    ds_kg = O.ds_ma_khoan_goc(x)
+    goc, kgs = O.tong_khoan_goc(db, ds_kg)
+    kg = ({"ma": ", ".join(ds_kg), "ten": kgs[0]["ten"] if len(kgs) == 1 else f"{len(kgs)} khoản: "
+           + "; ".join(k["ten"] for k in kgs), "so_tien": goc} if kgs else None)
     if kg:
-        goc = float(kg["so_tien"] or 0)
         xin = float(r.amount or 0)
         if goc > 0 and xin > goc + 0.5:
             kiem.append({"muc": "do", "chu": f"Xin {xin:,.0f} đ, khoản gốc gắn chỉ {goc:,.0f} đ — vượt "
@@ -2318,6 +2349,9 @@ def _dxc_chi_tiet(db: Session, u: User, r, x: dict) -> dict:
     trung = O.chung_tu_trung(db, r.document_ref, r.id) if (r.document_ref or "").strip() else []
     if trung:
         kiem.append({"muc": "vang", "chu": f"Số chứng từ {r.document_ref} cũng có ở {', '.join(trung)}"})
+    if dm is not None and _chuan_ten(r.supplier_name) not in dm:
+        kiem.append({"muc": "vang", "chu": f"Bên nhận «{r.supplier_name}» không có trong danh mục tài xế / nhà cung "
+                                          "cấp — Kế toán đối chiếu trước khi chi"})
     can_mst = x.get("loai") == "thanh_toan" and (x.get("nhom") or "") not in O.NHOM_DOI_XE_KHONG_MST
     if can_mst and not (r.supplier_tax_code or "").strip():
         kiem.append({"muc": "vang", "chu": "Bên nhận chưa có mã số thuế — Kế toán cần trước khi chi"})
@@ -2326,7 +2360,8 @@ def _dxc_chi_tiet(db: Session, u: User, r, x: dict) -> dict:
     return {"viec": viec, "kiem": kiem, "can_mst": can_mst, "chung_tu": r.document_ref or "",
             "co_tep": co_tep, "co_unc": O.co_unc(db, r) if st == "cho_chi" else None,
             "con_phai_chi": max(0.0, float(r.amount or 0) - chi),
-            "khoan_goc": ({"ma": kg_ma, "ten": kg["ten"], "so_tien": float(kg["so_tien"] or 0)} if kg else None),
+            "khoan_goc": kg,
+            "khoan_goc_ds": [{"ma": k["ma"], "ten": k["ten"], "so_tien": float(k["so_tien"] or 0)} for k in kgs],
             "ghi_chu_kiem_tra": x.get("ghi_chu_kiem_tra") or "", "hen_bo_sung": x.get("hen_bo_sung") or "",
             "luc_lap": r.created_at.isoformat() if r.created_at else None,
             "tuyen": [b for b in (
