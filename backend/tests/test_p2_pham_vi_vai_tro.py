@@ -764,7 +764,7 @@ PHAM_VI_DA_CHOT = {
     # được loại đối tượng và phòng ban của mình, hai cửa dữ liệu khách thì không mở. Bảng
     # này đếm MÀN HÌNH chạm tới đâu, nên nó không thấy phần bó ấy — xem
     # `test_q1_bang_diem_theo_pham_vi` để biết cửa thật hẹp tới đâu.
-    "gd_doi_xe": 37, "hanh_chinh": 34, "tp_hd": 32, "tai_xe": 23, "hdv": 23, "nv_visa": 22,
+    "gd_doi_xe": 37, "hanh_chinh": 34, "tp_hd": 33, "tai_xe": 23, "hdv": 23, "nv_visa": 22,
     # Vai trò máy – hẹp hơn cả tài xế, và đó là chủ ý: robot chỉ cần đúng bàn làm việc của nó.
     # robot_ks 17 → 96 ngày 09/9/2026: Chủ tịch quyết robot làm việc Ban Kiểm soát thì đọc được thứ
     # BKS đọc, nếu không nó chỉ kiểm tra lại chính báo cáo của mình. Bằng ĐÚNG bks, và chặn ghi bằng

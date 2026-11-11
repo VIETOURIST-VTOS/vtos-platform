@@ -199,3 +199,17 @@
   --vtos-logo-bong:      #0a234866;
   --vtos-logo-bong-dam:  #0a234888;
 }
+
+/* VH-17 · 11/11/2026 — NÚT VÀNG «Lịch xe 90 ngày» (thanh ngang của lãnh đạo, /xe). Cùng bộ màu hổ phách đã
+ * duyệt cho nút lớn trên /xe (VH-10): khác hẳn dàn nút navy để mắt bắt ngay. */
+:root {
+  --vtos-n90-a:        #ffd76a;
+  --vtos-n90-b:        #ffb627;
+  --vtos-n90-c:        #ff9a1f;
+  --vtos-n90-chu:      #3b2300;
+  --vtos-n90-net:      #5a3500;
+  --vtos-n90-vien:     #ffe7a8;
+  --vtos-n90-quang:    #ff9f1f66;
+  --vtos-n90-quang-2:  #ff9f1fa0;
+  --vtos-n90-vet:      #ffffffb0;
+}

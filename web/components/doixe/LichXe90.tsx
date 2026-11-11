@@ -29,7 +29,7 @@ export default function LichXe90({ mo }: { mo: Mo }) {
   const kt = d.khoang_trong.filter((k: any) => !cho || k.so_cho === cho).slice(0, 12);
   const ngay: string[] = d.ngay;
   const pc = (v: number | null) => (v == null ? "—" : `${v}%`);
-  return <>
+  return <div className="lx-goc">
     <div className="xe-dau-con"><h2 style={{ margin: 0 }}>Lịch xe {soNgay} ngày tới</h2>
       <div className="lx-chips">
         {[30, 60, 90].map((n) => <button key={n} type="button" aria-pressed={soNgay === n} onClick={() => setSoNgay(n)}>{n} ngày</button>)}
@@ -81,10 +81,20 @@ export default function LichXe90({ mo }: { mo: Mo }) {
           <span>{t.nhan}</span></div>)}</div></section>
     </div>
     <style>{CSS}</style>
-  </>;
+  </div>;
 }
 
 const CSS = `
+/* VH-17: thành phần này nay cũng vẽ ở /lich-xe-trong (ngoài /xe), nơi KHÔNG có bộ kiểu của /xe — nên mang
+   theo đúng mấy lớp nó mượn, khoanh trong .lx-goc để không đè lên /xe. Giá trị chép nguyên từ /xe. */
+.lx-goc .xe-blk{border:1px solid var(--xe-vien,#e1e7ef);border-radius:12px;padding:12px 15px;background:#fff}
+.lx-goc .xe-it{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #eef2f7}
+.lx-goc .xe-it:last-child{border-bottom:0}
+.lx-goc .xe-it button{font:inherit;font-size:13px;font-weight:600;border-radius:9px;padding:7px 13px;cursor:pointer;
+  border:1px solid #c9d6e8;background:#fff;color:var(--xe-nhan,#2c5fa2)}
+.lx-goc .xe-it button:hover{background:var(--xe-nhat,#edf3fc)}
+.lx-goc .xe-cho{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:6px 0 16px}
+.lx-goc .xe-cho i{display:block;height:96px;border-radius:14px;background:#e6ecf4}
 .lx-bao{margin:0 0 10px;font-size:13.5px;color:#4a5d78;background:#edf3fc;border-radius:10px;padding:8px 12px}
 .lx-bao.do{color:#8a1f33;background:#fff0f3}
 .xe-dau-con{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
