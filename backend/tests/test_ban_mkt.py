@@ -71,6 +71,32 @@ def _tab_cua_man_marketing() -> set[str]:
     return set(re.findall(r'\[\s*"([a-z0-9_]+)"', khoi.group(1)))
 
 
+def _bi_danh_cua_man_marketing(tab: set[str]) -> set[str]:
+    """MKT-11 · 12/11/2026 — ĐỌC THÊM PHÉP ÁNH XẠ `?tab=`, cũng THẲNG từ màn hình.
+
+    Không phải mọi đường dẫn `?tab=` hợp lệ đều là một tab. Màn `/marketing` nhận
+    `?tab=ngansach` rồi mở tab `chiendich` với ngăn `ngansach` — một đường dẫn sâu hai chiều,
+    và chính thanh menu của công ty đang dùng nó: dòng «Kế hoạch & ngân sách» trong
+    `components/Shell.tsx`, mà `test_menu.py` canh từng ký tự. Đọc mỗi bảng `TABS` thì hàng
+    rào này chặn cả đường dẫn menu ấy.
+
+    ĐỌC, KHÔNG CHÉP TAY — vì lý do hàm ngay trên đã viết: một bảng chép tay vẫn đúng vào
+    ngày người ta đổi tên, và lúc ấy phép thử xanh còn người bấm rơi vào trang trống.
+
+    VÀ SIẾT THÊM MỘT CHỖ: bí danh phải dẫn tới một tab CÓ THẬT. Trước 12/11/2026 không ai
+    canh điều này, nên một bí danh trỏ vào tab đã đổi tên sẽ im lặng cho tới khi có người bấm.
+    """
+    src = TRANG_MKT.read_text(encoding="utf-8")
+    cap = re.findall(
+        r'if\s*\(\s*url\s*===\s*"([a-z0-9_]+)"\s*\)\s*\{\s*setTab\(\s*"([a-z0-9_]+)"\s*\)', src)
+    lac = sorted({den for _, den in cap if den not in tab})
+    assert not lac, (
+        "Bí danh ?tab= của màn Marketing dẫn tới tab KHÔNG CÓ: " + ", ".join(lac) +
+        f". Tab đang có: {', '.join(sorted(tab))}. Bí danh trỏ vào chỗ không có thì người bấm "
+        "menu rơi vào trang trống, và không ai biết cho tới khi có người bấm.")
+    return {bi for bi, _ in cap}
+
+
 def test_moi_o_dan_toi_mot_tab_co_that():
     tab = _tab_cua_man_marketing()
     assert len(tab) >= 5, (
@@ -81,11 +107,16 @@ def test_moi_o_dan_toi_mot_tab_co_that():
     den = re.findall(r'"/marketing\?tab=([a-z0-9_]+)"', src)
     assert den, "không ô nào khai đường dẫn sang màn Marketing — bàn không có cửa đi thì nó là một bảng tin"
 
-    lac = sorted({t for t in den if t not in tab})
+    # MKT-11 · 12/11/2026 — chỗ tới được gồm TAB và BÍ DANH, cả hai đọc thẳng từ màn hình.
+    den_duoc = tab | _bi_danh_cua_man_marketing(tab)
+
+    lac = sorted({t for t in den if t not in den_duoc})
     assert not lac, (
-        "Các ô sau dẫn tới tab KHÔNG CÓ trên màn Marketing: " + ", ".join(lac) +
-        f". Tab đang có: {', '.join(sorted(tab))}. Hoặc sửa ô, hoặc tab đã bị đổi tên và phải sửa "
-        "theo — đừng để người bấm vào ô rơi vào một trang trống.")
+        "Các ô sau dẫn tới chỗ KHÔNG CÓ trên màn Marketing: " + ", ".join(lac) +
+        f". Tab đang có: {', '.join(sorted(tab))}."
+        f" Bí danh ?tab= đang có: {', '.join(sorted(den_duoc - tab)) or 'không có'}."
+        " Hoặc sửa ô, hoặc tab đã bị đổi tên và phải sửa theo — đừng để người bấm vào ô rơi "
+        "vào một trang trống.")
 
 
 def test_moi_o_viec_deu_co_mot_cua_di_toi():

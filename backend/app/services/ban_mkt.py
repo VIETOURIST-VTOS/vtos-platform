@@ -59,7 +59,7 @@ from sqlalchemy.orm import Session
 
 from app.models.core import User
 from app.models.crm import Lead
-from app.models.marketing import Campaign, ContentItem
+from app.models.marketing import Campaign, ContentItem, MarketingBudget
 from app.services import doi_soat_marketing as DSM
 from app.services import leads as LD
 from app.services import marketing as MKT
@@ -67,6 +67,12 @@ from app.services import pr_hoat_dong as PR
 
 SAN_SANG = "san_sang"
 LOI = "loi"
+# MKT-11 · 12/11/2026 — TRẠNG THÁI THỨ BA. Tài liệu bàn giao đòi phân biệt rõ sáu cảnh:
+# có số bằng 0 · chưa xác định · chưa lập · đang tải · lỗi tải · không có quyền. Bàn cũ chỉ
+# có hai: đọc được và đọc hỏng. "Tỷ lệ chốt chưa xác định" mà vẽ số 0 là nói dối — chính
+# `leads.py` đã viết "CHƯA ĐỐI CHIẾU THÌ KHÔNG XÁC ĐỊNH, KHÔNG PHẢI 0%". Ô mang trạng thái
+# này đem theo trường `chu`: CHỮ để vẽ thay cho số, chứ không phải một con số mặc định.
+CHUA_CO = "chua_co"
 
 # Lead CHƯA XONG VIỆC. Hai trạng thái này là đúng bộ mà `chuyen_doi_lead.ton_dong` dùng — chép
 # danh sách thì ngày thêm một trạng thái thứ ba, một trong hai chỗ sẽ quên.
@@ -78,11 +84,16 @@ ND_CHO_DUYET = ("cho_duyet", "cho_ky_2")
 
 
 def _o(khoa: str, ten: str, so_luong, don_vi: str, den: str, nguon: str,
-       muc: str = "", ghi_chu: str = "", trang_thai: str = SAN_SANG, ly_do: str = "") -> dict:
-    """Một ô hàng đợi. `so_luong = None` nghĩa là CHƯA ĐỌC ĐƯỢC, không phải bằng 0."""
+       muc: str = "", ghi_chu: str = "", trang_thai: str = SAN_SANG, ly_do: str = "",
+       chu: str = "") -> dict:
+    """Một ô hàng đợi. `so_luong = None` nghĩa là CHƯA ĐỌC ĐƯỢC, không phải bằng 0.
+
+    `chu` (MKT-11): chữ vẽ THAY cho số khi ô mang trạng thái `CHUA_CO` — "chưa xác định",
+    "chưa lập". Để trống ở mọi ô đếm được, nên nó không đổi một ô cũ nào.
+    """
     return {"khoa": khoa, "ten": ten, "so_luong": so_luong, "don_vi": don_vi,
             "muc": muc, "ghi_chu": ghi_chu, "den": den, "nguon": nguon,
-            "trang_thai": trang_thai, "ly_do": ly_do}
+            "trang_thai": trang_thai, "ly_do": ly_do, "chu": chu}
 
 
 def _chay(khoa: str, ten: str, ham) -> dict:
@@ -101,6 +112,17 @@ def ky_truoc(hom_nay: date | None = None) -> str:
     """
     n = hom_nay or date.today()
     return f"{n.year - 1:04d}-12" if n.month == 1 else f"{n.year:04d}-{n.month - 1:02d}"
+
+
+def ky_nay(hom_nay: date | None = None) -> str:
+    """Kỳ YYYY-MM của tháng ĐANG chạy — khác `ky_truoc` ở ngay trên.
+
+    Ba ô theo dõi của MKT-11 hỏi về tháng đang chạy: số điện thoại phát sinh trong kỳ, tỷ lệ
+    chốt của kỳ, ngân sách của kỳ. Ô "kỳ chưa chốt số" thì vẫn hỏi tháng đã đóng — hai câu
+    hỏi khác nhau nên hai hàm khác nhau, không dùng chung một tham số cho cả hai.
+    """
+    n = hom_nay or date.today()
+    return "%04d-%02d" % (n.year, n.month)
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
@@ -190,11 +212,102 @@ def _lead_chua_gan(db: Session) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════════════
+# MKT-11 · BA Ô THEO DÕI VÀ HAI Ô VIỆC, đưa lên bàn Phó TGĐ ngày 12/11/2026
+#
+# GỌI ĐÚNG HÀM MÀN `/marketing` ĐANG GỌI, KHÔNG TỰ ĐẾM LẠI. Màn ấy đọc số điện thoại và tỷ
+# lệ chốt từ `conversion_report`; hàm đếm theo kênh thì trả về số điện thoại của TỪNG kênh,
+# cộng lại là đếm hai lần một số nằm ở hai kênh. Tự đếm lại là cách chắc chắn để hai màn
+# hiện hai con số khác nhau cho cùng một thứ, rồi không ai biết tin cái nào.
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+
+def _bao_cao_ky(db: Session) -> dict:
+    """Một lần đọc cho CẢ HAI ô số điện thoại và tỷ lệ chốt — chúng cùng một báo cáo."""
+    return LD.conversion_report(db, ky_nay())
+
+
+def _sdt_phat_sinh(db: Session) -> dict:
+    """MẪU SỐ, không phải việc phải làm."""
+    ky = ky_nay()
+    n = int((_bao_cao_ky(db).get("total_current") or {}).get("so_sdt") or 0)
+    return _o("sdt_phat_sinh", "Số điện thoại phát sinh", n, "số",
+              "/marketing?tab=khach",
+              "leads.conversion_report(kỳ này)['total_current']['so_sdt']",
+              ghi_chu="Đếm trên tập số điện thoại ĐÃ CHUẨN HOÁ khác nhau của kỳ " + ky +
+                      ". Hai người chung một số đếm thành một, một người đổi số đếm thành "
+                      "hai — nên không cộng dồn số của từng kênh.")
+
+
+def _ty_le_chot(db: Session) -> dict:
+    """CHƯA ĐỐI CHIẾU THÌ CHƯA XÁC ĐỊNH, KHÔNG PHẢI 0% — luật của chính `leads.py`."""
+    rep = _bao_cao_ky(db)
+    if not rep.get("da_doi_chieu"):
+        return _o("ty_le_chot", "Tỷ lệ chốt", None, "",
+                  "/marketing?tab=doisoat",
+                  "leads.conversion_report(kỳ này)['da_doi_chieu'] = sai",
+                  trang_thai=CHUA_CO, chu="Chưa xác định", muc="vang",
+                  ghi_chu="Chưa chạy đối chiếu lead ↔ booking. Đây là CHƯA XÁC ĐỊNH, không "
+                          "phải 0% — hai thứ khác nhau và màn hình phải nói ra điều đó.")
+    ty = (rep.get("total_current") or {}).get("ty_le_chot_overview")
+    return _o("ty_le_chot", "Tỷ lệ chốt", round(float(ty or 0) * 100, 1), "%",
+              "/marketing?tab=chuyendoi",
+              "leads.conversion_report(kỳ này)['total_current']['ty_le_chot_overview']",
+              ghi_chu="Quy tắc overview-v1 Chủ tịch ký 14/9/2026: tính cả phần chốt ở các "
+                      "kỳ SAU, nên con số này còn tăng khi kỳ trước chốt muộn. Tăng KHÔNG "
+                      "phải lỗi.")
+
+
+def _ngan_sach_ky(db: Session) -> dict:
+    """CHƯA LẬP là một trạng thái, không phải số 0 — không có dự toán thì không có chỗ để so."""
+    ky = ky_nay()
+    n = int(db.execute(select(func.count()).select_from(MarketingBudget)
+                       .where(MarketingBudget.period == ky,
+                              MarketingBudget.status.in_(("cho_duyet", "hieu_luc")))).scalar() or 0)
+    if not n:
+        return _o("ngan_sach_ky", "Ngân sách kỳ", None, "",
+                  "/marketing?tab=ngansach",
+                  "marketing_budgets kỳ " + ky + " ∈ (cho_duyet, hieu_luc) = 0 bản",
+                  trang_thai=CHUA_CO, chu="Chưa lập", muc="vang",
+                  ghi_chu="Chưa có dự toán thì không có chỗ để so phần đã chi. Đây là việc "
+                          "còn thiếu, không phải ngân sách bằng 0.")
+    return _o("ngan_sach_ky", "Ngân sách kỳ", n, "bản",
+              "/marketing?tab=ngansach",
+              "marketing_budgets kỳ " + ky + " ∈ (cho_duyet, hieu_luc)",
+              ghi_chu="Thực chi đọc từ đề nghị chi ĐÃ DUYỆT, không nhập tay.")
+
+
+def _lead_qua_han_phong(db: Session) -> dict:
+    """CẢ PHÒNG, không cắt theo người — khác `_lead_qua_han_cua_toi` đúng một dòng lọc.
+
+    Và đó là khác biệt có lý do: bàn nhân viên trả lời "sáng nay TÔI phải làm gì", bàn Phó
+    TGĐ trả lời "phòng tôi đang nợ khách bao nhiêu lời hồi đáp". Một con số gồm cả lead
+    người khác giữ là vô dụng với người ngồi bàn nhân viên, và là con số DUY NHẤT đúng với
+    người quản. Chủ tịch duyệt 12/11/2026.
+    """
+    n = LD.dem_qua_han(db, select(Lead).where(Lead.status.in_(LEAD_DANG_MO)))
+    return _o("lead_qua_han_phong", "Lead quá hạn liên hệ", n, "lead",
+              "/marketing?tab=khach",
+              "leads.dem_qua_han trên CẢ sổ lead đang mở, không lọc theo người giữ",
+              muc="do" if n else "",
+              ghi_chu="Hạn lấy theo leads.han_hieu_luc: LỜI HẸN với khách thắng luật 24 giờ. "
+                      "Trạng thái vẫn là Mới và chưa ai liên hệ.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════
 # HAI BÀN
 # ══════════════════════════════════════════════════════════════════════════════════════════════
 
 # Ô là MẪU SỐ để đọc ô khác, không phải việc phải làm. Không cộng vào tổng đang chờ.
-MAU_SO = ("chien_dich_dang_chay",)
+#
+# MKT-11 · 12/11/2026 — NĂM Ô MỚI ĐỀU VÀO ĐÂY, và đây là một quyết định chứ không phải một
+# dòng cho đủ. `tong_dang_cho` đang cộng bốn ô: 0+0+0+1 = 1 việc đang chờ. Cộng thêm 25 lead
+# quá hạn và 7.355 lead chưa gắn thì tổng thành 7.381 "việc đang chờ" — một con số vô nghĩa,
+# cộng kỳ với lead với bản thảo. Chính tài liệu bàn giao dặn: "một lead có thể thuộc nhiều
+# nhóm nên không cộng các nhóm thành tổng người", và bản v32 cũng KHÔNG có ô tổng nào.
+#
+# Nên: năm ô mới không cộng vào tổng, màn hình mới không vẽ ô tổng, và `tong_dang_cho` giữ
+# nguyên ý nghĩa cũ cho bàn nhân viên và cho bất kỳ nơi nào còn đọc nó.
+MAU_SO = ("chien_dich_dang_chay", "sdt_phat_sinh", "ty_le_chot", "ngan_sach_ky",
+          "lead_qua_han_phong", "lead_chua_gan")
 
 
 def _dong_goi(ten: str, vai: str, o: list[dict]) -> dict:
@@ -220,6 +333,12 @@ def ban_ptgd(db: Session) -> dict:
         _chay("chien_dich_cho_duyet", "Chiến dịch chờ đưa vào chạy", lambda: _chien_dich_cho_duyet(db)),
         _chay("ky_chua_chot", "Kỳ chưa chốt số", lambda: _ky_chua_chot(db)),
         _chay("chien_dich_dang_chay", "Chiến dịch đang chạy", lambda: _chien_dich_dang_chay(db)),
+        # MKT-11 — ba ô theo dõi và hai ô việc. Đều là MẪU SỐ, xem chú thích ở `MAU_SO`.
+        _chay("sdt_phat_sinh", "Số điện thoại phát sinh", lambda: _sdt_phat_sinh(db)),
+        _chay("ty_le_chot", "Tỷ lệ chốt", lambda: _ty_le_chot(db)),
+        _chay("ngan_sach_ky", "Ngân sách kỳ", lambda: _ngan_sach_ky(db)),
+        _chay("lead_qua_han_phong", "Lead quá hạn liên hệ", lambda: _lead_qua_han_phong(db)),
+        _chay("lead_chua_gan", "Lead chưa gắn chiến dịch", lambda: _lead_chua_gan(db)),
     ]
     return _dong_goi("Bàn làm việc Phó TGĐ Marketing", "ptgd_mkt", o)
 
