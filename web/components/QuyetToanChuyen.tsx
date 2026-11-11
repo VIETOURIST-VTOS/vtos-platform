@@ -53,7 +53,7 @@ type To = {
   tam_ung: number | null; hoan_tra: number | null; chi_them: number | null; phu_thu: number | null;
   bc_tinh_trang_xe: string;
   tong: {
-    tai_xe_chi: number; cong_ty_chi: number; chua_khai_ai_tra: number;
+    tai_xe_chi: number; cong_ty_chi: number; chua_khai_ai_tra: number; tai_xe_da_de_nghi_chi?: number;
     tong_chi_phi_tour: number; tai_xe_con_nhan: number; so_khoan: number;
   };
   chi_phi: Dong[];
@@ -203,7 +203,8 @@ export default function QuyetToanChuyen({ tripId, toast }: {
         <OMay nhan="TỔNG TÀI XẾ CHI" gt={vnd(t.tai_xe_chi)}
           duoi="cộng các khoản khai là tài xế ứng tiền mặt – CÓ tính công tác phí (khai «Tài xế ứng tiền mặt»)" />
         <OMay nhan="Tài xế còn được nhận" gt={vnd(t.tai_xe_con_nhan)}
-          duoi="tài xế chi + chi thêm − tạm ứng − hoàn trả (số âm = tài xế còn nợ công ty)" />
+          duoi={"tài xế chi + chi thêm − tạm ứng − hoàn trả (số âm = tài xế còn nợ công ty)" +
+            (t.tai_xe_da_de_nghi_chi ? ` − ${vnd(t.tai_xe_da_de_nghi_chi)} đã có đề xuất chi (chi ở đề xuất ấy, không chi lại ở đây)` : "")} />
         <label>Tạm ứng<input type="number" {...o("tam_ung")} /></label>
         <label>Hoàn trả<input type="number" {...o("hoan_tra")} /></label>
         <label>Chi thêm<input type="number" {...o("chi_them")} /></label>
