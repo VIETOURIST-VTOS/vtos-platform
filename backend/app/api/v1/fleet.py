@@ -401,7 +401,7 @@ def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict, kg: dict | None = N
         from app.services import ops as _O
         kg = _O.de_nghi_theo_khoan_goc(db)
     return {"id": t.id, "vehicle_id": t.vehicle_id, "xe": veh.get(t.vehicle_id, ""),
-            "tai_xe": emps.get(t.driver_id, ""), "ten_tour": t.ten_tour, "ngay_di": t.ngay_di,
+            "driver_id": t.driver_id, "tai_xe": emps.get(t.driver_id, ""), "ten_tour": t.ten_tour, "ngay_di": t.ngay_di,
             "ngay_ve": t.ngay_ve, "so_ngay": (t.ngay_ve - t.ngay_di).days + 1,
             "km_dau": t.km_dau, "km_cuoi": t.km_cuoi, "km_gps": t.km_gps,
             "km_nguon": t.km_nguon, "km_nguon_ten": KM_NGUON.get(t.km_nguon, t.km_nguon or ""),
@@ -602,7 +602,7 @@ def sua_chuyen(tid: int, data: SuaChuyenIn, u: User = Depends(require_roles(*WRI
         raise HTTPException(422, "Chuyến đã xác nhận – mở lại (kèm lý do) rồi mới sửa được")
     truoc = {"ten_tour": t.ten_tour, "ngay_di": str(t.ngay_di), "ngay_ve": str(t.ngay_ve),
              "km_dau": t.km_dau, "km_cuoi": t.km_cuoi, "km_gps": t.km_gps, "km_nguon": t.km_nguon,
-             "doanh_thu": t.doanh_thu, "quyet_toan": t.quyet_toan}
+             "doanh_thu": t.doanh_thu, "quyet_toan": t.quyet_toan, "driver_id": t.driver_id}
     d = data.model_dump(exclude_none=True)
     from app.services import ghi_mot_lan as GML
     GML.kiem_phien_ban(t, d.pop("phien_ban", None), f"Chuyến {t.id}",
