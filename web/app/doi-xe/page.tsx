@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { Fragment, useEffect, useState, useCallback } from "react";
 import DinhKem from "@/components/DinhKem";
 import QuyetToanChuyen from "@/components/QuyetToanChuyen";
 import BonBuocBaoCaoXe from "@/components/doixe/BonBuocBaoCaoXe";
@@ -37,6 +37,7 @@ function DoiXe() {
   const [chuyen, setChuyen] = useState<any[]>([]);
   /** VH-2: chuyến cần mở sẵn tờ báo cáo (từ `?chuyen=`); mở khi danh sách chuyến đã về. */
   const [moChuyen, setMoChuyen] = useState<number>(0);
+  const [moCT, setMoCT] = useState<number>(0);          // VH-31: chuyến đang mở ngăn chi tiết
   const [gd, setGd] = useState<any>(null);
   const [chuXe, setChuXe] = useState<any[]>([]);
   const [qt, setQt] = useState<any[]>([]);
@@ -257,7 +258,6 @@ function DoiXe() {
   if (!tq) return <p className="muted">Đang tải…</p>;
   return (<>
     <h1>Đội xe Vietrip – hồ sơ và điều kiện khai thác</h1>
-    <p className="muted">Mã xe theo chiếc xe suốt vòng đời, không theo biển số: đổi biển hay chuyển sở hữu đều giữ nguyên lịch sử chuyến và chi phí của chính chiếc xe đó.</p>
 
     <div className="kpis">
       <div className="kpi"><b>{tq.tong_so_xe}</b><span>xe trong danh mục</span></div>
@@ -277,9 +277,8 @@ function DoiXe() {
     {tq.thieu_trong_o_dem > 0 && <p className="cb-do">Có <b>{tq.thieu_trong_o_dem}</b> xe không nằm
       trong ô đếm nào ở trên — nghĩa là máy chủ xếp chúng vào một mức mà dãy ô này chưa in. Đừng đọc
       các con số trên như đã đủ; báo CNTT.</p>}
-    {/* VH-5 (Chủ tịch duyệt 10/11/2026): bỏ đoạn giải thích ô đếm dài; giữ câu chế độ chặn — nó đổi việc
-        người điều xe được làm. */}
-    <p className="muted">{tq.chan_khi_thieu_giay ? "Đang BẬT chế độ chặn khi thiếu giấy tờ." : "Chế độ chặn khi thiếu giấy tờ đang TẮT – thiếu hồ sơ chỉ cảnh báo."}</p>
+    {/* VH-31 (Chủ tịch 12/11/2026): bỏ câu chế độ chặn khi TẮT; khi BẬT thì vẫn nói vì nó đổi việc người điều xe được làm. */}
+    {tq.chan_khi_thieu_giay && <p className="cb-vang">Đang BẬT chế độ chặn khi thiếu giấy tờ.</p>}
 
     <div className="dx-tabs">
       {([["xe", "Hồ sơ xe"], ["chuyen", `Nhật trình chuyến (${chuyen.length})`], ["giaodich", `Đối soát nguồn ngoài (${gd?.rows?.length || 0})`], ["quyettoan", `Chủ xe & quyết toán (${chuXe.length})`], ["congno", "Công nợ đội xe"], ["baoduong", bd ? `Bảo dưỡng (${(bd.theo_muc?.BLOCK || 0) + (bd.theo_muc?.REVIEW || 0)} cần xếp lịch)` : "Bảo dưỡng"], ["baohong", bh ? `Báo hỏng (${bh.dem?.dang_mo || 0} đang mở)` : "Báo hỏng"],
@@ -356,15 +355,7 @@ function DoiXe() {
         </div>
       </div>}
 
-      {chuyen.some((t: any) => t.nguon === "bao_cao_vietrip") && <div className="panel" style={{ borderColor: "var(--orange)" }}>
-        <b>Dữ liệu đối chiếu – CHƯA CHÍNH THỨC.</b>
-        <p className="muted">{chuyen.filter((t: any) => t.nguon === "bao_cao_vietrip").length} phiếu trong danh sách dưới
-          đây nạp từ báo cáo quyết toán xe của Vietrip để đối chiếu và chạy thử. Số liệu chính thức là phiếu do
-          người phụ trách nhập và xác nhận trên VTOS. Đừng lấy các con số này để báo cáo hay quyết toán khi
-          chưa được rà lại.</p>
-      </div>}
       <div className="panel wrap"><h2>Nhật trình chuyến</h2>
-      <p className="muted">Km để trống là <b>chưa đo</b>, không phải 0.</p>
       {canNhap && !form && <div style={{ marginBottom: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button className="act teal" onClick={() => setForm({ ngay_di: "", ngay_ve: "" })}>+ Nhập phiếu chi phí xe</button>
         {/* Cờ được tính lúc GHI rồi lưu vào dòng. Đo trên hệ thật 07/10/2026: cả 24 chuyến in rõ
@@ -373,31 +364,49 @@ function DoiXe() {
             không đổi trạng thái, không đổi km, không đổi tiền. */}
         <button className="act grey" onClick={tinhLaiCo}>Tính lại cờ chuyến</button>
       </div>}
-      <table><thead><tr><th>Phiếu</th><th>Xe</th><th>Tour</th><th>Đi → về</th><th>Km chạy</th><th>Doanh thu</th><th>VTS tạm ứng</th><th>Chủ xe chịu</th><th>Cờ</th>{canNhap && <th></th>}</tr></thead>
-        <tbody>{chuyen.length ? chuyen.map((t) => <tr key={t.id}>
-          <td className="muted">{t.ma_phieu || `#${t.id}`}
-            {t.nguon === "bao_cao_vietrip" && <div><Tag cls="warn">dữ liệu thử</Tag></div>}</td>
-          <td>{t.xe}</td><td>{t.ten_tour || <span className="muted">—</span>}</td>
-          <td>{fmtD(t.ngay_di)} → {fmtD(t.ngay_ve)} <span className="muted">({t.so_ngay} ngày)</span></td>
-          <td className="num">{t.km_chay === null ? <span className="muted">chưa đo</span> : t.km_chay.toLocaleString("vi-VN")}
-            {t.km_nguon_ten && <div className="muted">{t.km_nguon_ten}</div>}
-            {t.km_gps ? <div className="muted">GPS {t.km_gps.toLocaleString("vi-VN")}
-              {t.km_lech_gps !== null && t.km_lech_gps !== undefined ? ` · lệch ${t.km_lech_gps.toLocaleString("vi-VN")}` : ""}</div>
-              : <div className="muted">chưa có số GPS</div>}</td>
+      {/* VH-31 (Chủ tịch duyệt bản xem trước 12/11/2026): mỗi chuyến MỘT dòng ngang; cờ chỉ hiện nhãn + lý do đầu cắt
+          gọn. Bấm vào dòng → ngăn chi tiết ngay dưới (đủ lý do cờ, tài xế, km, ghi chú). Nút Sửa / Mở lại ở cuối dòng. */}
+      <div className="nt-bang"><table><thead><tr><th aria-hidden="true"></th><th>Phiếu</th><th>Xe</th><th>Tour</th><th>Đi → về</th>
+        <th className="num">Km chạy</th><th className="num">Doanh thu</th><th className="num" title="Vietourist tạm ứng">VTS ứng</th>
+        <th>Cờ</th>{canNhap && <th></th>}</tr></thead>
+        <tbody>{chuyen.length ? chuyen.map((t) => {
+          const ly = (t.co_ly_do || "").split(" · ").map((x: string) => x.trim()).filter(Boolean);
+          const mo = moCT === t.id;
+          const bat = () => setMoCT(mo ? 0 : t.id);
+          return <Fragment key={t.id}>
+          <tr className={"nt-dong" + (mo ? " mo" : "")} tabIndex={0} aria-expanded={mo} onClick={bat}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); bat(); } }}>
+          <td><span className="nt-mui" aria-hidden="true">›</span></td>
+          <td className="nt-ma" title={t.ma_phieu || undefined}><b>{t.ma_phieu || `#${t.id}`}</b></td>
+          <td>{t.xe}</td><td className="nt-tour" title={t.ten_tour || undefined}>{t.ten_tour || <span className="muted">—</span>}</td>
+          <td title={`${fmtD(t.ngay_di)} → ${fmtD(t.ngay_ve)} · ${t.so_ngay} ngày`}>{String(fmtD(t.ngay_di)).slice(0, 5)} → {String(fmtD(t.ngay_ve)).slice(0, 5)}</td>
+          <td className="num">{t.km_chay === null ? <span className="muted">chưa đo</span> : t.km_chay.toLocaleString("vi-VN")}</td>
           <td className="num">{t.doanh_thu ? t.doanh_thu.toLocaleString("vi-VN") : ""}</td>
           <td className="num">{t.tong_chi_vietourist.toLocaleString("vi-VN")}</td>
-          <td className="num">{t.tong_chi_chu_xe.toLocaleString("vi-VN")}</td>
-          <td><Tag cls={t.co === "xanh" ? "ok" : t.co === "do" ? "red" : "warn"}>{t.co === "xanh" ? "Xanh" : t.co === "do" ? "Đỏ" : "Vàng"}</Tag>
-            {t.co_ly_do && <div className="muted">{t.co_ly_do}</div>}
-            {t.note && <div className="muted">{t.note}</div>}</td>
-          {canNhap && <td>{t.status === "da_xac_nhan"
-            ? <button className="act grey" onClick={() => moLai(t.id)}>Mở lại để sửa</button>
-            : <button className="act grey" onClick={() => setForm({
+          <td className="nt-ly"><span className="nt-ly-t" title={t.co_ly_do || undefined}>
+            <Tag cls={t.co === "xanh" ? "ok" : t.co === "do" ? "red" : "warn"}>{t.co === "xanh" ? "Xanh" : t.co === "do" ? "Đỏ" : "Vàng"}</Tag>
+            {" "}{ly[0] || ""}{ly.length > 1 ? ` · +${ly.length - 1}` : ""}</span></td>
+          {canNhap && <td onClick={(e) => e.stopPropagation()}>{t.status === "da_xac_nhan"
+            ? <button className="act grey" style={{ margin: 0 }} onClick={() => moLai(t.id)}>Mở lại để sửa</button>
+            : <button className="act grey" style={{ margin: 0 }} onClick={() => setForm({
                 id: t.id, vehicle_id: t.vehicle_id, ten_tour: t.ten_tour,
                 ngay_di: (t.ngay_di || "").slice(0, 10), ngay_ve: (t.ngay_ve || "").slice(0, 10),
                 km_dau: t.km_dau, km_cuoi: t.km_cuoi, km_gps: t.km_gps, km_nguon: t.km_nguon,
                 doanh_thu: t.doanh_thu, note: t.note })}>Sửa</button>}</td>}
-        </tr>) : <tr><td colSpan={canNhap ? 10 : 9} className="muted">Chưa có chuyến nào được ghi nhật trình.</td></tr>}</tbody></table>
+          </tr>
+          {mo && <tr className="nt-ct"><td colSpan={canNhap ? 10 : 9}><dl>
+            <div className="dai"><dt>Cờ · lý do</dt><dd>{ly.length ? <ul>{ly.map((x: string, i: number) => <li key={i}>{x}</li>)}</ul> : "—"}</dd></div>
+            <div><dt>Thời gian</dt><dd>{fmtD(t.ngay_di)} → {fmtD(t.ngay_ve)} ({t.so_ngay} ngày)</dd></div>
+            <div><dt>Tài xế</dt><dd>{t.tai_xe || "—"}</dd></div>
+            <div><dt>Chủ xe chịu</dt><dd>{t.tong_chi_chu_xe.toLocaleString("vi-VN")} đ</dd></div>
+            <div><dt>Km</dt><dd>{t.km_dau ?? "—"} → {t.km_cuoi ?? "—"}{t.km_nguon_ten ? ` · ${t.km_nguon_ten}` : ""}</dd></div>
+            <div><dt>GPS</dt><dd>{t.km_gps ? `${t.km_gps.toLocaleString("vi-VN")} km${t.km_lech_gps != null ? ` · lệch ${t.km_lech_gps.toLocaleString("vi-VN")}` : ""}` : "chưa có số GPS"}</dd></div>
+            {t.qt_ten_trang_thai && <div><dt>Báo cáo xe</dt><dd>{t.qt_ten_trang_thai}</dd></div>}
+            {t.note && <div className="dai"><dt>Ghi chú</dt><dd>{t.note}</dd></div>}
+          </dl></td></tr>}
+          </Fragment>;
+        }) : <tr><td colSpan={canNhap ? 10 : 9} className="muted">Chưa có chuyến nào được ghi nhật trình.</td></tr>}</tbody></table></div>
+      <style>{NT_CSS}</style>
       </div>
     </>}
 
@@ -1132,3 +1141,25 @@ function XoaXe({ xe, xong }: { xe: any; xong: () => void }) {
     </div>
   );
 }
+
+/* VH-31 · nhật trình chuyến: một dòng ngang mỗi chuyến, bấm dòng mở chi tiết. */
+const NT_CSS = `
+.nt-bang{overflow-x:auto}
+.nt-bang table{min-width:820px}
+.nt-bang td.num{font-family:inherit;font-variant-numeric:tabular-nums}
+.nt-bang td.nt-ma{max-width:130px;overflow:hidden;text-overflow:ellipsis}
+.nt-bang td,.nt-bang th{white-space:nowrap;vertical-align:middle}
+.nt-dong{cursor:pointer}
+.nt-dong:hover>td,.nt-dong.mo>td{background:var(--panel2)}
+.nt-dong:focus-visible{outline:2px solid var(--orange);outline-offset:-2px}
+.nt-mui{display:inline-block;color:var(--ink2);transition:transform .15s}
+.nt-dong.mo .nt-mui{transform:rotate(90deg)}
+.nt-bang td.nt-ly{white-space:normal;width:100%;min-width:160px;max-width:0}
+.nt-bang td.nt-tour{max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.nt-ly-t{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2)}
+.nt-ct>td{background:var(--panel2);white-space:normal;padding:12px 16px 16px}
+.nt-ct dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 24px;margin:0}
+.nt-ct dl>div{min-width:0}.nt-ct .dai{grid-column:1/-1}
+.nt-ct dt{font-size:calc(11/14*1rem);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+.nt-ct dd{margin:2px 0 0}.nt-ct ul{margin:2px 0 0;padding-left:18px}
+`;
