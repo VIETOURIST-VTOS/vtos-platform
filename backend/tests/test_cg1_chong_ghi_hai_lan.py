@@ -157,5 +157,5 @@ def _web(*p):
 
 def test_6_man_hinh_chon_khoan_goc():
     s = _web("components", "doixe", "BonBuocDeXuatChi.tsx")
-    assert "/fleet/khoan-goc?xe_id=" in s and "disabled={!!k.de_nghi_chi}" in s
+    assert "/fleet/khoan-goc?xe_id=" in s and "disabled={!!k.de_nghi_chi" in s      # VH-29: || công ty đã trả
     assert "đã có đề nghị chi" in _web("components", "QuyetToanChuyen.tsx")
