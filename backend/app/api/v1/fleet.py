@@ -2149,6 +2149,7 @@ class DeNghiChiXeIn(BaseModel):
     can_cu_so_tien: str = ""
     ma_khoan_goc: str = ""
     ma_khoan_goc_ds: list[str] = []       # VH-29: nhiều khoản gốc trên một phiếu
+    ben_nhan_ma: str = ""                 # VH-34: mã NV tài xế / mã NCC khi chọn bên nhận từ danh mục
     hen_bo_sung: str = ""
     ghi_chu_kiem_tra: str = ""
     cho_phep_trung: bool = False
@@ -2196,6 +2197,12 @@ def lap_de_nghi_chi_xe(data: DeNghiChiXeIn, u: User = Depends(require_roles("gd_
                        "hen_bo_sung": data.hen_bo_sung, "ghi_chu_kiem_tra": data.ghi_chu_kiem_tra}})
     except ValueError as ex:
         raise HTTPException(422, str(ex))
+    # VH-34: bên nhận chọn từ danh mục → lưu MÃ (mã NV tài xế / mã NCC) để tài xế xem đúng phiếu trả cho mình,
+    # không dò theo tên. Chỉ nhận mã có thật trong danh mục.
+    bn = (data.ben_nhan_ma or "").strip()
+    if bn and any((b.get("ma") or "") == bn for b in danh_muc_ben_nhan(db)):
+        r.doi_xe = {**(r.doi_xe or {}), "ben_nhan_ma": bn[:30]}
+        db.commit()
     ai = O.cap_duyet(db, r)["ai"]
     # Chống ghi hai lần (10/11/2026): cùng số chứng từ ở đề nghị chi khác → CẢNH BÁO (không chặn).
     trung = O.chung_tu_trung(db, r.document_ref, r.id)
@@ -2304,6 +2311,35 @@ def ds_ben_nhan_chon(u: User = Depends(require_roles(*READ)), db: Session = Depe
     return {"rows": danh_muc_ben_nhan(db)}
 
 
+_TEN_O_SUA = {"amount": "Số tiền", "description": "Nội dung", "supplier_name": "Bên nhận",
+              "supplier_tax_code": "Mã số thuế", "ngay_den_han": "Ngày cần xử lý"}
+
+
+def _dxc_phien_ban(r) -> list[dict]:
+    """VH-34 · LỊCH SỬ PHIÊN BẢN (Chủ tịch duyệt 12/11/2026): bản 1 lúc lập → mỗi lần trả bổ sung (ai, lúc, lý do)
+    → bản kế khi gửi lại, kèm các ô ĐÃ ĐỔI (giá trị cũ → mới). Đọc `lan_tra` máy chủ đã lưu từ TT-TBS — mỗi lần
+    trả chụp lại bản trước; bản sau là bản trước của lần trả kế tiếp, hoặc chính phiếu hiện tại."""
+    lan = list(r.lan_tra or [])
+    ra = [{"loai": "lap", "ban": 1, "nguoi": r.created_by or "",
+           "luc": r.created_at.isoformat(timespec="minutes") if r.created_at else None}]
+    for i, t in enumerate(lan):
+        ra.append({"loai": "tra", "nguoi": t.get("boi", ""), "luc": (t.get("luc") or "")[:16], "ly_do": t.get("ly_do", "")})
+        if not t.get("gui_lai_luc"):
+            continue
+        truoc = t.get("ban_truoc") or {}
+        sau = (lan[i + 1].get("ban_truoc") or {}) if i + 1 < len(lan) else None
+        doi = []
+        for k in t.get("da_sua") or []:
+            cu = truoc.get(k)
+            moi = (sau or {}).get(k) if sau is not None else getattr(r, k, None)
+            if hasattr(moi, "isoformat"):
+                moi = moi.isoformat()
+            doi.append({"o": _TEN_O_SUA.get(k, k), "cu": cu, "moi": moi})
+        ra.append({"loai": "gui_lai", "ban": i + 2, "nguoi": r.created_by or "", "luc": (t.get("gui_lai_luc") or "")[:16],
+                   "doi": doi})
+    return ra
+
+
 def _dxc_chi_tiet(db: Session, u: User, r, x: dict, dm: set | None = None) -> dict:
     from app.services import ops as O
     viec: list[list[str]] = []
@@ -2318,8 +2354,9 @@ def _dxc_chi_tiet(db: Session, u: User, r, x: dict, dm: set | None = None) -> di
             viec.append(["pay", "Đã chi"])
         if chi <= 0 and O._ai_tra_duoc(db, u, r):
             viec.append(["tra_bo_sung", "Trả bổ sung"])
-    if st not in ("da_chi", "tu_choi") and chi <= 0 and u.role in ("chutich", "tgd", "ketoan") \
-            and (st != "cho_chi" or u.role == "ketoan") and u.username != r.created_by:
+    # VH-34 (Chủ tịch 12/11/2026): KT trưởng từ chối được như Kế toán. «Đã chi» vẫn chỉ Kế toán / thủ quỹ (NL-2).
+    if st not in ("da_chi", "tu_choi") and chi <= 0 and u.role in ("chutich", "tgd", "ketoan", "ketoan_truong") \
+            and (st != "cho_chi" or u.role in ("ketoan", "ketoan_truong")) and u.username != r.created_by:
         viec.append(["reject", "Từ chối"])
     if st == "tra_bo_sung" and u.username == r.created_by:
         viec.append(["gui_lai", "Bổ sung & gửi lại"])
@@ -2361,6 +2398,7 @@ def _dxc_chi_tiet(db: Session, u: User, r, x: dict, dm: set | None = None) -> di
             "co_tep": co_tep, "co_unc": O.co_unc(db, r) if st == "cho_chi" else None,
             "con_phai_chi": max(0.0, float(r.amount or 0) - chi),
             "khoan_goc": kg,
+            "phien_ban": _dxc_phien_ban(r),
             "khoan_goc_ds": [{"ma": k["ma"], "ten": k["ten"], "so_tien": float(k["so_tien"] or 0)} for k in kgs],
             "ghi_chu_kiem_tra": x.get("ghi_chu_kiem_tra") or "", "hen_bo_sung": x.get("hen_bo_sung") or "",
             "luc_lap": r.created_at.isoformat() if r.created_at else None,
