@@ -14,6 +14,7 @@
  *  RANH GIỚI 09/9 GIỮ NGUYÊN: thẻ nào máy chủ chưa có nguồn thì ghi "Chưa có nguồn" kèm CỬA NHẬP –
  *  đường dẫn tới màn hình mà bộ phận phụ trách gõ số vào. Không lấy 0 thay cho "chưa ai nhập".
  */
+import NutLich90, { VAI_NUT_LICH_90 } from "@/components/NutLich90";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { vnd } from "@/lib/api";
@@ -245,7 +246,11 @@ export function TieuDe({ vai, ten_vai, quyet_dinh }: {
   return (<>
     <div className="mh01-ban">
       <h1 className="mh01-ban-ten" title="Phạm vi: Vietourist — công ty mẹ">{ten}</h1>
-      <div className="mh01-ban-ngay"><span>Hôm nay</span>{homNay || "…"}</div>
+      {/* VH-27 (Chủ tịch 12/11/2026): nút vàng «Lịch xe 90 ngày» xuống góc phải, cạnh ô ngày. */}
+      <div className="mh01-ban-cum">
+        <div className="mh01-ban-ngay"><span>Hôm nay</span>{homNay || "…"}</div>
+        {vai && VAI_NUT_LICH_90.includes(vai) && <NutLich90 />}
+      </div>
     </div>
 
     {/* ĐỢT E12 13/10/2026 — khối xổ ra của dòng đang mở. Nằm NGOÀI thanh ngang vì nó là một BẢNG,

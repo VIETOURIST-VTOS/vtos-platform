@@ -163,6 +163,9 @@ class User(Base):
     # sự. Bắt buộc đuôi @vietourist.com.vn — kiểm ở `services/email_cong_viec.py`. Rỗng = chưa có.
     email_cong_viec: Mapped[str] = mapped_column(String(120), default="", server_default="")
     password_hash: Mapped[str] = mapped_column(String(200))
+    # VH-27 (Chủ tịch 12/11/2026): dòng nào trong hai nút «Công việc» / «Chờ duyệt» người này đã bấm xem —
+    # {"viec": [khoá…], "duyet": [khoá…]}. Khoá = nhãn dòng, mà nhãn mang số → có việc mới là khoá mới, số tăng lại.
+    viec_da_xem: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Bổ sung 07/9/2026 (đặc tả Tài khoản & phân quyền, mục B3)
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)

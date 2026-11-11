@@ -203,15 +203,16 @@
 /* VH-17 · 11/11/2026 — NÚT VÀNG «Lịch xe 90 ngày» (thanh ngang của lãnh đạo, /xe). Cùng bộ màu hổ phách đã
  * duyệt cho nút lớn trên /xe (VH-10): khác hẳn dàn nút navy để mắt bắt ngay. */
 :root {
-  --vtos-n90-a:        #ffd76a;
-  --vtos-n90-b:        #ffb627;
-  --vtos-n90-c:        #ff9a1f;
-  --vtos-n90-chu:      #3b2300;
-  --vtos-n90-net:      #5a3500;
-  --vtos-n90-vien:     #ffe7a8;
-  --vtos-n90-quang:    #ff9f1f66;
-  --vtos-n90-quang-2:  #ff9f1fa0;
-  --vtos-n90-vet:      #ffffffb0;
+  /* VH-27 (Chủ tịch 12/11/2026): nút «Lịch xe 90 ngày» đổi sang vàng-xanh nhạt sáng. */
+  --vtos-n90-a:        #f6fbb4;
+  --vtos-n90-b:        #e4f69c;
+  --vtos-n90-c:        #cbed80;
+  --vtos-n90-chu:      #2e4100;
+  --vtos-n90-net:      #3e5a00;
+  --vtos-n90-vien:     #f4fcd2;
+  --vtos-n90-quang:    #b5e05a66;
+  --vtos-n90-quang-2:  #b5e05aa0;
+  --vtos-n90-vet:      #ffffffc8;
 }
 
 /* VH-24 · 12/11/2026 — TIÊU ĐỀ PHÁT SÁNG của bàn làm việc trang chủ (Chủ tịch: «to rõ, hiệu ứng ánh sáng giống

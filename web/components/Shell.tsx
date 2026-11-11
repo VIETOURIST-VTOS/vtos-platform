@@ -685,31 +685,15 @@ const Ctx = createContext<{
 }>({ user: null, toast: () => {}, datChuaLuu: () => {} });
 export const useShell = () => useContext(Ctx);
 
-/** VH-17 · vai thấy nút vàng nhỏ «Lịch xe 90 ngày» trên thanh ngang. Quyền vào trang/cửa do máy chủ giữ
- *  (MENU_ROLES["/lich-xe-trong"], fleet.KHOANG_TRONG_XEM); danh sách này chỉ quyết ai THẤY NÚT. Nút mở màn
- *  /lich-xe-trong — nay là lịch 90 ngày đầy đủ (VH-17), cùng thành phần LichXe90 của /xe. */
-const VAI_NUT_LICH_90 = ["chutich", "tgd", "ptgd_doan", "ptgd_mkt", "gd_kd", "tp_dh", "tp_kd", "tp_hd",
-  "ketoan_truong", "hcns"];
-
-function NutLich90() {
-  const [trong, setTrong] = useState<number | null>(null);
-  useEffect(() => {
-    api("/fleet/lich-xe-tuong-lai?so_ngay=30").then((r: any) => setTrong(r?.ngay_xe_trong ?? null)).catch(() => {});
-  }, []);
-  return <Link href="/lich-xe-trong" className="n90s" title="Lịch xe 90 ngày — xe nào còn trống, ưu tiên bán tour">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>
-    <span>Lịch xe 90 ngày</span>{trong !== null && <b>{trong} trống</b>}
-  </Link>;
-}
-
 /* VH-24 · 12/11/2026 (Chủ tịch duyệt bản xem trước, chốt 1.1.1) — hai nút «Công việc» và «Chờ duyệt» trên
    thanh ngang thôi trỏ vào hai neo không có (neo «viec-cua-toi», «cho-toi-duyet» — bấm chỉ về trang chủ rồi
    đứng im). Nay là nút xổ danh sách, có SỐ khi có việc. Nguồn: `GET /dashboard/dem` — cửa đếm nhẹ, cùng hàm
    với bảng điều hành, máy chủ nhớ 60 giây; màn hình hỏi lại mỗi phút. Số đỏ trên «Chờ duyệt» CHỈ đếm việc phải
    bấm; dòng «để xem» nằm cuối danh sách, không cộng vào số. */
 type DemViec = { cho_duyet: any[]; so_cho_duyet: number; de_xem: any[]; cong_viec: any[]; so_cong_viec: number };
-function NutViec({ dem, loai, mo, datMo, children }: { dem: DemViec | null; loai: "viec" | "duyet"; mo: boolean;
-                                             datMo: (v: boolean) => void; children: string }) {
+function NutViec({ dem, loai, mo, datMo, daXem, children }: { dem: DemViec | null; loai: "viec" | "duyet"; mo: boolean;
+                                             datMo: (v: boolean) => void; daXem: (loai: "viec" | "duyet", label: string) => void;
+                                             children: string }) {
   const so = loai === "viec" ? dem?.so_cong_viec ?? 0 : dem?.so_cho_duyet ?? 0;
   const ds = loai === "viec" ? dem?.cong_viec ?? [] : dem?.cho_duyet ?? [];
   const xem = loai === "duyet" ? dem?.de_xem ?? [] : [];
@@ -723,7 +707,9 @@ function NutViec({ dem, loai, mo, datMo, children }: { dem: DemViec | null; loai
       <div className="nv-dau">{loai === "viec" ? "Công việc của tôi" : "Chờ tôi duyệt"}{so > 0 ? ` · ${so}` : ""}</div>
       {dem === null ? <div className="nv-trong">Đang đếm…</div>
         : ds.length === 0 && xem.length === 0 ? <div className="nv-trong">Không có việc nào đang chờ.</div> : null}
-      {ds.map((d: any, i: number) => <Link key={i} href={d.href} className="nv-dong" onClick={() => datMo(false)}>{d.label}</Link>)}
+      {/* VH-27: bấm một dòng = đã xem → số trên nút giảm ngay; máy chủ nhớ (POST /dashboard/da-xem). */}
+      {ds.map((d: any, i: number) => <Link key={i} href={d.href} className={"nv-dong" + (d.da_xem ? " nv-da" : "")}
+        onClick={() => { if (!d.da_xem) daXem(loai, d.label); datMo(false); }}>{d.label}</Link>)}
       {xem.length > 0 && <div className="nv-nhom">Để xem, không phải để bấm</div>}
       {xem.map((d: any, i: number) => <Link key={`x${i}`} href={d.href} className="nv-dong nv-doc" onClick={() => datMo(false)}>{d.label}</Link>)}
     </div>}
@@ -751,6 +737,17 @@ export default function Shell({ children, khongThanhBen = false }:
   // VH-24: số việc của hai nút «Công việc» / «Chờ duyệt»; nút nào đang xổ danh sách.
   const [dem, setDem] = useState<DemViec | null>(null);
   const [xoViec, setXoViec] = useState<"" | "viec" | "duyet">("");
+  // VH-27: đánh dấu đã xem — trừ số tại chỗ cho nhanh, rồi báo máy chủ nhớ (đổi máy vẫn giữ).
+  const daXem = useCallback((loai: "viec" | "duyet", label: string) => {
+    setDem((d) => {
+      if (!d) return d;
+      const k = loai === "viec" ? "cong_viec" : "cho_duyet", sk = loai === "viec" ? "so_cong_viec" : "so_cho_duyet";
+      const dong = (d as any)[k].find((x: any) => x.label === label);
+      return { ...d, [k]: (d as any)[k].map((x: any) => x.label === label ? { ...x, da_xem: true } : x),
+               [sk]: Math.max(0, (d as any)[sk] - (dong && !dong.da_xem ? dong.so || 1 : 0)) } as DemViec;
+    });
+    api("/dashboard/da-xem", { method: "POST", json: { loai, label } }).catch(() => {});
+  }, []);
   const path = usePathname();
   const router = useRouter();
 
@@ -902,15 +899,13 @@ export default function Shell({ children, khongThanhBen = false }:
             onClick={() => toast("Tìm kiếm: đang xây dựng")}>
             <Bt d="tim" /><span>Tìm kiếm…</span>
           </button>
-          {/* VH-17 · 11/11/2026 (Chủ tịch duyệt bản xem trước) — nút vàng NHỎ «Lịch xe 90 ngày» cho lãnh
-              đạo và trưởng phòng, ở MỌI bàn làm việc của họ. GĐ đội xe không có nút này: /xe đã có nút
-              vàng lớn, hai nút một màn là lặp (Chủ tịch dặn 10/11). Số trên nút = ngày-xe trống 30 ngày. */}
-          {user && VAI_NUT_LICH_90.includes(user.role) && <NutLich90 />}
-          <NutViec dem={dem} loai="viec" mo={xoViec === "viec"} datMo={(v) => setXoViec(v ? "viec" : "")}>Công việc</NutViec>
-          <NutViec dem={dem} loai="duyet" mo={xoViec === "duyet"} datMo={(v) => setXoViec(v ? "duyet" : "")}>Chờ duyệt</NutViec>
+          {/* VH-27 · 12/11/2026 — nút vàng «Lịch xe 90 ngày» rời thanh ngang, xuống đầu bàn làm việc cạnh ô
+              ngày (DauManHinh01 · NutLich90.tsx). */}
+          <NutViec dem={dem} loai="viec" mo={xoViec === "viec"} datMo={(v) => setXoViec(v ? "viec" : "")} daXem={daXem}>Công việc</NutViec>
+          <NutViec dem={dem} loai="duyet" mo={xoViec === "duyet"} datMo={(v) => setXoViec(v ? "duyet" : "")} daXem={daXem}>Chờ duyệt</NutViec>
           {/* THỨ TỰ theo bản vẽ 12/9: … Công việc · Chờ duyệt · Trợ lý AI · chuông · Tài khoản.
               Chuông đứng sát ô tài khoản vì hai thứ ấy đều là của riêng người đang đăng nhập. */}
-          <button type="button" className="bar-muc ai soon" title="Sắp có" onClick={() => toast("Trợ lý AI: đang xây dựng")}>
+          <button type="button" className="bar-muc ai soon" title="Trợ lý AI — sắp có" onClick={() => toast("Trợ lý AI: đang xây dựng")}>
             <Bt d="ai" /><span>Trợ lý AI</span>
           </button>
           {/* Con số trên chuông là TỔNG CẢNH BÁO NGHIỆP VỤ, không phải "số thông báo chưa đọc" mà
@@ -925,6 +920,7 @@ export default function Shell({ children, khongThanhBen = false }:
               một cái chuông đứng ở 99+ suốt nhiều tuần thì không ai biết nó đang là 120 hay 1900.
               Chừng nào chuông còn đếm cảnh báo nghiệp vụ chứ chưa đếm thông báo chưa đọc, thì số
               thật hữu ích hơn số đã chặn trần. Nhãn trợ năng nói rõ đây là cảnh báo nghiệp vụ. */}
+          <span className="bar-ngan" aria-hidden="true" />
           <Link href="/alerts" className="bar-muc" title="Thông báo & cảnh báo nghiệp vụ"
             aria-label={`Cảnh báo nghiệp vụ${alerts > 0 ? `: ${alerts}` : ""}`}>
             <Bt d="chuong" />{alerts > 0 && <b className="so-bao">{alerts}</b>}
