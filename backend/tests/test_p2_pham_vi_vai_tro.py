@@ -810,7 +810,8 @@ PHAM_VI_DA_CHOT = {
     # nạp «so_quy» cho thủ quỹ nhưng màn hình chưa mở (quyền có, cửa không). Cửa quyết toán tour vẫn tự chặn bằng
     # require_roles riêng của nó; thủ quỹ chỉ nạp được bộ «so_quy».
     "ketoan_truong": 123, "ketoan_tt": 32, "thu_quy": 30,
-    "robot_pq": 18, "robot_ks": 153, "robot_vpm": 17,   # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
+    "robot_pq": 18, "robot_ks": 154, "robot_vpm": 17,   # +1 11/11/2026 · robot_ks = bks: /api/v1/fleet/lich-xe-tuong-lai/khoang-trong (XE-KD-1, test_p8)
+      # +2 ngày 24/9/2026, cùng bốn vai nền: /api/v1/ptgd-doan và /api/v1/sales-admin
 }
 
 

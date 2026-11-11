@@ -183,3 +183,19 @@
   --vtos-sky:          #14538D;
   --vtos-nut-vien:     #5A9BD4;
 }
+
+/* LOGO-1 · 11/11/2026 — Ô NỀN TRẮNG CỦA LOGO trên thanh đầu (Chủ tịch duyệt). Ba sắc viền lấy đúng ba màu
+ * của bản logo v2 (xanh #5A9BD4 · hồng #FF6F96 · lá #5FAE66); vệt sáng lướt, quầng và bóng đổ của ô. Khai ở
+ * đây chứ không gõ thẳng vào globals.css — luật của bộ nhận diện: một mã màu gõ thẳng là một màu không ai
+ * duyệt (test_bo_nhan_dien, TC-31/35/38/40/44). Giống nhau ở cả nền tối và nền sáng: ô luôn trắng. */
+:root {
+  --vtos-logo-xanh:      #5A9BD4;
+  --vtos-logo-hong:      #FF6F96;
+  --vtos-logo-la:        #5FAE66;
+  --vtos-logo-vet-sang:  #eef5ff;
+  --vtos-logo-quang:     #8cc4ff40;
+  --vtos-logo-quang-dam: #8cc4ff70;
+  --vtos-logo-chu-sang:  #8cc4ff99;
+  --vtos-logo-bong:      #0a234866;
+  --vtos-logo-bong-dam:  #0a234888;
+}

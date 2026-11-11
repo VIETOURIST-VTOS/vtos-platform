@@ -349,12 +349,15 @@ def test_thu_tu_thanh_ngang_theo_ban_ve():
 
 
 def test_o_tim_kiem_gian_rong_chu_khong_chot_cung():
-    """Bản vẽ cho ô tìm kiếm ăn hết chỗ trống giữa ô đơn vị và cụm nút (flex:1), không chốt 260px."""
+    """Bản vẽ cũ cho ô tìm kiếm ăn hết chỗ trống (flex:1). TOP-1 · 11/11/2026 Chủ tịch duyệt bản xem trước:
+    thu hẹp còn tối đa 320px và đặt GIỮA thanh (margin:0 auto) cho cân đối. Vẫn không chốt cứng `width`
+    — ô co lại được khi thanh chật, và dưới 900px giãn trọn dòng."""
     css = open(os.path.join(ROOT, "web", "app", "globals.css"), encoding="utf-8").read()
     m = re.search(r'\.top \.bar \.o-tim\{[^}]*\}', css)
     assert m, "không tìm thấy quy tắc .o-tim trong globals.css"
     luat = m.group(0)
-    assert "flex:1" in luat, f"ô tìm kiếm phải giãn theo bản vẽ, đang là: {luat[:120]}"
+    assert "flex:0 1 320px" in luat and "max-width:320px" in luat and "margin:0 auto" in luat, \
+        f"ô tìm kiếm phải thu hẹp và đặt giữa (TOP-1), đang là: {luat[:160]}"
     assert not re.search(r'[;{]width:\d+px', luat), f"ô tìm kiếm còn chốt cứng bề rộng: {luat[:120]}"
 
 

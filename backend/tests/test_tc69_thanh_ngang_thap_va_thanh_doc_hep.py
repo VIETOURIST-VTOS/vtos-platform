@@ -169,7 +169,7 @@ def test_logo_khong_bi_dung_toi():
     (nền trong suốt) — không còn dấu VTOS, không còn bản đơn sắc trắng (anh đã bác 18/9).
     """
     src = _doc(os.path.join(ROOT, "web", "components", "Shell.tsx"))
-    assert "/thuong-hieu/v2/khoachu-holdings-nen-trong.svg" in src, "thanh ngang phải dùng logo Vietourist Holdings v2"
+    assert "/thuong-hieu/v2/khoachu-holdings-ngang.svg" in src, "thanh ngang phải dùng logo Vietourist Holdings v2 (LOGO-1 11/11/2026: bản chữ navy trên ô trắng)"
     assert "vtos-logo-nen-toi.svg" not in _khong_chu_thich(src), "dấu VTOS đã bỏ khỏi thanh ngang (logo v2)"
     assert "khoachu-holdings-trang" not in src, "bản đơn sắc trắng đã bị anh Tuấn bác"
     assert "HỆ THỐNG ĐIỀU HÀNH" in src, "thiếu chữ nhỏ «Hệ thống điều hành» cạnh logo"

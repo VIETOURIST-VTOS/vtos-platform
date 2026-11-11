@@ -1149,8 +1149,10 @@ MENU_ROLES = {
     # cntt}). Ghép từ BASE_VIEW/SALES/… thì gọn hơn hôm nay, nhưng ngày một hằng nhóm nhận
     # thêm một vai, vai ấy THẤY mục menu rồi bấm vào và nhận 403 — mà người nhận 403 không
     # có cách nào biết đó là quyền hay là lỗi. Thà dài một dòng.
+    # +robot_ks (11/11/2026, làn Phân quyền sửa hộ theo lệnh Chủ tịch): robot Kiểm soát phải nhìn ĐÚNG bằng
+    # Ban Kiểm soát (test_p8) — bks có mặt ở đây thì robot_ks cũng phải có; nó chỉ đọc (READ_ONLY_ROLES).
     "/lich-xe-trong": ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "tp_dh", "nv_dh", "ketoan",
-                       "bks", "cntt", "hcns", "gd_doi_xe", "gd_kd", "tp_kd"),
+                       "bks", "robot_ks", "cntt", "hcns", "gd_doi_xe", "gd_kd", "tp_kd"),
     # KS-46 (08/11/2026) — "/xe": màn RIÊNG của đội xe, không cột dọc, không phân hệ
     # phòng khác. HẸP HƠN "/lai-lo-doi-xe" một vai: kế toán không có việc gì trên bàn
     # làm việc của giám đốc, họ đã có màn Lãi lỗ để đọc số. Chủ tịch nằm trong
