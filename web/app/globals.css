@@ -354,7 +354,25 @@ aside.side .nhom-xo.mo .grp-xo-dau{opacity:1}
     box-shadow:none;background:rgba(255,255,255,.06)}
 }
 
-.shell main{flex:1;min-width:0;margin:0}
+/* ══ GD-1 · BỀ NGANG KHUNG NỘI DUNG TRONG VỎ ỨNG DỤNG — anh Tuấn 12/11/2026 ═══════════════
+   "mở rộng chiều ngang, khoảng trống bên phải đang quá lớn"
+
+   ĐO TRƯỚC KHI SỬA, trên chính máy anh Tuấn: cửa sổ 1920px · thanh dọc 331px · khung nội dung
+   1180px · TRỐNG BÊN PHẢI 409px — 21% bề ngang bỏ không. Và trống dồn HẾT sang phải chứ không
+   chia đôi, vì `margin:0 auto` của `main` ở trên bị chính dòng này đè bằng `margin:0`.
+
+   TRẦN TÍNH THEO CỠ CHỮ, KHÔNG PHẢI SỐ PX CỨNG. 1180px cứng có một tật kín: ai phóng to cỡ chữ
+   thì chữ to ra mà khung không to theo, nên khung càng lúc càng CHẬT so với chữ trong nó — đúng
+   chỗ anh Tuấn đang đứng (cỡ chữ gốc máy anh là 20px, nên thanh dọc đo được 331px chứ không phải
+   232px như ở cỡ 14px). Trần theo rem giữ nguyên SỐ CHỮ trên một dòng ở mọi cỡ chữ, và đó mới là
+   thứ quyết định dòng chữ có đọc nổi hay không.
+   Ở cỡ chữ 14px trần là 1480px; ở cỡ chữ của anh Tuấn là 2114px — tức trên màn 1920 thì không
+   chạm trần, khung ăn trọn chỗ còn lại. Đo lại sau khi sửa: khung 1566px, trống còn 23px.
+
+   `margin-inline:auto` trả lại phần căn giữa mà `margin:0` đã lấy mất: trên màn siêu rộng, chỗ
+   thừa chia đôi hai bên thay vì dồn một bên. Viết tách `margin-block` / `margin-inline` chứ
+   không quay về `margin:0 auto` — khối này là con của flex, lề trên dưới phải giữ bằng 0. */
+.shell main{flex:1;min-width:0;margin-block:0;margin-inline:auto;max-width:calc(1480/14*1rem)}
 /* Thu thanh dọc (v1.1 §I.2: rộng 224–240px, thu còn 56–64px). Ở trạng thái thu chỉ còn một cột biểu
    tượng; nhãn nhóm không mất mà chuyển vào title/aria-label, vì §I.2 đòi biểu tượng phải có chú
    thích. Mục con ẩn hẳn khi thu: nhét chúng vào một cột 60px là một cột chữ vỡ dòng, không đọc được. */
@@ -1458,6 +1476,16 @@ table.bang-doc{width:100%}
   box-shadow:0 2px 10px rgb(0 0 0 / 18%);
   opacity:0;visibility:hidden;transition:opacity .08s;pointer-events:none;z-index:6;text-align:center}
 .bd-cham:hover .bd-cham-so,.bd-cham:focus-visible .bd-cham-so{opacity:1;visibility:visible}
+/* GD-1 · NHÃN CỦA CHẤM ĐẦU VÀ CHẤM CUỐI KHÔNG CĂN GIỮA.
+   Nhãn rộng ~200px, căn giữa chấm nên thò mỗi bên ~100px. Hai chấm cạnh nhau cách xa hơn thế,
+   nên chỉ chấm ĐẦU và chấm CUỐI mới thò được ra ngoài khung — và chấm cuối thò ra thì nó đẩy CẢ
+   TRANG tràn ngang: đo 12/11/2026 đúng 16px, hiện một thanh cuộn ngang ở đáy MỌI màn hình.
+   Lỗi này có sẵn từ trước; bề ngang 1180 chỉ giấu nó vì chấm cuối chưa chạm mép cửa sổ. Nới bề
+   ngang không tạo ra nó, chỉ làm nó lộ ra — nên sửa ở đây, không sửa bằng cách thôi nới rộng.
+   KHÔNG dùng `overflow:clip` cho khung biểu đồ: cắt nhãn thì con số mất một nửa, mà con số mới
+   là lý do cái nhãn tồn tại. Đổi ĐIỂM NEO, không cắt. */
+.bd-cham.dau .bd-cham-so{left:0;right:auto;transform:none;text-align:left}
+.bd-cham.cuoi .bd-cham-so{left:auto;right:0;transform:none;text-align:right}
 .bd-cham-so b{display:block;font-size:calc(12.5/14*1rem);font-weight:700;color:var(--vtos-text);
   font-variant-numeric:tabular-nums;line-height:1.25}
 .bd-cham-so i{display:block;font-style:normal;font-size:calc(10.5/14*1rem);color:var(--vtos-text-mute);

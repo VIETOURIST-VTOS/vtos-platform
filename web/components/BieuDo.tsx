@@ -633,7 +633,14 @@ export function BieuDoDuong({ ten, phu, ds, nhan, dinh_dang = "tien", moc, chan,
               `tabIndex` để bàn phím tới được: Tab tới chấm thì nhãn hiện y như rê chuột. */}
           {ds.map((d) => d.diem.map((p, i) => (
             p.gt === null || p.gt === undefined ? null : (
-              <span key={d.ten + "-" + i} className={"bd-cham " + d.lop}
+              {/* GD-1 · 12/11/2026 — CHẤM ĐẦU và CHẤM CUỐI mang thêm một lớp để nhãn của chúng
+                  neo vào trong khung thay vì căn giữa. Nhãn rộng ~200px; căn giữa chấm cuối thì
+                  nửa nhãn thò ra khỏi mép phải và đẩy CẢ TRANG tràn ngang 16px. Chỉ hai chấm ấy
+                  cần, vì khoảng cách giữa hai chấm giữa rộng hơn nửa nhãn. Lý do đầy đủ ở
+                  `.bd-cham.dau` / `.bd-cham.cuoi` trong globals.css. */}
+              <span key={d.ten + "-" + i}
+                className={"bd-cham " + d.lop
+                  + (i === 0 ? " dau" : i === d.diem.length - 1 ? " cuoi" : "")}
                 style={{ left: `${x(i)}%`, bottom: `${pct(p.gt)}%` }}
                 tabIndex={0}
                 title={`${d.ten} · ${nhan[i]}: ${daySo(p.gt, dinh_dang)}`}>
