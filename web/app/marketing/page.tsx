@@ -1054,6 +1054,14 @@ function Marketing() {
    vì nhiều làn cùng giữ hai tệp ấy. Mã màu lấy NGUYÊN từ khối `:root` của chính màn `/xe`
    trong `globals.css` — không thêm một mã màu mới nào vào hệ thống. */
 const MAU = <style>{`
+/* MKT-7 · 11/11/2026 — THÂN TRANG RỘNG RA CHO BẰNG THANH ĐẦU.
+   Đo trên bản thật: nội dung dừng ở khoảng 950px trong khi thanh đầu trải hết màn, nên
+   nửa phải màn hình trống trơn. Không phải MKT-6 gây ra — nó có từ đợt MKT-3 ngày
+   09/11/2026, hôm ẩn thanh dọc bằng khongThanhBen mà không nới main: chiều rộng cũ
+   là chiều rộng cho một trang CÒN thanh dọc, và thanh dọc thì không còn.
+   LẤY NGUYÊN CON SỐ 1440 CỦA MÀN /xe, không tự chọn một số khác: hai màn của hai phòng
+   cạnh nhau phải rộng bằng nhau, chứ không phải mỗi màn một khổ. */
+main{max-width:1440px!important;margin:0 auto!important}
 body,.shell{background:#eaf0f7!important}
 :root{--mkt-b1:0 1px 2px #12305414,0 4px 12px #1230541a;
   --mkt-nhan:#2c5fa2;--mkt-dam:#183c69;--mkt-vien:#e1e7ef}
@@ -1064,7 +1072,15 @@ main h1{color:var(--mkt-dam)}
 /* HÀNG CHỨC NĂNG — khuôn .xe-nhom. Điểm nhấn của màn nằm Ở NÚT, không ở gạch chân: tám nhóm
    là tám nút navy đặc, nút đang mở navy đậm có vòng sáng. Dính trên cùng như /xe, để cuộn
    xuống giữa một bảng dài vẫn đổi nhóm được mà không phải cuộn ngược lên. */
-.mkt-chuc{position:sticky;top:0;z-index:5;background:#eaf0f7;padding:6px 0 4px;margin-bottom:10px;
+/* MKT-7 · 11/11/2026 — DÍNH Ở ĐÁY THANH ĐẦU, KHÔNG DÍNH Ở ĐỈNH MÀN.
+   Đo trên bản thật ngay sau khi MKT-6 gộp: cuộn xuống thì hàng chức năng trùm lên nửa
+   trái thanh đầu, che mất ô logo và chữ HỆ THỐNG ĐIỀU HÀNH.
+   MKT-6 chép khuôn .xe-nhom-dinh của màn /xe kể cả top:0, mà nếp của kho không phải
+   thế: chú thích của đợt LOGO-1 cùng ngày ghi rõ nav.tabs và aside.side đều dính ở
+   top: var(--top-h). Biến ấy là chiều cao THẬT của thanh đầu, đã tính cả ô logo, đệm
+   và viền đáy — nên dùng nó thì ngày thanh đầu cao lên, hàng này tụt theo đúng chừng ấy.
+   Màn /xe đang sai y hệt. Không sửa tệp của làn khác; đã báo sang làn giữ màn ấy. */
+.mkt-chuc{position:sticky;top:var(--top-h);z-index:5;background:#eaf0f7;padding:6px 0 4px;margin-bottom:10px;
   display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
 .mkt-chuc button{display:inline-flex;align-items:center;justify-content:center;gap:8px;margin:0;
   font:inherit;font-size:13.5px;font-weight:600;color:#fff;background:var(--mkt-nhan);border:0;
