@@ -68,7 +68,7 @@ const ChuaNhap = () => (
  *  Mọi đường dẫn ở đây là MÀN HÌNH CÓ THẬT đang chạy; v3.3 §11 gọi đợt này là "nối giao diện với
  *  chức năng hiện có", nên không dựng màn mới nào. Trang con nào là một TAB của /doi-xe thì trỏ
  *  thẳng vào tab ấy. */
-type Trang = { ma: string; ten: string; toi: string; ghi?: string };
+type Trang = { ma: string; ten: string; toi: string; ghi?: string; an?: true };
 const NHOM: { ma: string; ten: string; tom: string; trang: Trang[] }[] = [
   { ma: "dispatch", ten: "Điều xe", tom: "Đề nghị xe · lịch và lệnh · tài xế nhận lệnh", trang: [
     { ma: "lich", ten: "Lịch & lệnh điều xe", toi: "/lenh-dieu-xe" },
@@ -81,22 +81,25 @@ const NHOM: { ma: string; ten: string; tom: string; trang: Trang[] }[] = [
       ghi: "Hạn nhận: trước giờ khởi hành 24 giờ" },
     { ma: "xe-hom-nay", ten: "Xe hôm nay", toi: "/doi-xe/xe-hom-nay" },
   ] },
-  { ma: "fleet", ten: "Xe & tài xế", tom: "Hồ sơ xe · tài xế · chủ xe và hợp đồng", trang: [
+  { ma: "fleet", ten: "Xe & tài xế", tom: "Hồ sơ xe · tài xế · chủ xe và hợp đồng · xếp hạng", trang: [
     { ma: "ho-so-xe", ten: "Hồ sơ xe", toi: "/doi-xe" },
     { ma: "tai-xe", ten: "Tài xế", toi: "/tai-xe" },
     { ma: "chu-xe", ten: "Chủ xe & hợp đồng", toi: "/doi-xe?tab=quyettoan" },
     { ma: "phat", ten: "Phạt tài xế", toi: "/doi-xe/phat-tai-xe" },
+    // VH-35 (Chủ tịch duyệt 12/11/2026): xếp hạng xe & tài xế về nhóm Xe & tài xế.
+    { ma: "hieu-qua", ten: "Xếp hạng xe & tài xế", toi: "/hieu-qua-doi-xe?chi=xep-hang" },
   ] },
-  { ma: "finance", ten: "Báo cáo & chi phí", tom: "Báo cáo từng xe · đề xuất chi · quyết toán · công nợ", trang: [
-    { ma: "bao-cao-xe", ten: "Báo cáo từng xe", toi: "/doi-xe?tab=chuyen", ghi: "Nhật trình chuyến" },
-    { ma: "de-xuat-chi", ten: "Đề xuất chi", toi: "/doi-xe?tab=giaodich", ghi: "Tab Đối soát nguồn ngoài" },
+  { ma: "finance", ten: "Báo cáo & chi phí", tom: "Quyết toán · công nợ · lãi lỗ · thuê xe ngoài", trang: [
+    // VH-35 (Chủ tịch duyệt 12/11/2026): hai trang này KHÔNG hiện trên thanh con — hai nút lớn đầu bàn
+    // («Lập đề xuất chi», «Nhập báo cáo từng xe») vào thẳng form; hiện thêm tab là lặp nút trên một màn.
+    { ma: "bao-cao-xe", ten: "Báo cáo từng xe", toi: "/doi-xe?tab=chuyen", ghi: "Nhật trình chuyến", an: true },
+    { ma: "de-xuat-chi", ten: "Đề xuất chi", toi: "/doi-xe?tab=giaodich", ghi: "Tab Đối soát nguồn ngoài", an: true },
     { ma: "quyet-toan", ten: "Quyết toán", toi: "/doi-xe?tab=quyettoan" },
     { ma: "cong-no", ten: "Công nợ", toi: "/doi-xe?tab=congno" },
     { ma: "lai-lo", ten: "Lãi lỗ đội xe", toi: "/lai-lo-doi-xe", ghi: "Ba tầng chi phí và chi phí kỳ" },
     // VH-11 (Chủ tịch duyệt 11/11/2026): nút «Hiệu quả» bỏ — tổng kết kỳ và bản tin sáng trùng bàn làm
-    // việc; hai phần KHÔNG trùng chuyển về đây. `chi=xep-hang` giấu hai khối trùng của trang cũ.
-    { ma: "hieu-qua", ten: "Xếp hạng xe & tài xế", toi: "/hieu-qua-doi-xe?chi=xep-hang" },
-    { ma: "nhin-lai", ten: "Nhìn lại thuê xe ngoài", toi: "/doi-xe?tab=nhin-lai" },
+    // việc; «Xe thuê ngoài» (trước là «Nhìn lại thuê xe ngoài», đổi tên VH-35) về đây (xếp hạng: nhóm Xe & tài xế, VH-35).
+    { ma: "nhin-lai", ten: "Xe thuê ngoài", toi: "/doi-xe?tab=nhin-lai" },
   ] },
   { ma: "technical", ten: "Bảo dưỡng & sự cố", tom: "Bảo dưỡng · báo hỏng · dầu và định mức", trang: [
     { ma: "bao-duong", ten: "Bảo dưỡng", toi: "/doi-xe?tab=bao-duong" },
@@ -324,7 +327,7 @@ function BanLamViecXe() {
   const [quyen, setQuyen] = useState(false);
   /** «Số tiền theo»: mặc định chuyến đã quyết toán (KS-65); chọn «tất cả» thì nói thêm phần đang treo. */
   const [theoTien, setTheoTien] = useState<"qt" | "tat_ca">("qt");
-  const trangMo = nhomMo ? (nhomMo.trang.find((t) => t.ma === trang) || nhomMo.trang[0]) : null;
+  const trangMo = nhomMo ? (nhomMo.trang.find((t) => t.ma === trang) || nhomMo.trang.find((t) => !t.an) || nhomMo.trang[0]) : null;
 
   /** VH-6: mở một đường dẫn đội xe TẠI CHỖ — chọn trang con có `toi` khớp dài nhất, rồi mở chi tiết. */
   const moTaiCho = (href: string) => {
@@ -396,8 +399,8 @@ function BanLamViecXe() {
     </nav>
 
     {/* ② THANH CON — chỉ hiện khi nhóm có nhiều hơn một trang (v3.3). */}
-    {nhomMo && nhomMo.trang.length > 1 && <nav aria-label={`Trang của ${nhomMo.ten}`} className="xe-con">
-      {nhomMo.trang.map((t) => (
+    {nhomMo && nhomMo.trang.filter((t) => !t.an).length > 1 && <nav aria-label={`Trang của ${nhomMo.ten}`} className="xe-con">
+      {nhomMo.trang.filter((t) => !t.an).map((t) => (
         <button key={t.ma} type="button" onClick={() => { setTrang(t.ma); setMoSan(""); setChiTiet(null); }}
           aria-pressed={trangMo?.ma === t.ma}>
           {t.ten}

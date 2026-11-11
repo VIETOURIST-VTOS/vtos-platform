@@ -17,8 +17,10 @@ def test_bo_nhom_hieu_qua_chuyen_hai_trang_ve_bao_cao():
     i = s.index('{ ma: "finance", ten: "Báo cáo & chi phí"')
     j = s.index('{ ma: "technical"')
     nhom = s[i:j]
-    assert '{ ma: "hieu-qua", ten: "Xếp hạng xe & tài xế", toi: "/hieu-qua-doi-xe?chi=xep-hang" }' in nhom
-    assert '{ ma: "nhin-lai", ten: "Nhìn lại thuê xe ngoài", toi: "/doi-xe?tab=nhin-lai" }' in nhom
+    # VH-35 (12/11/2026): «Xếp hạng xe & tài xế» chuyển sang nhóm Xe & tài xế.
+    xe = s[s.index('{ ma: "fleet", ten: "Xe & tài xế"'):i]
+    assert '{ ma: "hieu-qua", ten: "Xếp hạng xe & tài xế", toi: "/hieu-qua-doi-xe?chi=xep-hang" }' in xe
+    assert '{ ma: "nhin-lai", ten: "Xe thuê ngoài", toi: "/doi-xe?tab=nhin-lai" }' in nhom
 
 
 def test_nut_trang_chu_dau_dong():
