@@ -251,8 +251,6 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
       {!d.dispatch_id && d.vehicle_id && <p className="muted">Không chọn lệnh thì phiếu ghi là <b>không qua lệnh</b>: không đối chiếu được với lệnh và tour — tài xế chọn tay ở ô trên.</p>}
       <label style={{ display: "block", marginTop: 8 }}>Ghi chú chuyến
         <input value={d.note} onChange={(e) => dat("note", e.target.value)} /></label>
-      <p className="muted">Biển số đối chiếu theo <b>ngày chuyến</b>: mã xe theo chiếc xe suốt vòng đời, đổi biển
-        hay chuyển sở hữu đều giữ nguyên lịch sử của chính chiếc đó.</p>
     </>}
 
     {buoc === 1 && <>
