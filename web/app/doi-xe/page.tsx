@@ -24,6 +24,11 @@ function DoiXe() {
   const [chon, setChon] = useState<any>(null);
   const [xm, setXm] = useState<any[]>([]);
   const [tab, setTab] = useState<"xe" | "chuyen" | "giaodich" | "quyettoan" | "congno" | "baoduong" | "baohong" | "nhinlai">("xe");
+  /* VH-33 (Chủ tịch 12/11/2026): mở trong khung của bàn GĐ đội xe (/xe) thì /xe đã có tiêu đề, ô đếm và thanh
+     nghiệp vụ — ở đây giấu phần đầu trang và dãy tab để không lặp nút trên một màn; liên kết sang màn ngoài
+     đội xe (tờ quyết toán tour) cũng giấu vì trong khung chúng không mở được. */
+  const [nhung, setNhung] = useState(false);
+  useEffect(() => { try { setNhung(window.self !== window.top); } catch { setNhung(true); } }, []);
   // DX-2 · 16/10/2026 — báo cáo NHÌN LẠI. Nạp RIÊNG, không nhét vào `load()` chung: nó quét toàn
   // bộ chặng phương tiện và đối chiếu từng ngày với nhật trình xe, nên nặng hơn hẳn các khối kia.
   // Nhét chung thì mở màn hình Hồ sơ xe cũng phải chờ một phép quét không ai hỏi tới.
@@ -257,6 +262,7 @@ function DoiXe() {
 
   if (!tq) return <p className="muted">Đang tải…</p>;
   return (<>
+    {!nhung && <>
     <h1>Đội xe Vietrip – hồ sơ và điều kiện khai thác</h1>
 
     <div className="kpis">
@@ -295,6 +301,7 @@ function DoiXe() {
       <a className="act grey" style={{ margin: 0 }} href="/doi-xe/gia-dau" target="_blank" rel="noopener">Giá dầu & định mức ↗</a>
       <a className="act grey" style={{ margin: 0 }} href="/doi-xe/xe-hom-nay" target="_blank" rel="noopener">Xe hôm nay theo sheet ↗</a>
     </div>
+    </>}
 
     {tab === "chuyen" && <>
       {form?.id && <DinhKem doiTuong="chuyen_xe" doiTuongId={form.id}
@@ -918,7 +925,7 @@ function DoiXe() {
               : c.thanh_tien.toLocaleString("vi-VN")}</td>
             <td>{c.xe_nha_ranh.map((v: any) => <Tag key={v.id} cls="ok">{v.ma} · {v.bien} · {v.ghe} chỗ</Tag>)}
               {c.so_xe_ranh > c.xe_nha_ranh.length && <span className="muted"> và {c.so_xe_ranh - c.xe_nha_ranh.length} xe nữa</span>}</td>
-            <td><a className="act grey" style={{ margin: 0 }} href={`/tours/${c.tour_id}`}>Mở tờ quyết toán</a></td>
+            <td>{!nhung && <a className="act grey" style={{ margin: 0 }} href={`/tours/${c.tour_id}`}>Mở tờ quyết toán</a>}</td>
           </tr>)}{!(nl.a_dang_le_khong_can_thue?.danh_sach || []).length
             && <tr><td colSpan={6} className="muted">Kỳ này không có chặng nào đáng lẽ không cần thuê.</td></tr>}</tbody></table>
 
@@ -934,7 +941,7 @@ function DoiXe() {
               : c.thanh_tien.toLocaleString("vi-VN")}</td>
             {/* Cửa sửa nằm trên TỜ QUYẾT TOÁN (mục Phương tiện, nút «Gắn tay»), không ở đây: người
                 giữ màn đội xe không có quyền ghi tờ quyết toán. Mở thẳng đúng tab. */}
-            <td><a className="act grey" style={{ margin: 0 }} href={`/tours/${c.tour_id}?tab=lop3`}>Mở tờ quyết toán để gắn ↗</a></td>
+            <td>{!nhung && <a className="act grey" style={{ margin: 0 }} href={`/tours/${c.tour_id}?tab=lop3`}>Mở tờ quyết toán để gắn ↗</a>}</td>
           </tr>)}{!(nl.b_nghi_khai_nham?.danh_sach || []).length
             && <tr><td colSpan={5} className="muted">Không có chặng nào nghi khai nhầm.</td></tr>}</tbody></table>
 
@@ -946,7 +953,7 @@ function DoiXe() {
             <td>{c.nha_cung_cap}</td>
             <td className="num">{c.thanh_tien === null ? <span className="muted">chưa có</span>
               : c.thanh_tien.toLocaleString("vi-VN")}</td>
-            <td><a className="act grey" style={{ margin: 0 }} href={`/tours/${c.tour_id}`}>Mở tờ quyết toán</a></td>
+            <td>{!nhung && <a className="act grey" style={{ margin: 0 }} href={`/tours/${c.tour_id}`}>Mở tờ quyết toán</a>}</td>
           </tr>)}{!(nl.c_khong_doi_chieu_duoc?.danh_sach || []).length
             && <tr><td colSpan={4} className="muted">Mọi chặng thuê ngoài đều đã có ngày.</td></tr>}</tbody></table>
       </>}
