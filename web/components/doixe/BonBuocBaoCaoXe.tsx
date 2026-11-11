@@ -63,7 +63,7 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
   xe: any[]; kmNguon: Record<string, string>;
   toast: (s: string, loi?: boolean) => void; onXong: () => void; onDong: () => void;
 }) {
-  const { data: d, setData, xoaNhap, coNhapCu } = useNhap("vtos.doixe.bao-cao-xe.nhap", rong);
+  const { data: d, setData, xoaNhap } = useNhap("vtos.doixe.bao-cao-xe.nhap", rong);
   const [buoc, setBuoc] = useState(0);
   const [dang, setDang] = useState(false);
   const [daLuu, setDaLuu] = useState<{ id: number; ma_phieu?: string } | null>(null);
@@ -216,9 +216,6 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
   return <div className="panel">
     <h2>Nhập báo cáo từng xe</h2>
     <ThanhBuoc ten={TEN_BUOC} buoc={buoc} veBuoc={setBuoc} />
-    {coNhapCu && buoc === 0 && <p className="muted">Đang mở lại <b>nháp lưu trong máy này</b> từ lần gõ trước.
-      Nháp không nằm trên máy chủ: đổi máy hoặc xoá dữ liệu trình duyệt là mất.
-      {" "}<button className="act grey" style={{ margin: 0 }} onClick={() => { xoaNhap(); setBuoc(0); }}>Bỏ nháp, gõ lại từ đầu</button></p>}
     <ConThieu ds={thieuNay} />
 
     {buoc === 0 && <>
@@ -343,7 +340,6 @@ export default function BonBuocBaoCaoXe({ xe, kmNguon, toast, onXong, onDong }: 
       {buoc === 3 && <button className="act teal" disabled={dang || thieuNay.length > 0} onClick={gui}>
         {dang ? "Đang lưu…" : "Gửi báo cáo"}</button>}
       <button className="act grey" onClick={onDong}>Đóng</button>
-      <span className="bb-nhap">Nháp tự lưu trong máy này</span>
     </div>
   </div>;
 }

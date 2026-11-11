@@ -73,15 +73,17 @@ export function TuyenDuyet({ tuyen, ghi }: { tuyen: TuyenMot[]; ghi: string }) {
         <em>{i === 0 ? "Đang lập" : "Bước sau · chỉ xem"}</em>
       </li>)}
     </ol>
-    <p className="muted" style={{ marginTop: 10 }}>{ghi}</p>
+    {ghi && <p className="muted" style={{ marginTop: 10 }}>{ghi}</p>}
   </>;
 }
 
 /** Ô xác nhận trước khi gửi. Bắt buộc, và câu chữ nói rõ người bấm đang xác nhận ĐIỀU GÌ —
  *  "Tôi đồng ý" không xác nhận gì cả. */
+/** VH-26 (Chủ tịch 12/11/2026): ô tích thay bằng NÚT CHỮ «Xác nhận» — người lập đọc câu cam kết rồi bấm. */
 export function OXacNhan({ cho, doi, chu }: { cho: boolean; doi: (v: boolean) => void; chu: string }) {
-  return <label className="bb-ok"><input type="checkbox" checked={cho} onChange={(e) => doi(e.target.checked)} />
-    <span>{chu}</span></label>;
+  return <div className="bb-ok"><span>{chu}</span>
+    <button type="button" className={"act " + (cho ? "teal" : "")} aria-pressed={cho} style={{ margin: 0 }}
+      onClick={() => doi(!cho)}>{cho ? "✓ Đã xác nhận" : "Xác nhận"}</button></div>;
 }
 
 /** Nháp. LƯU TRONG MÁY NÀY, không lưu trên máy chủ — và câu đó phải hiện ra bằng chữ ở nơi
