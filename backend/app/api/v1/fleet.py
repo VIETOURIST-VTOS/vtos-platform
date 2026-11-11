@@ -2297,9 +2297,10 @@ def _dxc_chi_tiet(db: Session, u: User, r, x: dict) -> dict:
     kg = O.khoan_goc(db, kg_ma) if kg_ma else None
     if kg:
         goc = float(kg["so_tien"] or 0)
-        if goc > 0 and float(r.amount or 0) > goc + 0.5:
-            kiem.append({"muc": "do", "chu": f"Xin {float(r.amount):,.0f} đ, khoản gốc gắn chỉ {goc:,.0f} đ — vượt "
-                                            f"{float(r.amount) - goc:,.0f} đ (luật VH-21: không chi vượt khoản gốc)"})
+        xin = float(r.amount or 0)
+        if goc > 0 and xin > goc + 0.5:
+            kiem.append({"muc": "do", "chu": f"Xin {xin:,.0f} đ, khoản gốc gắn chỉ {goc:,.0f} đ — vượt "
+                                            f"{xin - goc:,.0f} đ (luật VH-21: không chi vượt khoản gốc)"})
         else:
             kiem.append({"muc": "ok", "chu": f"Số tiền khớp khoản gốc {kg['ten']} ({goc:,.0f} đ)"})
     elif x.get("loai") != "tam_ung" and not (x.get("nhom") or "").startswith("Nạp quỹ"):
