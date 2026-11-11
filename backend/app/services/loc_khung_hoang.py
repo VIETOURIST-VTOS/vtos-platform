@@ -38,6 +38,11 @@ BA DẤU HIỆU, MỖI DẤU HIỆU MỘT LÝ DO
   · TỪ ĐỎ (+2) — danh sách ký, sửa được bằng tham số `pr_tu_do` mà không phải đụng vào mã.
     Cộng 2 một lần thôi, dù khớp mấy từ: một câu chửi dài không nguy hiểm hơn một câu "tôi sẽ kiện".
 
+    MKT-9 · 11/11/2026 — DẤU LÀ MỘT PHẦN CỦA LỆNH KÝ. Từ ký CÓ DẤU thì khớp đúng dấu; từ ký
+    KHÔNG DẤU thì khớp mọi cách gõ dấu của cùng chữ ấy. Và một danh sách ký thứ hai,
+    `pr_cum_bo_qua`, HUỶ một lần khớp nằm BÊN TRONG một cụm vô hại đã ký — huỷ theo CHỖ,
+    không huỷ cả tin. Lý do và số đo: xem chú thích của `tu_do` và `tim_tu_do` ở dưới.
+
   · DỐC (+1) — nhiều tin vào trong một khoảng ngắn trên cùng hội thoại. Một vụ thật thường trông
     giống một cái DỐC chứ không giống một cái TỪ; khách đang bình tĩnh không nhắn sáu tin trong
     mười phút.
@@ -80,6 +85,7 @@ from app.services import fb_binh_luan as BL
 from app.services import rules as R
 
 THAM_SO_TU_DO = "pr_tu_do"
+THAM_SO_CUM_BO_QUA = "pr_cum_bo_qua"
 THAM_SO_NGUONG = "pr_nguong_canh_bao"
 THAM_SO_CUM_PHUT = "pr_cum_phut"
 THAM_SO_CUM_SO_TIN = "pr_cum_so_tin"
@@ -103,9 +109,45 @@ DIEM_CONG_KHAI = 1
 # Tham số đã ký
 # ---------------------------------------------------------------------------------------------
 def tu_do(db: Session) -> list[str]:
-    """Danh sách từ đỏ, đã bỏ dấu và viết thường — so khớp không phân biệt hoa thường và dấu."""
+    """Danh sách từ đỏ ĐÚNG NHƯ NGƯỜI KÝ GÕ — chỉ viết thường, KHÔNG bỏ dấu.
+
+    MKT-9 · 11/11/2026 — ĐO ĐƯỢC TRÊN BẢN THẬT, KHÔNG SUY. Hàng đợi 7 ngày lúc ấy có 16 tin
+    và cả 16 đều là báo sai: «kien» 10 tin (dự kiến, điều kiện), «bao chi» 4 tin (đều là
+    «báo chị» — nhắn cho chị), «to» 2 tin (tổ chức, từng tờ). Không một tin thật nào, và
+    «Bắt đúng» lẫn «Bỏ sót» đều đang là dấu gạch.
+
+    BẢN CŨ GỌI `bo_dau` LÊN CẢ DANH SÁCH ngay tại đây, nên dấu mà người ký gõ bị cắt mất
+    trước khi so. Hệ quả nặng hơn mấy tin sai: danh sách KHÔNG CÒN CÁCH NÀO diễn đạt một từ
+    ở dạng chặt — Marketing ký «kiện» thì mã cũng chỉ thấy «kien». Tức là chú thích của
+    `pr_tu_do` trong `rules.py` hứa «Marketing tự sửa và người sửa có tên», mà mã thì không
+    cho sửa theo hướng siết, chỉ cho thêm từ mới.
+
+    Từ nay DẤU LÀ MỘT PHẦN CỦA LỆNH KÝ, và người ký chọn độ chặt bằng cách gõ dấu hay không:
+      · ký CÓ DẤU    → `tim_tu_do` khớp đúng dấu. «báo chí» bắt, «báo chị» không.
+      · ký KHÔNG DẤU → khớp mọi cách gõ dấu của cùng chữ ấy, y như lỗ lệ cũ của `bo_dau`.
+
+    KHÔNG tự lọc, không tự sửa, không bỏ từ nào: hàm này chỉ thôi làm hỏng thứ nó nhận được.
+    Việc từ nào nên có dấu là một quyết định ĐƯỢC KÝ, nằm ở `rules.py` và ở màn Tham số.
+    """
     tho = R.get_param_chu(db, THAM_SO_TU_DO)
-    return [bo_dau(t) for t in (x.strip() for x in tho.split(",")) if t]
+    return [unicodedata.normalize("NFC", t)
+            for t in (x.strip().lower() for x in tho.split(",")) if t]
+
+
+def cum_bo_qua(db: Session) -> list[str]:
+    """Danh sách CỤM BỎ QUA — những cụm vô hại HUỶ một lần khớp nằm bên trong chúng.
+
+    MKT-9 · 11/11/2026 — SINH RA VÌ CÓ CHỖ DẤU KHÔNG TÁCH ĐƯỢC. «điều kiện» và «khởi kiện»
+    dùng CÙNG một âm tiết «kiện», cùng dấu nặng. Chạy thử việc 1 trên đúng 16 tin đã đo thì
+    16 xuống còn 2, và hai tin còn lại đều là «điều kiện» — chỗ này cần NGỮ CẢNH chứ không
+    còn cần dấu.
+
+    Đọc cùng một luật với từ đỏ: cụm ký có dấu thì khớp đúng dấu, ký không dấu thì khớp lỏng.
+    Một cụm ở đây KHÔNG tắt cả tin — xem `tim_tu_do`.
+    """
+    tho = R.get_param_chu(db, THAM_SO_CUM_BO_QUA)
+    return [unicodedata.normalize("NFC", t)
+            for t in (x.strip().lower() for x in tho.split(",")) if t]
 
 
 def nguong(db: Session) -> int:
@@ -134,26 +176,82 @@ def bo_dau(s: str) -> str:
     return s.replace("đ", "d")
 
 
-def tim_tu_do(text: str, danh_sach: list[str]) -> list[str]:
+# Bảng BIẾN THỂ DẤU của từng chữ cái. Dùng cho những từ KÝ KHÔNG DẤU: chúng khớp với mọi cách
+# gõ dấu của cùng chữ ấy, nên "lua dao" vẫn bắt được "lừa đảo".
+#
+# MKT-9 · 11/11/2026 — VÌ SAO LÀM TRONG KHUÔN TÌM CHỨ KHÔNG BẰNG CÁCH BỎ DẤU VĂN BẢN. Bản cũ
+# bỏ dấu cả câu rồi mới tìm, nên chỗ tìm thấy là chỗ trên MỘT BẢN KHÁC của câu — và hai bản
+# ấy không chắc dài bằng nhau, nên không chiếu được vị trí từ bản này sang bản kia. Việc huỷ
+# theo CHỖ ở dưới đòi đúng cái không chắc ấy. Nên đổi hướng: giữ MỘT mặt chữ duy nhất (bản
+# viết thường, còn nguyên dấu) và đem sự không-phân-biệt-dấu vào khuôn tìm.
+BIEN_THE = {
+    "a": "aàáảãạăằắẳẵặâầấẩẫậ",
+    "d": "dđ",
+    "e": "eèéẻẽẹêềếểễệ",
+    "i": "iìíỉĩị",
+    "o": "oòóỏõọôồốổỗộơờớởỡợ",
+    "u": "uùúủũụưừứửữự",
+    "y": "yỳýỷỹỵ",
+}
+
+
+def _khuon(t: str) -> str:
+    r"""Khuôn tìm của một từ đã ký, kèm RANH GIỚI TỪ ở hai đầu.
+
+    "tố" nằm giữa "tối nay" không phải là tố cáo; khớp lỏng ở đây sinh ra một hàng đợi toàn
+    tin vô hại, và một hàng đợi toàn tin vô hại là một hàng đợi không ai mở.
+
+    Ranh giới dùng `\w` chứ không dùng `[0-9a-z]` như bản cũ: bản cũ so trên chữ đã bỏ dấu
+    nên chỉ cần chữ ASCII, còn ở đây mặt chữ còn nguyên dấu, và một chữ có dấu đứng sát bên
+    cũng phải tính là cùng một từ.
+    """
+    if bo_dau(t) != t:
+        giua = re.escape(t)                      # ký CÓ DẤU — đúng từng dấu một
+    else:
+        giua = "".join("[" + BIEN_THE[c] + "]" if c in BIEN_THE else re.escape(c) for c in t)
+    return r"(?<!\w)" + giua + r"(?!\w)"
+
+
+def _cho_khop(mat_chu: str, danh_sach: list[str]) -> list[tuple[str, int, int]]:
+    """Mọi lần xuất hiện của mọi từ trong danh sách, kèm CHỖ nó nằm."""
+    ra = []
+    for t in danh_sach:
+        if not t:
+            continue
+        for m in re.finditer(_khuon(t), mat_chu):
+            ra.append((t, m.start(), m.end()))
+    return ra
+
+
+def tim_tu_do(text: str, danh_sach: list[str],
+              cum_bo_qua_ds: list[str] | None = None) -> list[str]:
     """Những từ đỏ có mặt trong tin. Khớp theo RANH GIỚI TỪ, không khớp giữa chữ.
 
-    "tố" nằm giữa "tối nay" không phải là tố cáo; khớp lỏng ở đây sinh ra một hàng đợi toàn tin
-    vô hại, và một hàng đợi toàn tin vô hại là một hàng đợi không ai mở.
+    MKT-9 · 11/11/2026 — HUỶ THEO CHỖ, KHÔNG HUỶ CẢ TIN. Một lần khớp bị bỏ khi nó nằm TRỌN
+    bên trong một cụm vô hại đã ký. Nên "điều kiện visa cần gì" không vào hàng đợi, mà "điều
+    kiện gì, tôi sẽ khởi kiện" thì VẪN VÀO — lần khớp thứ hai không nằm trong cụm nào.
+
+    Đây đúng là chỗ một bộ lọc kiểu "tin nào chứa cụm này thì bỏ qua cả tin" sẽ hỏng, và hỏng
+    về phía nguy hiểm: ai biết luật ấy chỉ cần gõ thêm hai chữ vô hại là tắt được cả bộ lọc.
     """
-    kho = bo_dau(text)
-    thay = []
-    for t in danh_sach:
-        if t and re.search(r"(?<![0-9a-z])" + re.escape(t) + r"(?![0-9a-z])", kho):
+    mat_chu = unicodedata.normalize("NFC", (text or "").lower())
+    bo = [(a, b) for _t, a, b in _cho_khop(mat_chu, cum_bo_qua_ds or [])]
+    thay: list[str] = []
+    for t, a, b in _cho_khop(mat_chu, danh_sach):
+        if any(x <= a and b <= y for x, y in bo):
+            continue
+        if t not in thay:
             thay.append(t)
     return thay
 
 
 def cham_diem(text: str, danh_sach_tu_do: list[str], la_doc: bool = False,
-              qua_han_tra_loi: bool = False, cong_khai: bool = False) -> tuple[int, list[str]]:
+              qua_han_tra_loi: bool = False, cong_khai: bool = False,
+              cum_bo_qua_ds: list[str] | None = None) -> tuple[int, list[str]]:
     """Trả về (điểm, danh sách lý do đọc được). Lý do là thứ người trực đọc, nên nó viết bằng
     tiếng người chứ không phải mã."""
     diem, ly_do = 0, []
-    thay = tim_tu_do(text, danh_sach_tu_do)
+    thay = tim_tu_do(text, danh_sach_tu_do, cum_bo_qua_ds)
     if thay:
         diem += DIEM_TU_DO
         ly_do.append("Từ đỏ: " + ", ".join(thay))
@@ -242,6 +340,7 @@ def canh_bao(db: Session, ngay: int = NGAY_MAC_DINH, nguong_tuy: int | None = No
     """
     n = int(nguong_tuy) if nguong_tuy is not None else nguong(db)
     ds = tu_do(db)
+    bo = cum_bo_qua(db)
     hang = ung_vien(db, ngay, bay_gio)
     cat_bot = len(hang) > TRAN_DONG
     hang = hang[:TRAN_DONG]
@@ -254,7 +353,7 @@ def canh_bao(db: Session, ngay: int = NGAY_MAC_DINH, nguong_tuy: int | None = No
     for m, c in hang:
         la_doc = cum.get(c.id, 0) >= nguong_cum
         tre = bool(c.unanswered and c.sla_due_at and c.sla_due_at < gio)
-        diem, ly_do = cham_diem(m.text or "", ds, la_doc, tre)
+        diem, ly_do = cham_diem(m.text or "", ds, la_doc, tre, cum_bo_qua_ds=bo)
         if diem >= n:
             cham.append((m, c, diem, ly_do))
 
@@ -281,7 +380,8 @@ def canh_bao(db: Session, ngay: int = NGAY_MAC_DINH, nguong_tuy: int | None = No
         if not BL.dang_doc_duoc(b):
             continue
         la_doc = cum_bai.get(b.post_id, 0) >= nguong_cum
-        diem, ly_do = cham_diem(b.noi_dung or "", ds, la_doc, False, cong_khai=True)
+        diem, ly_do = cham_diem(b.noi_dung or "", ds, la_doc, False, cong_khai=True,
+                                cum_bo_qua_ds=bo)
         if diem >= n:
             bl_cham.append((b, diem, ly_do))
     bl_xu_ly = _da_xu_ly(db, [b.id for b, _d, _l in bl_cham], "binh_luan")
@@ -301,6 +401,7 @@ def canh_bao(db: Session, ngay: int = NGAY_MAC_DINH, nguong_tuy: int | None = No
         "nguong_ky": nguong(db),
         "ngay": int(ngay),
         "tu_do": ds,
+        "cum_bo_qua": bo,
         # Chạm trần thì nói ra. Màn hình phải hiện dòng này — một hàng đợi thiếu dòng mà im lặng
         # tệ hơn hẳn một hàng đợi chậm.
         "cat_bot": cat_bot,
@@ -411,7 +512,8 @@ def _lay(db: Session, message_id: int, bay_gio: datetime | None = None, nguon: s
         gio = bay_gio or datetime.now()
         cum = BL.dem_cum_bai(db, [b.post_id] if b.post_id else [], cum_phut(db), gio)
         la_doc = cum.get(b.post_id, 0) >= cum_so_tin(db)
-        diem, ly_do = cham_diem(b.noi_dung or "", tu_do(db), la_doc, False, cong_khai=True)
+        diem, ly_do = cham_diem(b.noi_dung or "", tu_do(db), la_doc, False, cong_khai=True,
+                                cum_bo_qua_ds=cum_bo_qua(db))
         return b, None, diem, ly_do
     row = db.execute(
         select(Message, Conversation)
@@ -424,7 +526,8 @@ def _lay(db: Session, message_id: int, bay_gio: datetime | None = None, nguon: s
     cum = _dem_cum(db, [c.id], cum_phut(db), gio)
     la_doc = cum.get(c.id, 0) >= cum_so_tin(db)
     tre = bool(c.unanswered and c.sla_due_at and c.sla_due_at < gio)
-    diem, ly_do = cham_diem(m.text or "", tu_do(db), la_doc, tre)
+    diem, ly_do = cham_diem(m.text or "", tu_do(db), la_doc, tre,
+                            cum_bo_qua_ds=cum_bo_qua(db))
     return m, c, diem, ly_do
 
 

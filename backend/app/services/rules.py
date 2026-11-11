@@ -159,14 +159,42 @@ DEFAULT_PARAMS = [
     # DANH SÁCH TỪ ĐỎ để ở tham số chứ không viết cứng, vì nó là thứ SẼ SAI và phải sửa được trong
     # ngày: mỗi vụ đi qua lại dạy cho công ty một từ mới. Viết trong mã thì sửa nó là một bản nâng
     # cấp; để ở đây thì Marketing tự sửa và người sửa có tên.
-    # So khớp KHÔNG dấu và theo RANH GIỚI TỪ (loc_khung_hoang.tim_tu_do), nên viết có dấu hay không
-    # đều được — "lừa đảo" và "lua dao" là một.
+    # DẤU LÀ MỘT PHẦN CỦA LỆNH KÝ (MKT-9 · Chủ tịch chốt 11/11/2026). Một từ viết KHÔNG DẤU thì
+    # khớp mọi cách gõ dấu của cùng chữ ấy — "lừa đảo" và "lua dao" là một. Một từ viết CÓ DẤU
+    # thì khớp đúng dấu, và đó là cách siết một từ đang bắt sai.
+    #
+    # BỐN TỪ DƯỚI ĐÂY ĐÃ ĐƯỢC KÝ LẠI CÓ DẤU, vì đo được trên bản thật ngày 11/11/2026: hàng đợi
+    # 7 ngày có 16 tin và cả 16 đều là báo sai. "kien" bắt 10 tin (dự kiến, điều kiện), "bao chi"
+    # bắt 4 tin (đều là "báo chị" — nhắn cho chị), "to" bắt 2 tin (tổ chức, từng tờ). Từ thứ tư,
+    # "nha bao", chưa nổ trong hàng đợi hôm ấy nhưng đo được là sẽ nổ: nó bắt cả câu "nhà bao
+    # nhiêu người", một câu rất thường gặp trong tin khách hỏi giá.
+    #
+    # HAI MƯƠI TỪ CÒN LẠI CỐ Ý GIỮ KHÔNG DẤU. Chúng không có từ vô hại nào trùng hình, nên để
+    # không dấu là giữ được người đang bực mà gõ không bật bộ gõ — xem `loc_khung_hoang.bo_dau`.
     ("pr_tu_do",
-     "lua dao,lua gat,bip,to cao,khieu nai,kien,luat su,cong an,bao chi,nha bao,quyt,bung tien,"
-     "doi tien,hoan tien,tra tien,ngo doc,tai nan,bo roi,mat do,to,phot,scandal,tay chay",
+     "lua dao,lua gat,bip,to cao,khieu nai,kiện,luat su,cong an,báo chí,nhà báo,quyt,bung tien,"
+     "doi tien,hoan tien,tra tien,ngo doc,tai nan,bo roi,mat do,tố,phot,scandal,tay chay",
      "Những từ làm một tin được xếp lên đầu hàng đợi Marketing. Sửa được ở màn hình này, không "
      "phải bằng bản nâng cấp – mỗi vụ đi qua lại dạy thêm một từ",
      "từ, cách nhau bằng dấu phẩy", "Marketing đề xuất – Chủ tịch chốt 19/9/2026"),
+    # CỤM BỎ QUA — sinh ra vì có chỗ DẤU KHÔNG TÁCH ĐƯỢC (MKT-9 · Chủ tịch chốt 11/11/2026).
+    #
+    # "điều kiện" và "khởi kiện" dùng CÙNG một âm tiết "kiện", cùng dấu nặng. Ký "kiện" có dấu
+    # đã bỏ được "dự kiến" và "ý kiến", nhưng không bỏ được "điều kiện" — và hai trong mười sáu
+    # tin báo sai ngày 11/11 chính là "điều kiện". Chỗ này cần NGỮ CẢNH chứ không cần dấu nữa.
+    #
+    # HUỶ THEO CHỖ, KHÔNG HUỶ CẢ TIN: một lần khớp bị bỏ khi nó nằm TRỌN trong một cụm ở đây,
+    # nên "điều kiện gì, tôi sẽ khởi kiện" VẪN vào hàng đợi. Đây là chỗ một luật kiểu "tin nào
+    # chứa cụm này thì bỏ qua cả tin" sẽ hỏng về phía nguy hiểm: ai biết luật ấy chỉ cần gõ
+    # thêm hai chữ vô hại là tắt được cả bộ lọc.
+    #
+    # THÊM MỘT CỤM VÀO ĐÂY LÀ MỘT QUYẾT ĐỊNH CÓ TÊN, y như thêm một từ đỏ: nó làm bộ lọc im đi
+    # ở một chỗ, và chỗ ấy phải là chỗ đã ĐO ĐƯỢC là vô hại, không phải chỗ đoán. Để trống
+    # cũng hợp lệ — bộ lọc chạy y như khi chưa có tham số này.
+    ("pr_cum_bo_qua", "điều kiện",
+     "Những cụm vô hại HUỶ một lần khớp từ đỏ nằm bên trong chúng. Huỷ theo chỗ, không huỷ cả "
+     "tin – câu còn một chỗ khớp khác thì vẫn vào hàng đợi",
+     "cụm, cách nhau bằng dấu phẩy", "Marketing đề xuất – Chủ tịch chốt 11/11/2026"),
     # NGƯỠNG 2 nghĩa là: một từ đỏ (+2) đủ vào hàng đợi, hoặc dốc (+1) cộng quá hạn trả lời (+1)
     # cũng đủ. Hạ xuống 1 thì mọi tin của một hội thoại đang dốc đều vào — dùng được khi muốn xem
     # lại, nhưng để thường trực thì hàng đợi dài đến mức không ai mở.
