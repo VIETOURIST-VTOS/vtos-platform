@@ -303,21 +303,30 @@ def _chuan_doi_xe(db: Session, u: User, data: dict) -> dict:
             raise ValueError("Chọn xe, hoặc đổi phạm vi sang «chi phí toàn đội»")
     if not (x.get("can_cu") or "").strip():
         raise ValueError("Chọn căn cứ số tiền — VTOS không tự cộng VAT")
-    kg_ma = (x.get("ma_khoan_goc") or "").strip()
-    if kg_ma:
+    # VH-29 (Chủ tịch duyệt đề xuất chi bản 2, đợt 2): MỘT phiếu gắn ĐƯỢC NHIỀU khoản gốc — phiếu trả tài xế
+    # gồm công tác phí + gửi xe không phải tách hai phiếu. Mỗi khoản vẫn chỉ thuộc một đề nghị chi.
+    ds = ds_ma_khoan_goc(x)
+    if len(ds) > 30:
+        raise ValueError("Một đề nghị chi gắn tối đa 30 khoản gốc")
+    da = de_nghi_theo_khoan_goc(db) if ds else {}
+    for kg_ma in ds:
         kg = khoan_goc(db, kg_ma)
         if kg is None:
             raise ValueError("Khoản gốc phải chọn trong danh sách khoản đã ghi của xe (phiếu chuyến / phiếu bảo "
                              "dưỡng) — mã gõ tay thì máy không đối chiếu được, và chống ghi hai lần không chạy")
         if v is not None and kg["vehicle_id"] != v.id:
             raise ValueError(f"Khoản gốc {kg['ten']} thuộc xe khác — chọn khoản của chính xe {v.plate}")
-        cu = de_nghi_theo_khoan_goc(db).get(kg_ma)
+        if kg.get("cong_ty_da_tra"):
+            raise ValueError(f"Khoản gốc {kg['ten']} công ty đã trả ({kg['cong_ty_da_tra']}) — đề nghị chi nữa là "
+                             "tiền ra hai lần cho một việc")
+        cu = da.get(kg_ma)
         if cu:
             raise ValueError(f"Khoản gốc {kg['ten']} đã có đề nghị chi {cu} — một khoản gốc chỉ một đề nghị chi. "
                              f"Cần chi thêm thì Kế toán chi tiếp phần còn lại của {cu}.")
     return {"pham_vi": pv, "xe_id": v.id if v else None, "bien_so": v.plate if v else "", "loai": loai, "nhom": nhom,
             "tk": tk_doi_xe(nhom, loai), "can_cu": x["can_cu"].strip()[:80],
-            "ma_khoan_goc": kg_ma[:60], "hen_bo_sung": (x.get("hen_bo_sung") or "").strip()[:200],
+            "ma_khoan_goc": ds[0] if ds else "", "ma_khoan_goc_ds": ds,
+            "hen_bo_sung": (x.get("hen_bo_sung") or "").strip()[:200],
             "ghi_chu_kiem_tra": (x.get("ghi_chu_kiem_tra") or "").strip()[:500]}
 
 
@@ -339,8 +348,12 @@ def khoan_goc(db: Session, ma: str) -> dict | None:
         t = db.get(Trip, c.trip_id) if c else None
         if not c or not t:
             return None
+        from app.models.fleet import TRA_BANG, TRA_BANG_TAI_XE
         return {"ma": ma, "loai": "tc", "id": c.id, "vehicle_id": t.vehicle_id, "so_tien": c.amount,
-                "ngay": t.ngay_di, "ten": f"Chuyến {t.ma_phieu or t.id} · {c.kind}", "chung_tu": c.chung_tu or ""}
+                "ngay": t.ngay_di, "ten": f"Chuyến {t.ma_phieu or t.id} · {c.kind}", "chung_tu": c.chung_tu or "",
+                # VH-29: khoản thẻ / ePass công ty đã trả thẳng — không làm khoản gốc của đề nghị chi được.
+                "cong_ty_da_tra": (TRA_BANG.get(c.tra_bang, "") if c.tra_bang and c.tra_bang not in TRA_BANG_TAI_XE
+                                   else "")}
     b = db.get(Maintenance, int(m.group(2)))
     if not b:
         return None
@@ -348,13 +361,32 @@ def khoan_goc(db: Session, ma: str) -> dict | None:
             "ten": f"Phiếu bảo dưỡng #{b.id} · {b.noi_dung[:60]}", "chung_tu": b.chung_tu or ""}
 
 
+def ds_ma_khoan_goc(x: dict | None) -> list[str]:
+    """Các mã khoản gốc của một đề nghị chi đội xe (VH-29: nhiều khoản). Phiếu cũ chỉ có `ma_khoan_goc` một mã
+    vẫn đọc đúng. Bỏ trùng, giữ thứ tự."""
+    x = x or {}
+    ds = x.get("ma_khoan_goc_ds")
+    tho = [str(m) for m in ds] if isinstance(ds, list) and ds else [str(x.get("ma_khoan_goc") or "")]
+    ra: list[str] = []
+    for m in tho:
+        m = m.strip()
+        if m and m not in ra:
+            ra.append(m)
+    return ra
+
+
+def tong_khoan_goc(db: Session, ds: list[str]) -> tuple[float, list[dict]]:
+    """Tổng số tiền và danh sách các khoản gốc ĐỌC ĐƯỢC trong `ds` (mã sai bị bỏ — _chuan_doi_xe đã chặn lúc lập)."""
+    kgs = [k for k in (khoan_goc(db, m) for m in ds) if k]
+    return sum(float(k["so_tien"] or 0) for k in kgs), kgs
+
+
 def de_nghi_theo_khoan_goc(db: Session) -> dict[str, str]:
     """{mã khoản gốc: mã DC} của mọi đề nghị chi đội xe còn hiệu lực (không tính hồ sơ đã từ chối)."""
     ra: dict[str, str] = {}
     for r in db.execute(select(PaymentRequest).where(PaymentRequest.category == "chi_doi_xe",
                                                      PaymentRequest.status != "tu_choi")).scalars():
-        k = ((r.doi_xe or {}).get("ma_khoan_goc") or "").strip()
-        if k:
+        for k in ds_ma_khoan_goc(r.doi_xe):
             ra.setdefault(k, r.code)
     return ra
 
@@ -1216,6 +1248,11 @@ def gui_lai(db: Session, u: User, r: PaymentRequest, data: dict) -> str:
             if k in data["doi_xe"]:
                 dx[k] = str(data["doi_xe"][k] or "").strip()[:200]
         r.doi_xe = dx
+    if r.category == "chi_doi_xe" and "amount" in doi:
+        # VH-29: sửa số tiền lúc gửi lại cũng không được vượt tổng khoản gốc đã gắn (luật VH-21).
+        goc, kgs = tong_khoan_goc(db, ds_ma_khoan_goc(r.doi_xe))
+        if kgs and goc > 0 and float(r.amount or 0) > goc + 0.5:
+            raise ValueError(f"Số đề nghị {float(r.amount or 0):,.0f} đ vượt tổng khoản gốc đã gắn ({goc:,.0f} đ)")
     if "amount" in doi:
         # Số tiền đổi thì xét lại «ngoài dự toán» như lúc lập — một khoản tăng tiền phải đi qua đúng cổng ấy.
         t = db.get(Tour, r.tour_id) if r.tour_id else None
