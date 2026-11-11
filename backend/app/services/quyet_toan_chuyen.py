@@ -58,13 +58,20 @@ def tong(db: Session, t: Trip) -> dict:
     con số trông như đã xong.
     """
     cs = db.execute(select(TripCost).where(TripCost.trip_id == t.id)).scalars().all()
-    tai_xe = cong_ty = chua_khai = 0.0
+    # VH-21 · Chủ tịch chốt 11/11/2026: ĐỀ XUẤT CHI là đường chi chuẩn. Khoản tài xế ứng đã có đề xuất chi
+    # gắn làm khoản gốc thì tiền ra ở đề xuất ấy — tờ quyết toán KHÔNG tính lại vào «tài xế còn được nhận»,
+    # nếu không Kế toán chi cùng một khoản hai lần qua hai đường.
+    from app.services.ops import de_nghi_theo_khoan_goc as _dn
+    _kg = _dn(db)
+    tai_xe = cong_ty = chua_khai = da_de_nghi = 0.0
     for c in cs:
         v = _s(c.amount)
         if not (c.tra_bang or ""):
             chua_khai += v
         elif c.tra_bang in TRA_BANG_TAI_XE:
             tai_xe += v
+            if _kg.get(f"tc:{c.id}"):
+                da_de_nghi += v
         else:
             cong_ty += v
     return {
@@ -84,7 +91,9 @@ def tong(db: Session, t: Trip) -> dict:
         # RỖNG Ở ĐÂY TÍNH BẮNG KHÔNG LÀ ĐÚNG, và đó là quyết định chứ không phải mặc định: chưa ai
         # nhập tạm ứng nghĩa là chưa ứng đồng nào, nên khoản tài xế còn nhận không bị trừ gì — khác
         # hẳn những chỗ mà rỗng nghĩa là "chưa biết số" và kết quả cũng phải rỗng theo.
-        "tai_xe_con_nhan": tai_xe + _s(t.chi_them) - _s(t.tam_ung) - _s(t.hoan_tra),  # k2-doc-an-toan: ba o tien deu qua `_s()` = `float(x or 0)`
+        # Phần tài xế ứng ĐÃ CÓ đề xuất chi (VH-21): chi ở đề xuất ấy, trừ ra khỏi «còn được nhận».
+        "tai_xe_da_de_nghi_chi": da_de_nghi,
+        "tai_xe_con_nhan": tai_xe - da_de_nghi + _s(t.chi_them) - _s(t.tam_ung) - _s(t.hoan_tra),  # k2-doc-an-toan: ba o tien deu qua `_s()` = `float(x or 0)`
         "so_khoan": len(cs),
     }
 

@@ -2167,6 +2167,17 @@ def lap_de_nghi_chi_xe(data: DeNghiChiXeIn, u: User = Depends(require_roles("gd_
     if ((data.so_tien or 0) >= nguong and not (data.chung_tu or "").strip() and data.loai == "thanh_toan"
             and not data.nhom.startswith("Nạp quỹ")):
         raise HTTPException(422, f"Khoản chi từ {nguong:,.0f} đ bắt buộc ghi số chứng từ gốc (chặn cứng B6)")
+    # VH-21 · Chủ tịch chốt 11/11/2026: số đề nghị KHÔNG ĐƯỢC VƯỢT khoản gốc đã gắn. Thử thật DC2611-0001: xin
+    # 630.000 mà khoản gốc (công tác phí) chỉ 600.000 — 30.000 gửi xe đi kèm không có khoản gốc nào đứng sau.
+    # Đặt ở cửa này chứ không ở `services/ops.py` vì tệp ấy đang do làn TC-KT giữ chỗ (TT-TBS).
+    kg = O.khoan_goc(db, data.ma_khoan_goc) if (data.ma_khoan_goc or "").strip() else None
+    _xe = db.execute(select(Vehicle).where(Vehicle.plate == (data.bien_so or "").strip())).scalars().first()
+    if kg and _xe is not None and kg["vehicle_id"] != _xe.id:
+        kg = None                  # khoản gốc của xe khác: để `services/ops.py` báo đúng lỗi «xe khác»
+    if kg and float(kg["so_tien"] or 0) > 0 and (data.so_tien or 0) > float(kg["so_tien"]) + 0.5:
+        raise HTTPException(422, f"Số đề nghị {data.so_tien:,.0f} đ vượt khoản gốc {kg['ten']} "
+                                 f"({float(kg['so_tien']):,.0f} đ). Mỗi đề nghị chi chỉ chi tối đa đúng khoản gốc "
+                                 "đã gắn — phần còn lại lập phiếu riêng gắn khoản của nó.")
     ngan = " · ".join(x.strip() for x in (data.so_tai_khoan, data.ngan_hang) if x.strip())
     try:
         r = O.create_request(db, u, {
