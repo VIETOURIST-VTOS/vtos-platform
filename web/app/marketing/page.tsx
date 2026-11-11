@@ -805,7 +805,9 @@ function Marketing() {
         </table></div>
       </div>
 
-      {chua && chua.tong > 0 && <div className="panel" style={{ borderColor: "var(--vtos-warning)" }}>
+      {/* MKT-8 · 11/11/2026 — lớp `mkt-luu-y` thay cho viền khai bằng thuộc tính nội dòng:
+          `main .panel{border:0!important}` của MKT-6 đã xoá mất viền ấy. */}
+      {chua && chua.tong > 0 && <div className="panel mkt-luu-y">
         <h2>{chua.tong} lead chưa gắn chiến dịch</h2>
         <p className="muted">Gom theo ô chữ chiến dịch cũ. Hệ thống không tự đoán — chọn một chiến dịch bên dưới rồi bấm gán.</p>
         <div className="wrap"><table><thead><tr><th>Ô chữ cũ</th><th className="num">Số lead</th><th>Gán vào</th></tr></thead><tbody>
@@ -1034,7 +1036,8 @@ function Marketing() {
           <b>{lkDo.bao_nham}</b> · bỏ sót <b>{lkDo.bo_sot}</b> · không có tin nguồn để đối chiếu{" "}
           <b>{lkDo.khong_co_tin_nguon}</b>. {lkDo.ghi_chu}</p>}
       </div>
-      <div className="panel" style={{ borderColor: "var(--vtos-warning)" }}>
+      {/* MKT-8 · 11/11/2026 — xem chú thích của lớp `mkt-luu-y` trong thẻ style cuối tệp. */}
+      <div className="panel mkt-luu-y">
         <h2>Còn thiếu</h2>
         <div className="mh01-the">
           <The rong nhan="Ai trực ngoài giờ, báo về đâu" so="chưa ký"
@@ -1068,6 +1071,25 @@ body,.shell{background:#eaf0f7!important}
 main .panel{background:#fff;border:0!important;border-radius:16px!important;
   box-shadow:var(--mkt-b1)!important}
 main h1{color:var(--mkt-dam)}
+
+/* MKT-8 11/11/2026 TRA LAI MAU DO CHO SO CANH BAO.
+   globals.css co .the-so.do mau danger kem chu thich cua ban ve V1.2: do chi nhan phan
+   qua han hoac thieu dieu kien, khong to do ca con so tong. MKT-6 viet
+   .mh01-the .the-so mau navy, CUNG do uu tien 0-2-0, va the style cua man nap sau
+   globals.css nen no thang. Bay con so tren khap man mat mau do: so qua han, lead chua
+   gan chien dich, cho chu ky, qua han phan hoi, cho nguoi xem, binh luan cong khai.
+   Khai 0-3-0 o day de manh hon ca hai luat tren. Khong dung !important: do uu tien la
+   du, va mot dau !important them vao la mot cho nua cho nguoi sau phai go ra.
+   Mau do lay cua man /xe chu khong lay --vtos-danger: man nay la nen SANG, the trang,
+   con danger cua ban toi la hong nhat, tren trang doc khong ra. */
+.mh01-the .the-so.do{color:#b72f45}
+
+/* KHUNG LUU Y. Hai khung khai vien vang bang thuoc tinh noi dong, va border 0 !important
+   o tren xoa mat vien ay. Thay bang nen vang nhat va mot vach doc ben trai. KHONG dung
+   lai bang vang dac cua canh bao may chu: bang ay danh cho mot cau ngan, con hai khung
+   nay co bang va nut ben trong, to vang het ca khung thi chu kho doc. */
+main .panel.mkt-luu-y{background:#fdf6e7!important;
+  box-shadow:inset 5px 0 0 #a66a00,var(--mkt-b1)!important}
 
 /* HÀNG CHỨC NĂNG — khuôn .xe-nhom. Điểm nhấn của màn nằm Ở NÚT, không ở gạch chân: tám nhóm
    là tám nút navy đặc, nút đang mở navy đậm có vòng sáng. Dính trên cùng như /xe, để cuộn
@@ -1106,6 +1128,16 @@ main h1{color:var(--mkt-dam)}
 .mh01-the .the-ct.rong{background:transparent;box-shadow:none;border:1px dashed var(--mkt-vien)}
 .mh01-the .the-so{color:var(--mkt-nhan)}
 .mh01-the .the-cua{color:var(--mkt-nhan);border-bottom-color:var(--mkt-nhan)}
+
+/* MKT-8 11/11/2026 CUA CUA THE DONG HANG O DAY, dung nhu ban ve de xuat.
+   Ban ve ve ba o mot hang co cua thang hang nhau va cach phan chu nguon bang mot vach
+   ngan. Ban chay thi cua bam ngay duoi doan chu nguon, nen ba cua cao thap khac nhau
+   theo do dai doan chu -- do duoc 105 / 119 / 133 o hang dau cua Tong quan, lech nhau
+   28 diem. Mat phai di tim cua cua tung the mot thay vi luot mot duong ngang.
+   globals.css da dat san .the-ct la mot khung flex doc, nen chi can day phan cua xuong
+   day bang margin-top:auto. Khai o 0-3-0 de manh hon .the-thieu cua globals. */
+.mh01-the .the-ct .the-thieu{margin-top:auto;padding-top:9px;
+  border-top:1px solid var(--mkt-vien)}
 
 /* CẢNH BÁO CỦA MÁY CHỦ — khuôn băng vàng .xe-n90. Cùng một dữ liệu rep.canh_bao, chỉ nổi
    hơn: hôm nay nó là một khung viền vàng nằm lẫn giữa các khung trắng khác. */
