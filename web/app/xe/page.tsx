@@ -225,16 +225,24 @@ const TRUNG_SAN_SANG: Record<string, string[]> = {
 };
 
 /** Ngăn kéo: xử lý tại chỗ, đóng lại là bàn tự đọc lại số. */
-const NGAN_KEO: Record<string, { ten: string; toi: string; nhan: string }> = {
-  "quyet-toan": { ten: "Quyết toán chuyến", toi: "/doi-xe", nhan: "Mở bảng quyết toán" },
-  "chi-phi-ky": { ten: "Nhập chi phí kỳ", toi: "/lai-lo-doi-xe", nhan: "Mở sổ chi phí kỳ" },
-  "ho-so-xe":   { ten: "Hồ sơ xe", toi: "/doi-xe", nhan: "Mở hồ sơ xe" },
-  "bao-duong":  { ten: "Bảo dưỡng", toi: "/doi-xe", nhan: "Mở tab bảo dưỡng" },
-  "de-xuat":    { ten: "Đề xuất chờ duyệt", toi: "/requests", nhan: "Mở màn đề xuất" },
+/*  VH-42 (Chủ tịch duyệt bản xem trước 13/11/2026): nút chính của ngăn kéo mở ĐÚNG trang con của bàn
+    (`nhom` + `trang`) — trước đây «Mở bảng quyết toán» trỏ `/doi-xe` nên bàn mở nhầm «Hồ sơ xe».
+    `buoc` là các bước cần làm hiện trong ngăn kéo. */
+const NGAN_KEO: Record<string, { ten: string; toi: string; nhan: string; nhom?: string; trang?: string; buoc: string[] }> = {
+  "quyet-toan": { ten: "Quyết toán chuyến", toi: "/doi-xe?tab=quyettoan", nhan: "Mở màn Quyết toán xe", nhom: "finance", trang: "quyet-toan",
+    buoc: ["Mở từng chuyến chưa quyết toán, nhập đủ km và chi phí.", "Gỡ cờ đỏ của chuyến kẹt để Điều hành xác nhận được.",
+           "Gửi tờ quyết toán lên Chủ tịch duyệt."] },
+  "chi-phi-ky": { ten: "Nhập chi phí kỳ", toi: "/lai-lo-doi-xe", nhan: "Mở sổ chi phí kỳ", nhom: "finance", trang: "lai-lo",
+    buoc: ["Nhập số tiền từng nhóm chi phí của kỳ ngay trong ngăn này.", "Nhóm không phát sinh thì ghi 0 — để trống là «chưa nhập»."] },
+  "ho-so-xe":   { ten: "Hồ sơ xe", toi: "/doi-xe", nhan: "Mở hồ sơ xe", nhom: "fleet", trang: "ho-so-xe",
+    buoc: ["Mở xe đang bị chặn, xem điều kiện còn thiếu.", "Tải giấy tờ còn thiếu (đăng kiểm, bảo hiểm) hoặc gỡ chặn."] },
+  "bao-duong":  { ten: "Bảo dưỡng", toi: "/doi-xe?tab=bao-duong", nhan: "Mở màn Bảo dưỡng", nhom: "technical", trang: "bao-duong",
+    buoc: ["Ghi phiếu bảo dưỡng gần nhất cho từng xe.", "Máy tự tính mốc kỳ tới từ phiếu ấy."] },
+  "de-xuat":    { ten: "Đề xuất chờ duyệt", toi: "/requests", nhan: "Mở màn đề xuất", buoc: ["Xem từng đề xuất và duyệt hoặc trả lại."] },
 };
 
 function BanLamViecXe() {
-  const { user, toast } = useShell();
+  const { user, toast, datViecBan } = useShell();
   const [ky, setKy] = useState(() => new Date().toISOString().slice(0, 7));
   const [d, setD] = useState<any>(null);
   const [dang, setDang] = useState(true);
@@ -314,6 +322,13 @@ function BanLamViecXe() {
   }, []);
   /* VH-12 đã về thanh đầu dùng chung (LOGO-1 của làn R2, PR #788) — lớp ghi đè tạm ở /xe gỡ ở VH-14. */
   const hd = d?.hang_doi, sk = d?.so_ky, xe = d?.xe_hom_nay;
+  /* VH-42 (Chủ tịch duyệt 13/11/2026): «Việc cần xử lý» thu vào nút «Công việc» trên thanh đầu — có số, rê chuột
+     là xổ; bấm một việc mở ngăn kéo NGAY TRÊN BÀN. «Chờ người khác» ẩn (Shell lọc `muc === "trang"`). */
+  useEffect(() => {
+    datViecBan(hd ? (hd.viec || []).map((v: any) => ({ ma: v.ma, tieu_de: v.tieu_de, mo_ta: v.mo_ta, muc: v.muc,
+      bam: v.bam_duoc && v.ngan_keo ? () => setKeo(v.ngan_keo) : undefined })) : null);
+  }, [hd, datViecBan]);
+  useEffect(() => () => datViecBan(null), [datViecBan]);
   /** «Mỗi nút một chỗ» (Chủ tịch dặn 10/11/2026): việc nào «Việc cần xử lý» đã nói thì bảng sẵn sàng
    *  không nói lại. Khoá là mã việc của hàng đợi → mã dòng / mã nhóm của bảng sẵn sàng. */
   const daNoi: string[] = (hd?.viec || []).flatMap((v: any) => TRUNG_SAN_SANG[v.ma] || []);
@@ -452,44 +467,10 @@ function BanLamViecXe() {
       {dang && !d && <div className="xe-cho" aria-busy="true" aria-label="Đang đọc số"><i /><i /><i /><i /></div>}
 
       {/* ⑥ HÀNG ĐỢI VIỆC — VH-4 (Chủ tịch duyệt 10/11/2026): LÊN ĐẦU tổng quan, viền navy; mục đỏ nền đỏ nhạt. */}
-      {hd && <section className="xe-uu" aria-label="Việc cần xử lý">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline",
-                      justifyContent: "space-between", marginBottom: 8 }}>
-          <h2 style={{ margin: 0 }}>Việc cần xử lý</h2>
-          <span className="muted">
-            {hd.so_viec_cua_toi} việc · <strong style={{ color: "#be2f2f" }}>{hd.so_do} đỏ</strong>
-            {hd.so_cho_nguoi_khac > 0 && ` · ${hd.so_cho_nguoi_khac} đang chờ người khác`}
-          </span>
-        </div>
-
-        {hd.viec.length === 0
-          ? <p className="muted">Không có việc nào đang mở.</p>
-          : <div className="xe-the-luoi">
-          {/* VH-5 · kiểu thẻ (Chủ tịch duyệt 10/11/2026): mỗi việc một thẻ — mã việc nhỏ góc trái, nhãn viền
-              màu góc phải, tên việc, mô tả, nút ở đáy. */}
-          {hd.viec.map((v: any, i: number) => (
-            <div key={v.ma} className={"xe-the" + (v.muc === "do" ? " xe-the-do" : "")}>
-              <div className="xe-the-dau">
-                <span className="xe-the-ma">VIỆC {String(i + 1).padStart(2, "0")}</span>
-                <span className={"xe-pill xe-pill-" + (v.muc in NHAN_MUC ? v.muc : "vang")}>{(NHAN_MUC[v.muc] || NHAN_MUC.vang)}</span>
-              </div>
-              <strong className="xe-the-ten">{v.tieu_de}</strong>
-              <span className="muted" style={{ fontSize: 13 }}>{v.mo_ta}</span>
-              {/* Quyền ẩn NÚT, không ẩn VIỆC: giám đốc vẫn thấy tiền đang treo kể cả khi chưa
-                  được bấm. Giấu việc đi thì tiền treo biến mất khỏi tầm mắt người duy nhất
-                  quan tâm đến nó. */}
-              <div className="xe-the-day">
-                {v.bam_duoc && v.ngan_keo
-                  ? <button type="button" className={v.muc === "do" ? "xe-nut-chinh" : undefined} onClick={() => setKeo(v.ngan_keo)}>{v.nhan_nut}</button>
-                  : <span className="muted"><strong>{v.nhan_nut}</strong></span>}
-              </div>
-            </div>))}</div>}
-
-        {hd.bo_do_hong?.length > 0 && <p style={{ color: "#a66a00" }}>
-          {hd.bo_do_hong.length} bộ dò lỗi ({hd.bo_do_hong.join(", ")}) — hàng đợi đang thiếu dòng,
-          báo CNTT.
-        </p>}
-      </section>}
+      {/* VH-42: khối «Việc cần xử lý» đã thu vào nút «Công việc» trên thanh đầu (xem `datViecBan` ở trên).
+          Chỉ còn lời báo khi bộ dò lỗi hỏng — đó là việc của CNTT, không phải một việc của giám đốc. */}
+      {hd?.bo_do_hong?.length > 0 && <p style={{ color: "#a66a00" }}>
+        {hd.bo_do_hong.length} bộ dò lỗi ({hd.bo_do_hong.join(", ")}) — hàng đợi đang thiếu dòng, báo CNTT.</p>}
 
       {/* HAI CỬA NHẬP — chỉ xuất hiện MỘT lần trên cả màn (v3.3). */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center",
@@ -563,32 +544,33 @@ function BanLamViecXe() {
           nó vẫn mở được từ thanh con ở trên. */}
     </>}
 
-    {/* NGĂN KÉO */}
-    {k && <>
-      <div onClick={() => setKeo(null)}
-           style={{ position: "fixed", inset: 0, background: "rgba(14,42,82,.42)", zIndex: 40 }} />
-      <aside role="dialog" aria-modal="true" aria-label={k.ten}
-             style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "min(720px, 94vw)",
-                      background: "#fff", zIndex: 41, overflowY: "auto", padding: 22,
-                      boxShadow: "-12px 0 28px rgba(14,42,82,.22)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-                      gap: 12, marginBottom: 14 }}>
-          <div>
-            <h2 style={{ margin: 0 }}>{k.ten}</h2>
-            <p className="muted" style={{ margin: 0 }}>Kỳ {kyDoc(ky)}</p>
-          </div>
+    {/* NGĂN KÉO — VH-42 (Chủ tịch duyệt bản xem trước 13/11/2026): đầu navy (kỳ · mã việc), thẻ việc, các bước cần
+        làm, đáy dính hai nút: «Xong — đọc lại số» và nút chính mở ĐÚNG trang con của bàn. */}
+    {k && keo && <>
+      <div className="xe-keo-mu" onClick={() => setKeo(null)} />
+      <aside role="dialog" aria-modal="true" aria-label={k.ten} className="xe-keo">
+        <div className="xe-keo-dau">
+          <div><small>KỲ {kyDoc(ky)}</small><h2>{k.ten}</h2></div>
           <button type="button" aria-label="Đóng ngăn kéo" onClick={() => setKeo(null)}>✕</button>
         </div>
-        {/* NGĂN KÉO GẮN LẠI CHÍNH KHỐI CỦA MÀN CÓ SẴN, không dựng form thứ hai.
-            `ChiPhiKyPanel` là tab «Chi phí kỳ» của /lai-lo-doi-xe chuyển nguyên văn ra. */}
-        {hd?.viec.filter((v: any) => v.ngan_keo === keo).map((v: any) => (
-          <p key={v.ma}><strong>{v.tieu_de}</strong><br /><span className="muted">{v.mo_ta}</span></p>
-        ))}
-        {keo === "chi-phi-ky"
-          ? <ChiPhiKyPanel ky={ky} onDoiSo={() => doc(ky)} />
-          : <p><Link href={k.toi}>{k.nhan} →</Link></p>}
-        <p className="muted">Đóng ngăn kéo thì bàn tự đọc lại số.</p>
-        <button type="button" onClick={() => { setKeo(null); doc(ky); }}>Xong — đọc lại số</button>
+        <div className="xe-keo-than">
+          {/* NGĂN KÉO GẮN LẠI CHÍNH KHỐI CỦA MÀN CÓ SẴN, không dựng form thứ hai.
+              `ChiPhiKyPanel` là tab «Chi phí kỳ» của /lai-lo-doi-xe chuyển nguyên văn ra. */}
+          <div className="xe-keo-so">
+            {hd?.viec.filter((v: any) => v.ngan_keo === keo).map((v: any) => (
+              <div key={v.ma} className={v.muc === "do" ? "do" : undefined}><b>{v.tieu_de}</b><span>{v.mo_ta}</span></div>))}
+          </div>
+          {keo === "chi-phi-ky" && <ChiPhiKyPanel ky={ky} onDoiSo={() => doc(ky)} />}
+          {k.buoc.length > 0 && <div className="xe-keo-buoc"><h3>Cần làm</h3><ol>{k.buoc.map((b) => <li key={b}>{b}</li>)}</ol></div>}
+        </div>
+        <div className="xe-keo-day">
+          <button type="button" className="phu" onClick={() => { setKeo(null); doc(ky); }}>Xong — đọc lại số</button>
+          {k.nhom && k.trang
+            ? <button type="button" className="chinh" onClick={() => {
+                setKeo(null); setNhom(k.nhom!); setTrang(k.trang!); setMoSan(""); setChiTiet(null);
+                window.scrollTo({ top: 0, behavior: "smooth" }); }}>{k.nhan} →</button>
+            : <Link className="chinh" href={k.toi}>{k.nhan} →</Link>}
+        </div>
       </aside>
     </>}
   </div>);
@@ -665,6 +647,25 @@ main .panel{background:#fff;border:0!important;border-radius:16px!important;box-
 .xe-con{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 14px}
 .xe-con button{font:inherit;font-size:13.5px;border:1px solid var(--xe-vien);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer}
 .xe-con button[aria-pressed=true]{background:var(--xe-nhan);border-color:var(--xe-nhan);color:#fff;font-weight:600}
+.xe-keo-mu{position:fixed;inset:0;background:rgba(14,42,82,.42);z-index:40}
+.xe-keo{position:fixed;top:0;right:0;bottom:0;width:min(600px,94vw);background:#eef3f9;z-index:41;overflow-y:auto;
+  box-shadow:-12px 0 28px rgba(14,42,82,.25);display:flex;flex-direction:column}
+.xe-keo-dau{background:linear-gradient(120deg,var(--vtos-ban-a,#2a6db5),var(--vtos-ban-b,#1f5fa8));color:#fff;padding:18px 20px;
+  display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.xe-keo-dau small{display:block;font-size:13px;font-weight:700;letter-spacing:.08em;opacity:.9}
+.xe-keo-dau h2{margin:2px 0 0;font-size:21px;color:#fff}
+.xe-keo-dau button{font:inherit;color:#fff;background:rgba(255,255,255,.16);border:0;border-radius:8px;width:34px;height:34px;cursor:pointer;margin:0}
+.xe-keo-than{padding:16px 20px;display:flex;flex-direction:column;gap:14px;flex:1}
+.xe-keo-so{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.xe-keo-so div{background:#fff;border:1px solid #d6dfeb;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.xe-keo-so b{font-size:16px;color:var(--xe-dam)}.xe-keo-so div.do b{color:#b72f45}
+.xe-keo-so span{font-size:13px;color:#5f6f86}
+.xe-keo-buoc{background:#fff;border:1px solid #d6dfeb;border-radius:12px;padding:12px 14px}
+.xe-keo-buoc h3{margin:0 0 6px;font-size:15px}.xe-keo-buoc ol{margin:0;padding-left:18px;color:#3b4a5e;font-size:14px}
+.xe-keo-day{position:sticky;bottom:0;background:#fff;border-top:1px solid #d6dfeb;padding:12px 20px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.xe-keo-day .phu,.xe-keo-day .chinh{font:inherit;font-weight:700;border-radius:10px;padding:9px 16px;cursor:pointer;margin:0;text-decoration:none}
+.xe-keo-day .phu{background:#fff;color:#1d2b3d;border:1px solid #d6dfeb}
+.xe-keo-day .chinh{background:var(--xe-nhan,#2c5fa2);color:#fff;border:0}
 .xe-uu{border:0;border-radius:16px;background:#fff;padding:16px 20px 10px;margin-bottom:18px;box-shadow:var(--xe-b1)}
 .xe-uu h2{color:var(--xe-dam)}
 .xe-it{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #eef2f7}

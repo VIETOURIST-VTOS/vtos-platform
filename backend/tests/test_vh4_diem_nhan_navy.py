@@ -30,7 +30,9 @@ def test_1_nam_nhom_la_nut_navy_khong_cat_chu():
 def test_2_viec_can_xu_ly_len_dau():
     s = _w("app", "xe", "page.tsx")
     tq = s.split("④ TỔNG QUAN", 1)[1]
-    assert tq.index('className="xe-uu"') < tq.index("CUA_NHAP.map") < tq.index("<KhoiHieuQuaXe") < tq.index("<SanSangVanHanh")
+    # VH-42 (13/11/2026): «Việc cần xử lý» lên hẳn thanh đầu (nút «Công việc»), tổng quan bắt đầu bằng hai cửa nhập.
+    assert 'className="xe-uu" aria-label="Việc cần xử lý"' not in tq
+    assert tq.index("CUA_NHAP.map") < tq.index("<KhoiHieuQuaXe") < tq.index("<SanSangVanHanh")
 
 
 def test_3_moi_nut_mot_cho():
