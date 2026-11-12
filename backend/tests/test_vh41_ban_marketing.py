@@ -11,7 +11,7 @@ def _w(*p):
 
 def test_1_bay_nhom_dung_ten_dung_thu_tu_khung_hoang_do():
     s = _w("app", "marketing", "page.tsx")
-    khoi = s[s.index("export const NHOM_MKT"):s.index("const DUONG_MKT")]
+    khoi = s[s.index("const NHOM_MKT"):s.index("const DUONG_MKT")]
     ten = re.findall(r'\{ ma: "\w+", ten: "([^"]+)"', khoi)
     assert ten == ["Trang chủ", "Khách tiềm năng & Sales", "Chiến dịch & ngân sách", "Nội dung & thương hiệu",
                    "Khủng hoảng & PR", "Doanh thu & đối soát", "Chăm sóc & khiếu nại"]
@@ -20,7 +20,7 @@ def test_1_bay_nhom_dung_ten_dung_thu_tu_khung_hoang_do():
 
 def test_2_moi_tab_cu_deu_con_mot_cho_trong_nhom():
     s = _w("app", "marketing", "page.tsx")
-    khoi = s[s.index("export const NHOM_MKT"):s.index("const DUONG_MKT")]
+    khoi = s[s.index("const NHOM_MKT"):s.index("const DUONG_MKT")]
     for t in ("tongquan", "khach", "chuyendoi", "chiendich", "doisoat", "noidung", "thuonghieu"):
         assert f'tab: "{t}"' in khoi, t
     for d in ("/noi-dung", "/bao-chi-kol", "/dong-gop-marketing", "/doi-soat-marketing", "/chuyen-doi-lead",
