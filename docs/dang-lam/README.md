@@ -19,6 +19,7 @@ git không có gì để xung đột.
 | Quyết toán | `docs/dang-lam/quyet-toan.md` |
 | R2 | `docs/dang-lam/r2.md` |
 | TC-KT | `docs/dang-lam/tc-kt.md` |
+| R5 | `docs/dang-lam/r5.md` (và `docs/dang-lam/r5/`, mỗi đợt một tệp) |
 
 **Bổ sung 02/11/2026 — làn TC-KT.** Việc tách ngày 06/10 chạy đúng: ngày 02/11 làn
 `at2-nha-hang-agoda` gộp vào main mà không đụng `phan-quyen.md`. Nhưng bốn nhánh R4c liên

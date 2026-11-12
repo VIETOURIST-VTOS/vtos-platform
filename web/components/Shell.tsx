@@ -172,8 +172,8 @@ const NGUONG_NGAN_KEO = 900;
  *
  *  3. NEO THEO MÉP PHẢI CỦA THANH DỌC, không theo mép nút. Nút thụt vào 8px (margin 0 8px), neo
  *     theo nút thì bảng đè lên viền thanh dọc 3px. Em đo thấy trong mockup rồi mới sửa. */
-function NhomXo({ g, thu, dangO, dongThanhDoc }:
-                { g: Group; thu: boolean; dangO: boolean; dongThanhDoc: () => void }) {
+function NhomXo({ g, thu, dangO, dongThanhDoc, vai = "" }:
+                { g: Group; thu: boolean; dangO: boolean; dongThanhDoc: () => void; vai?: string }) {
   const [mo, datMo] = useState(false);
   const [toaDo, datToaDo] = useState<{ left: number; top: number } | null>(null);
   const [taiCho, datTaiCho] = useState(false);   // true = ngăn kéo, vẽ tại chỗ
@@ -265,7 +265,7 @@ function NhomXo({ g, thu, dangO, dongThanhDoc }:
           chuỗi `/phan-he/` tại chỗ — phòng chưa dời vẫn về chỗ cũ, và ngày dời thêm một
           phòng thì chỉ sửa bảng trong `lib/duong_phong.ts`, không ai phải nhớ dòng này. */}
       {g.phans!.map((p) => (
-        <Link key={p.khoa} href={duongCuaPhong(p.khoa)} className="xo-muc" role="menuitem"
+        <Link key={p.khoa} href={duongPhongTheoVai(p.khoa, vai)} className="xo-muc" role="menuitem"
           onClick={() => { datMo(false); dongThanhDoc(); }}>{p.label}</Link>
       ))}
     </div>
@@ -402,6 +402,9 @@ export const GROUPS: Group[] = [
     // 08/11/2026: bấm vào phân hệ nào thì ra đúng trang của phòng ấy.
     ["Kinh doanh lẻ", "/fit"],
     ["Kinh doanh đoàn", "/mice"],
+    // R5 · 13/11/2026 — bàn làm việc Giám đốc Kinh doanh lẻ. Vai có bàn bấm chip «Kinh doanh lẻ»
+    // là vào thẳng bàn (xem `VAI_BAN_KD_LE`); mục này giữ lối vào trong bảng menu cho test_menu.
+    ["Bàn làm việc GĐ Kinh doanh lẻ", "/ban-kd-le"],
     // 24/9/2026 · Bàn làm việc của Phó TGĐ tour đoàn — hàng đợi dự toán đoàn chờ chính ông ký
     // (Điều 4 Văn bản đính chính). ĐỨNG ĐẦU NHÓM, và ba chỗ đặt em đã cân rồi mới chọn chỗ này:
     //
@@ -685,6 +688,14 @@ export const VAI_BAN_NV = ["nv_mkt"];
 /** VH-41 (Chủ tịch duyệt 12/11/2026 22:17): bấm «Marketing & PR» là vào BÀN LÀM VIỆC /marketing cho mọi vai,
  *  như /xe của đội xe. Trang chủ theo vai (bàn Phó TGĐ / bàn nhân viên) nay chọn NGAY TRONG bàn — hai
  *  danh sách vai trên vẫn là nguồn duy nhất, bàn /marketing đọc lại chúng. */
+/** R5 · 13/11/2026 (Chủ tịch chốt): vai có bàn GĐ Kinh doanh lẻ — bấm chip «Kinh doanh lẻ» là vào bàn.
+ *  Gương của MENU_ROLES["/ban-kd-le"] và `XEM` ở backend/app/api/v1/ban_kd_le.py; phép thử so ba chỗ. */
+export const VAI_BAN_KD_LE = ["chutich", "tgd", "bks", "robot_ks", "gd_kd", "cntt"];
+export function duongPhongTheoVai(khoa: string, vai: string): string {
+  if (khoa === "kdle" && VAI_BAN_KD_LE.includes(vai)) return "/ban-kd-le";
+  return duongCuaPhong(khoa);
+}
+
 export function dichCuaNhom(g: { key: string; href?: string }, vai: string): string {  // eslint-disable-line @typescript-eslint/no-unused-vars
   if (g.key === "marketing") return "/marketing";
   return g.href || "";
@@ -937,7 +948,7 @@ export default function Shell({ children, khongThanhBen = false }:
             width/height khai đúng tỉ lệ tệp (1107×269) để trang không giật khi ảnh tải xong. */}
         {/* Màn ẩn thanh dọc (/xe) thì «về tổng quan» là về chính màn ấy, không phải trang chủ:
             thanh của nó chỉ có năm mục nghiệp vụ, và lối về nằm ở đây (bản vẽ v3.3). */}
-        <Link href={khongThanhBen ? (path?.startsWith("/marketing") ? "/marketing" : "/xe") : "/"} className="brand" aria-label="Vietourist Holdings – Hệ thống điều hành, về bảng điều hành">
+        <Link href={khongThanhBen ? (path?.startsWith("/marketing") ? "/marketing" : path?.startsWith("/ban-kd-le") ? "/ban-kd-le" : "/xe") : "/"} className="brand" aria-label="Vietourist Holdings – Hệ thống điều hành, về bảng điều hành">
           {/* LOGO v2 (anh Tuấn duyệt 07/11/2026, bản xem thử «Logo v2 trên VTOS và VTD»): chỉ dùng
               logo Vietourist Holdings, bỏ dấu VTOS. Bản nền tối của bộ v2 (#5A9BD4 · #FF6F96 ·
               #5FAE66 + chữ trắng), đã bỏ ô nền #0B2545 để nằm thẳng trên thanh navy #14538D.
@@ -1056,7 +1067,7 @@ export default function Shell({ children, khongThanhBen = false }:
                   Khi THU thì chỉ còn biểu tượng, nhãn nhóm đi vào title và aria-label chứ không mất
                   (§I.2: "biểu tượng phải có chú thích"). */}
               {g.phans
-                ? <NhomXo g={g} thu={thu} dangO={dangO(g)} dongThanhDoc={() => setSide(false)} />
+                ? <NhomXo g={g} thu={thu} dangO={dangO(g)} dongThanhDoc={() => setSide(false)} vai={user?.role || ""} />
                 : <Link href={g.href!} className={"grp" + (dangO(g) ? " on" : "")}
                     title={g.label} aria-label={g.label}
                     onClick={() => setSide(false)}>

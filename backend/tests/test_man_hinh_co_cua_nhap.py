@@ -152,6 +152,13 @@ BAN_LAM_VIEC = {
                  # Đối soát dữ liệu. Không dựng ô ghi trên bàn — chăm một lead là việc
                  # phải mở lead ấy ra đọc, không phải việc gạch một dòng trong danh sách.
                  "POST qua /marketing: tab Khách tiềm năng & Sales · tab Đối soát dữ liệu"),
+    # R5 · 13/11/2026 — bàn Giám đốc Kinh doanh lẻ (Chủ tịch duyệt bản xem trước). Chỉ đọc theo đúng
+    # phạm vi Chủ tịch chốt; cửa ghi của vai nằm ở các màn gốc, và bàn MỞ CHÚNG NGAY TRONG BÀN
+    # (KhungNhung) chứ không dựng bản sao: giao chỉ tiêu ở /kinh-doanh-le, sửa dữ liệu gốc tour ở
+    # /tours, ghi kết quả chăm sóc ở /cham-soc, trả lời khách ở /inbox.
+    "/ban-kd-le": ("Bàn làm việc Giám đốc Kinh doanh lẻ: bốn thẻ số, bảy việc cần xử lý, sẵn sàng bán và chuyến cần thúc bán. Không sở hữu con số nào của riêng mình — mọi ô đọc lại hàm của màn gốc (bàn bán tour lẻ, cơ cấu tổ chức, chăm sóc, hộp thư, bảng chỉ tiêu).",
+                   ("/ban-kd-le/tong-quan",),
+                   "POST qua các màn mở trong bàn: /kinh-doanh-le (giao chỉ tiêu) · /tours · /cham-soc · /inbox"),
 }
 
 # ── NHẬT KÝ MÁY GHI — nhóm ĐẾM RIÊNG, mở ngày 16/10/2026 ───────────────────────────────────────
@@ -516,11 +523,18 @@ def test_ban_lam_viec_co_tran_rieng_va_chi_duoc_cua_ghi_cua_minh():
     người phải bỏ qua nửa số ô, và một bàn mà người ngồi phải bỏ qua nửa số ô thì nó đã thôi
     là bàn làm việc.
 
+    → 6 (13/11/2026, `/ban-kd-le` — bàn Giám đốc Kinh doanh lẻ, Chủ tịch duyệt). Trả lời đúng câu
+    mốc dưới đặt ra: phòng Lẻ ĐÃ CÓ một bàn ở đây (`/ban-tour-le`), vì sao cần thêm? Vì hai bàn
+    không cùng một người ngồi: `/ban-tour-le` là bàn của người BÁN (từng chuyến, ba con số dự
+    toán), còn bàn mới là bàn của người ĐIỀU HÀNH PHÒNG (việc tồn của cả phòng, đơn vị chưa
+    khai, chỉ tiêu). Và bàn mới không lặp bàn cũ: nó MỞ `/ban-tour-le` ngay trong mình như một
+    trang con, nên phòng Lẻ vẫn chỉ có một chỗ bán. Dòng thứ BẢY thì xem lại cách chia bàn.
+
     MỐC MỚI: dòng thứ SÁU. Nếu nó lại là một vai nữa của một phòng ĐÃ CÓ bàn ở đây thì câu hỏi
     phải đổi — không phải «vai này có cửa ghi ở đâu» nữa, mà «vì sao phòng ấy cần thêm một bàn
     thứ ba» — và lúc ấy việc phải làm là xem lại cách chia bàn, không phải nâng tiếp con số này.
     """
-    assert len(BAN_LAM_VIEC) <= 5, (
+    assert len(BAN_LAM_VIEC) <= 6, (
         f"Đang khai {len(BAN_LAM_VIEC)} bàn làm việc chỉ đọc. Mỗi dòng thêm vào đây là một vai được "
         "cho một màn hình mà không có việc nào bấm được trên đó – hỏi lại xem vai ấy làm gì.")
     thieu = [d for d, x in BAN_LAM_VIEC.items() if len(x) < 3 or not str(x[2]).strip()]
