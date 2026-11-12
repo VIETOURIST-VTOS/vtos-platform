@@ -131,7 +131,7 @@ const MUC_PHONG: [string, string][] = (() => {
  *  sang CRM tổng), `ban` là trang chủ theo vai — Phó TGĐ / Chủ tịch / TGĐ thấy bàn Phó TGĐ, nhân viên
  *  thấy bàn nhân viên, vai khác (gd_kd, kế toán: không mở được hai bàn) thấy Tổng quan số. */
 type ConMkt = { ten: string; tab?: string; sub?: string; toi?: string; ban?: true };
-export const NHOM_MKT: { ma: string; ten: string; khan?: true; con: ConMkt[] }[] = [
+const NHOM_MKT: { ma: string; ten: string; khan?: true; con: ConMkt[] }[] = [
   { ma: "chu", ten: "Trang chủ", con: [{ ten: "Bàn làm việc của tôi", ban: true }] },
   { ma: "khach", ten: "Khách tiềm năng & Sales", con: [
     { ten: "Khách tiềm năng", tab: "khach" }, { ten: "Chuyển đổi & phối hợp Sales", toi: "/chuyen-doi-lead" },
