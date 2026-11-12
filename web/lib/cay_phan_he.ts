@@ -51,6 +51,9 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
       // dự toán — nối về cho Phòng Kinh doanh Lẻ, mỗi chuyến đang bán một dòng. Không có dòng
       // nhà cung cấp: "không liên quan giá vốn".
       { ma: "1.3d", ten: "Bàn bán tour lẻ", href: "/ban-tour-le" },
+      // R5 · 13/11/2026 · Bàn làm việc Giám đốc Kinh doanh lẻ: việc tồn của cả phòng, mở các màn
+      // của phòng ngay trong bàn (gồm cả 1.3d).
+      { ma: "1.3f", ten: "Bàn làm việc GĐ Kinh doanh lẻ", href: "/ban-kd-le" },
       // 25/9/2026 · Đánh giá sau tour: bảng điểm khách chấm cho chuyến, HDV, tài xế, cộng ba con
       // số đã gửi / đã trả lời / không gửi được. Trang khách tự chấm ở /y-kien/<mã> không nằm
       // trong cây này: nó là trang công khai, không phải một phân hệ nội bộ.

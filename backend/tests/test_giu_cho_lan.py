@@ -70,6 +70,8 @@ LAN_TEP = {
     # ngay 06/10 lap lai o mot tang sau hon — khong phai giua cac lan nua, ma TRONG mot lan
     # da phinh thanh sau lan doi lot mot.
     "TC-KT": "tc-kt",
+    # Làn R5 — bàn làm việc Giám đốc Kinh doanh lẻ (bàn giao 13/11/2026). Một thư mục, mỗi đợt một tệp.
+    "R5": "r5",
 }
 LAN_HOP_LE = tuple(LAN_TEP)
 
