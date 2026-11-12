@@ -373,13 +373,14 @@ function DoiXe() {
             không đổi trạng thái, không đổi km, không đổi tiền. */}
         <button className="act grey" onClick={tinhLaiCo}>Tính lại cờ chuyến</button>
       </div>}
-      {/* VH-37 (Chủ tịch duyệt bản xem trước 12/11/2026 08:06): đầu bảng navy sáng, kẻ ngang dọc; Mã tour (nối từ tour
+      {/* VH-38 (Chủ tịch dặn 12/11/2026 08:36): thu hẹp Ghi chú, mở rộng các cột bị chồng / thiếu chữ, bảng vừa khung không kéo ngang.
+          VH-37 (Chủ tịch duyệt bản xem trước 12/11/2026 08:06): đầu bảng navy sáng, kẻ ngang dọc; Mã tour (nối từ tour
           Kinh doanh / lệnh Điều hành) thay Phiếu; Chi phí và Lãi cạnh Doanh thu; Cờ → Ghi chú (cột rộng nhất); cột cuối là
           nút trạng thái 4 màu — bấm nút hay dòng đều mở chi tiết, Sửa / Mở lại để sửa nằm TRONG chi tiết (một nút một
           chỗ). Chuyến đã huỷ không hiện. */}
-      <div className="nt-bang"><table><colgroup><col style={{ width: 24 }} /><col style={{ width: 104 }} /><col style={{ width: 140 }} />
-        <col style={{ width: 90 }} /><col style={{ width: 114 }} /><col style={{ width: 78 }} /><col style={{ width: 94 }} />
-        <col style={{ width: 94 }} /><col style={{ width: 94 }} /><col /><col style={{ width: 78 }} /></colgroup>
+      <div className="nt-bang"><table><colgroup><col style={{ width: 30 }} /><col style={{ width: 92 }} /><col style={{ width: 150 }} />
+        <col style={{ width: 88 }} /><col style={{ width: 116 }} /><col style={{ width: 76 }} /><col style={{ width: 96 }} />
+        <col style={{ width: 96 }} /><col style={{ width: 96 }} /><col /><col style={{ width: 76 }} /></colgroup>
         <thead><tr><th aria-hidden="true"></th><th>Mã tour</th><th>Tên tour</th><th>Xe</th><th>Đi → về</th>
         <th className="num">Km chạy</th><th className="num">Doanh thu</th><th className="num">Chi phí</th><th className="num">Lãi</th>
         <th>Ghi chú</th><th title="Trạng thái">T.thái</th></tr></thead>
@@ -394,14 +395,14 @@ function DoiXe() {
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); bat(); } }}>
           <td><span className="nt-mui" aria-hidden="true">›</span></td>
           <td title={t.ma_tour || "Chuyến chưa nối tour"}>{t.ma_tour ? <b>{t.ma_tour}</b> : <i className="muted">chưa nối</i>}</td>
-          <td title={t.ten_tour || undefined}>{t.ten_tour || <span className="muted">—</span>}</td>
+          <td className="nt-hai" title={t.ten_tour || undefined}>{t.ten_tour ? <span>{t.ten_tour}</span> : <span className="muted">—</span>}</td>
           <td>{t.xe}</td>
           <td title={`${fmtD(t.ngay_di)} → ${fmtD(t.ngay_ve)} · ${t.so_ngay} ngày`}>{String(fmtD(t.ngay_di)).slice(0, 5)} → {String(fmtD(t.ngay_ve)).slice(0, 5)}</td>
           <td className="num">{t.km_chay === null ? <span className="muted">chưa đo</span> : t.km_chay.toLocaleString("vi-VN")}</td>
           <td className="num">{t.doanh_thu ? Number(t.doanh_thu).toLocaleString("vi-VN") : <span className="muted">—</span>}</td>
           <td className="num">{Number(t.tong_chi || 0).toLocaleString("vi-VN")}</td>
           <td className={"num nt-lai" + (lai !== null && lai < 0 ? " lo" : "")}>{lai === null ? <span className="muted">—</span> : lai.toLocaleString("vi-VN")}</td>
-          <td className="nt-gc" title={t.co_ly_do || undefined}>{ly[0] || ""}{ly.length > 1 ? ` · +${ly.length - 1}` : ""}</td>
+          <td className="nt-gc nt-hai" title={t.co_ly_do || undefined}><span>{ly[0] || ""}{ly.length > 1 ? ` · +${ly.length - 1}` : ""}</span></td>
           <td><button type="button" className={"nt-tt " + tt[0]} title={tt[2]}>{tt[1]}</button></td>
           </tr>
           {mo && <tr className="nt-ct"><td colSpan={11}><dl>
@@ -1171,7 +1172,7 @@ const NT_CSS = `
 .nt-bang{overflow-x:auto;border:1px solid var(--nt-ke);border-radius:10px;--nt-ke:#b9c6d8}
 [data-theme="dark"] .nt-bang{--nt-ke:#3c5070}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .nt-bang{--nt-ke:#3c5070}}
-.nt-bang table{width:100%;min-width:1080px;table-layout:fixed;border-collapse:separate;border-spacing:0;margin:0}
+.nt-bang table{width:100%;min-width:1030px;table-layout:fixed;border-collapse:separate;border-spacing:0;margin:0}
 .nt-bang th{background:linear-gradient(120deg,var(--vtos-ban-a,#2a6db5),var(--vtos-ban-b,#1f5fa8));color:#fff;
   font-size:calc(13/14*1rem);font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:11px 8px;
   border-right:1px solid rgba(255,255,255,.28);border-bottom:0;white-space:nowrap}
@@ -1182,6 +1183,9 @@ const NT_CSS = `
 .nt-bang th.num,.nt-bang td.num{text-align:right;font-family:inherit;font-variant-numeric:tabular-nums}
 .nt-bang td.nt-lai{font-weight:700;color:var(--vtos-success,#23804d)}.nt-bang td.nt-lai.lo{color:var(--red,#c4314b)}
 .nt-bang td.nt-gc{color:var(--ink2)}
+/* VH-38: Tên tour và Ghi chú xuống tối đa 2 dòng thay vì cắt chữ; Ghi chú hẹp lại nhường chỗ cho các cột số. */
+.nt-bang td.nt-hai{white-space:normal}
+.nt-bang td.nt-hai>span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35}
 .nt-dong{cursor:pointer}
 .nt-dong:hover>td,.nt-dong.mo>td{background:var(--panel2)}
 .nt-dong:focus-visible{outline:2px solid var(--orange);outline-offset:-2px}
