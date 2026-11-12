@@ -678,13 +678,14 @@ export const GROUPS: Group[] = [
  *  (`XEM_PTGD` và `XEM_NV` ở `backend/app/api/v1/ban_mkt.py`), nên đưa họ sang bàn là họ nhận
  *  403 ở mọi ô. Phép thử `test_mkt13_nut_marketing_theo_vai.py` đọc cả hai tệp và so với nhau.
  */
-const VAI_BAN_PTGD = ["chutich", "tgd", "bks", "robot_ks", "ptgd_mkt", "cntt"];
-const VAI_BAN_NV = ["nv_mkt"];
+export const VAI_BAN_PTGD = ["chutich", "tgd", "bks", "robot_ks", "ptgd_mkt", "cntt"];
+export const VAI_BAN_NV = ["nv_mkt"];
 
-export function dichCuaNhom(g: { key: string; href?: string }, vai: string): string {
-  if (g.key !== "marketing") return g.href || "";
-  if (VAI_BAN_NV.includes(vai)) return "/ban-mkt";
-  if (VAI_BAN_PTGD.includes(vai)) return "/ptgd-mkt";
+/** VH-41 (Chủ tịch duyệt 12/11/2026 22:17): bấm «Marketing & PR» là vào BÀN LÀM VIỆC /marketing cho mọi vai,
+ *  như /xe của đội xe. Trang chủ theo vai (bàn Phó TGĐ / bàn nhân viên) nay chọn NGAY TRONG bàn — hai
+ *  danh sách vai trên vẫn là nguồn duy nhất, bàn /marketing đọc lại chúng. */
+export function dichCuaNhom(g: { key: string; href?: string }, vai: string): string {  // eslint-disable-line @typescript-eslint/no-unused-vars
+  if (g.key === "marketing") return "/marketing";
   return g.href || "";
 }
 
@@ -902,7 +903,7 @@ export default function Shell({ children, khongThanhBen = false }:
             width/height khai đúng tỉ lệ tệp (1107×269) để trang không giật khi ảnh tải xong. */}
         {/* Màn ẩn thanh dọc (/xe) thì «về tổng quan» là về chính màn ấy, không phải trang chủ:
             thanh của nó chỉ có năm mục nghiệp vụ, và lối về nằm ở đây (bản vẽ v3.3). */}
-        <Link href={khongThanhBen ? "/xe" : "/"} className="brand" aria-label="Vietourist Holdings – Hệ thống điều hành, về bảng điều hành">
+        <Link href={khongThanhBen ? (path?.startsWith("/marketing") ? "/marketing" : "/xe") : "/"} className="brand" aria-label="Vietourist Holdings – Hệ thống điều hành, về bảng điều hành">
           {/* LOGO v2 (anh Tuấn duyệt 07/11/2026, bản xem thử «Logo v2 trên VTOS và VTD»): chỉ dùng
               logo Vietourist Holdings, bỏ dấu VTOS. Bản nền tối của bộ v2 (#5A9BD4 · #FF6F96 ·
               #5FAE66 + chữ trắng), đã bỏ ô nền #0B2545 để nằm thẳng trên thanh navy #14538D.

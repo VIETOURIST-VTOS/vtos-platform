@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 // MKT-3 · 09/11/2026 — `GROUPS` là bảng menu mà THANH DỌC đọc. Thanh chức năng ngang ở
 // dưới đọc đúng bảng ấy, nên hai chỗ không bao giờ lệch nhau được.
-import Shell, { useShell, GROUPS } from "@/components/Shell";
+import Shell, { useShell, GROUPS, VAI_BAN_PTGD, VAI_BAN_NV } from "@/components/Shell";
 import { api, vnd, fmtD, fmtDT, pct, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import BaoCaoChuyenDoi, { tyLe } from "@/components/BaoCaoChuyenDoi";
@@ -12,6 +12,7 @@ import BaoCaoChuyenDoi, { tyLe } from "@/components/BaoCaoChuyenDoi";
 // đứng riêng, không thuộc một tab bên trong màn hình nghiệp vụ. Màn `/xe` đã gắn mục lục
 // vào chính nó đúng kiểu này từ trước, nên đây là đi theo nếp có sẵn chứ không mở nếp mới.
 import MucLucPhanHe from "@/components/MucLucPhanHe";
+import KhungNhung from "@/components/KhungNhung";
 
 /** KHÔNG GIAN LÀM VIỆC MARKETING & PR — bảy màn hình, một chỗ (18/9/2026)
  *
@@ -124,6 +125,37 @@ const MUC_PHONG: [string, string][] = (() => {
   return ra;
 })();
 
+/** VH-41 (Chủ tịch duyệt bản xem trước 12/11/2026 22:17) — BÀN LÀM VIỆC MARKETING & PR NHƯ BÀN /xe.
+ *  Bảy NHÓM nút lớn thay cho hàng 12 liên kết đi khỏi màn + 8 nút chức năng; mỗi nhóm có trang con
+ *  MỞ TẠI CHỖ: `tab` là phần của chính màn này, `toi` là màn riêng của phòng nhúng vào khung (không
+ *  sang CRM tổng), `ban` là trang chủ theo vai — Phó TGĐ / Chủ tịch / TGĐ thấy bàn Phó TGĐ, nhân viên
+ *  thấy bàn nhân viên, vai khác (gd_kd, kế toán: không mở được hai bàn) thấy Tổng quan số. */
+type ConMkt = { ten: string; tab?: string; sub?: string; toi?: string; ban?: true };
+export const NHOM_MKT: { ma: string; ten: string; khan?: true; con: ConMkt[] }[] = [
+  { ma: "chu", ten: "Trang chủ", con: [{ ten: "Bàn làm việc của tôi", ban: true }] },
+  { ma: "khach", ten: "Khách tiềm năng & Sales", con: [
+    { ten: "Khách tiềm năng", tab: "khach" }, { ten: "Chuyển đổi & phối hợp Sales", toi: "/chuyen-doi-lead" },
+    { ten: "Tỷ lệ chốt theo kỳ", tab: "chuyendoi" }] },
+  { ma: "cd", ten: "Chiến dịch & ngân sách", con: [
+    { ten: "Chiến dịch", tab: "chiendich", sub: "chiendich" }, { ten: "Ngân sách", tab: "chiendich", sub: "ngansach" },
+    { ten: "Khai kênh & chạy đối chiếu", tab: "doisoat" }] },
+  { ma: "nd", ten: "Nội dung & thương hiệu", con: [
+    { ten: "Nội dung & thương hiệu", toi: "/noi-dung" }, { ten: "Hàng đợi duyệt nội dung", tab: "noidung" },
+    { ten: "Báo chí, KOL & sự kiện", toi: "/bao-chi-kol" }] },
+  // Nút ĐỎ riêng: cửa báo động phải thấy ngay lúc gấp (bài học 19/9/2026 ở Shell — đừng để sâu ba lớp).
+  { ma: "kh", ten: "Khủng hoảng & PR", khan: true, con: [{ ten: "Khủng hoảng & phản ứng nhanh", tab: "thuonghieu" }] },
+  { ma: "ds", ten: "Doanh thu & đối soát", con: [
+    { ten: "Tổng quan số", tab: "tongquan" }, { ten: "Đóng góp doanh thu", toi: "/dong-gop-marketing" },
+    { ten: "Đối soát dữ liệu", toi: "/doi-soat-marketing" }] },
+  { ma: "cs", ten: "Chăm sóc & khiếu nại", con: [
+    { ten: "Chăm sóc sau bán", toi: "/cham-soc" }, { ten: "Phản hồi & khiếu nại", toi: "/khieu-nai" }] },
+];
+/** Màn của phòng được mở TRONG khung của bàn; liên kết ra ngoài danh sách này bị chặn trong khung. */
+const DUONG_MKT = ["/ptgd-mkt", "/ban-mkt", "/noi-dung", "/bao-chi-kol", "/dong-gop-marketing", "/doi-soat-marketing",
+  "/chuyen-doi-lead", "/cham-soc", "/khieu-nai", "/leads"];
+const laMkt = (h: string) => DUONG_MKT.some((t) => h === t || h.startsWith(t + "/") || h.startsWith(t + "?"));
+const banCuaVai = (vai: string) => VAI_BAN_NV.includes(vai) ? "/ban-mkt" : VAI_BAN_PTGD.includes(vai) ? "/ptgd-mkt" : "";
+
 /** Một THẺ SỐ của Tổng quan. Bốn phần, và phần thứ tư không được bỏ:
  *      nhãn · số · số ấy đọc từ đâu · CỬA để đi tới chỗ sửa nó.
  *  Thẻ không có cửa là một con số người đọc không làm gì được với nó. */
@@ -155,6 +187,42 @@ function Marketing() {
   // nên nhánh ấy không bao giờ chạm vào dòng này.
   const [tab, setTab] = useState("tongquan");
   const [sub, setSub] = useState("chiendich");          // trong tab "chiendich": chiendich | ngansach
+  // VH-41: nhóm đang mở và màn đang nhúng (null = nội dung của chính màn này theo `tab`).
+  const [nhom, setNhom] = useState("chu");
+  const [khung, setKhung] = useState<string | null>(null);
+  const [con, setCon] = useState(0);
+  const moCon = (ma: string, i: number) => {
+    const g = NHOM_MKT.find((x) => x.ma === ma); const c = g?.con[i]; if (!g || !c) return;
+    setNhom(ma); setCon(i);
+    if (c.ban) { const b = banCuaVai(role); setKhung(b || null); if (!b) setTab("tongquan"); return; }
+    if (c.toi) { setKhung(c.toi); return; }
+    setKhung(null); if (c.tab) setTab(c.tab); if (c.sub) setSub(c.sub);
+  };
+  /** Mở theo `?tab=` (đường dẫn cũ, dấu trang, ô trên bàn Phó TGĐ): tìm nhóm chứa tab ấy. */
+  const moTheoTab = (t: string) => {
+    const k = t === "ngansach" ? "chiendich" : t;
+    for (const g of NHOM_MKT) g.con.forEach((c, i) => {
+      if (c.tab === k && (t !== "ngansach" || c.sub === "ngansach") && (t === "ngansach" || !c.sub || c.sub === "chiendich")) {
+        setNhom(g.ma); setCon(i); setKhung(null);
+      }
+    });
+  };
+  /** Trang chủ theo vai: mở MỘT lần khi đã biết người đăng nhập, trừ khi đường dẫn đã chỉ sẵn một tab. */
+  const daMo = useRef(false);
+  const urlDau = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (daMo.current || !role) return;
+    daMo.current = true;
+    const b = banCuaVai(role); setKhung(b || null); if (!b) setTab("tongquan");
+  }, [role]);
+  /** Liên kết bấm trong khung: `/marketing?tab=…` đổi nhóm TẠI CHỖ (không lồng bàn trong bàn). */
+  const ngoaiKhung = (h: string) => {
+    if (!h.startsWith("/marketing")) return false;
+    const t = new URLSearchParams(h.split("?")[1] || "").get("tab") || "tongquan";
+    if (t === "ngansach") { setTab("chiendich"); setSub("ngansach"); } else setTab(t);
+    moTheoTab(t);
+    return true;
+  };
 
   // ── chiến dịch & ngân sách (giữ nguyên từ bản trước, không sửa logic) ──
   const [meta, setMeta] = useState<any>({ muc_tieu: {}, kenh: {}, trang_thai: {}, mang: {} });
@@ -231,10 +299,15 @@ function Marketing() {
     api("/products").then((r) => setSp(Array.isArray(r) ? r : r.rows || [])).catch(() => {});
     api("/users").then((r) => setNv(Array.isArray(r) ? r : [])).catch(() => {});
     api("/marketing/budgets/hang-muc").then(setHm).catch(() => {});
-    const url = new URLSearchParams(window.location.search).get("tab");
+    // VH-41: đọc `?tab=` của đường dẫn LÚC MỞ đúng một lần và giữ trong ref — hiệu ứng ghi đường dẫn bên dưới
+    // có thể ghi đè `?tab=` trước khi `setTab` kịp áp (React chạy hai hiệu ứng trong cùng một nhịp).
+    if (urlDau.current === undefined) urlDau.current = new URLSearchParams(window.location.search).get("tab");
+    const url = urlDau.current;
     // Đường dẫn CŨ của menu vẫn phải mở đúng chỗ cũ – xem ghi chú "HAI ĐƯỜNG DẪN CŨ" ở đầu tệp.
     if (url === "ngansach") { setTab("chiendich"); setSub("ngansach"); }
     else if (url && TABS.some(([k]) => k === url)) setTab(url);
+    // VH-41: có `?tab=` thì mở đúng nhóm chứa nó; không có thì trang chủ theo vai (effect dưới, chờ biết vai).
+    if (url === "ngansach" || (url && TABS.some(([k]) => k === url))) { moTheoTab(url); daMo.current = true; }
     // MKT-2 · 09/11/2026 — `/phan-he/marketing?xem=muc-luc` nay chuyển hướng về đây mang
     // theo nguyên tham số. Đọc nó ra thành tab là để những dấu trang và tin nhắn đã gửi
     // nhau vẫn mở đúng chỗ người gửi muốn, thay vì rơi về tab Tổng quan rồi tự đi tìm.
@@ -257,12 +330,13 @@ function Marketing() {
    *  bên thì đường dẫn copy ra lại mở về ngăn Chiến dịch.
    */
   useEffect(() => {
+    if (khung) return;   // VH-41: đang nhúng màn khác thì không ghi tab của màn này
     const ghi = (tab === "chiendich" && sub === "ngansach") ? "ngansach" : tab;
     const u = new URL(window.location.href);
     if (u.searchParams.get("tab") === ghi) return;
     u.searchParams.set("tab", ghi);
     window.history.replaceState(null, "", u.toString());
-  }, [tab, sub]);
+  }, [tab, sub, khung]);
 
   // Báo cáo chuyển đổi nuôi CẢ tab Tổng quan lẫn tab Chuyển đổi, nên nạp ngay từ đầu.
   useEffect(() => { api(`/leads/conversion?month=${repThang}`).then(setRep).catch(() => {}); }, [repThang]);
@@ -421,32 +495,28 @@ function Marketing() {
         hàng liên kết lên trên nó là hai bảng nút cho cùng một việc. Làn R2 đã áp đúng
         luật ấy ở đợt PH-2 cùng ngày cho các trang phòng khác; màn này chưa được hưởng
         vì ở đây mục lục là một NHÓM chứ không phải một trang riêng. */}
-    {tab !== "muc-luc" && <nav aria-label="Màn hình phòng Marketing" className="mkt-man">
-      {MUC_PHONG.map(([ten, duong]) => (
-        <Link key={duong + ten} href={duong}>{ten}</Link>
-      ))}
-    </nav>}
-
-    {/* LỐI RA TÁCH RA VÀ LUÔN HIỆN. Chú thích ngay trên đã cảnh báo: ẩn thanh dọc là lấy
-        mất đường sang phân hệ khác, thiếu nó thì màn này thành một ngõ cụt đẹp. Mục lục
-        chỉ liệt kê màn của CHÍNH phòng này, nó không thay được lối ra. */}
-    <nav aria-label="Lối ra" className="mkt-ra"><Link href="/">Trang tổng CRM →</Link></nav>
-
-    <h1>Marketing &amp; PR</h1>
-
-    {/* MKT-6 · 11/11/2026 — HÀNG CHỨC NĂNG, khuôn `.xe-nhom` của màn điều hành đội xe.
-        Hôm nay tám nhóm là tám nút `.act` cùng cỡ chữ với mọi nút khác trên màn, nên
-        không nút nào đọc ra là «chỗ đổi nội dung». Ở `/xe` hàng ấy là năm nút navy đặc
-        và nó đọc ra ngay từ xa. `aria-pressed` thay cho lớp `grey`: nó vừa nói cho
-        trình đọc màn hình biết nút nào đang bật, vừa là chỗ CSS bám vào để tô navy đậm.
-        LỌC THEO QUYỀN GIỮ NGUYÊN `hienTab`: ba nhóm đọc sổ lead tự ẩn với vai không mở
-        được sổ, như từ trước. */}
-    <nav className="mkt-chuc" aria-label="Chức năng của phòng Marketing">
-      {TABS.filter(([k]) => hienTab(k)).map(([k, l]) =>
-        <button key={k} type="button" aria-pressed={tab === k}
-          onClick={() => setTab(k)}>{l}</button>)}
+    {/* VH-41 (Chủ tịch duyệt bản xem trước 12/11/2026 22:17): bàn làm việc như /xe — đầu bàn navy sáng,
+        bảy nhóm nút lớn, trang con mở tại chỗ. Thay cho hàng 12 liên kết đi KHỎI màn (MKT-3) và tám nút
+        chức năng (MKT-6): mỗi việc một nút, không nút nào lặp. Lối ra CRM tổng giữ ở cuối đầu bàn. */}
+    <div className="mkt-ban">
+      <div><small>MARKETING &amp; PR · VIETOURIST HOLDINGS</small><h1>Bàn làm việc Marketing &amp; PR</h1></div>
+      <Link href="/" className="mkt-ra-ban">Trang tổng CRM →</Link>
+    </div>
+    <nav className="mkt-nhom" aria-label="Nhóm nghiệp vụ Marketing">
+      {NHOM_MKT.map((g) => (
+        <button key={g.ma} type="button" className={g.khan ? "khan" : undefined} aria-pressed={nhom === g.ma}
+          onClick={() => moCon(g.ma, 0)}>{g.ten}</button>))}
     </nav>
-    <p className="muted">{TABS.find(([k]) => k === tab)?.[2]}</p>
+    {(() => { const g = NHOM_MKT.find((g) => g.ma === nhom) || NHOM_MKT[0]; return g.con.length > 1 && (
+      <nav className="mkt-con" aria-label={`Trang của ${g.ten}`}>
+        {g.con.map((c, i) => {
+          const tat = !!c.tab && !hienTab(c.tab);
+          return tat ? null : <button key={c.ten} type="button" aria-pressed={con === i} onClick={() => moCon(g.ma, i)}>{c.ten}</button>;
+        })}
+      </nav>); })()}
+    {khung && <KhungNhung key={khung} toi={khung} ten={(NHOM_MKT.find((g) => g.ma === nhom) || NHOM_MKT[0]).con[con]?.ten || "Marketing"}
+      cuaBan={laMkt} ngoai={ngoaiKhung} />}
+    {!khung && <>
 
     {/* ═══════════════ 8 · MỤC LỤC CHỨC NĂNG ═══════════════
         MKT-2 · 09/11/2026 — gộp từ `/phan-he/marketing`. Trang ấy không còn: bấm vào nó
@@ -582,10 +652,8 @@ function Marketing() {
 
     {/* ═══════════════ 4 · NGÂN SÁCH & CHIẾN DỊCH ═══════════════ */}
     {tab === "chiendich" && <>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-        {[["chiendich", "Chiến dịch"], ["ngansach", "Kế hoạch & ngân sách"]].map(([k, l]) =>
-          <button key={k} className={"act " + (sub === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setSub(k)}>{l}</button>)}
-      </div>
+      {/* VH-41: hai nút «Chiến dịch / Kế hoạch & ngân sách» đã là trang con của nhóm «Chiến dịch & ngân sách»
+          trên thanh của bàn — để thêm ở đây là lặp nút trên một màn. */}
 
       {sub === "ngansach" && <>
         <p className="muted">Màn hình này chỉ giữ phần <b>dự toán</b>. Số <b>đã chi</b> đọc từ đề nghị chi đã duyệt — không có ô nào để gõ tay. Chi vượt phần còn lại của hạng mục sẽ tự bật cờ ngoài dự toán và cần hai chữ ký; hệ thống không chặn cứng việc chi, nhưng không cho chi âm thầm.</p>
@@ -1047,6 +1115,7 @@ function Marketing() {
         </div>
       </div>
     </>}
+    </>}
   </>);
 }
 // MKT-3 · 09/11/2026 — `khongThanhBen`: Chủ tịch chốt «bỏ màn hình dọc giống bên đội xe».
@@ -1121,6 +1190,28 @@ main .panel.mkt-luu-y{background:#fdf6e7!important;
 .mkt-man a:hover{background:var(--mkt-nhan);border-color:var(--mkt-nhan);color:#fff}
 .mkt-ra{display:flex;margin:0 0 10px}
 .mkt-ra a{margin-left:auto;color:var(--mkt-nhan);font-weight:600;font-size:13.5px}
+
+/* VH-41 — ĐẦU BÀN + BẢY NHÓM + TRANG CON, khuôn của /xe (navy sáng như thanh đầu bàn VH-30). */
+.mkt-ban{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin:4px 0 14px;
+  padding:12px 18px;border-radius:18px;color:#fff;background:linear-gradient(120deg,var(--vtos-ban-a,#2a6db5),var(--vtos-ban-b,#1f5fa8));
+  box-shadow:0 2px 4px rgba(2,11,24,.18),0 14px 32px rgba(2,11,24,.22)}
+.mkt-ban small{display:block;font-size:13px;font-weight:700;letter-spacing:.08em;opacity:.9}
+.mkt-ban h1{margin:0;font-size:26px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#fff}
+.mkt-ban a.mkt-ra-ban{color:#fff;font-weight:700;font-size:14px;background:rgba(255,255,255,.14);border-radius:10px;padding:7px 12px;text-decoration:none}
+.mkt-nhom{position:sticky;top:var(--top-h);z-index:5;background:#eaf0f7;padding:6px 0 4px;margin-bottom:8px;
+  display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px}
+.mkt-nhom button{margin:0;font:inherit;font-size:13.5px;font-weight:700;color:#fff;background:var(--mkt-nhan);border:0;
+  border-radius:10px;min-height:46px;padding:8px 10px;cursor:pointer;line-height:1.2;text-align:center;box-shadow:0 2px 6px #2c5fa230}
+.mkt-nhom button:hover{background:#3a6fb5}
+.mkt-nhom button[aria-pressed=true]{background:var(--mkt-dam);box-shadow:0 0 0 3px #9fc0ec}
+.mkt-nhom button.khan{background:#a8243f}.mkt-nhom button.khan[aria-pressed=true]{background:#7d1530;box-shadow:0 0 0 3px #f3b3c2}
+.mkt-nhom button:focus-visible,.mkt-con button:focus-visible{outline:3px solid #719ee1;outline-offset:2px}
+@media(max-width:1100px){.mkt-nhom{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:560px){.mkt-nhom{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.mkt-con{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.mkt-con button{margin:0;font:inherit;font-size:13.5px;font-weight:600;border:1px solid var(--mkt-vien);background:#fff;color:#1b2d44;
+  border-radius:9px;padding:6px 12px;cursor:pointer}
+.mkt-con button[aria-pressed=true]{border-color:var(--mkt-nhan);color:var(--mkt-nhan);box-shadow:inset 0 -2px 0 var(--mkt-nhan)}
 
 /* BẢY THẺ — giữ nguyên bộ khung .the-ct của bản vẽ, chỉ đổi nền và bóng cho khớp /xe. */
 .mh01-the .the-ct{background:#fff;border:0;border-radius:14px;box-shadow:var(--mkt-b1);
