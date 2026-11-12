@@ -692,7 +692,9 @@ export const VAI_BAN_NV = ["nv_mkt"];
  *  Gương của MENU_ROLES["/ban-kd-le"] và `XEM` ở backend/app/api/v1/ban_kd_le.py; phép thử so ba chỗ. */
 export const VAI_BAN_KD_LE = ["chutich", "tgd", "bks", "robot_ks", "gd_kd", "cntt"];
 export function duongPhongTheoVai(khoa: string, vai: string): string {
-  if (khoa === "kdle" && VAI_BAN_KD_LE.includes(vai)) return "/ban-kd-le";
+  // R5-4 (Chủ tịch 13/11/2026: «link vẫn chưa về /fit»): chip «Kinh doanh lẻ» trỏ /fit cho MỌI vai.
+  // /fit tự chọn: vai trong VAI_BAN_KD_LE gặp bàn GĐ KD lẻ; TP, trưởng nhóm, NV gặp trang hai tab.
+  if (khoa === "kdle" && VAI_BAN_KD_LE.includes(vai)) return "/fit";
   return duongCuaPhong(khoa);
 }
 
@@ -948,7 +950,7 @@ export default function Shell({ children, khongThanhBen = false }:
             width/height khai đúng tỉ lệ tệp (1107×269) để trang không giật khi ảnh tải xong. */}
         {/* Màn ẩn thanh dọc (/xe) thì «về tổng quan» là về chính màn ấy, không phải trang chủ:
             thanh của nó chỉ có năm mục nghiệp vụ, và lối về nằm ở đây (bản vẽ v3.3). */}
-        <Link href={khongThanhBen ? (path?.startsWith("/marketing") ? "/marketing" : path?.startsWith("/ban-kd-le") ? "/ban-kd-le" : "/xe") : "/"} className="brand" aria-label="Vietourist Holdings – Hệ thống điều hành, về bảng điều hành">
+        <Link href={khongThanhBen ? (path?.startsWith("/marketing") ? "/marketing" : path?.startsWith("/ban-kd-le") ? "/ban-kd-le" : path?.startsWith("/fit") ? "/fit" : "/xe") : "/"} className="brand" aria-label="Vietourist Holdings – Hệ thống điều hành, về bảng điều hành">
           {/* LOGO v2 (anh Tuấn duyệt 07/11/2026, bản xem thử «Logo v2 trên VTOS và VTD»): chỉ dùng
               logo Vietourist Holdings, bỏ dấu VTOS. Bản nền tối của bộ v2 (#5A9BD4 · #FF6F96 ·
               #5FAE66 + chữ trắng), đã bỏ ô nền #0B2545 để nằm thẳng trên thanh navy #14538D.

@@ -23,9 +23,10 @@
  */
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import Shell, { useShell } from "@/components/Shell";
+import Shell, { useShell, VAI_BAN_KD_LE } from "@/components/Shell";
 import TrangPhanHe from "@/components/TrangPhanHe";
 import DoanhThuChiTieuKd from "@/components/DoanhThuChiTieuKd";
+import BanGdKdLe from "@/components/BanGdKdLe";
 import { usePhamViBaoCao } from "@/components/BangChiTieuPhong";
 
 function KinhDoanhLe() {
@@ -63,7 +64,22 @@ function KinhDoanhLe() {
   </>);
 }
 
+/** R5-4 · 13/11/2026 (Chủ tịch): Giám đốc Kinh doanh vào /fit là gặp BÀN LÀM VIỆC CỦA MÌNH theo mẫu
+ *  v32 (`BanGdKdLe`), không thanh dọc — như bàn GĐ đội xe; Chủ tịch, TGĐ bấm «Kinh doanh lẻ» cũng gặp bàn ấy.
+ *  TP, trưởng nhóm, NV vẫn gặp trang hai tab ở
+ *  trên. Vai đọc từ phiên đã lưu SAU khi gắn trang (đọc lúc dựng sẵn là lệch giữa máy chủ và trình duyệt);
+ *  `?xem=` (mục lục, doanh thu) vẫn mở trang hai tab cho mọi vai. */
+function vaiDaLuu(): string {
+  try { return JSON.parse(localStorage.getItem("vtos_user") || "{}").role || ""; } catch { return ""; }
+}
+
 export default function Page() {
+  const [vai, setVai] = useState<string | null>(null);
+  const [coXem, setCoXem] = useState(false);
+  useEffect(() => { setVai(vaiDaLuu()); setCoXem(new URLSearchParams(window.location.search).has("xem")); }, []);
+  if (vai === null) return <Shell><div className="panel muted">Đang tải…</div></Shell>;
+  // R5-4: GĐ KD cùng Chủ tịch, TGĐ (và hai vai đọc nền) — đúng danh sách vai của bàn — gặp bàn ở /fit.
+  if (VAI_BAN_KD_LE.includes(vai) && !coXem) return <Shell khongThanhBen><BanGdKdLe /></Shell>;
   return <Shell><Suspense fallback={<div className="panel muted">Đang tải…</div>}>
     <KinhDoanhLe />
   </Suspense></Shell>;

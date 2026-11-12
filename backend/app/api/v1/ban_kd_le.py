@@ -24,3 +24,11 @@ router = APIRouter(prefix="/api/v1/ban-kd-le", tags=["ban-kd-le"])
 def tong_quan(u: User = Depends(require_roles(*XEM, mo_ta="bàn làm việc Giám đốc Kinh doanh lẻ")),
               db: Session = Depends(get_db)):
     return S.tong_quan(db)
+
+
+@router.get("/doanh-thu")
+def doanh_thu(nam: int = 0, u: User = Depends(require_roles(*XEM, mo_ta="doanh thu – chỉ tiêu tour lẻ")),
+              db: Session = Depends(get_db)):
+    """Tách khỏi /tong-quan: 12 tháng doanh thu tốn vài giây, bàn hiện trước rồi biểu đồ hiện sau."""
+    from datetime import date
+    return S.doanh_thu_le(db, nam or date.today().year)

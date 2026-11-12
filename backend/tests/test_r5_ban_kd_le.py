@@ -28,7 +28,8 @@ from app.api.v1 import ban_kd_le as API
 
 HOM_NAY = dt.date.today()
 GOC = pathlib.Path(__file__).resolve().parents[2]
-TRANG = (GOC / "web/app/ban-kd-le/page.tsx").read_text(encoding="utf-8")
+# R5-4: thân bàn ở components/BanGdKdLe.tsx (dùng chung cho /ban-kd-le và /fit của GĐ KD).
+TRANG = (GOC / "web/components/BanGdKdLe.tsx").read_text(encoding="utf-8")
 SHELL = (GOC / "web/components/Shell.tsx").read_text(encoding="utf-8")
 
 
@@ -142,3 +143,36 @@ def test_trang_chi_doc_khong_so_viet_cung():
     # Trang con mở TRONG bàn, không nhảy màn.
     assert "<KhungNhung" in TRANG and "window.location.assign(\"/\")" in TRANG
     assert "/sales-admin" not in TRANG, "Sales Admin làm đợt riêng"
+
+
+def test_ba_con_so_dong_luc_tren_tung_chuyen():
+    """R5-4 · hòa vốn, lãi ngưỡng biên, lãi khi bán đủ 45 khách — chỉ khi đủ ba con số dự toán."""
+    db = _db()
+    t = _tour(db, "LE-DL", 3, cho=50, fc=20_000_000)   # p 5tr, v 2tr, f 20tr
+    _ban(db, t, 5)
+    r = BTL.ban_lam_viec(db)["rows"][0]
+    assert r["khach_hoa_von"] == 7                      # 20/(5-2) = 6,67 → 7
+    # lãi ≥ 10%: n ≥ 20 / (0,9·5 − 2) = 8
+    assert r["khach_dat_bien"] == 8 and abs(r["bien_muc_tieu"] - 0.10) < 1e-9
+    assert r["khach_toi_da"] == 45                      # chuyến 50 chỗ → trần 45
+    assert abs(r["bien_khi_day"] - ((3 * 45 - 20) / (5 * 45))) < 1e-9
+    nho = _tour(db, "LE-NHO", 4, cho=10, fc=20_000_000)
+    r2 = [x for x in BTL.ban_lam_viec(db)["rows"] if x["code"] == "LE-NHO"][0]
+    assert r2["khach_toi_da"] == 10, "chuyến mở ít chỗ hơn 45 thì tính theo số chỗ mở"
+    kd = _tour(db, "LE-KHONG", 5, cho=20, fc=0)
+    t3 = db.get(Tour, kd.id); t3.var_cost_per_pax = 0; db.commit()
+    r3 = [x for x in BTL.ban_lam_viec(db)["rows"] if x["code"] == "LE-KHONG"][0]
+    if r3["trang_thai_cong"] == "chua_du_co_so":
+        assert r3["khach_hoa_von"] is None and r3["bien_khi_day"] is None, "thiếu dự toán thì None, không 0"
+
+
+def test_phai_thu_le_chia_theo_ngay_khoi_hanh():
+    db = _db()
+    a = _tour(db, "LE-PT", 10, cho=20); _ban(db, a, 2)   # 2 booking × 5tr, chưa thu
+    pt = S.phai_thu_le(db)
+    assert pt["tong"] == 10_000_000 and pt["so_booking"] == 2
+    assert pt["nhom"]["2 tuần"] == 10_000_000
+    for bk in a.bookings:
+        bk.paid = bk.amount
+    db.commit()
+    assert S.phai_thu_le(db)["tong"] is None, "không ai nợ thì None kèm lý do, không phải 0"

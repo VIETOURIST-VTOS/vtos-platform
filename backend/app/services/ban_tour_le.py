@@ -41,6 +41,24 @@ from app.services import segments as SEG
 DANG_BAN = ("da_duyet",)
 
 
+# R5-4 · Chủ tịch 13/11/2026: «đạt mục tiêu tối đa 45 khách/tour thì lời được bao nhiêu %, hiện rõ trên
+# từng tour cho sales thấy để làm động lực bán». Chuyến mở ÍT chỗ hơn thì tính ở số chỗ mở — không bán
+# được khách thứ 46 trên một chuyến 30 chỗ.
+KHACH_TOI_DA_TOUR = 45
+
+
+def _khach_cho_bien(p: float, f: float, v: float, bien: float) -> int | None:
+    """Số khách nhỏ nhất để lãi ÷ doanh thu ≥ `bien` (bien = 0 → hòa vốn).
+
+    lãi(n) = (p − v)·n − f ;  lãi(n) ≥ bien·p·n  ⇔  n ≥ f ÷ ((1 − bien)·p − v).
+    Mẫu ≤ 0 nghĩa là bán bao nhiêu khách cũng không tới mức ấy → None, không bịa một con số."""
+    mau = (1 - bien) * p - v
+    if mau <= 0:
+        return None
+    from math import ceil
+    return max(0, ceil(f / mau - 1e-9))
+
+
 def _dong(db: Session, t: Tour, nguong: float) -> dict:
     c = R.calc_db(db, t, nguong)
     ban = R.booked_pax(t)
@@ -71,7 +89,22 @@ def _dong(db: Session, t: Tour, nguong: float) -> dict:
         "nguong_bien": c["threshold"], "trang_thai_cong": c["gate_state"],
         "nguon_du_toan": c["budget_source_label"], "chi_tham_chieu": c["reference_only"],
         "duoi_bien": bool(t.below_margin),
+        # ── R5-4: ba con số động lực cho người bán — chỉ khi đủ ba con số dự toán ──────────
+        **_dong_luc(c["complete"], p, f, v, ban, tran, nguong),
     }
+
+
+def _dong_luc(du: bool, p: float, f: float, v: float, ban: int, tran: int, nguong: float) -> dict:
+    """Khách cần để hòa vốn · để đạt ngưỡng biên (tham số `nguong_bien`, hiện 10%) · lãi % khi bán đủ
+    khách tối đa. Thiếu dự toán thì cả ba là None — màn hình in «chưa có dự toán», không in 0."""
+    if not du or not p:
+        return {"khach_hoa_von": None, "khach_dat_bien": None, "bien_muc_tieu": nguong,
+                "khach_toi_da": None, "bien_khi_day": None, "lai_khi_day": None}
+    n_max = min(KHACH_TOI_DA_TOUR, tran) if tran else KHACH_TOI_DA_TOUR
+    lai = (p - v) * n_max - f
+    return {"khach_hoa_von": _khach_cho_bien(p, f, v, 0.0),
+            "khach_dat_bien": _khach_cho_bien(p, f, v, nguong or 0.0), "bien_muc_tieu": nguong,
+            "khach_toi_da": n_max, "lai_khi_day": lai, "bien_khi_day": (lai / (p * n_max)) if n_max else None}
 
 
 def ban_lam_viec(db: Session) -> dict:
