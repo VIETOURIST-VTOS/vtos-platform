@@ -391,8 +391,22 @@ class ChuyenIn(BaseModel):
 from app.models.fleet import QT_TRANG_THAI as _QT_TEN  # noqa: E402
 
 
+def _ma_tour_chuyen(db: Session, trips: list) -> dict[int, str]:
+    """VH-37: mã tour của chuyến — tour Kinh doanh lập, nối qua `tour_id` của chuyến hoặc qua lệnh điều xe
+    Điều hành lập (`dispatch_id` → `tour_id`). Không nối được thì không có mã (màn ghi «chưa nối»)."""
+    from app.models.core import Tour
+    from app.models.hr import DispatchOrder as _DO
+    ld_ids = {t.dispatch_id for t in trips if t.dispatch_id and not t.tour_id}
+    ld_tour = ({d.id: d.tour_id for d in db.execute(select(_DO).where(_DO.id.in_(ld_ids))).scalars()}
+               if ld_ids else {})
+    tour_cua = {t.id: (t.tour_id or ld_tour.get(t.dispatch_id)) for t in trips}
+    ids = {v for v in tour_cua.values() if v}
+    ma = ({x.id: x.code for x in db.execute(select(Tour).where(Tour.id.in_(ids))).scalars()} if ids else {})
+    return {tid: ma.get(v, "") for tid, v in tour_cua.items()}
+
+
 def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict, kg: dict | None = None,
-                cps: list | None = None) -> dict:
+                cps: list | None = None, ma_tour: dict | None = None) -> dict:
     # NHANH-1 (11/11/2026): danh sách chuyến truyền sẵn `cps` đọc MỘT lần cho cả trang — trước đó mỗi chuyến
     # một truy vấn (500 chuyến = 500 lượt hỏi CSDL, đo trên bản thật 1,2–1,6 giây). Gọi lẻ thì vẫn tự đọc.
     if cps is None:
@@ -400,7 +414,9 @@ def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict, kg: dict | None = N
     if kg is None:
         from app.services import ops as _O
         kg = _O.de_nghi_theo_khoan_goc(db)
-    return {"id": t.id, "vehicle_id": t.vehicle_id, "xe": veh.get(t.vehicle_id, ""),
+    if ma_tour is None:
+        ma_tour = _ma_tour_chuyen(db, [t])
+    return {"id": t.id, "ma_tour": ma_tour.get(t.id, ""), "vehicle_id": t.vehicle_id, "xe": veh.get(t.vehicle_id, ""),
             "driver_id": t.driver_id, "tai_xe": emps.get(t.driver_id, ""), "ten_tour": t.ten_tour, "ngay_di": t.ngay_di,
             "ngay_ve": t.ngay_ve, "so_ngay": (t.ngay_ve - t.ngay_di).days + 1,
             "km_dau": t.km_dau, "km_cuoi": t.km_cuoi, "km_gps": t.km_gps,
@@ -429,7 +445,9 @@ def _chuyen_out(db: Session, t: Trip, veh: dict, emps: dict, kg: dict | None = N
                          # Chống ghi hai lần (10/11/2026): khoản này đã là khoản gốc của đề nghị chi nào.
                          "de_nghi_chi": kg.get(f"tc:{c.id}")} for c in cps],
             "tong_chi_vietourist": sum((c.amount or 0) for c in cps if c.ben_chiu == "vietourist_tam_ung"),
-            "tong_chi_chu_xe": sum((c.amount or 0) for c in cps if c.ben_chiu == "chu_xe")}
+            "tong_chi_chu_xe": sum((c.amount or 0) for c in cps if c.ben_chiu == "chu_xe"),
+            # VH-37 (Chủ tịch duyệt 12/11/2026): cột «Chi phí» của nhật trình = tổng mọi dòng chi phí chuyến.
+            "tong_chi": sum((c.amount or 0) for c in cps)}
 
 
 @router.get("/chuyen")
@@ -449,7 +467,8 @@ def danh_sach_chuyen(vehicle_id: int | None = None, tu: date | None = None, den:
     if trips:
         for c in db.execute(select(TripCost).where(TripCost.trip_id.in_(list(cp_theo))).order_by(TripCost.id)).scalars():
             cp_theo[c.trip_id].append(c)
-    return [_chuyen_out(db, t, veh, emps, kg, cps=cp_theo[t.id]) for t in trips]
+    mt = _ma_tour_chuyen(db, trips)
+    return [_chuyen_out(db, t, veh, emps, kg, cps=cp_theo[t.id], ma_tour=mt) for t in trips]
 
 
 @router.post("/chuyen", status_code=201)
