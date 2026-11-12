@@ -108,7 +108,7 @@ function ThanhChucNang({ khoa }: { khoa: string }) {
     </nav>);
 }
 
-function BangCuaPhong({ khoa, phamVi, khongChip }: { khoa: string; phamVi: string; khongChip?: boolean }) {
+function BangCuaPhong({ khoa, phamVi, khongChip, khongThanh }: { khoa: string; phamVi: string; khongChip?: boolean; khongThanh?: boolean }) {
   const { meta, xong } = usePhamViBaoCao();
   const ph = timPhanHe(khoa);
   if (!xong) return <p className="muted">Đang tải…</p>;
@@ -119,7 +119,8 @@ function BangCuaPhong({ khoa, phamVi, khongChip }: { khoa: string; phamVi: strin
         «các nút chức năng không được lặp lại trên cùng một màn hình — mỗi nút một chỗ».
         Màn mục lục đã liệt kê đúng những mục ấy rồi; đặt thêm thanh ngang lên trên nó là
         hai bảng nút cho cùng một việc. */}
-    <ThanhChucNang khoa={khoa} />
+    {/* R5-2 · 13/11/2026: /fit bỏ hàng nút này (thanh dọc đã có đủ) — các phòng khác giữ nguyên. */}
+    {!khongThanh && <ThanhChucNang khoa={khoa} />}
     <LoiVaoMucLuc khoa={khoa} />
     {/* BD-1 · 12/10/2026 — VIỆC CẦN LÀM ĐỨNG TRÊN CHỈ TIÊU. Chủ tịch chốt sau khi xem bản dựng
         thử: người mở máy buổi sáng là để làm việc; chỉ tiêu tháng xem một lần đầu ngày là đủ.
@@ -130,7 +131,7 @@ function BangCuaPhong({ khoa, phamVi, khongChip }: { khoa: string; phamVi: strin
   </>);
 }
 
-export default function TrangPhanHe({ khoa, khongChip }: { khoa: string; khongChip?: boolean }) {
+export default function TrangPhanHe({ khoa, khongChip, khongThanh }: { khoa: string; khongChip?: boolean; khongThanh?: boolean }) {
   const sp = useSearchParams();
   const { user } = useShell();
   const phamVi = PHONG_CUA_PHAN_HE[khoa];
@@ -138,5 +139,5 @@ export default function TrangPhanHe({ khoa, khongChip }: { khoa: string; khongCh
   if (sp?.get("xem") === "muc-luc" || !phamVi || an.includes("/bao-cao")) {
     return <MucLucPhanHe khoa={khoa} khongChip={khongChip} />;
   }
-  return <BangCuaPhong khoa={khoa} phamVi={phamVi} khongChip={khongChip} />;
+  return <BangCuaPhong khoa={khoa} phamVi={phamVi} khongChip={khongChip} khongThanh={khongThanh} />;
 }

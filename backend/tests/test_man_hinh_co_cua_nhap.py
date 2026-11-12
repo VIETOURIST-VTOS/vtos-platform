@@ -154,11 +154,11 @@ BAN_LAM_VIEC = {
                  "POST qua /marketing: tab Khách tiềm năng & Sales · tab Đối soát dữ liệu"),
     # R5 · 13/11/2026 — bàn Giám đốc Kinh doanh lẻ (Chủ tịch duyệt bản xem trước). Chỉ đọc theo đúng
     # phạm vi Chủ tịch chốt; cửa ghi của vai nằm ở các màn gốc, và bàn MỞ CHÚNG NGAY TRONG BÀN
-    # (KhungNhung) chứ không dựng bản sao: giao chỉ tiêu ở /kinh-doanh-le, sửa dữ liệu gốc tour ở
+    # (KhungNhung) chứ không dựng bản sao: giao chỉ tiêu ở /fit (tab doanh thu, R5-2), sửa dữ liệu gốc tour ở
     # /tours, ghi kết quả chăm sóc ở /cham-soc, trả lời khách ở /inbox.
     "/ban-kd-le": ("Bàn làm việc Giám đốc Kinh doanh lẻ: bốn thẻ số, bảy việc cần xử lý, sẵn sàng bán và chuyến cần thúc bán. Không sở hữu con số nào của riêng mình — mọi ô đọc lại hàm của màn gốc (bàn bán tour lẻ, cơ cấu tổ chức, chăm sóc, hộp thư, bảng chỉ tiêu).",
                    ("/ban-kd-le/tong-quan",),
-                   "POST qua các màn mở trong bàn: /kinh-doanh-le (giao chỉ tiêu) · /tours · /cham-soc · /inbox"),
+                   "POST qua các màn mở trong bàn: /fit (giao chỉ tiêu) · /tours · /cham-soc · /inbox"),
 }
 
 # ── NHẬT KÝ MÁY GHI — nhóm ĐẾM RIÊNG, mở ngày 16/10/2026 ───────────────────────────────────────
@@ -264,11 +264,8 @@ HO_SO_NGUOI = {
 # PHAN TU THU BA la CUA NHAP THAT -- nguoi dung di dau de sua con so ay. Voi nhom nay cau tra loi
 # luon la "o man hinh nghiep vu cua phong", va viet ra de khong ai tuong trang phong la noi nhap.
 TRANG_PHONG = {
-    "/fit": (
-        "Trang phòng Kinh doanh lẻ: bảng chỉ tiêu của phòng cộng mục lục chức năng. Không đọc "
-        "bảng nghiệp vụ nào — số lấy từ `/api/v1/bao-cao` đã tính sẵn ở `bao_cao_phong`.",
-        ("/bao-cao",),
-        "Số bán hàng nhập ở Booking, Yêu cầu và Báo giá; chỉ tiêu tháng nhập ở /ke-hoach-thang."),
+    # R5-2 · 13/11/2026: "/fit" RỜI nhóm này — đã gộp /kinh-doanh-le nên có CỬA GHI thật
+    # (giao chỉ tiêu ở tab «Doanh thu & chỉ tiêu»). Ngoại lệ sinh ra vì thiếu cửa, có cửa thì đi.
     "/mice": (
         "Trang phòng Kinh doanh đoàn: bảng chỉ tiêu của phòng cộng mục lục chức năng. Cùng "
         "khuôn với /fit, khác phạm vi báo cáo — số lấy từ `/api/v1/bao-cao` đã tính sẵn.",
