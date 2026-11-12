@@ -1,6 +1,6 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Shell, { useShell } from "@/components/Shell";
 import { api } from "@/lib/api";
 import { errMsg } from "@/components/ui";
@@ -16,8 +16,15 @@ import {
 import KhoiKetQuaKinhDoanh from "@/components/KhoiKetQuaKinhDoanh";
 import { bieuDoCua } from "@/components/BaKhuBieuDo";
 
+/** R5-3 · 13/11/2026 (Chủ tịch chốt): bốn vai phòng Kinh doanh lẻ đăng nhập là vào /fit — trang
+ *  của phòng, mỗi người thấy đúng phần mình (GĐ, TP: bảng chỉ tiêu phòng + doanh thu; trưởng nhóm,
+ *  NV: doanh thu của mình). Trang chủ chung không hiện với bốn vai này, nên không còn hai bàn. */
+const VAI_VAO_FIT = ["gd_kd", "tp_kd", "tn_kd", "nv_kd"];
+
 function Dash() {
   const { user } = useShell();
+  const router = useRouter();
+  const vaoFit = VAI_VAO_FIT.includes(user?.role || "");
   /* TQ-1 · Hai danh sách của mục «Vận hành & công việc» mở NGAY TRÊN trang này (`?xem=viec`,
      `?xem=qua-han`) — không thêm màn hình, không thêm quyền. Đổi tham số thì `d` vẫn giữ, nên dải
      «Số đã cập nhật» so được số ô vừa đọc với số danh sách vừa tính lại. */
@@ -29,7 +36,12 @@ function Dash() {
   // "Đang tải…" đứng im vĩnh viễn – lỗi PostgreSQL ngày 07/9 sống sót nhiều ngày vì đúng chỗ này.
   const [loi, setLoi] = useState<string>("");
   const tai = () => { setLoi(""); api("/dashboard").then(setD).catch((e) => setLoi(errMsg(e) || "Không tải được bảng điều khiển")); };
-  useEffect(tai, []);
+  useEffect(() => {
+    if (!user) return;
+    if (vaoFit) { router.replace("/fit"); return; }
+    tai();
+  }, [user?.role]);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (vaoFit) return <p className="muted">Đang mở trang Kinh doanh lẻ…</p>;
   if (loi) return <div className="panel" style={{ borderColor: "var(--red)" }}>
     <b style={{ color: "var(--red)" }}>Không tải được bảng điều khiển.</b>
     <div className="muted" style={{ margin: "6px 0" }}>{loi}</div>
