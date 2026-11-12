@@ -7,7 +7,7 @@ CHỈ ĐỌC, KHÔNG SỞ HỮU CON SỐ NÀO. Mỗi số trên bàn đọc lạ
     phiếu chăm sóc quá hạn                                           ← services.cskh (/cham-soc)
     khách chờ trả lời                                                ← bảng hội thoại (/inbox, cửa status)
     booking · doanh thu · lead · tour lệch quy tắc mảng              ← services.bao_cao_phong (/fit)
-    doanh thu tính chỉ tiêu                                          ← services.doanh_thu_kd (/kinh-doanh-le)
+    doanh thu tính chỉ tiêu                                          ← services.doanh_thu_kd (/fit, tab doanh thu)
 
 Không chép lại phép tính nào: chép là dựng bản thứ hai, và bản thứ hai rồi cũng lệch.
 
@@ -80,7 +80,7 @@ def tong_quan(db: Session, hom_nay: date | None = None) -> dict:
         "chuyen_dang_ban": _o(t["chuyen"], "/ban-tour-le"),
         "cho_con": _o(t["cho_con"], "/ban-tour-le"),
         "sap_khoi_hanh": _o(t["sap_khoi_hanh"], "/ban-tour-le"),
-        "doanh_thu_chi_tieu": _o(dt, "/kinh-doanh-le", ly_do_dt),
+        "doanh_thu_chi_tieu": _o(dt, "/fit", ly_do_dt),   # R5-2: /kinh-doanh-le gộp vào /fit
     }
 
     # Bảy việc, đúng thứ tự bản vẽ đã duyệt. `toi` = màn đang giữ nghiệp vụ (bàn mở nó trong khung).

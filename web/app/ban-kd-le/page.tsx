@@ -17,7 +17,7 @@ import { errMsg } from "@/components/ui";
  *  các hàm đang nuôi màn gốc (xem backend/app/services/ban_kd_le.py). Ô nào máy chủ trả `null` thì
  *  in «chưa đo» kèm lý do — không in số 0.
  *
- *  `/kinh-doanh-le` (doanh thu & giao chỉ tiêu) GIỮ NGUYÊN, mở trong nhóm «Chỉ tiêu & báo cáo».
+ *  R5-2: `/kinh-doanh-le` đã gộp vào `/fit` (tab «Doanh thu & chỉ tiêu»), mở trong nhóm «Chỉ tiêu & báo cáo».
  *  «Bàn Sale Admin» của v32 KHÔNG ở đây: Chủ tịch chốt làm riêng một đợt sau.
  */
 
@@ -40,7 +40,8 @@ const NHOM_KD: { ma: string; ten: string; con: Con[] }[] = [
   { ma: "doi", ten: "Đội ngũ", con: [
     { ten: "Cơ cấu tổ chức", toi: "/to-chuc-kd" }, { ten: "Người bán hàng", toi: "/nguoi-ban-hang" }] },
   { ma: "ct", ten: "Chỉ tiêu & báo cáo", con: [
-    { ten: "Chỉ tiêu kinh doanh", toi: "/kinh-doanh-le" }, { ten: "Báo cáo ngày / tuần / tháng", toi: "/fit" },
+    // R5-2: /kinh-doanh-le gộp vào /fit (hai tab bên trong) — một thẻ, không lặp.
+    { ten: "Chỉ tiêu & doanh thu", toi: "/fit" },
     { ten: "Báo cáo bán hàng", toi: "/sales-reports?mang=le" }, { ten: "Đối soát OTA", toi: "/doi-soat-ota" }] },
 ];
 

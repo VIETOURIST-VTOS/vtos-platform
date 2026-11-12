@@ -53,17 +53,21 @@ export type MetaPhamVi = { pham_vi: { ma: string; ten: string }[]; ky: { ma: str
  *  ô chọn phòng, còn `/phan-he/<khoa>` cần nó để QUYẾT ĐỊNH vẽ bảng hay rơi về mục lục. Trang
  *  phân hệ hỏi một lần rồi truyền xuống bảng, nên mở một phân hệ vẫn chỉ tốn đúng một lượt hỏi.
  */
-export function usePhamViBaoCao() {
+/** R5-2 · 13/11/2026: `boQua` — vai không có màn /bao-cao (nhân viên, trưởng nhóm KD mở /fit) thì
+ *  không gọi: gọi là nhận 403 rồi hiện báo lỗi vô ích. `undefined` = chưa biết vai, chờ. */
+export function usePhamViBaoCao(boQua: boolean | undefined = false) {
   const { toast } = useShell();
   const [meta, setMeta] = useState<MetaPhamVi | null>(null);
   const [xong, setXong] = useState(false);
   useEffect(() => {
+    if (boQua === undefined) return;
+    if (boQua) { setXong(true); return; }
     let song = true;
     api<MetaPhamVi>("/bao-cao/pham-vi")
       .then((m) => { if (song) { setMeta(m); setXong(true); } })
       .catch((e) => { if (song) { setXong(true); toast(errMsg(e), true); } });
     return () => { song = false; };
-  }, [toast]);
+  }, [toast, boQua]);
   return { meta, xong };
 }
 
