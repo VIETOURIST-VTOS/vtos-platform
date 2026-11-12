@@ -660,6 +660,34 @@ export const GROUPS: Group[] = [
  *  "/** Vai trò" và tên hằng "const ROADMAP_ROLES". Bỏ ROADMAP_ROLES là một tệp phép thử vỡ ngay,
  *  báo ValueError không nói gì về nguyên nhân. Mốc mới là MÃ THẬT chứ không phải chú thích: bộ đọc
  *  của tệp kia xoá hết chú thích trước khi tìm mốc. */
+/** MKT-13 · 12/11/2026 — ĐÍCH CỦA NÚT «MARKETING & PR» CĂN THEO TÀI KHOẢN ĐĂNG NHẬP.
+ *
+ *  Chủ tịch 12/11/2026: bấm «Marketing & PR» thì ra bàn làm việc của chính mình. Một dòng
+ *  `href` tĩnh không rẽ theo vai được, nên chỗ VẼ nút chọn đích — thanh menu vốn đã biết người
+ *  đăng nhập là ai, nó đang dùng `user.role` để ẩn hiện mục.
+ *
+ *  CHỈ ĐỔI ĐÍCH CỦA MỘT NÚT. Bảng `GROUPS` không nhúc nhích một chữ, nên mọi mục menu, mọi hàng
+ *  rào của `test_menu.py` và bảng phân quyền đều nguyên vẹn. Hai mục con «Bàn Phó TGĐ
+ *  Marketing» và «Bàn nhân viên Marketing» vẫn còn trong nhóm — ai muốn mở thẳng vẫn mở được.
+ *
+ *  KHAI BẰNG TÊN VAI, không đoán theo «ai không phải nhân viên thì là quản lý»: đoán thì một
+ *  vai thêm vào ngày mai sẽ lặng lẽ rơi vào nhánh sai, và không ai thấy cho tới khi có người bấm.
+ *
+ *  HAI VAI KHÔNG CÓ BÀN GIỮ NGUYÊN ĐÍCH CŨ, và bỏ nhánh ấy đi là hỏng thật: `gd_kd` và
+ *  `ketoan` mở được màn Marketing nhưng KHÔNG nằm trong danh sách vai của hai cửa bàn
+ *  (`XEM_PTGD` và `XEM_NV` ở `backend/app/api/v1/ban_mkt.py`), nên đưa họ sang bàn là họ nhận
+ *  403 ở mọi ô. Phép thử `test_mkt13_nut_marketing_theo_vai.py` đọc cả hai tệp và so với nhau.
+ */
+const VAI_BAN_PTGD = ["chutich", "tgd", "bks", "robot_ks", "ptgd_mkt", "cntt"];
+const VAI_BAN_NV = ["nv_mkt"];
+
+export function dichCuaNhom(g: { key: string; href?: string }, vai: string): string {
+  if (g.key !== "marketing") return g.href || "";
+  if (VAI_BAN_NV.includes(vai)) return "/ban-mkt";
+  if (VAI_BAN_PTGD.includes(vai)) return "/ptgd-mkt";
+  return g.href || "";
+}
+
 export const CA_NHAN: Item[] = [
   ["Báo cáo công việc của tôi", "/reports"],
   ["Phiếu lương của tôi", "/phieu-luong"],
@@ -821,7 +849,8 @@ export default function Shell({ children, khongThanhBen = false }:
         })
         .filter((b): b is Block => b !== null);
       const dem = blocks.reduce((n, b) => n + (laMuc(b) ? 1 : b.items.length), 0);
-      return { ...g, blocks, dem };
+      // MKT-13 · 12/11/2026 — đích của nhóm chọn theo vai ngay tại đây.
+      return { ...g, href: dichCuaNhom(g, user?.role || ""), blocks, dem };
       // GIỮ ĐỦ TÁM NHÓM CHO MỌI VAI TRÒ (anh Tuấn chốt 13/9/2026). Trước đó nhóm nào vai này không
       // có màn hình nào thì rụng khỏi menu; bỏ cách ấy vì nó khiến nhân viên không biết hệ thống có
       // những gì và không biết phải xin quyền ở đâu – cứ tưởng phần mềm chưa làm chức năng ấy.
