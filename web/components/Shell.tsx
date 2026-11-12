@@ -7,6 +7,7 @@ import { api, getUser, clearSession, type User } from "@/lib/api";
 import { laTenMienCong, phienCong } from "@/lib/cong";
 import ChonDonVi from "@/components/ChonDonVi";
 import ChonGiaoDien from "@/components/ChonGiaoDien";
+import KhungNhung from "@/components/KhungNhung";
 import { duongCuaPhong } from "@/lib/duong_phong";
 
 /** Mục v1.1 §I.2 có tên nhưng CHƯA có trang. TC-2 yêu cầu ẩn chức năng "sắp có", nên chúng không vào
@@ -707,11 +708,15 @@ type Toast = { msg: string; err?: boolean } | null;
  *  Mỗi màn hình có biểu nhập gọi `datChuaLuu(true)` khi người dùng bắt đầu sửa và `datChuaLuu(false)`
  *  sau khi lưu xong. Màn hình chưa gọi thì coi như không có gì để mất – đúng với màn hình chỉ đọc,
  *  và KHÔNG chặn nhầm người dùng ở những chỗ không cần chặn. */
+/** VH-42: việc RIÊNG của bàn đang mở (vd. «Việc cần xử lý» của /xe) — bàn đưa lên nút «Công việc» trên thanh đầu
+ *  thay vì vẽ một khối riêng; bấm một dòng thì bàn tự xử lý tại chỗ (`bam`). */
+export type ViecBan = { ma: string; tieu_de: string; mo_ta?: string; muc?: string; bam?: () => void };
 const Ctx = createContext<{
   user: User | null;
   toast: (m: string, err?: boolean) => void;
   datChuaLuu: (co: boolean) => void;
-}>({ user: null, toast: () => {}, datChuaLuu: () => {} });
+  datViecBan: (v: ViecBan[] | null) => void;
+}>({ user: null, toast: () => {}, datChuaLuu: () => {}, datViecBan: () => {} });
 export const useShell = () => useContext(Ctx);
 
 /* VH-24 · 12/11/2026 (Chủ tịch duyệt bản xem trước, chốt 1.1.1) — hai nút «Công việc» và «Chờ duyệt» trên
@@ -720,14 +725,26 @@ export const useShell = () => useContext(Ctx);
    với bảng điều hành, máy chủ nhớ 60 giây; màn hình hỏi lại mỗi phút. Số đỏ trên «Chờ duyệt» CHỈ đếm việc phải
    bấm; dòng «để xem» nằm cuối danh sách, không cộng vào số. */
 type DemViec = { cho_duyet: any[]; so_cho_duyet: number; de_xem: any[]; cong_viec: any[]; so_cong_viec: number };
-function NutViec({ dem, loai, mo, datMo, daXem, children }: { dem: DemViec | null; loai: "viec" | "duyet"; mo: boolean;
+/* VH-42 (Chủ tịch chốt 13/11/2026): «chỉ làm việc trên một bàn làm việc của mình» — bấm một dòng Công việc /
+   Chờ duyệt KHÔNG rời bàn đang đứng: khối «Xử lý tại bàn» mở ở đầu bàn, nhúng ĐÚNG màn gốc của việc ấy (đủ nút,
+   đủ luật — không chép lại luật nào). Áp cho mọi vai, mọi việc. Giữ Ctrl / chuột giữa thì vẫn mở tab mới. */
+const NHAN_MUC_BAN: Record<string, string> = { do: "Đỏ", cam: "Cam", vang: "Vàng" };
+function NutViec({ dem, loai, mo, datMo, daXem, moTaiBan, viecBan, children }: { dem: DemViec | null; loai: "viec" | "duyet"; mo: boolean;
                                              datMo: (v: boolean) => void; daXem: (loai: "viec" | "duyet", label: string) => void;
-                                             children: string }) {
-  const so = loai === "viec" ? dem?.so_cong_viec ?? 0 : dem?.so_cho_duyet ?? 0;
+                                             moTaiBan: (href: string, label: string) => void; viecBan?: ViecBan[] | null; children: string }) {
+  const bam = (e: React.MouseEvent, href: string, label: string) => {
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
+    e.preventDefault(); moTaiBan(href, label);
+  };
+  // VH-42: «Chờ người khác» ẩn khỏi danh sách (Chủ tịch chốt 13/11/2026) — không phải việc của người đọc.
+  const ban = loai === "viec" ? (viecBan || []).filter((v) => v.muc !== "trang") : [];
+  const so = (loai === "viec" ? dem?.so_cong_viec ?? 0 : dem?.so_cho_duyet ?? 0) + ban.length;
   const ds = loai === "viec" ? dem?.cong_viec ?? [] : dem?.cho_duyet ?? [];
   const xem = loai === "duyet" ? dem?.de_xem ?? [] : [];
   const ten = children;
-  return <span className="nv-goc">
+  // VH-42: rê chuột là xổ (chỉ chuột thật — chạm trên điện thoại không sinh hover giả rồi bị bấm đóng lại).
+  return <span className="nv-goc" onPointerEnter={(e) => { if (e.pointerType === "mouse") datMo(true); }}
+    onPointerLeave={(e) => { if (e.pointerType === "mouse") datMo(false); }}>
     <button type="button" className="bar-muc" aria-expanded={mo} aria-haspopup="true"
       onClick={(e) => { e.stopPropagation(); datMo(!mo); }} title={so ? `${so} ${loai === "viec" ? "việc" : "việc chờ anh/chị bấm"}` : ten}>
       <Bt d={loai === "viec" ? "viec" : "duyet"} /><span>{ten}</span>{so > 0 && <b className="so-bao">{so}</b>}
@@ -735,12 +752,21 @@ function NutViec({ dem, loai, mo, datMo, daXem, children }: { dem: DemViec | nul
     {mo && <div className="nv-xo" role="menu" onClick={(e) => e.stopPropagation()}>
       <div className="nv-dau">{loai === "viec" ? "Công việc của tôi" : "Chờ tôi duyệt"}{so > 0 ? ` · ${so}` : ""}</div>
       {dem === null ? <div className="nv-trong">Đang đếm…</div>
-        : ds.length === 0 && xem.length === 0 ? <div className="nv-trong">Không có việc nào đang chờ.</div> : null}
+        : ds.length === 0 && xem.length === 0 && ban.length === 0 ? <div className="nv-trong">Không có việc nào đang chờ.</div> : null}
+      {ban.map((v, i) => <button key={v.ma} type="button" className={"nv-ban" + (v.muc === "do" ? " nv-ban-do" : "")}
+        onClick={() => { datMo(false); v.bam?.(); }}>
+        <span className="nv-ban-ma">VIỆC {String(i + 1).padStart(2, "0")}</span>
+        <b>{v.tieu_de}</b>
+        {v.muc && NHAN_MUC_BAN[v.muc] && <span className={"nv-ban-muc nv-ban-" + v.muc}>{NHAN_MUC_BAN[v.muc]}</span>}
+        {v.mo_ta && <span className="nv-ban-mt">{v.mo_ta}</span>}
+      </button>)}
+      {ban.length > 0 && ds.length > 0 && <div className="nv-nhom">Việc khác</div>}
       {/* VH-27: bấm một dòng = đã xem → số trên nút giảm ngay; máy chủ nhớ (POST /dashboard/da-xem). */}
       {ds.map((d: any, i: number) => <Link key={i} href={d.href} className={"nv-dong" + (d.da_xem ? " nv-da" : "")}
-        onClick={() => { if (!d.da_xem) daXem(loai, d.label); datMo(false); }}>{d.label}</Link>)}
+        onClick={(e) => { if (!d.da_xem) daXem(loai, d.label); datMo(false); bam(e, d.href, d.label); }}>{d.label}</Link>)}
       {xem.length > 0 && <div className="nv-nhom">Để xem, không phải để bấm</div>}
-      {xem.map((d: any, i: number) => <Link key={`x${i}`} href={d.href} className="nv-dong nv-doc" onClick={() => datMo(false)}>{d.label}</Link>)}
+      {xem.map((d: any, i: number) => <Link key={`x${i}`} href={d.href} className="nv-dong nv-doc"
+        onClick={(e) => { datMo(false); bam(e, d.href, d.label); }}>{d.label}</Link>)}
     </div>}
   </span>;
 }
@@ -765,7 +791,15 @@ export default function Shell({ children, khongThanhBen = false }:
   const [alerts, setAlerts] = useState(0);
   // VH-24: số việc của hai nút «Công việc» / «Chờ duyệt»; nút nào đang xổ danh sách.
   const [dem, setDem] = useState<DemViec | null>(null);
+  const [viecBan, datViecBan] = useState<ViecBan[] | null>(null);
   const [xoViec, setXoViec] = useState<"" | "viec" | "duyet">("");
+  /** VH-42: việc đang mở tại bàn (null = không). */
+  const [xuLy, setXuLy] = useState<{ href: string; label: string } | null>(null);
+  const xuLyRef = useRef<HTMLElement | null>(null);
+  const moTaiBan = useCallback((href: string, label: string) => {
+    setXuLy({ href, label });
+    setTimeout(() => xuLyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }, []);
   // VH-27: đánh dấu đã xem — trừ số tại chỗ cho nhanh, rồi báo máy chủ nhớ (đổi máy vẫn giữ).
   const daXem = useCallback((loai: "viec" | "duyet", label: string) => {
     setDem((d) => {
@@ -895,7 +929,7 @@ export default function Shell({ children, khongThanhBen = false }:
 
 
   return (
-    <Ctx.Provider value={{ user, toast, datChuaLuu }}>
+    <Ctx.Provider value={{ user, toast, datChuaLuu, datViecBan }}>
       <div className="top">
         <button type="button" className="burger" onClick={() => setSide((s) => !s)} aria-label="Menu">☰</button>
         {/* Dấu hiệu nhận biết: logo Vietourist Holdings v2, nền TRONG SUỐT (không đặt ảnh nền trắng lên
@@ -931,8 +965,8 @@ export default function Shell({ children, khongThanhBen = false }:
           </button>
           {/* VH-27 · 12/11/2026 — nút vàng «Lịch xe 90 ngày» rời thanh ngang, xuống đầu bàn làm việc cạnh ô
               ngày (DauManHinh01 · NutLich90.tsx). */}
-          <NutViec dem={dem} loai="viec" mo={xoViec === "viec"} datMo={(v) => setXoViec(v ? "viec" : "")} daXem={daXem}>Công việc</NutViec>
-          <NutViec dem={dem} loai="duyet" mo={xoViec === "duyet"} datMo={(v) => setXoViec(v ? "duyet" : "")} daXem={daXem}>Chờ duyệt</NutViec>
+          <NutViec dem={dem} loai="viec" mo={xoViec === "viec"} datMo={(v) => setXoViec(v ? "viec" : "")} daXem={daXem} moTaiBan={moTaiBan} viecBan={viecBan}>Công việc</NutViec>
+          <NutViec dem={dem} loai="duyet" mo={xoViec === "duyet"} datMo={(v) => setXoViec(v ? "duyet" : "")} daXem={daXem} moTaiBan={moTaiBan}>Chờ duyệt</NutViec>
           {/* THỨ TỰ theo bản vẽ 12/9: … Công việc · Chờ duyệt · Trợ lý AI · chuông · Tài khoản.
               Chuông đứng sát ô tài khoản vì hai thứ ấy đều là của riêng người đang đăng nhập. */}
           <button type="button" className="bar-muc ai soon" title="Trợ lý AI — sắp có" onClick={() => toast("Trợ lý AI: đang xây dựng")}>
@@ -1032,7 +1066,14 @@ export default function Shell({ children, khongThanhBen = false }:
             </div>
           ))}
         </aside>}
-        <main>{children}</main>
+        <main>
+          {xuLy && <section className="xu-ly-ban" aria-label="Xử lý tại bàn" ref={xuLyRef}>
+            <div className="xu-ly-dau"><b>Xử lý tại bàn</b><span>{xuLy.label}</span>
+              <button type="button" className="act grey" onClick={() => setXuLy(null)}>Đóng ✕</button></div>
+            <KhungNhung key={xuLy.href} toi={xuLy.href} ten={xuLy.label} cuaBan={(h) => h !== "/"} />
+          </section>}
+          {children}
+        </main>
       </div>
       {t && <div className={"toast" + (t.err ? " err" : "")} role="status">{t.msg}</div>}
     </Ctx.Provider>

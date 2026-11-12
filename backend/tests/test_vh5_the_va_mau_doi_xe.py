@@ -32,9 +32,12 @@ def test_3_tab_doi_xe_xuong_hang_khong_cat_chu():
 
 
 def test_4_viec_can_xu_ly_la_the():
+    # VH-42 (13/11/2026): khối thẻ việc thu vào nút «Công việc» trên thanh đầu — mỗi việc vẫn là một dòng
+    # «VIỆC 0n · tên · nhãn màu · mô tả» (Shell `nv-ban`), bấm mở ngăn kéo tại bàn.
     s = _w("app", "xe", "page.tsx")
-    assert 'className="xe-the-luoi"' in s and "xe-the-ma" in s and "NHAN_MUC" in s
-    assert ".xe-the{background:#fbfcfe;border:1px solid #d6dfeb;border-radius:13px" in s     # VH-7: thẻ trên nền thẻ trắng
+    assert "datViecBan(hd ?" in s and "bam: v.bam_duoc && v.ngan_keo ? () => setKeo(v.ngan_keo)" in s
+    sh = _w("components", "Shell.tsx")
+    assert 'className="nv-ban-ma">VIỆC {String(i + 1).padStart(2, "0")}' in sh
 
 
 def test_5_khoi_hieu_qua_xuong_hang_tren_dien_thoai():

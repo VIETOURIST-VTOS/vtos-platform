@@ -23,6 +23,8 @@ function DoiXe() {
   const [xe, setXe] = useState<any[]>([]);
   const [chon, setChon] = useState<any>(null);
   const [xm, setXm] = useState<any[]>([]);
+  /** VH-42: chỉ hiện các tờ quyết toán đang chờ Chủ tịch duyệt, mỗi tờ mở sẵn để duyệt tại chỗ. */
+  const [choTgd, setChoTgd] = useState(false);
   const [tab, setTab] = useState<"xe" | "chuyen" | "giaodich" | "quyettoan" | "congno" | "baoduong" | "baohong" | "nhinlai">("xe");
   /* VH-33 (Chủ tịch 12/11/2026): mở trong khung của bàn GĐ đội xe (/xe) thì /xe đã có tiêu đề, ô đếm và thanh
      nghiệp vụ — ở đây giấu phần đầu trang và dãy tab để không lặp nút trên một màn; liên kết sang màn ngoài
@@ -91,6 +93,8 @@ function DoiXe() {
       // xe trỏ sang đây. Không trỏ tới từng chuyến mà tới đúng tab chứa nhật trình: trỏ sâu hơn
       // đòi một mã mở sẵn một dòng, và một đường dẫn hứa nhiều hơn nó làm được thì tệ hơn.
       if (t === "chuyen") setTab("chuyen");
+      // VH-42: dòng «tờ quyết toán chuyến xe chờ CHỦ TỊCH duyệt» trên ô Chờ duyệt trỏ `?tab=chuyen&cho=tgd`.
+      if (new URLSearchParams(window.location.search).get("cho") === "tgd") setChoTgd(true);
       if (t === "nhin-lai" || t === "nhinlai") setTab("nhinlai");
       // Bốn tab còn lại: trước hôm nay gõ đúng tên tab vẫn rơi về «Hồ sơ xe».
       if (t === "giaodich" || t === "giao-dich") setTab("giaodich");
@@ -364,7 +368,15 @@ function DoiXe() {
         </div>
       </div>}
 
-      <div className="panel wrap"><h2>Nhật trình chuyến</h2>
+      {choTgd && <div className="panel wrap"><h2>Tờ quyết toán chuyến xe chờ Chủ tịch duyệt</h2>
+        {chuyen.filter((t) => t.qt_trang_thai === "cho_tgd").length === 0
+          ? <p className="muted">Không còn tờ nào chờ duyệt.</p>
+          : chuyen.filter((t) => t.qt_trang_thai === "cho_tgd").map((t) => <div key={t.id} style={{ marginBottom: 14 }}>
+              <p style={{ margin: "0 0 6px" }}><b>{t.ma_tour || t.ma_phieu || `#${t.id}`}</b> · {t.xe} · {t.ten_tour || "—"} · {String(fmtD(t.ngay_di)).slice(0, 5)} → {String(fmtD(t.ngay_ve)).slice(0, 5)}</p>
+              <QuyetToanChuyen tripId={t.id} toast={toast} />
+            </div>)}
+      </div>}
+      {!choTgd && <div className="panel wrap"><h2>Nhật trình chuyến</h2>
       {canNhap && !form && <div style={{ marginBottom: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button className="act teal" onClick={() => setForm({ ngay_di: "", ngay_ve: "" })}>+ Nhập phiếu chi phí xe</button>
         {/* Cờ được tính lúc GHI rồi lưu vào dòng. Đo trên hệ thật 07/10/2026: cả 24 chuyến in rõ
@@ -427,7 +439,7 @@ function DoiXe() {
           </Fragment>;
         }) : <tr><td colSpan={11} className="muted">Chưa có chuyến nào được ghi nhật trình.</td></tr>}</tbody></table></div>
       <style>{NT_CSS}</style>
-      </div>
+      </div>}
     </>}
 
     {tab === "giaodich" && formNga && <div className="panel" style={{ borderColor: "var(--orange)" }}>

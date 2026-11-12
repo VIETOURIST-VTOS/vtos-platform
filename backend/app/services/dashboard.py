@@ -268,7 +268,9 @@ def viec_cho_duyet(db: Session, u: User) -> list[dict]:
     if role == "chutich":
         from app.models.fleet import Trip as _Trip
         n = db.execute(select(func.count()).select_from(_Trip).where(_Trip.qt_trang_thai == "cho_tgd")).scalar()
-        if n: ap.append({"label": f"{n} tờ quyết toán chuyến xe chờ CHỦ TỊCH duyệt", "href": "/xe"})
+        # VH-42: trỏ thẳng danh sách tờ chờ Chủ tịch (mở tại bàn) — `/xe` là bàn GĐ đội xe, Chủ tịch ở đó chỉ
+        # thấy «Không có quyền».
+        if n: ap.append({"label": f"{n} tờ quyết toán chuyến xe chờ CHỦ TỊCH duyệt", "href": "/doi-xe?tab=chuyen&cho=tgd"})
     return ap
 
 
