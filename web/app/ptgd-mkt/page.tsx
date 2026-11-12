@@ -1,5 +1,5 @@
 "use client";
-/** MKT-12 · BÀN LÀM VIỆC PHÓ TGĐ MARKETING — `/ptgd-mkt`. Chủ tịch duyệt bản xem thử 12/11/2026.
+/** MKT-14 · BÀN LÀM VIỆC PHÓ TGĐ MARKETING — `/ptgd-mkt`. Chủ tịch duyệt bản xem thử 12/11/2026.
  *
  *  ĐỢT NÀY SỬA GIAO DIỆN, KHÔNG SỬA MỘT CON SỐ NÀO. Cửa `/api/v1/marketing/ban-ptgd` giữ nguyên,
  *  ba luật nói thật vẫn nằm ở máy chủ. Bốn chỗ đổi, và một chỗ trong đó là sửa lỗi của chính đợt
@@ -84,19 +84,30 @@ const MAU = <style>{`
   border-radius:999px;padding:5px 11px;white-space:nowrap}
 .pt-nut{font-size:calc(12.5/14*1rem);font-weight:600;color:var(--vtos-navy);
   background:var(--vtos-text-on-navy);border:0;border-radius:8px;padding:6px 12px;
-  cursor:pointer;font-family:inherit}
+  cursor:pointer;font-family:var(--vtos-font-text)}
 .pt-muc{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 9px}
 .pt-muc h2{margin:0;font-size:calc(15/14*1rem);font-weight:700;color:var(--vtos-navy)}
 .pt-luoi{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(248px,1fr));
   margin-bottom:22px}
-.pt-dv{font-family:inherit;font-size:calc(12.5/14*1rem);font-weight:500;
+/* MKT-14 - don vi lay phong CHU, khong de inherit. inherit o day thua ke tu .the-so, ma
+   .the-so co y dung phong may cho con so, nen "0 ban thao" hien ra bang phong may. Do tren
+   trang that ngay 12/11/2026, sau khi dot MKT-12 gop. */
+.pt-dv{font-family:var(--vtos-font-text);font-size:calc(12.5/14*1rem);font-weight:500;
   color:var(--vtos-text-mute);margin-left:5px;letter-spacing:0}
-.pt-chu{font-family:inherit;font-size:calc(19/14*1rem);font-weight:700;color:var(--vtos-warning)}
+.pt-chu{font-family:var(--vtos-font-text);font-size:calc(19/14*1rem);font-weight:700;
+  color:var(--vtos-warning)}
 .the-ct.pt-do{border-left:3px solid var(--vtos-danger)}
 .the-ct.pt-do .the-so{color:var(--vtos-danger)}
 .the-ct.pt-vang{border-left:3px solid var(--vtos-warning)}
 .the-ct.pt-vang .the-so{color:var(--vtos-warning)}
 .pt-nen .the-ct{background:var(--vtos-surface)}
+/* MKT-14 - CHU GIAI THICH THU VE MOT DONG.
+   Dot MKT-12 dung san khung nay nhung khong truyen noi dung vao o nao, nen moi the van in
+   nguyen cau dai cua may chu -- do duoc bang mat tren trang that. Nay .the-duoi cat con MOT
+   dong; cau day du nam sau mot dong bam mo. CAT BANG CSS chu khong cat chuoi trong ma: cat
+   chuoi thi co ngay mot cau bi chem doi giua chung. */
+.the-ct .the-duoi.pt-gon{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;
+  overflow:hidden}
 .pt-vs{margin-top:6px}
 .pt-vs summary{font-size:calc(12/14*1rem);color:var(--vtos-text-mute);cursor:pointer;
   list-style:none;font-weight:600;display:inline-block;
@@ -127,13 +138,18 @@ function So({ o }: { o: O }) {
 function duoi(o: O) { return o.trang_thai === "loi" ? o.ly_do : o.ghi_chu; }
 
 /** Một ô. `vs` là phần giải thích dài — xem điểm (4) ở đầu tệp: thu về một dòng bấm mở, không xoá. */
-function TheO({ o, mau, vs }: { o: O; mau?: string; vs?: [string, string] }) {
+function TheO({ o, mau }: { o: O; mau?: string }) {
+  const chu = duoi(o);
+  /* MKT-14 · 12/11/2026 — dài bao nhiêu thì mới dựng cửa đọc thêm. 90 ký tự là chỗ một dòng bắt
+     đầu bị cắt ở bề ngang một cột của lưới; ngắn hơn thì cắt cũng không giấu đi chữ nào, nên
+     dựng cửa là dựng thừa. */
+  const dai = chu.length > 90;
   return (
     <div className={"the-ct" + (mau ? " pt-" + mau : "")}>
       <div className="the-nhan">{o.ten}</div>
       <So o={o} />
-      {duoi(o) && <div className="the-duoi">{duoi(o)}</div>}
-      {vs && <details className="pt-vs"><summary>{vs[0]}</summary><p>{vs[1]}</p></details>}
+      {chu && <div className={"the-duoi" + (dai ? " pt-gon" : "")}>{chu}</div>}
+      {dai && <details className="pt-vs"><summary>đọc cả câu</summary><p>{chu}</p></details>}
       {o.den && <Link className="the-cua" href={o.den}>Mở chỗ làm việc này →</Link>}
     </div>
   );
