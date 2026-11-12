@@ -13,6 +13,8 @@ import BaoCaoChuyenDoi, { tyLe } from "@/components/BaoCaoChuyenDoi";
 // vào chính nó đúng kiểu này từ trước, nên đây là đi theo nếp có sẵn chứ không mở nếp mới.
 import MucLucPhanHe from "@/components/MucLucPhanHe";
 import KhungNhung from "@/components/KhungNhung";
+import NutLich90, { VAI_NUT_LICH_90 } from "@/components/NutLich90";
+import { useHomNay } from "@/components/DauManHinh01";
 
 /** KHÔNG GIAN LÀM VIỆC MARKETING & PR — bảy màn hình, một chỗ (18/9/2026)
  *
@@ -151,9 +153,12 @@ const NHOM_MKT: { ma: string; ten: string; khan?: true; con: ConMkt[] }[] = [
     { ten: "Chăm sóc sau bán", toi: "/cham-soc" }, { ten: "Phản hồi & khiếu nại", toi: "/khieu-nai" }] },
 ];
 /** Màn của phòng được mở TRONG khung của bàn; liên kết ra ngoài danh sách này bị chặn trong khung. */
-const DUONG_MKT = ["/ptgd-mkt", "/ban-mkt", "/noi-dung", "/bao-chi-kol", "/dong-gop-marketing", "/doi-soat-marketing",
+const DUONG_MKT = ["/lich-xe-trong", "/ptgd-mkt", "/ban-mkt", "/noi-dung", "/bao-chi-kol", "/dong-gop-marketing", "/doi-soat-marketing",
   "/chuyen-doi-lead", "/cham-soc", "/khieu-nai", "/leads"];
 const laMkt = (h: string) => DUONG_MKT.some((t) => h === t || h.startsWith(t + "/") || h.startsWith(t + "?"));
+/** VH-43: tên trên thanh đầu bàn — theo bàn mà trang chủ mở cho vai ấy. */
+const tenBan = (vai: string) => VAI_BAN_NV.includes(vai) ? "Bàn làm việc nhân viên Marketing"
+  : VAI_BAN_PTGD.includes(vai) ? "Bàn làm việc P.TGĐ Marketing" : "Bàn làm việc Marketing & PR";
 const banCuaVai = (vai: string) => VAI_BAN_NV.includes(vai) ? "/ban-mkt" : VAI_BAN_PTGD.includes(vai) ? "/ptgd-mkt" : "";
 
 /** Một THẺ SỐ của Tổng quan. Bốn phần, và phần thứ tư không được bỏ:
@@ -189,6 +194,17 @@ function Marketing() {
   const [sub, setSub] = useState("chiendich");          // trong tab "chiendich": chiendich | ngansach
   // VH-41: nhóm đang mở và màn đang nhúng (null = nội dung của chính màn này theo `tab`).
   const [nhom, setNhom] = useState("chu");
+  const homNay = useHomNay();
+  /* VH-43 (Chủ tịch 13/11/2026): bấm chữ «HỆ THỐNG ĐIỀU HÀNH» trên thanh đầu là về trang tổng CRM — cùng cách /xe
+     (VH-8): logo bên cạnh vẫn về trang chủ của bàn này. */
+  useEffect(() => {
+    const chu = document.querySelector("a.brand small") as HTMLElement | null;
+    if (!chu) return;
+    const ve = (e: Event) => { e.preventDefault(); e.stopPropagation(); window.location.assign("/"); };
+    chu.title = "Về trang tổng CRM";
+    chu.addEventListener("click", ve, true);
+    return () => { chu.removeEventListener("click", ve, true); chu.removeAttribute("title"); };
+  }, []);
   const [khung, setKhung] = useState<string | null>(null);
   const [con, setCon] = useState(0);
   const moCon = (ma: string, i: number) => {
@@ -497,10 +513,20 @@ function Marketing() {
         vì ở đây mục lục là một NHÓM chứ không phải một trang riêng. */}
     {/* VH-41 (Chủ tịch duyệt bản xem trước 12/11/2026 22:17): bàn làm việc như /xe — đầu bàn navy sáng,
         bảy nhóm nút lớn, trang con mở tại chỗ. Thay cho hàng 12 liên kết đi KHỎI màn (MKT-3) và tám nút
-        chức năng (MKT-6): mỗi việc một nút, không nút nào lặp. Lối ra CRM tổng giữ ở cuối đầu bàn. */}
-    <div className="mkt-ban">
-      <div><small>MARKETING &amp; PR · VIETOURIST HOLDINGS</small><h1>Bàn làm việc Marketing &amp; PR</h1></div>
-      <Link href="/" className="mkt-ra-ban">Trang tổng CRM →</Link>
+        chức năng (MKT-6): mỗi việc một nút, không nút nào lặp. Lối ra CRM tổng: chữ «HỆ THỐNG ĐIỀU HÀNH» trên thanh đầu. */}
+    {/* VH-43 (Chủ tịch 13/11/2026): MỘT thanh đầu bàn — khuôn chung `.mh01-ban` như bàn Chủ tịch và bàn GĐ đội xe:
+        tên bàn theo vai, ô «Hôm nay», nút «Lịch xe 90 ngày». Thanh đầu của bàn nhúng bên dưới bị giấu (`anDauBan`),
+        nên không còn hai thanh «Bàn làm việc» chồng nhau. Lịch xe 90 ngày mở TẠI CHỖ trong khung, không rời bàn. */}
+    <div className="mh01-ban" onClickCapture={(e) => {
+      const a = (e.target as HTMLElement).closest("a[href]") as HTMLAnchorElement | null;
+      const h = a?.getAttribute("href") || "";
+      if (h.startsWith("/lich-xe-trong")) { e.preventDefault(); setNhom(""); setCon(0); setKhung(h); }
+    }}>
+      <h1 className="mh01-ban-ten">{tenBan(role)}</h1>
+      <div className="mh01-ban-cum">
+        <div className="mh01-ban-ngay"><span>Hôm nay</span>{homNay || "…"}</div>
+        {VAI_NUT_LICH_90.includes(role) && <NutLich90 />}
+      </div>
     </div>
     <nav className="mkt-nhom" aria-label="Nhóm nghiệp vụ Marketing">
       {NHOM_MKT.map((g) => (
@@ -515,7 +541,7 @@ function Marketing() {
         })}
       </nav>); })()}
     {khung && <KhungNhung key={khung} toi={khung} ten={(NHOM_MKT.find((g) => g.ma === nhom) || NHOM_MKT[0]).con[con]?.ten || "Marketing"}
-      cuaBan={laMkt} ngoai={ngoaiKhung} />}
+      cuaBan={laMkt} ngoai={ngoaiKhung} anDauBan />}
     {!khung && <>
 
     {/* ═══════════════ 8 · MỤC LỤC CHỨC NĂNG ═══════════════
@@ -1191,13 +1217,11 @@ main .panel.mkt-luu-y{background:#fdf6e7!important;
 .mkt-ra{display:flex;margin:0 0 10px}
 .mkt-ra a{margin-left:auto;color:var(--mkt-nhan);font-weight:600;font-size:13.5px}
 
+/* VH-43 — chữ «HỆ THỐNG ĐIỀU HÀNH» bấm được (về trang tổng CRM), khuôn của /xe. */
+a.brand small{cursor:pointer;border-radius:6px;padding:2px 6px;transition:background .15s}
+a.brand small:hover{background:#ffffff26;text-decoration:underline}
+
 /* VH-41 — ĐẦU BÀN + BẢY NHÓM + TRANG CON, khuôn của /xe (navy sáng như thanh đầu bàn VH-30). */
-.mkt-ban{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin:4px 0 14px;
-  padding:12px 18px;border-radius:18px;color:#fff;background:linear-gradient(120deg,var(--vtos-ban-a,#2a6db5),var(--vtos-ban-b,#1f5fa8));
-  box-shadow:0 2px 4px rgba(2,11,24,.18),0 14px 32px rgba(2,11,24,.22)}
-.mkt-ban small{display:block;font-size:13px;font-weight:700;letter-spacing:.08em;opacity:.9}
-.mkt-ban h1{margin:0;font-size:26px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#fff}
-.mkt-ban a.mkt-ra-ban{color:#fff;font-weight:700;font-size:14px;background:rgba(255,255,255,.14);border-radius:10px;padding:7px 12px;text-decoration:none}
 .mkt-nhom{position:sticky;top:var(--top-h);z-index:5;background:#eaf0f7;padding:6px 0 4px;margin-bottom:8px;
   display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px}
 .mkt-nhom button{margin:0;font:inherit;font-size:13.5px;font-weight:700;color:#fff;background:var(--mkt-nhan);border:0;

@@ -11,8 +11,10 @@ import { useState } from "react";
  *    đổi nhóm tại chỗ, không mở bàn lồng trong bàn).
  *  · đường dẫn thuộc `cuaBan` → mở NGAY TRONG KHUNG.
  *  · còn lại (trang chủ, phân hệ khác của CRM) → không đi đâu cả; lối ra duy nhất là thanh đầu. */
-export default function KhungNhung({ toi, ten, mo, cuaBan, ngoai }: {
+export default function KhungNhung({ toi, ten, mo, cuaBan, ngoai, anDauBan }: {
   toi: string; ten: string; mo?: string; cuaBan: (href: string) => boolean; ngoai?: (href: string) => boolean;
+  /** VH-43: giấu thanh đầu `.mh01-ban` của bàn nhúng — bàn ngoài đã có một thanh, hai thanh là lặp. */
+  anDauBan?: boolean;
 }) {
   const [cao, setCao] = useState(640);
   const src = toi + (mo ? (toi.includes("?") ? "&" : "?") + `mo=${mo}` : "");
@@ -30,6 +32,7 @@ export default function KhungNhung({ toi, ten, mo, cuaBan, ngoai }: {
           // VH-33: trong khung chỉ giữ việc CHÍNH của màn; «‹ Lên một cấp» và lối sang màn khác đã có trên
           // thanh nghiệp vụ của bàn — giữ lại là lặp nút trên một màn. Thanh trống thì giấu.
           + ".thanh-viec a.tv:not(.chinh),.thanh-viec .tv-nhan{display:none!important}.thanh-viec:not(:has(a.tv.chinh)){display:none!important}";
+        if (anDauBan) st.textContent += ".mh01-ban{display:none!important}";
         doc.head.appendChild(st);
         doc.addEventListener("click", (e) => {
           const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
