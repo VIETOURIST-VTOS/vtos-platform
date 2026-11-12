@@ -59,7 +59,8 @@ function BanTourLe() {
         <thead><tr>
           <th>Chuyến</th><th>Khởi hành</th><th className="num">Chỗ</th>
           <th className="num">Giá bán</th><th className="num">Chi phí cố định</th><th className="num">Chi phí/khách</th>
-          <th className="num">Hòa vốn</th><th className="num">Lợi nhuận kế hoạch</th><th className="num">Tại số đang bán</th><th>Cổng biên</th>
+          <th className="num">Hòa vốn</th><th className="num">Lãi {Math.round(((d.rows || [])[0]?.bien_muc_tieu ?? 0.1) * 100)}%</th>
+          <th className="num">Bán đủ khách</th><th className="num">Lợi nhuận kế hoạch</th><th className="num">Tại số đang bán</th><th>Cổng biên</th>
         </tr></thead>
         <tbody>{rows.length ? rows.map((r: any) => {
           const [nhan, mau] = CONG[r.trang_thai_cong] || [r.trang_thai_cong, "grey"];
@@ -73,6 +74,15 @@ function BanTourLe() {
             <td className="num">{r.chi_phi_theo_khach ? vnd(r.chi_phi_theo_khach) : <span className="muted">–</span>}</td>
             <td className="num">{r.hoa_von_khach ?? <span className="muted">–</span>}
               {chuaHoaVon && <div><Tag cls="red">thiếu {r.con_thieu_de_hoa_von}</Tag></div>}</td>
+            {/* R5-4 · Chủ tịch 13/11/2026: hiện rõ trên từng tour cho người bán làm động lực — cần bao nhiêu
+                khách để đạt ngưỡng biên (tham số), và bán đủ khách tối đa (45, hay số chỗ mở nếu ít hơn) thì
+                lãi bao nhiêu %. Máy chủ tính (`ban_tour_le._dong_luc`); thiếu dự toán thì gạch, không in 0. */}
+            <td className="num">{r.khach_dat_bien == null ? <span className="muted">–</span>
+              : <>{r.khach_dat_bien}{r.khach_dat_bien > r.cho_da_ban
+                  ? <div><Tag cls="orange">thiếu {r.khach_dat_bien - r.cho_da_ban}</Tag></div> : <div><Tag cls="ok">đã đạt</Tag></div>}</>}</td>
+            <td className="num">{r.bien_khi_day == null ? <span className="muted">–</span>
+              : <><b style={{ color: r.bien_khi_day < 0 ? "var(--red)" : "var(--teal)" }}>{pct(r.bien_khi_day)}</b>
+                  <div className="muted">ở {r.khach_toi_da} khách</div></>}</td>
             {/* `null` KHÁC 0: chuyến chưa có dự toán riêng thì in chữ, không in số. Thiếu giá vốn
                 mà hiện "0 đ · biên 100%" là đúng cái bệnh Ý kiến thẩm định 06/9/2026 đã bắt. */}
             <td className="num">{r.loi_nhuan_ke_hoach == null ? <span className="muted">chưa tính được</span>
@@ -82,7 +92,7 @@ function BanTourLe() {
             <td><Tag cls={mau}>{nhan}</Tag>{r.duoi_bien && <div><Tag cls="warn">đã ký dưới biên</Tag></div>}
               {r.chi_tham_chieu && <div className="muted">số chỉ để tham chiếu</div>}</td>
           </tr>;
-        }) : <tr><td colSpan={10} className="muted">Không có chuyến lẻ nào đang bán.</td></tr>}</tbody>
+        }) : <tr><td colSpan={12} className="muted">Không có chuyến lẻ nào đang bán.</td></tr>}</tbody>
       </table>
     </div>
 

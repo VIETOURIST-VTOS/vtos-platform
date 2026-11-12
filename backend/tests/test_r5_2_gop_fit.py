@@ -14,7 +14,7 @@ GOC = pathlib.Path(__file__).resolve().parents[2]
 FIT = (GOC / "web/app/fit/page.tsx").read_text(encoding="utf-8")
 KDL = (GOC / "web/app/kinh-doanh-le/page.tsx").read_text(encoding="utf-8")
 THAN = (GOC / "web/components/DoanhThuChiTieuKd.tsx").read_text(encoding="utf-8")
-BAN = (GOC / "web/app/ban-kd-le/page.tsx").read_text(encoding="utf-8")
+BAN = (GOC / "web/components/BanGdKdLe.tsx").read_text(encoding="utf-8")   # R5-4: thân bàn dời vào component
 
 
 def test_chi_phong_kinh_doanh_le_mo_fit():
@@ -42,4 +42,5 @@ def test_duong_cu_khong_gay():
 
 def test_ban_gd_tro_fit():
     assert '"/kinh-doanh-le"' not in BAN
-    assert 'toi: "/fit" }' in BAN
+    # R5-4: chỉ tiêu & doanh thu đặt THẲNG vào bàn (thân /fit), không nhúng /fit trong /fit.
+    assert 'noi: "doanh-thu"' in BAN and 'noi: "bang"' in BAN

@@ -40,7 +40,7 @@ def test_4_trang_chu_theo_vai_va_nut_crm_tong_tro_marketing():
     assert 'VAI_BAN_NV.includes(vai) ? "/ban-mkt" : VAI_BAN_PTGD.includes(vai) ? "/ptgd-mkt" : ""' in s
     sh = _w("components", "Shell.tsx")
     assert 'if (g.key === "marketing") return "/marketing";' in sh
-    assert 'startsWith("/marketing") ? "/marketing" : path?.startsWith("/ban-kd-le") ? "/ban-kd-le" : "/xe"' in sh
+    assert 'startsWith("/marketing") ? "/marketing" : path?.startsWith("/ban-kd-le") ? "/ban-kd-le" : path?.startsWith("/fit") ? "/fit" : "/xe"' in sh
 
 
 def test_5_khung_nhung_chan_lien_ket_ra_crm_tong():

@@ -25,10 +25,10 @@ from sqlalchemy.orm import Session
 from app.models.crm import Conversation
 from app.models.to_chuc_kd import DonViKD
 from app.services import ban_tour_le as BTL
-from app.services import bao_cao_phong as BP
 from app.services import cskh as CS
 from app.services import doanh_thu_kd as DT
 from app.services import to_chuc_kd as TC
+from app.services import segments as SEG
 
 TOAN_CTY = "toan_cong_ty"
 
@@ -36,11 +36,6 @@ TOAN_CTY = "toan_cong_ty"
 def _o(so, nguon: str, ly_do: str = "", pham_vi: str = "kd_le") -> dict:
     return {"so": so, "nguon": nguon, "ly_do": "" if so is not None else (ly_do or "chưa có cửa đo"),
             "pham_vi": pham_vi}
-
-
-def _chi_tieu(db: Session, tu: date, den: date) -> dict:
-    """Các chỉ tiêu của bảng /fit phòng Kinh doanh lẻ, theo mã."""
-    return {c["ma"]: c for c in BP._kd_le(db, tu, den)}
 
 
 def _doanh_thu_tinh_chi_tieu(db: Session, ky: str, ids: list[int]):
@@ -68,8 +63,9 @@ def tong_quan(db: Session, hom_nay: date | None = None) -> dict:
     cho_tra_loi = int(db.execute(select(func.count()).select_from(Conversation)
                                  .where(Conversation.unanswered == True)).scalar() or 0)  # noqa: E712
 
-    ct = _chi_tieu(db, d.replace(day=1), d)
-    g = lambda ma: (ct.get(ma) or {}).get("gia_tri")  # noqa: E731
+    # R5-4: đọc thẳng `segments.lech_quy_tac` — đúng hàm mà dòng ấy của bảng /fit đang đọc — thay cho
+    # cả bảng chỉ tiêu phòng (bảng ấy tốn ~4 giây, mà bàn chỉ cần một con số của nó).
+    lech = SEG.lech_quy_tac(db)["tong_lech"]
 
     dt, ly_do_dt = _doanh_thu_tinh_chi_tieu(db, ky, don_vi)
     co_du_toan = n - t["chua_du_co_so"]
@@ -109,15 +105,17 @@ def tong_quan(db: Session, hom_nay: date | None = None) -> dict:
         {"ma": "lech_mang", "muc": "vang", "toi": "/fit",
          "ten": "Tour hai quy tắc mảng nói khác nhau",
          "mo_ta": "Kinh doanh sửa dữ liệu gốc (loại chuyến hoặc mã tour) để hai quy tắc khớp lại.",
-         **_o(g("lech_quy_tac_mang"), "/fit")},
+         **_o(lech, "/fit")},
         {"ma": "cho_dieu_hanh", "muc": "cho", "toi": "",
          "ten": "Lịch khởi hành do Phòng Điều hành mở",
          "mo_ta": "Bàn này không mở chuyến mới được. Đây là việc chờ, không phải việc tồn của phòng.",
          "so": None, "nguon": "", "ly_do": "", "pham_vi": "kd_le"},
     ]
 
-    ket_qua = {"ky": ky, "booking": g("booking"), "doanh_thu": g("doanh_thu"), "lead": g("lead"),
-               "ty_le_chot": g("ty_le_chot"), "nguon": "/fit"}
+    from app.services import dem_tour as DEM
+    gd = DEM.theo_giai_doan(db, hom_nay=d)
+    hoat_dong = {"dang_ban": t["chuyen"], "cho_con": t["cho_con"], "sap_khoi_hanh": t["sap_khoi_hanh"],
+                 "dang_di": gd.get("dang_chay"), "nguon_dang_di": "dem_tour.theo_giai_doan (mọi tour, như trang chủ)"}
 
     san_sang = [
         {"ten": "Có lịch khởi hành đang bán", "dat": n > 0, "so": f"{n}"},
@@ -134,7 +132,78 @@ def tong_quan(db: Session, hom_nay: date | None = None) -> dict:
     thuc_ban = [{"id": r["id"], "code": r["code"], "name": r["name"], "start_date": r["start_date"],
                  "cho_da_ban": r["cho_da_ban"], "cho_mo_ban": r["cho_mo_ban"], "cho_con": r["cho_con"],
                  "gia_ban": r["gia_ban"], "loi_nhuan_tai_so_dang_ban": r["loi_nhuan_tai_so_dang_ban"],
-                 "trang_thai_cong": r["trang_thai_cong"]} for r in thuc]
+                 "trang_thai_cong": r["trang_thai_cong"],
+                 "khach_hoa_von": r.get("khach_hoa_von"), "khach_dat_bien": r.get("khach_dat_bien"),
+                 "bien_muc_tieu": r.get("bien_muc_tieu"), "khach_toi_da": r.get("khach_toi_da"),
+                 "bien_khi_day": r.get("bien_khi_day")} for r in thuc]
 
-    return {"ngay": d.isoformat(), "the": the, "viec": viec, "ket_qua": ket_qua,
-            "san_sang": san_sang, "thuc_ban": thuc_ban}
+    return {"ngay": d.isoformat(), "the": the, "viec": viec, "hoat_dong": hoat_dong,
+            "san_sang": san_sang, "thuc_ban": thuc_ban, "phai_thu": phai_thu_le(db, d)}
+
+
+def phai_thu_le(db: Session, hom_nay: date | None = None) -> dict:
+    """R5-4 · Phải thu KHÁCH của booking tour LẺ, chia bảy mốc hạn — cùng bảy khoảng với khối Phải thu
+    của Chủ tịch (`han_cong_no.khoang`), để hai khối đọc được cạnh nhau.
+
+    Còn nợ = giá trị booking − đã thu (booking chưa huỷ). HẠN = ngày khởi hành của chuyến: khách lẻ trả
+    đủ trước ngày đi, và đó là mốc duy nhất mọi booking đều có. Chuyến đã đi mà còn nợ → «Quá hạn»."""
+    from app.models.core import Booking, Tour
+    from app.services import han_cong_no as HCN
+    d = hom_nay or date.today()
+    khoang = HCN.khoang(d)
+    nhom = {nhan: 0.0 for nhan, _, _ in khoang}
+    so_bk, co = 0, False
+    q = (select(Booking, Tour).join(Tour, Tour.id == Booking.tour_id)
+         .where(Booking.cancelled == False, Tour.tour_type.in_(SEG.LE_TYPES)))  # noqa: E712
+    for bk, tour in db.execute(q).all():
+        if SEG.mang_of(tour) != "le" or tour.start_date is None:
+            continue
+        no = float(bk.amount or 0) - float(bk.paid or 0)
+        if no <= 0.5:
+            continue
+        co = True; so_bk += 1
+        for nhan, tu, den in khoang:
+            if tu <= tour.start_date <= den:
+                nhom[nhan] += no
+                break
+    if not co:
+        return {"nhom": {nhan: None for nhan in nhom}, "tong": None, "so_booking": 0,
+                "ly_do": "Không có booking tour lẻ nào còn nợ."}
+    return {"nhom": nhom, "tong": sum(nhom.values()), "so_booking": so_bk, "ly_do": ""}
+
+
+def doanh_thu_le(db: Session, nam: int) -> dict:
+    """R5-4 · Doanh thu tour LẺ từng tháng của một năm, cạnh chỉ tiêu tháng.
+
+    Doanh thu = ngăn `le` của `ket_qua_that.thang` — CÙNG tập đã cộng ra doanh thu trên biểu đồ của
+    Chủ tịch (TC-98), không phải phép tính thứ hai. Chỉ tiêu = tổng chỉ tiêu đã giao cho các đơn vị
+    GỐC của cây Kinh doanh lẻ (luồng «tất cả»). Chưa khai đơn vị / chưa giao → None, không vẽ 0."""
+    from app.services import ket_qua_that as KQT
+    from app.services import chi_tieu_kd as CT
+    goc = [dv.id for dv in db.execute(select(DonViKD).where(DonViKD.mang == "le",
+                                                             DonViKD.cha_id.is_(None))).scalars()]
+    thang = []
+    nay = date.today()
+    for m in range(1, 13):
+        ky = f"{nam}-{m:02d}"
+        if date(nam, m, 1) > nay:
+            thang.append({"ky": ky, "doanh_thu": None, "chi_tieu": None})
+            continue
+        try:
+            dt = (KQT.thang(db, ky).get("theo_mang") or {}).get("le", {}).get("doanh_thu")
+        except Exception:  # noqa: BLE001 — một tháng hỏng không làm sập cả biểu đồ
+            dt = None
+        ct = None
+        if goc:
+            bang = CT.tra_cuu(db, ky)["don_vi"]
+            vals = [bang.get(f"{i}|tat_ca") for i in goc]
+            vals = [v for v in vals if v is not None]
+            ct = sum(vals) if vals else None
+        thang.append({"ky": ky, "doanh_thu": dt, "chi_tieu": ct})
+    dts = [x["doanh_thu"] for x in thang if x["doanh_thu"] is not None]
+    cts = [x["chi_tieu"] for x in thang if x["chi_tieu"] is not None]
+    tong = sum(dts) if dts else None
+    tong_ct = sum(cts) if cts else None
+    return {"nam": nam, "thang": thang, "tong_doanh_thu": tong, "tong_chi_tieu": tong_ct,
+            "ty_le_dat": (tong / tong_ct) if (tong is not None and tong_ct) else None,
+            "ly_do_chi_tieu": "" if goc else "Chưa khai đơn vị Kinh doanh lẻ nên chưa có chỉ tiêu để đặt cạnh."}
