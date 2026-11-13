@@ -7,7 +7,7 @@ import time
 from collections import defaultdict
 from datetime import date
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -50,6 +50,37 @@ def _phanh(req: Request) -> None:
 router = APIRouter(prefix="/api/v1/cong/mo", tags=["cong-mo"], dependencies=[Depends(_phanh)])
 
 KHONG_DIEM = {"dang_bat": False, "hang": None, "he_so": 0}
+
+# ── TR-17 · NHÃN ĐỆM CHO CÁC CỬA CHỈ ĐỌC ───────────────────────────────────────────────────────
+# Đo trang tour HC001 trên bản chạy 14-11-2026: MỌI cửa đều trả «Cache-Control: public,
+# max-age=0, must-revalidate» và «x-vercel-cache: MISS» ở MỌI lượt gọi. Tức mỗi khách mở trang
+# là chạy lại máy chủ từ đầu — tim 1.791 ms, san-pham 1.481 ms lần đầu (có cả cold start của
+# Render), còn 496–674 ms khi máy đã ấm. Cả trang phải đợi 3.241 ms mới có lịch trình.
+#
+# Router này CHỈ có GET, không đọc phiên, không trả gì gắn với một tài khoản (xem lời mở tệp:
+# điểm VTD Rewards luôn «chưa bật» ở đây). Đó chính là điều kiện để một bản trả về được CHIA
+# CHUNG cho mọi khách, và là lý do đặt được s-maxage. Cửa nào đọc phiên thì tuyệt đối không.
+#
+#   max-age=0                  giữ nguyên — TRÌNH DUYỆT của khách không giữ bản cũ, bấm lại là hỏi lại
+#   s-maxage                   chỉ nói với tầng đệm CHUNG (biên Vercel / CDN trước Render)
+#   stale-while-revalidate     hết hạn vẫn trả bản cũ NGAY rồi làm mới ngầm phía sau, nên không
+#                              khách nào phải đứng đợi lượt làm mới
+#
+# KHÔNG đệm, cố ý, ghi ra đây để vòng sau không ai thêm nhầm:
+#   · /tour-online/tinh      giá của chính đơn khách đang đặt — sai một lượt là sai tiền
+#   · /ks-vtd/tim            còn phòng theo ngày, đổi từng phút
+#   · /tt-doan/{ma}          link thanh toán riêng của MỘT khách, không được chia chung
+#
+# Giá và chỗ trống trên trang danh sách vì thế có thể cũ tối đa 2 phút. Chấp nhận được vì mọi
+# phép tính tiền thật đều đi qua /tinh (không đệm), nên không có đường nào chốt đơn theo số cũ.
+DEM_DANH_SACH = "public, max-age=0, s-maxage=120, stale-while-revalidate=600"
+DEM_LICH_TRINH = "public, max-age=0, s-maxage=300, stale-while-revalidate=1800"
+KHONG_DEM = ("/tour-online/tinh", "/ks-vtd/tim", "/tt-doan/{ma}", "/tt-doan/{ma}/hoa-don")
+
+
+def _dem(resp: Response, nhan: str) -> None:
+    """Dán nhãn đệm lên một bản trả về chia chung được."""
+    resp.headers["Cache-Control"] = nhan
 
 
 def _ks(f, *a, **k):
@@ -144,16 +175,22 @@ def _lam_moi_nen(pid: int) -> None:
 
 
 @router.get("/tour-online/tim")
-def tr_tim(tab: str = "", q: str = "", noi: str = "", tu: date | None = None, den: date | None = None, nguoi_lon: int = 2,
-           tre_em: int = 0, loai: str = "", db: Session = Depends(get_db)):
+def tr_tim(resp: Response, tab: str = "", q: str = "", noi: str = "", tu: date | None = None, den: date | None = None,
+           nguoi_lon: int = 2, tre_em: int = 0, loai: str = "", db: Session = Depends(get_db)):
     from app.services import tour_online as TR
+    _dem(resp, DEM_DANH_SACH)
     return _tr(TR.tim, db, tab, q, noi, tu, den, nguoi_lon, tre_em, loai)
 
 
 @router.get("/tour-online/san-pham/{pid:int}")
-def tr_mot(pid: int, background: BackgroundTasks, nguoi_lon: int = 2, tre_em: int = 0, db: Session = Depends(get_db)):
+def tr_mot(pid: int, background: BackgroundTasks, resp: Response, nguoi_lon: int = 2, tre_em: int = 0,
+           db: Session = Depends(get_db)):
     from app.models.core import Product
     from app.services import tour_online as TR
+    # Cửa này còn hẹn đọc lại bài web khi bản cũ quá 24 giờ. Có đệm thì nó chạy thưa hơn —
+    # tối đa 2 phút một lượt cho mỗi tour — nhưng lịch 24 giờ của can_lam_moi vẫn tới hạn đúng,
+    # chỉ là tới muộn vài phút. Không mất lượt nào.
+    _dem(resp, DEM_DANH_SACH)
     p = db.get(Product, pid)
     if p is not None and p.link_web and not p.noi_dung_web:
         TR.lam_moi(db, p)                       # chưa có bản nào: đọc ngay (hỏng thì vẫn trả trang, chỉ thiếu ảnh)
@@ -176,8 +213,9 @@ def tr_danh_gia(pid: int, trang: int = 1, db: Session = Depends(get_db)):
 
 
 @router.get("/tour-online/san-pham/{pid:int}/lich-trinh/{tour_id:int}")
-def tr_lich(pid: int, tour_id: int, db: Session = Depends(get_db)):
+def tr_lich(pid: int, tour_id: int, resp: Response, db: Session = Depends(get_db)):
     from app.services import tour_online as TR
+    _dem(resp, DEM_LICH_TRINH)      # chữ chương trình tour, cả tháng mới sửa một lần
     return _tr(TR.lich_trinh_chuyen, db, pid, tour_id)
 
 
