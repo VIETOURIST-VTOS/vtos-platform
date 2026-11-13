@@ -132,7 +132,7 @@ export default function BanGdKdLe() {
     setMo({ ten: "Chi tiết", mo_ta: "" }); setKhung(toi); window.scrollTo({ top: 0 });
   };
   const ngoaiKhung = (h: string) => {
-    if (h.startsWith("/fit") || h.startsWith("/ban-kd-le")) { moTab("tq"); return true; }
+    if (h.startsWith("/fit")) { moTab("tq"); return true; }
     return false;
   };
 

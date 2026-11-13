@@ -90,7 +90,8 @@ def test_mt5_moi_ngoai_le_phai_tu_bao_ve_duoc():
     web = MT.thu_muc_web()
     # "cong" thêm ngày 26/10/2026 (CG-1) — Chủ tịch duyệt bản xem thử cổng kết nối VTD: trang của khách
     # hàng / đối tác / cổ đông sau khi đăng nhập bằng mã một lần. Người quyết: Chủ tịch.
-    assert set(MT.NGOAI_LE) == {"login", "doi-mat-khau", "payroll", "cong"}, \
+    # "ban-kd-le" thêm ngày 13/11/2026 (R5-5) — trang chỉ chuyển về /fit, kiểm ở dưới như payroll. Người quyết: Chủ tịch.
+    assert set(MT.NGOAI_LE) == {"login", "doi-mat-khau", "payroll", "cong", "ban-kd-le"}, \
         "thêm ngoại lệ là mở một màn hình cho mọi tài khoản – phải có người quyết, không thêm âm thầm"
     # Trang cổng ngoài được miễn vì nó KHÔNG gọi cửa nội bộ nào — kiểm lại điều đó, đừng tin ghi chú:
     # nó không được dùng bộ gọi API nội bộ (lib/api) mà chỉ đi qua lib/cong (phiên cổng ngoài).
@@ -104,6 +105,9 @@ def test_mt5_moi_ngoai_le_phai_tu_bao_ve_duoc():
     ma = (web / "payroll" / "page.tsx").read_text(encoding="utf-8")
     assert 'location.replace("/hr")' in ma and len(ma) < 400, \
         "payroll không còn là trang chuyển hướng nữa – phải khai quyền cho nó"
+    bk = (web / "ban-kd-le" / "page.tsx").read_text(encoding="utf-8")
+    assert 'location.replace("/fit")' in bk and len(bk) < 400 and "@/lib/api" not in bk, \
+        "ban-kd-le không còn là trang chuyển hướng nữa – phải khai quyền cho nó"
     # Phiếu lương CÁ NHÂN là màn hình khác, đường dẫn khác, và KHÔNG được nằm trong danh sách ngoại lệ:
     # nó hiển thị dữ liệu thật nên phải khai quyền thật. Đổi nghĩa của /payroll để dùng lại chỗ miễn trừ
     # của nó là cách lặng lẽ lật lại quyết định 07/9 về việc tài xế không được thấy bảng lương.

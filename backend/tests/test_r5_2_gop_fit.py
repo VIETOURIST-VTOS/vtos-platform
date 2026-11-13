@@ -21,7 +21,7 @@ def test_chi_phong_kinh_doanh_le_mo_fit():
     assert set(AC.MENU_ROLES["/fit"]) == set(AC.BASE_VIEW) | {"gd_kd", "tp_kd", "tn_kd", "nv_kd"}
     for vai in ("ptgd_mkt", "hcns", "ketoan", "ptgd_doan", "sales_admin"):
         assert vai not in AC.MENU_ROLES["/fit"], f"{vai} không thuộc phòng Kinh doanh lẻ"
-    assert AC.MAN_HINH_API["/fit"] == ("/api/v1/kinh-doanh",), "tab doanh thu gọi /kinh-doanh/*; KHÔNG cấp /bao-cao cho nhân viên"
+    assert AC.MAN_HINH_API["/fit"] == ("/api/v1/kinh-doanh", "/api/v1/ban-kd-le"), "tab doanh thu gọi /kinh-doanh/*; KHÔNG cấp /bao-cao cho nhân viên (R5-5: + cửa bàn GĐ, tự gác vai)"
     # Gõ thẳng đường dẫn cũng phải dừng: vai khác vẫn có /api/v1/bao-cao qua màn /bao-cao.
     assert 'includes("/fit")' in FIT
 
