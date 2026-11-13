@@ -1794,3 +1794,78 @@ main .xu-ly-ban .xu-ly-dau .act{margin:0}
 .top .bar .nv-xo .nv-ban-cam{color:var(--vtos-warning);background:var(--vtos-warning-bg)}
 .top .bar .nv-xo .nv-ban-vang{color:var(--ink2);background:var(--vtos-warning-bg)}
 .top .bar .nv-goc .nv-xo::before{content:"";position:absolute;left:0;right:0;top:-10px;height:10px}
+
+/* ══ R5-13 · THANH ĐẦU TRÊN ĐIỆN THOẠI (Chủ tịch duyệt bản xem trước 14/11/2026) ═══════════════════
+   Đo 390 px: thanh đầu chia ba hàng (logo · ô tìm · biểu tượng) và chữ tên người dùng — đã ẩn bằng
+   clip — vẫn chiếm chỗ tới 544 px, làm thân trang rộng 433 px. Trên điện thoại: MỘT hàng — logo, ô tìm
+   thu thành biểu tượng, Công việc, Chờ duyệt, Chuông, Giao diện (chỉ biểu tượng), vòng tên. Bấm vòng
+   tên vẫn xổ đủ tên + vai như cũ. Máy tính (trên 600 px) giữ nguyên. */
+@media (max-width:600px){
+  .top{flex-wrap:nowrap;gap:8px;padding:6px 10px}
+  .top .bar{flex-wrap:nowrap;gap:4px;justify-content:flex-end}
+  .top .bar .o-tim{flex:0 0 34px;min-width:34px;max-width:34px;padding:0;justify-content:center;margin:0}
+  .top .bar .bar-ngan,.top .bar .bar-muc.ai{display:none}
+  .top .bar .bar-muc{height:36px;padding:0 8px}
+  .top .bar .gd-nut{height:36px;padding:0 8px}
+  .top .bar .gd-nut span:last-child{display:none}
+  .top .bar .who-ten{display:none}
+  .burger{min-width:40px;min-height:40px}
+  .top .bar .who{height:36px;padding:0 2px}
+  .top .brand .brand-logo{height:26px;padding:4px 9px}
+}
+/* R5-13 · Đầu bàn trên điện thoại: chữ 17 px, «Phạm vi» và «Hôm nay» cùng một hàng, đệm gọn. */
+@media (max-width:600px){
+  .mh01-ban{padding:12px 14px;gap:10px;margin:2px 0 12px}
+  .mh01-ban-ten{font-size:calc(17/14*1rem);letter-spacing:.3px;line-height:1.25}
+  .mh01-ban-cum{gap:6px}
+  .mh01-ban-ngay{padding:5px 10px;font-size:calc(12.5/14*1rem)}
+  .mh01-ban-ngay span{font-size:calc(9.5/14*1rem)}
+}
+/* ══ R5-13 · BÀN KINH DOANH TRÊN ĐIỆN THOẠI (GĐ KD, TP, Trưởng nhóm, Chuyên viên) ═════════════════
+   Chủ tịch duyệt bản xem trước 14/11/2026. Chỉ dưới 600 px; máy tính giữ nguyên. Đặt ở đây (không
+   trong khối style của từng bàn) vì bàn GĐ và khung chung ba bàn có hai khối style riêng — một chỗ
+   sửa cho cả bốn. Bộ chọn có tiền tố `.g5` để thắng khối style của bàn nạp sau. */
+@media (max-width:600px){
+  /* 2 · Sáu tab: lưới 3 × 2, thấy đủ, mỗi nút cao 42 px. */
+  .g5 .g5-tab{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;overflow:visible;padding:5px}
+  .g5 .g5-tab button{min-height:42px;padding:6px 4px;white-space:normal;line-height:1.2;font-size:calc(12.5/14*1rem)}
+  /* 6 · Nút chạm tối thiểu 40 px. */
+  .g5 .g5-cua,.g5 .g5-them,.g5 .nh-seg button,.g5 .g5-ky button,.g5 .g5-lui{min-height:40px;display:inline-flex;align-items:center;justify-content:center}
+  .g5 .g5-hd .g5-cua,.g5 .g5-ds .g5-cua{padding:0 14px}
+  /* 3 · Đội ngũ: mỗi người một thẻ. */
+  .g5 .dn-bang{min-width:0}
+  .g5 .dn-bang thead{display:none}
+  .g5 .dn-bang tbody{display:grid;gap:8px}
+  .g5 .dn-bang tr{display:grid;grid-template-columns:30px repeat(3,minmax(0,1fr)) auto;
+    grid-template-areas:"hang ten ten ten dat" "hang nhom nhom nhom nhom" "hang dt ct bk bk" "hang lcb lcb lcb lcb";
+    gap:4px 8px;align-items:center;padding:10px;border:1px solid var(--vtos-line);border-left:4px solid var(--vtos-navy-light);border-radius:12px;background:var(--vtos-card)}
+  .g5 .dn-bang td{display:block;padding:0;border:0;min-width:0}
+  .g5 .dn-bang tbody tr:hover td{background:none}
+  .g5 .dn-bang .c-hang{grid-area:hang;align-self:start}.g5 .dn-bang .c-ten{grid-area:ten}.g5 .dn-bang .c-nhom{grid-area:nhom}
+  .g5 .dn-bang .c-dat{grid-area:dat;font-weight:800;color:var(--vtos-navy);text-align:right}.g5 .dn-bang .c-dat .dn-tr{display:none}
+  .g5 .dn-bang .c-dt{grid-area:dt}.g5 .dn-bang .c-ct{grid-area:ct}.g5 .dn-bang .c-bk{grid-area:bk}.g5 .dn-bang .c-lcb{grid-area:lcb}
+  .g5 .dn-bang td[data-n]::before{content:attr(data-n);display:block;font-size:calc(10.5/14*1rem);color:var(--vtos-text-mute);font-weight:600}
+  .g5 .dn-khoi,.g5 .dn-khoi.dn-don{height:auto;max-height:620px}
+  /* 5 · Chuyến cần thúc bán: mỗi chuyến một thẻ. */
+  .g5 .g5-bang{min-width:0;margin-top:6px}
+  .g5 .g5-bang thead{display:none}
+  .g5 .g5-bang tbody{display:grid;gap:8px}
+  .g5 .g5-bang tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px;padding:10px 12px;border:1px solid var(--vtos-line);border-radius:12px;background:var(--vtos-card)}
+  .g5 .g5-bang td{display:block;padding:0;border:0;min-width:0}
+  .g5 .g5-bang tbody tr:hover td{background:none}
+  .g5 .g5-bang td.c-ma,.g5 .g5-bang td.c-nut,.g5 .g5-bang td.c-rong{grid-column:1/-1}
+  .g5 .g5-bang td[data-n]:not([data-n=""])::before{content:attr(data-n);display:block;font-size:calc(10.5/14*1rem);color:var(--vtos-text-mute);font-weight:600;margin-bottom:1px}
+  .g5 .g5-bang .vach{width:100%}
+  .g5 .g5-bang td.c-nut .g5-cua{width:100%;border-radius:999px;background:var(--vtos-info-bg);color:var(--vtos-navy);font-weight:700;text-decoration:none}
+  /* 4 · Biểu đồ nhịp: chỉ chấm hôm nay (chấm cuối của đường lũy kế), nhãn ngày mỗi 5 ngày, bỏ nhãn đầu chồng nhau. */
+  .nh-khoi .bd-cham{display:none}
+  .nh-khoi .bd-cham.d1:has(+ .bd-cham.d2){display:block}
+  .nh-khoi .bd-duong-nhan:not(.cuoi){display:none}
+  .nh-ky-thang .bd-duong-nhanx>span:not(:first-child):not(:nth-child(5n)){visibility:hidden}
+  /* Hàng nhãn ngày: khe 10 px × 29 khe = 290 px đã ép vùng vẽ rộng hơn khung trên điện thoại (đo 390 px:
+     khung vẽ chạy tới 391 px trong thẻ 380 px). Trên điện thoại khe về 0, nhãn được phép tràn ô của mình. */
+  .bd-duong-nhanx{gap:0;min-width:0}
+  .bd-duong-nhanx>span{min-width:0}
+  .nh-khoi .bd-duong-nhanx>span{overflow:visible;font-size:calc(10/14*1rem)}
+  .nh-khoi .nh-cum{width:100%}
+}

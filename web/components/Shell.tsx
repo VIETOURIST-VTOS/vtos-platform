@@ -1006,7 +1006,7 @@ export default function Shell({ children, khongThanhBen = false }:
           <ChonGiaoDien user={user} />
           {/* Menu cá nhân: ba mục của chính người đăng nhập, rời khỏi menu trái theo TC-2. */}
           <span style={{ position: "relative" }}>
-            <button type="button" className="who" aria-haspopup="menu" aria-expanded={menuToi}
+            <button type="button" className="who" aria-haspopup="menu" aria-expanded={menuToi} title={[user?.full_name, user?.role_name].filter(Boolean).join(" · ")}
               onClick={() => setMenuToi((m) => !m)}
               style={{ background: "none", border: 0, cursor: "pointer", font: "inherit", color: "inherit" }}>
               <span className="anh-dai-dien" aria-hidden="true">{chuDau(user?.full_name)}</span>
