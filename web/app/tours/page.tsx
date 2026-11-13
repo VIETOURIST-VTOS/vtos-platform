@@ -118,7 +118,7 @@ function Tours() {
     <MangTag mang={mang} />
     <div className="panel wrap"><table><thead><tr><th>Mã</th><th>Tên</th><th>Loại</th><th>Khởi hành</th><th className="num">Biên KH</th><th className="num">Hòa vốn</th><th className="num">Đạt 10%</th><th className="num">Đã bán</th><th>Trạng thái</th><th>Hạn QT</th></tr></thead>
       <tbody>{rows.map((t) => { const c = t.calc; return <tr key={t.id}><td><Link href={`/tours/${t.id}`}>{t.code}</Link></td><td>{t.name}</td><td>{TOUR_TYPES[t.tour_type]}</td><td>{fmtD(t.start_date)}</td>
-        <td className="num">{c.complete ? <Tag cls={c.pass_gate ? "ok" : "red"}>{pct(c.margin)}</Tag> : <Tag cls="warn">chưa đủ cơ sở</Tag>}</td><td className="num">{c.breakeven_pax ?? "–"}</td><td className="num">{c.pax_for_margin ?? "–"}</td>
+        <td className="num">{c.complete ? <Tag cls={c.pass_gate ? "ok" : "red"}>{pct(c.margin)}</Tag> : <Tag cls="warn">chưa đủ cơ sở</Tag>}</td>{/* R5-16 · 14/11/2026: chưa đủ cơ sở thì máy chủ trả 0 cho hai ô này — in «–», không in 0 (Chủ tịch bắt ở bàn Lẻ). */}<td className="num">{c.complete && c.breakeven_pax != null ? c.breakeven_pax : "–"}</td><td className="num">{c.complete && c.pax_for_margin != null ? c.pax_for_margin : "–"}</td>
         <td className="num">{t.booked_pax} {t.d7_flag && <Tag cls="red">D-7</Tag>}</td><td>{TOUR_STATUS[t.status]} {t.below_margin && <Tag cls="warn">dưới biên</Tag>}</td>
         <td>{fmtD(t.settlement_deadline)} {t.status === "ket_thuc" && today > t.settlement_deadline && <Tag cls="red">quá hạn</Tag>}</td></tr>; })}</tbody></table></div>
   </>);

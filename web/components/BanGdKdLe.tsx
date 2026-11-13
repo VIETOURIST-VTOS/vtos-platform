@@ -33,11 +33,9 @@ const TAB: { ma: string; ten: string; tieu_de?: string; the: The[] }[] = [
   { ma: "tq", ten: "Tổng quan", the: [] },
   { ma: "ban", ten: "Bán hàng", tieu_de: "Bán hàng", the: [
     { ten: "Bàn bán tour lẻ", mo_ta: "Chỗ trống, ngày đi và dự toán chuyến", toi: "/ban-tour-le" },
-    { ten: "Lịch khởi hành", mo_ta: "Danh sách chuyến tour lẻ", toi: "/tours?mang=le" },
     { ten: "Lịch xe trống", mo_ta: "Phối hợp đội xe để bán tour", toi: "/lich-xe-trong" },
-    { ten: "Báo giá", mo_ta: "Soạn nháp, kiểm tra biên trước khi gửi khách", toi: "/bao-gia?mang=kd_le" },
-    { ten: "Giá & chính sách bán", mo_ta: "Bảng giá và thời hạn áp dụng", toi: "/bang-gia" },
-    { ten: "Dịch vụ lẻ", mo_ta: "Visa, vé, phòng, xe và dịch vụ rời", toi: "/non-package" },
+    { ten: "Chính sách bán", mo_ta: "Chiết khấu, giá trẻ em, khuyến mãi · hoa hồng đối tác/CTV · điểm Rewards", toi: "/chinh-sach-ban" },
+    { ten: "Dịch vụ lẻ", mo_ta: "Visa, vé, phòng, xe, gửi khách hưởng hoa hồng", toi: "/non-package" },
     { ten: "Khách sạn & vé máy bay OTA", mo_ta: "Màn liên kết OTA trong phân hệ", toi: "/khach-san-ota" }] },
   { ma: "khach", ten: "Khách & booking", tieu_de: "Khách & booking", the: [
     { ten: "Khách hàng & nguồn khách", mo_ta: "Hồ sơ, lead, kênh và đối chiếu chuyển đổi", toi: "/leads?tab=leads" },
@@ -193,7 +191,7 @@ export default function BanGdKdLe() {
       {/* R5-4: 4 thẻ số + khối Hoạt động tour gộp MỘT dải, bỏ hai thẻ trùng (Chủ tịch 13/11/2026). */}
       <p className="g5-nhom">HOẠT ĐỘNG TOUR LẺ</p>
       <div className="g5-dai5">
-        <OSo nhan="Tour đang bán" v={d ? hd?.dang_ban : undefined} phu="Đã duyệt, chưa tới ngày đi" lk="Xem tour đang bán" bam={() => moToi("/tours?mang=le")} />
+        <OSo nhan="Tour đang bán" v={d ? hd?.dang_ban : undefined} phu="Đã duyệt, chưa tới ngày đi" lk="Xem tour đang bán" bam={() => moToi("/ban-tour-le")} />
         <OSo nhan="Chỗ còn trống" v={d ? hd?.cho_con : undefined} phu="Trên các chuyến đang bán" lk="Bàn bán tour lẻ" bam={() => moToi("/ban-tour-le")} />
         <OSo nhan="Sắp khởi hành" v={d ? hd?.sap_khoi_hanh : undefined} phu="7 ngày tới" lk="Xem chuyến gần" bam={() => moToi("/ban-tour-le")} />
         <OSo nhan="Tour đang đi" v={d ? hd?.dang_di : undefined} phu="Đang trong hành trình · mọi tour" lk="Xem tour đang đi" bam={() => moToi("/tours?mang=le")} />

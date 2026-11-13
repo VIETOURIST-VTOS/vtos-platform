@@ -260,3 +260,26 @@ class LichThanhToanHD(Base):
     ghi_chu: Mapped[str] = mapped_column(String(300), default="")
     boi: Mapped[str] = mapped_column(String(50), default="")
     luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+
+class ChinhSachBan(Base):
+    """R5-16 · Chủ tịch duyệt 14/11/2026: «Chính sách bán» thay «Giá & chính sách bán» cho Phòng KD Lẻ.
+
+    Giá bán tour lẻ đã nằm trên từng chuyến (Điều hành đặt khi mở lịch), nên đây chỉ giữ CHÍNH SÁCH CÓ
+    THỜI HẠN mà GĐ KD / TP ban hành: chiết khấu tối đa người bán tự cho theo vai, giá trẻ em / em bé /
+    phụ thu phòng đơn, khuyến mãi. Hoa hồng đối tác / đại lý / CTV (D06) và điểm thưởng khách (VTD
+    Rewards) KHÔNG lưu ở đây — màn chính sách đọc thẳng từ hai nơi ấy, không nhập lần hai.
+
+    Mỗi lần ban hành là MỘT bản mới; bản đang hiệu lực được khép `hieu_luc_den` = ngày trước bản mới.
+    Không sửa, không xoá: hỏi «ngày ấy áp chính sách nào» phải trả lời được. Ô để rỗng = «chưa ban
+    hành», không phải 0."""
+    __tablename__ = "chinh_sach_ban"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ma: Mapped[str] = mapped_column(String(30), unique=True, index=True)
+    mang: Mapped[str] = mapped_column(String(20), default="kd_le", index=True)
+    hieu_luc_tu: Mapped[date] = mapped_column(Date, index=True)
+    hieu_luc_den: Mapped[date | None] = mapped_column(Date, nullable=True)
+    noi_dung: Mapped[str] = mapped_column(Text, default="{}")        # JSON — xem services/chinh_sach_ban.py
+    ghi_chu: Mapped[str] = mapped_column(Text, default="")
+    tao_boi: Mapped[str] = mapped_column(String(50), default="")
+    tao_luc: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

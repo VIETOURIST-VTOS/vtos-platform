@@ -474,11 +474,13 @@ export const GROUPS: Group[] = [
     { label: "Lẻ", items: [
       ["Tour lẻ", "/tours?mang=le"], ["Yêu cầu & booking", "/requests?mang=le"],
       ["Booking & bảo lưu", "/bookings?mang=le"], ["Dịch vụ lẻ", "/non-package"],
-      ["Giá & chính sách bán", "/bang-gia"], ["Báo giá", "/bao-gia?mang=kd_le"],
+      // R5-16 · Chủ tịch 14/11/2026: Lẻ bỏ soạn báo giá; «Giá & chính sách bán» thành «Chính sách bán». Bảng giá
+      // theo thời hạn vẫn dùng cho Đoàn nên dời sang nhóm MICE.
+      ["Chính sách bán", "/chinh-sach-ban"],
       ["Báo cáo bán hàng", "/sales-reports?mang=le"]] },
     { label: "MICE", items: [
       ["Tour đoàn", "/tours?mang=doan"], ["Yêu cầu & booking", "/requests?mang=doan"],
-      ["Booking & bảo lưu", "/bookings?mang=doan"], ["Báo giá đoàn", "/bao-gia?mang=kd_doan"],
+      ["Booking & bảo lưu", "/bookings?mang=doan"], ["Báo giá đoàn", "/bao-gia?mang=kd_doan"], ["Bảng giá đoàn", "/bang-gia"],
       ["Hợp đồng", "/hop-dong-khach"], ["Báo cáo bán hàng", "/sales-reports?mang=doan"]] },
   ] },
 

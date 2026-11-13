@@ -72,8 +72,8 @@ BO_QUA_VAI = ("chutich",)
 # không cho nó dài thêm — thêm một cặp mới là `test_lg4` đỏ, và người thêm phải nói vì sao.
 DA_BIET = (
     ("/ai-roles", "robot_ks"),
-    ("/bang-gia", "robot_ks"),
-    ("/bao-gia", "robot_ks"),
+    # ("/bang-gia" | "/bao-gia" | "/hop-dong-khach", "robot_ks") — GẠCH 14/11/2026, R5-16: robot_ks nay đọc được
+    #   tiền tố /api/v1/ban-hang qua cửa XEM chính sách bán (GET /ban-hang/chinh-sach).
     # ("/bao-gia", "sales_admin") và ("/hop-dong-khach", "sales_admin") — GẠCH 02/11/2026, TR-1d: Sale Admin
     #   được mở BA cửa đọc của `/api/v1/ban-hang` (danh sách hợp đồng, lịch thanh toán, link thanh toán) để tạo
     #   link theo đợt. `/bao-gia` gạch theo vì phép đo này xét theo TIỀN TỐ dùng chung — thực tế cửa đọc
@@ -98,7 +98,6 @@ DA_BIET = (
     # ("/hach-toan", "robot_ks") và ("/ket-so", "robot_ks") — GẠCH 02/11/2026, SUA-2: cửa đọc mới
     #   `GET /api/v1/hach-toan/bang` (danh mục hình thức thanh toán) mở cho nhóm vai đề nghị chi, trong đó có
     #   robot_ks; phép đo xét theo TIỀN TỐ `/api/v1/hach-toan` nên hai cặp này hết lệch.
-    ("/hop-dong-khach", "robot_ks"),
     ("/ir-phap-che", "robot_ks"),
     ("/lai-lo-tour", "robot_ks"),
     ("/lai-lo-tour", "sales_admin"),

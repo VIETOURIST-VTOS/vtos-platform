@@ -107,22 +107,36 @@ def _dong_luc(du: bool, p: float, f: float, v: float, ban: int, tran: int, nguon
             "khach_toi_da": n_max, "lai_khi_day": lai, "bien_khi_day": (lai / (p * n_max)) if n_max else None}
 
 
-def ban_lam_viec(db: Session) -> dict:
+# R5-16 · Chủ tịch 14/11/2026: bỏ thẻ «Lịch khởi hành» khỏi bàn Lẻ, GỘP vào bàn này — thêm hai phạm vi CHỈ XEM.
+#   sap_mo_ban = chuyến tương lai Điều hành đã tạo nhưng chưa duyệt (nháp / chờ xác nhận / chờ duyệt) — chưa bán được;
+#   da_di      = chuyến đã khởi hành (mọi trạng thái trừ huỷ), mới nhất trước.
+# Không có cửa tạo tour: đó là việc của Điều hành / Đoàn ở màn /tours.
+CHUA_DUYET = ("nhap", "cho_xac_nhan", "cho_duyet")
+PHAM_VI = ("dang_ban", "sap_mo_ban", "da_di")
+TOI_DA_XEM = 300
+
+
+def ban_lam_viec(db: Session, pham_vi: str = "dang_ban") -> dict:
     """Danh sách chuyến LẺ đang bán, sắp theo ngày khởi hành gần nhất.
 
     KHÔNG cắt theo người phụ trách. Tour lẻ do Điều hành mở lịch và cả phòng cùng bán một kho chỗ —
     cắt theo sale thì mỗi người thấy một mẩu của cùng một chuyến, và chuyến nào không ai nhận sẽ
     không nằm trên bảng của ai. Cắt theo người là luật của BOOKING, không phải của chỗ ngồi.
     """
+    if pham_vi not in PHAM_VI:
+        pham_vi = "dang_ban"
     hom_nay = date.today()
+    tat = [t for t in db.execute(select(Tour).where(Tour.tour_type.in_(SEG.LE_TYPES), Tour.status != "huy")).scalars()
+           if SEG.mang_of(t) == "le"]
+    nhom = {"dang_ban": [t for t in tat if t.status in DANG_BAN and t.start_date >= hom_nay],
+            "sap_mo_ban": [t for t in tat if t.status in CHUA_DUYET and t.start_date >= hom_nay],
+            "da_di": [t for t in tat if t.start_date < hom_nay]}
+    dem = {k: len(v) for k, v in nhom.items()}
     # Lọc HAI BƯỚC, cố ý. Câu truy vấn thu hẹp theo loại chuyến; `segments.mang_of` mới là thứ
     # quyết định chuyến ấy thuộc mảng nào — nó là định nghĩa DUY NHẤT của "đoàn hay lẻ" trong kho
     # (hợp của loại chuyến và quy ước mã MICE). Một tour `le_noi_dia` mang mã MICE là tour ĐOÀN, và
     # nó không được nằm trên bàn của phòng Lẻ chỉ vì câu SQL không biết chuyện ấy.
-    ts = [t for t in db.execute(
-        select(Tour).where(Tour.tour_type.in_(SEG.LE_TYPES), Tour.status.in_(DANG_BAN),
-                           Tour.start_date >= hom_nay).order_by(Tour.start_date)).scalars()
-          if SEG.mang_of(t) == "le"]
+    ts = sorted(nhom[pham_vi], key=lambda t: t.start_date, reverse=(pham_vi == "da_di"))[:TOI_DA_XEM if pham_vi != "dang_ban" else None]
     rows, nho = [], {}
     for t in ts:
         nguong = nho.get(t.start_date)
@@ -132,6 +146,7 @@ def ban_lam_viec(db: Session) -> dict:
 
     sap_di = [r for r in rows if r["days_left"] <= 7]
     return {
+        "pham_vi": pham_vi, "dem_pham_vi": dem, "cat_bot": max(0, dem[pham_vi] - len(rows)),
         "rows": rows,
         "tong": {
             "chuyen": len(rows),

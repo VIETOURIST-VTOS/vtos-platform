@@ -485,6 +485,7 @@ MAN_HINH_API = {
     # thẻ nào). KHÔNG gồm kết quả quét, chấm điểm phòng ban hay hậu kiểm số nhập tay.
     "/ra-soat-cot-tien": ("/api/v1/ra-soat-cot-tien",),
     "/bang-gia": ("/api/v1/ban-hang",),
+    "/chinh-sach-ban": ("/api/v1/ban-hang",),   # R5-16
     "/bao-gia": ("/api/v1/ban-hang",),
     "/hop-dong-khach": ("/api/v1/ban-hang",),
     # V11 – Lịch tự động hóa. Phạm vi API HẸP: chỉ nhánh /tu-dong. Màn hình này chỉ đọc trạng thái
@@ -1323,6 +1324,9 @@ MENU_ROLES = {
     # Bảng giá là con số mà mọi báo giá của mảng Đoàn phải theo; người phụ trách mảng ấy không
     # đọc được chính sách giá thì duyệt báo giá bằng gì.
     "/bang-gia": BASE_VIEW + ("gd_kd", "tp_kd", "ptgd_mkt", "ptgd_doan", "ketoan", "cntt"),
+    # R5-16 · Chủ tịch duyệt 14/11/2026: «Chính sách bán» của Phòng KD Lẻ — cả phòng XEM (người bán cần biết
+    # mức chiết khấu được tự cho); chỉ GĐ KD / TP ban hành (kiểm ở `services/chinh_sach_ban.VAI_BAN_HANH`).
+    "/chinh-sach-ban": BASE_VIEW + SALES_ADMIN + ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "ketoan", "cntt"),
     "/bao-gia": BASE_VIEW + SALES_ADMIN + ("nv_kd", "tn_kd", "tp_kd", "gd_kd", "ptgd_mkt", "nv_mkt",
                              "tp_dh", "nv_dh", "ptgd_doan", "ketoan", "cntt"),
     # Hợp đồng là căn cứ ghi nhận doanh thu nên Kế toán phải xem được.

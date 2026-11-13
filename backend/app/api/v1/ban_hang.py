@@ -451,3 +451,21 @@ def chuoi(hid: int, u: User = Depends(require_roles(*XEM)), db: Session = Depend
     hd = db.get(HopDongKhach, hid)
     if hd is None: raise HTTPException(404, "Không có hợp đồng")
     return BH.chuoi_ban_hang(db, hd)
+
+
+# ── R5-16 · Chính sách bán (Chủ tịch duyệt 14/11/2026) ─────────────────────────────────────────────
+from app.services import chinh_sach_ban as CSB  # noqa: E402
+
+
+@router.get("/chinh-sach")
+def chinh_sach(mang: str = "kd_le", u: User = Depends(require_roles(*CSB.VAI_XEM, mo_ta="chính sách bán")),
+               db: Session = Depends(get_db)):
+    """Bản đang hiệu lực + các bản cũ + hai chính sách đã có (D06, VTD Rewards) đọc thẳng."""
+    return CSB.tong_hop(db, u, mang)
+
+
+@router.post("/chinh-sach")
+def ban_hanh_chinh_sach(d: dict, mang: str = "kd_le",
+                        u: User = Depends(require_roles(*CSB.VAI_BAN_HANH, mo_ta="ban hành chính sách bán")),
+                        db: Session = Depends(get_db)):
+    return CSB.ban_hanh(db, u, d, mang)

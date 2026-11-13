@@ -400,7 +400,11 @@ TOUR_TRON_GOI = ("le_noi_dia", "le_nuoc_ngoai", "doan_noi_dia", "doan_nuoc_ngoai
 # Hai loại này giống nhau ở chỗ ĐỨNG NGOÀI mọi con số tour, và khác nhau ở chỗ tiền về từ đâu —
 # nên chúng chung danh sách này mà vẫn tách nhau ở bảng doanh thu (xem `doanh_thu_kd.LUONG`).
 KHONG_TRON_GOI = ("non_package", "thue_xe")
-SERVICE_KINDS = {"VISA": "Visa", "FLIGHT": "Vé máy bay", "HOTEL": "Khách sạn", "VEHICLE": "Xe", "RESTAURANT": "Nhà hàng", "LAND": "Land", "GUIDE": "Hướng dẫn viên", "OTHER": "Khác"}
+SERVICE_KINDS = {"VISA": "Visa", "FLIGHT": "Vé máy bay", "HOTEL": "Khách sạn", "VEHICLE": "Xe", "RESTAURANT": "Nhà hàng", "LAND": "Land", "GUIDE": "Hướng dẫn viên",
+                 # R5-16 · Chủ tịch 14/11/2026: khách lẻ gửi qua công ty khác để hưởng hoa hồng — khách trả qua mình;
+                 # doanh thu = giá khách trả, giá vốn = phần trả đối tác, lãi = hoa hồng.
+                 "GUI_KHACH": "Gửi khách – hưởng hoa hồng",
+                 "OTHER": "Khác"}
 TOUR_STATUS = {
     "nhap": "Nháp (Điều hành đang lập dự toán)",
     "cho_xac_nhan": "Chờ Trưởng phòng ĐH xác nhận",
