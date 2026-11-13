@@ -502,7 +502,9 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
     if (sp.noi_khoi_hanh) nhanhTour.push(["Khởi hành từ", sp.noi_khoi_hanh]);
     if (sp.phuong_tien?.length) nhanhTour.push(["Phương tiện", sp.phuong_tien.map((pt: string) => PT[pt] || pt).join(", ")]);
     if (sp.loai_ten) nhanhTour.push(["Loại tour", sp.loai_ten]);
-    if (sp.diem_den) nhanhTour.push(["Điểm đến", sp.diem_den]);
+    // TR-14: điểm đến chép lại nguyên tên tour thì bỏ ô này — đúng phép so TR-7 đã dùng ở thẻ
+    // danh sách. Để lại là in cùng một chuỗi hai lần trên một màn, chiếm một ô mà không thêm chữ nào.
+    if (sp.diem_den && !trungTen(sp.ten, sp.diem_den)) nhanhTour.push(["Điểm đến", sp.diem_den]);
     // TR-13: mỗi mục chính sách chỉ dựng từ dữ liệu có thật của sản phẩm — không bịa thêm điều khoản.
     const csMuc: [string, string][] = [];
     if (!doan) csMuc.push(["Đặt cọc và thanh toán",
