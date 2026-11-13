@@ -273,7 +273,7 @@ function TongHop() {
         {d.cac_phong.map((p: any) => <option key={p.ma} value={p.ma}>{p.ten}</option>)}</select></label>
       <label>Trạng thái<select value={loc} onChange={(e) => setLoc(e.target.value)}><option value="">Tất cả</option>
         {BA.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-      <span className="muted" style={{ marginLeft: "auto" }}>Mốc dữ liệu {fmtDT(d.as_of)} (giờ VN){d.chi_trang_thai ? " · bạn xem trạng thái cả công ty, nội dung chỉ phòng mình" : d.pham_vi === "nhom" ? " · báo cáo của người trong nhóm bạn — chỉ đọc, xem xét do Trưởng phòng" : ""}</span>
+      <span className="muted" style={{ marginLeft: "auto" }}>Mốc dữ liệu {fmtDT(d.as_of)} (giờ VN){d.chi_trang_thai ? " · bạn xem trạng thái cả công ty, nội dung chỉ phòng mình" : d.pham_vi === "nhom" ? " · báo cáo của người trong nhóm bạn" : ""}</span>
     </div>
     <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", marginTop: 10 }}>
       {BA.map(([k, l, g, c]) => <button key={k} className="panel" aria-pressed={loc === k} onClick={() => setLoc(loc === k ? "" : k)}

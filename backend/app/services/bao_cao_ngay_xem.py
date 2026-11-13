@@ -77,8 +77,8 @@ def co_quyen_noi_dung(db: Session, u: User, r: DailyReport) -> bool:
 
 # R5-19 · TRƯỞNG NHÓM ĐỌC BÁO CÁO NGÀY CỦA NGƯỜI TRONG NHÓM MÌNH (Chủ tịch 14/11/2026: «có»).
 # Phạm vi nhóm là phạm vi bàn Trưởng nhóm (`ban_kd_vai.pham_vi`: cơ cấu tổ chức KD nếu đã khai, chưa
-# khai thì người cùng ô nhóm bán hàng) — không khai lại. CHỈ ĐỌC: «đã xem / trả bổ sung / giao hỗ trợ»
-# vẫn là việc của người xem xét phòng (TP, GĐ KD) theo `co_quyen_noi_dung`.
+# khai thì người cùng ô nhóm bán hàng) — không khai lại. R5-20 (Chủ tịch 14/11/2026 «2 ok»): Trưởng nhóm
+# bấm được «đã xem» và «trả bổ sung» cho người trong nhóm; «giao hỗ trợ» vẫn là việc người xem xét phòng.
 VAI_DOC_THEO_NHOM = ("tn_kd",)
 
 
@@ -113,8 +113,8 @@ def xem_xet(db: Session, u: User, r: DailyReport, hanh_dong: str, diem: float | 
     PermissionError → 403, LookupError → 409 (báo cáo vừa nộp lại), ValueError → 422."""
     if r.user_id == u.id:
         raise PermissionError("Không xem xét báo cáo của chính mình — báo cáo này chuyển lên cấp trên")
-    if not co_quyen_noi_dung(db, u, r):
-        raise PermissionError("Báo cáo này không thuộc phòng bạn được xem")
+    if not doc_duoc(db, u, r):
+        raise PermissionError("Báo cáo này không thuộc phòng hay nhóm bạn được xem")
     if lan is not None and lan != (r.so_lan_nop or 1):
         raise LookupError("Nhân viên vừa nộp lại báo cáo này — mở lại để xem bản mới rồi hãy xem xét")
     hien = trang_thai_xem(r)
@@ -323,7 +323,7 @@ def tong_hop(db: Session, u: User, d: date, phong: str = "", now: datetime | Non
         tt = O.trang_thai_ngay(db, e, e.user_id, d, now, nghi_san=nghi_san, bc_san=bc, han_san=han_san)
         dem[tt["ma"]] = dem.get(tt["ma"], 0) + 1
         r = bc.get(e.user_id)
-        xet = trong(pv_nd, e.department)        # được xem xét (TP, GĐ…); Trưởng nhóm chỉ đọc
+        xet = trong(pv_nd, e.department) or e.user_id in nhom   # R5-20: Trưởng nhóm xem xét người trong nhóm
         doc = r is not None and (r.user_id == u.id or xet or e.user_id in nhom)
         xem = trang_thai_xem(r)
         tu_minh = e.user_id == u.id
