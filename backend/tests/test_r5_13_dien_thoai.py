@@ -30,9 +30,6 @@ def test_sau_muc_da_duyet():
 
 
 def test_o_bang_co_nhan_de_doc_tren_the():
-    for f in ("BanKdKhung", "BanGdKdLe"):
-        t = (GOC / f"web/components/{f}.tsx").read_text(encoding="utf-8")
-        for n in ("Đã bán / chỗ mở", "Giá bán", "Hòa vốn", "Lãi mục tiêu", "Bán đủ khách"):
-            assert f'data-n="{n}"' in t, (f, n)
+    # R5-14: «Chuyến cần thúc bán» đã thành thẻ ở mọi bề rộng (khối khẩn) — không còn bảng để gắn `data-n`.
     k = (GOC / "web/components/BanKdKhung.tsx").read_text(encoding="utf-8")
     assert re.search(r'className="c-dt" data-n="Doanh thu"', k)

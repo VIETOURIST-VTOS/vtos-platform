@@ -250,55 +250,120 @@ export function DoiNguVaNhom({ doi, nhom, dang }: { doi: any[]; nhom: any[] | un
 }
 
 /** Phải thu khách — booking lẻ của người trong phạm vi, theo bảy mốc hạn (cùng khối bàn GĐ). */
+/** R5-14 · Chủ tịch duyệt 14/11/2026 («thanh công nợ phải thu quá dài»): bản GỌN — một số tổng, MỘT thanh
+ *  chồng màu theo hạn (quá hạn = hồng logo), bảng các mốc chia hai cột, nợ cũ thành ô cảnh báo riêng. Dùng chung
+ *  bốn bàn; đứng cạnh khối Doanh thu – Chỉ tiêu trong `HangTien`. CSS đi kèm (`pt-*`). */
+const MAU_HAN = ["var(--vtos-logo-hong)", "#2f6fc0", "#4a86d4", "#6c9fe0", "#8fb7ea", "#b0cdf1", "#cfdff6"];
 export function KhoiPhaiThu({ pt, moToi }: { pt: any; moToi: (t: string) => void }) {
-  return <section className="g5-khoi" aria-label="Phải thu khách hàng">
-    <div className="g5-dau"><h2>Phải thu khách hàng</h2><span>Booking tour lẻ · theo hạn</span></div>
+  const ds: [string, number][] = pt?.nhom ? Object.entries(pt.nhom).map(([k, v]: [string, any]) => [k, Number(v || 0)]) : [];
+  const tong = ds.reduce((a, [, v]) => a + v, 0) || 1;
+  return <section className="g5-khoi pt-khoi" aria-label="Phải thu khách hàng">
+    <div className="g5-dau"><h2>Phải thu khách</h2><span>Booking tour lẻ · theo hạn đi</span></div>
     {!pt ? <p className="g5-nho">Đang đọc số…</p> : pt.tong == null ? <p className="g5-nho">{pt.ly_do || "chưa đo"}</p> : <>
-      <div className="g5-han">
-        {Object.entries(pt.nhom).map(([nhan, v]: [string, any]) => {
-          const max = Math.max(1, ...Object.values(pt.nhom).map((x: any) => x || 0));
-          return <div key={nhan} className={"h" + (nhan === "Quá hạn" ? " qh" : "")}>
-            <span>{nhan}</span><span className="tr"><i style={{ width: ((v || 0) / max) * 100 + "%" }} /></span><b>{tien(v || 0)}</b></div>; })}
+      <div className="pt-tong"><b>{tien(pt.tong)}</b><small>{so(pt.so_booking)} booking còn nợ · hạn = ngày khởi hành</small></div>
+      <div className="pt-chong" role="img" aria-label="Phải thu chia theo hạn">
+        {ds.map(([k, v], i) => v > 0 && <i key={k} title={`${k}: ${tien(v)}`} style={{ width: (v / tong) * 100 + "%", background: MAU_HAN[i % MAU_HAN.length] }} />)}
       </div>
-      <p className="g5-nho">Tổng <b>{tien(pt.tong)}</b> · <b>{so(pt.so_booking)}</b> booking còn nợ. Hạn = ngày khởi hành.</p>
-      <button type="button" className="g5-cua" onClick={() => moToi("/bookings?mang=le")}>Xem booking còn nợ →</button>
+      <div className="pt-ht">
+        {ds.map(([k, v], i) => <div key={k} className={k === "Quá hạn" ? "qh" : ""}>
+          <i style={{ background: MAU_HAN[i % MAU_HAN.length] }} /><span>{k}</span><b>{tien(v)}</b></div>)}
+      </div>
     </>}
-    {pt?.no_cu?.tong != null && <p className="g5-nho g5-nocu">+ Nợ cũ cần đối soát: <b>{tien(pt.no_cu.tong)}</b> · {so(pt.no_cu.so_booking)} booking — {pt.no_cu.ghi}.</p>}
+    {pt?.no_cu?.tong != null && <div className="pt-nocu"><span aria-hidden="true">⚠</span>
+      <span>Nợ cũ cần đối soát <b>{tien(pt.no_cu.tong)}</b> · {so(pt.no_cu.so_booking)} booking — {pt.no_cu.ghi}. Không cộng vào số tổng ở trên.</span></div>}
+    {pt?.tong != null && <button type="button" className="g5-cua pt-nut" onClick={() => moToi("/bookings?mang=le")}>Xem booking còn nợ →</button>}
+    {/* Không dùng dấu backtick trong khối style dưới đây (bài học MKT-6/7). */}
+    <style>{`
+.pt-khoi{display:flex;flex-direction:column;gap:12px}
+.pt-tong{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}.pt-tong b{font-size:28px;font-weight:800;color:#1f4f97}.pt-tong small{color:#7d8ca3;font-size:12.5px}
+.pt-chong{display:flex;height:16px;border-radius:99px;overflow:hidden;gap:2px;background:#eef3fb}.pt-chong i{display:block;height:100%;min-width:3px}
+.pt-ht{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 16px}
+.pt-ht div{display:grid;grid-template-columns:10px 1fr auto;gap:8px;align-items:center;font-size:13px;padding:6px 0;border-bottom:1px dashed #e6ecf5}
+.pt-ht i{width:10px;height:10px;border-radius:3px}.pt-ht b{font-variant-numeric:tabular-nums;color:#1d3a68}
+.pt-ht .qh span,.pt-ht .qh b{color:#d6336c;font-weight:800}
+.pt-nocu{display:flex;gap:10px;align-items:flex-start;background:#fff4e5;border:1px solid #f3d3a4;border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.5;color:#5b4520}
+.pt-nocu b{color:#b45309}
+.pt-khoi .pt-nut{align-self:flex-start;font-size:12.5px;font-weight:700;color:#1f4f97;background:#e8f0fc;border-radius:999px;padding:7px 14px}
+@media(max-width:600px){.pt-ht{grid-template-columns:1fr}}
+`}</style>
   </section>;
 }
 
-/** Chuyến cần thúc bán — cùng hàm, cùng số với bàn GĐ (`ban_kd_le.thuc_ban`). */
+/** R5-14: hàng tiền — Doanh thu – Chỉ tiêu bên trái, Phải thu gọn bên phải. */
+export function HangTien({ duong, coToi, pt, moToi }: { duong: string; coToi: boolean; pt: any; moToi: (t: string) => void }) {
+  return <div className="g5-tien">
+    <KhoiNhipDoanhThu duong={duong} coToi={coToi} />
+    <KhoiPhaiThu pt={pt} moToi={moToi} />
+    <style>{`
+.g5-tien{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:14px;align-items:start}
+@media(max-width:1100px){.g5-tien{grid-template-columns:1fr}}
+`}</style>
+  </div>;
+}
+
+/** R5-14 · Chủ tịch duyệt 14/11/2026: «Chuyến cần thúc bán» thành CẢNH BÁO KHẨN — khung và đầu màu hồng logo,
+ *  chuông nháy, đếm chuyến / chỗ trống / khách còn thiếu để hòa vốn, mỗi chuyến một thẻ có «còn N ngày».
+ *  Cùng hàm, cùng số với bàn GĐ (`ban_kd_le.thuc_ban`). Không còn chuyến nào thì thu về một dòng xanh. */
+function ngayCon(d: string): number {
+  const a = new Date(d + "T00:00:00"), h = new Date(); h.setHours(0, 0, 0, 0);
+  return Math.round((a.getTime() - h.getTime()) / 86400000);
+}
 export function BangThucBan({ ds, moToi }: { ds: any[] | undefined; moToi: (t: string) => void }) {
   const [het, setHet] = useState(false);
-  return <section className="g5-khoi" aria-label="Chuyến cần thúc bán">
-    <div className="g5-dau"><h2>Chuyến cần thúc bán</h2><span>Khởi hành trong 7 ngày, còn chỗ · hòa vốn / lãi mục tiêu / bán đủ khách</span></div>
-    {!ds ? <p className="g5-nho">Đang đọc số…</p> : ds.length === 0 ? <p className="g5-nho">Không có chuyến nào khởi hành trong 7 ngày còn chỗ trống.</p> :
-      <div className="g5-cuon"><table className="g5-bang">
-        <thead><tr><th>Chuyến / khởi hành</th><th>Đã bán / chỗ mở</th><th>Giá bán</th><th>Hòa vốn</th>
-          <th>Lãi {Math.round(((ds[0]?.bien_muc_tieu) || 0.1) * 100)}%</th><th>Bán đủ khách</th><th /></tr></thead>
-        <tbody>{(het ? ds : ds.slice(0, 6)).map((r: any) => {
-          const p = r.cho_mo_ban ? Math.min(100, Math.round((r.cho_da_ban / r.cho_mo_ban) * 100)) : 0;
-          const co = r.khach_hoa_von != null;
-          const thieu = (n: number | null) => n == null ? <div className="ngay">không đạt được ở giá này</div>
-            : n - r.cho_da_ban > 0 ? <div className="ngay">còn thiếu <b className="cam">{n - r.cho_da_ban}</b> khách</div>
-            : <div className="ngay dat">đã đạt</div>;
-          return <tr key={r.id}>
-            <td data-n="" className="c-ma"><b className="ma">{r.code}</b><div className="ngay">{fmtD(r.start_date)} · {r.name}</div></td>
-            <td data-n="Đã bán / chỗ mở"><b>{r.cho_da_ban} / {r.cho_mo_ban}</b><div className="ngay">Còn {r.cho_con} chỗ</div>
-              <div className="vach">{co && r.cho_mo_ban ? <s style={{ left: Math.min(100, (r.khach_hoa_von / r.cho_mo_ban) * 100) + "%" }} /> : null}
-                <i style={{ width: p + "%" }} /></div></td>
-            <td data-n="Giá bán">{vnd(r.gia_ban)} đ</td>
-            {co ? <>
-              <td data-n="Hòa vốn"><b>{r.khach_hoa_von} khách</b>{thieu(r.khach_hoa_von)}</td>
-              <td data-n="Lãi mục tiêu">{r.khach_dat_bien == null ? <span className="ngay">không đạt được ở giá này</span> : <><b>{r.khach_dat_bien} khách</b>{thieu(r.khach_dat_bien)}</>}</td>
-              <td data-n="Bán đủ khách"><b className={"lai" + ((r.bien_khi_day ?? 0) < 0 ? " lo" : "")}>{r.bien_khi_day == null ? "—" : (r.bien_khi_day * 100).toFixed(1).replace(".", ",") + "%"}</b>
-                <div className="ngay">nếu bán đủ {r.khach_toi_da} khách</div></td>
-            </> : <td colSpan={3} className="c-rong"><span className="nhan chua">Chưa có dự toán riêng — Điều hành nhập dự toán thì ba cột này tự hiện</span></td>}
-            <td className="c-nut"><button type="button" className="g5-cua" onClick={() => moToi(`/tours/${r.id}`)}>Chi tiết →</button></td>
-          </tr>; })}</tbody>
-      </table>
-      {ds.length > 6 && <button type="button" className="g5-them" onClick={() => setHet(!het)}>{het ? "Thu gọn" : `Xem thêm ${ds.length - 6} chuyến`}</button>}
-      </div>}
+  const thieuHv = (r: any) => r.khach_hoa_von == null ? 0 : Math.max(0, r.khach_hoa_von - r.cho_da_ban);
+  const cho = (ds || []).reduce((a, r) => a + (r.cho_con || 0), 0);
+  const thieu = (ds || []).reduce((a, r) => a + thieuHv(r), 0);
+  const css = <style>{`
+.kh-khoi{border:2px solid var(--vtos-logo-hong);border-radius:18px;background:linear-gradient(180deg,#fff0f4,#fff 160px);overflow:hidden}
+.kh-dau{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;color:#fff;background:linear-gradient(120deg,var(--vtos-logo-hong),#e0466f)}
+.kh-chuong{position:relative;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);font-size:18px;flex:none}
+.kh-chuong::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid rgba(255,255,255,.75);animation:khNhay 1.6s ease-out infinite}
+@keyframes khNhay{0%{transform:scale(.85);opacity:1}100%{transform:scale(1.35);opacity:0}}
+@media (prefers-reduced-motion:reduce){.kh-chuong::after{animation:none}}
+.kh-dau h2{margin:0;font-size:16px;letter-spacing:.03em;color:#fff}.kh-dau p{margin:2px 0 0;font-size:12.5px;opacity:.92}
+.kh-dem{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}.kh-dem span{background:rgba(255,255,255,.2);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:700}
+.kh-ds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:12px}
+.kh-the{background:#fff;border:1px solid #f3dbe3;border-left:5px solid var(--vtos-logo-hong);border-radius:12px;padding:10px 12px;display:grid;gap:7px;min-width:0}
+.kh-the.cam{border-left-color:#d97706}
+.kh-the .d{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.kh-the .ma{font-weight:800;color:#1d3a68}
+.kh-con{font-size:11.5px;font-weight:800;color:#fff;background:var(--vtos-logo-hong);border-radius:999px;padding:3px 10px;white-space:nowrap}
+.kh-the.cam .kh-con{background:#d97706}
+.kh-the small{color:#7d8ca3;font-size:12px}
+.kh-bar{height:8px;border-radius:99px;background:#eef3fb;position:relative}.kh-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:#2f6fc0}
+.kh-bar s{position:absolute;top:-4px;bottom:-4px;width:2px;background:#d6336c}
+.kh-so{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;flex-wrap:wrap}.kh-so b{color:#d6336c}.kh-so .dat{color:#1c7a52;font-weight:700}
+.kh-the.cam .kh-so b{color:#b45309}
+.kh-phu{font-size:11.5px;color:#7d8ca3}
+.kh-the .g5-cua{justify-content:center;font-size:12.5px;font-weight:700;border-radius:999px;padding:8px;background:#fff0f4;color:#d6336c;text-decoration:none}
+.kh-the .g5-cua:hover{background:var(--vtos-logo-hong);color:#fff}
+.kh-them{margin:0 12px 12px}
+.kh-yen{display:flex;align-items:center;gap:10px;background:#e8f5ef;border:1px solid #bfe3d0;color:#1c7a52;border-radius:14px;padding:12px 16px;font-weight:600}
+@media(max-width:1100px){.kh-ds{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.kh-ds{grid-template-columns:1fr}.kh-dem{margin-left:0}}
+`}</style>;
+  if (!ds) return <section className="g5-khoi" aria-label="Chuyến cần thúc bán"><p className="g5-nho">Đang đọc chuyến cần thúc bán…</p></section>;
+  if (ds.length === 0) return <div className="kh-yen" role="status">✓ Không có chuyến nào khởi hành trong 7 ngày còn chỗ trống cần thúc bán.{css}</div>;
+  const bien = Math.round(((ds[0]?.bien_muc_tieu) || 0.1) * 100);
+  return <section className="kh-khoi" aria-label="Cảnh báo khẩn: chuyến cần thúc bán">
+    <div className="kh-dau"><span className="kh-chuong" aria-hidden="true">🔔</span>
+      <div><h2>KHẨN · CHUYẾN CẦN THÚC BÁN</h2><p>Khởi hành trong 7 ngày, còn chỗ trống</p></div>
+      <div className="kh-dem"><span>{so(ds.length)} chuyến</span><span>{so(cho)} chỗ trống</span>{thieu > 0 && <span>thiếu {so(thieu)} khách hòa vốn</span>}</div></div>
+    <div className="kh-ds">{(het ? ds : ds.slice(0, 6)).map((r: any) => {
+      const n = ngayCon(r.start_date);
+      const p = r.cho_mo_ban ? Math.min(100, (r.cho_da_ban / r.cho_mo_ban) * 100) : 0;
+      const co = r.khach_hoa_von != null, t = thieuHv(r);
+      return <div key={r.id} className={"kh-the" + (n > 4 ? " cam" : "")}>
+        <div className="d"><span className="ma">{r.code}</span><span className="kh-con">{n <= 0 ? "đi hôm nay" : `còn ${n} ngày`}</span></div>
+        <small>{r.name} · đi {fmtD(r.start_date)}</small>
+        <div className="kh-bar"><i style={{ width: p + "%" }} />{co && r.cho_mo_ban ? <s style={{ left: Math.min(100, (r.khach_hoa_von / r.cho_mo_ban) * 100) + "%" }} /> : null}</div>
+        <div className="kh-so"><span>Đã bán {r.cho_da_ban} / {r.cho_mo_ban} · còn {r.cho_con} chỗ</span>
+          {!co ? <span className="kh-phu">chưa có dự toán</span> : t > 0 ? <span>thiếu <b>{t} khách</b> hòa vốn</span> : <span className="dat">đã hòa vốn</span>}</div>
+        <div className="kh-phu">Giá bán {vnd(r.gia_ban)} đ{r.khach_dat_bien != null && <> · lãi {bien}% cần {r.khach_dat_bien} khách</>}{r.bien_khi_day != null && <> · bán đủ {r.khach_toi_da} khách lãi {(r.bien_khi_day * 100).toFixed(1).replace(".", ",")}%</>}</div>
+        <button type="button" className="g5-cua" onClick={() => moToi(`/tours/${r.id}`)}>Chi tiết →</button>
+      </div>; })}</div>
+    {ds.length > 6 && <button type="button" className="g5-them kh-them" onClick={() => setHet(!het)}>{het ? "Thu gọn" : `Xem thêm ${ds.length - 6} chuyến`}</button>}
+    {css}
   </section>;
 }
 
@@ -426,6 +491,7 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
 .g5-nhom{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;letter-spacing:.12em;color:var(--g5-ns-b);margin:2px 0 -6px}
 .g5-nhom::before{content:"";width:4px;height:14px;border-radius:3px;background:linear-gradient(var(--g5-ns-a),var(--g5-ns-b))}
 .g5-dai5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.g5-dai3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .g5-hd{position:relative;overflow:hidden;background:#fff;border:1px solid var(--g5-line);border-radius:14px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:2px;min-width:0;
   box-shadow:0 1px 2px rgba(23,38,63,.04);transition:border-color .15s,box-shadow .15s,transform .15s}
 .g5-hd::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,var(--g5-ns-a),var(--g5-ns-c))}
@@ -499,7 +565,7 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
 .g5-ds .g5-cua{font-size:12.5px;font-weight:700;color:var(--g5-ns-b);background:var(--g5-ns-nhat);border-radius:999px;padding:5px 11px}
 @media(max-width:1100px){.g5-dai5{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:1000px){.g5-hai{grid-template-columns:1fr}}
-@media(max-width:620px){.g5-dai5,.g5-luoi{grid-template-columns:1fr 1fr}.g5-luoi{grid-template-columns:1fr}}
+@media(max-width:620px){.g5-dai5,.g5-luoi{grid-template-columns:1fr 1fr}.g5-luoi{grid-template-columns:1fr}.g5-dai3{grid-template-columns:1fr 1fr}}
 `}</style>
   </div>);
 }

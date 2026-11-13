@@ -8,7 +8,7 @@ import { useHomNay } from "@/components/DauManHinh01";
 import NutLich90, { VAI_NUT_LICH_90 } from "@/components/NutLich90";
 import { api, vnd, fmtD } from "@/lib/api";
 import { errMsg } from "@/components/ui";
-import { DoiNguVaNhom, KhoiNhipDoanhThu } from "@/components/BanKdKhung";
+import { BangThucBan, DoiNguVaNhom, HangTien } from "@/components/BanKdKhung";
 
 /** R5-4 · BÀN LÀM VIỆC GIÁM ĐỐC KINH DOANH LẺ THEO MẪU v32 — Chủ tịch 13/11/2026 05:49:
  *  «giao diện bàn làm việc của GĐKD chưa giống theo mẫu đề xuất» (vietourist-vtd-v32-demo
@@ -102,7 +102,6 @@ export default function BanGdKdLe() {
   const [tab, setTab] = useState("tq");
   const [mo, setMo] = useState<The | null>(null);
   const [khung, setKhung] = useState<string | null>(null);
-  const [hetBang, setHetBang] = useState(false);   // bảng chuyến: 6 dòng đầu, bấm để xem hết
 
   const tai = useCallback(() => {
     api("/ban-kd-le/tong-quan").then((r) => { setD(r); setLoi(""); })
@@ -201,65 +200,13 @@ export default function BanGdKdLe() {
         <OSo nhan="Khách tiềm năng mới" v={null} phu="Chưa có nguồn · không thay bằng 0 (Marketing)" lk="Cửa nhập" bam={() => moToi("/leads?tab=leads")} />
       </div>
 
-      {/* R5-12 · Chủ tịch 14/11/2026: một khối đường lũy kế; bàn GĐ chỉ «Của phòng». */}
-      <KhoiNhipDoanhThu duong="/ban-kd-le/nhip" coToi={false} />
-
-      <div>
-        <section className="g5-khoi" aria-label="Phải thu khách hàng">
-          <div className="g5-dau"><h2>Phải thu khách hàng</h2><span>Booking tour lẻ · theo hạn</span></div>
-          {!d ? <p className="g5-nho">Đang đọc số…</p> : !pt || pt.tong == null ? <p className="g5-nho">{pt?.ly_do || "chưa đo"}</p> : <>
-            <div className="g5-han">
-              {Object.entries(pt.nhom).map(([nhan, v]: [string, any]) => {
-                const max = Math.max(1, ...Object.values(pt.nhom).map((x: any) => x || 0));
-                return <div key={nhan} className={"h" + (nhan === "Quá hạn" ? " qh" : "")}>
-                  <span>{nhan}</span><span className="tr"><i style={{ width: ((v || 0) / max) * 100 + "%" }} /></span><b>{tien(v || 0)}</b></div>; })}
-            </div>
-            <p className="g5-nho">Tổng phải thu <b>{tien(pt.tong)}</b> · <b>{so(pt.so_booking)}</b> booking còn nợ. Hạn = ngày khởi hành của chuyến.</p>
-            <button type="button" className="g5-cua" onClick={() => moToi("/bookings?mang=le")}>Xem booking còn nợ →</button>
-          </>}
-          {pt?.no_cu?.tong != null && <p className="g5-nho g5-nocu">+ Nợ cũ cần đối soát: <b>{tien(pt.no_cu.tong)}</b> · {so(pt.no_cu.so_booking)} booking — {pt.no_cu.ghi}. Cộng hai phần = số phải thu tour lẻ đầy đủ.</p>}
-        </section>
-      </div>
-
-      {/* R5-11 · Chủ tịch duyệt 14/11/2026: Đội ngũ + Theo nhóm của cả phòng Lẻ — cùng khối, cùng cách tính bàn TP. */}
+      {/* R5-14 · Chủ tịch duyệt 14/11/2026: khối khẩn «Chuyến cần thúc bán» lên ngay dưới dải hoạt động; hàng tiền
+          Doanh thu (chỉ «Của phòng») + Phải thu gọn đứng cạnh nhau; Đội ngũ cuối trang. Ba khối dùng chung với bàn TP. */}
+      <BangThucBan ds={d ? (d.thuc_ban || []) : undefined} moToi={moToi} />
+      <p className="g5-nhom">TIỀN · THÁNG NÀY</p>
+      <HangTien duong="/ban-kd-le/nhip" coToi={false} pt={d ? (pt || {}) : undefined} moToi={moToi} />
+      <p className="g5-nhom">ĐỘI NGŨ</p>
       <DoiNguVaNhom doi={d?.doi_ngu || []} nhom={d?.theo_nhom} dang={!d} />
-
-      <section className="g5-khoi" aria-label="Chuyến cần thúc bán">
-        <div className="g5-dau"><div><h2>Chuyến cần thúc bán</h2>
-          <span>Khởi hành trong 7 ngày, còn chỗ trống · ưu tiên chuyến trống nhiều</span></div></div>
-        {!d ? <p className="g5-nho">Đang đọc số…</p> : (d.thuc_ban || []).length === 0
-          ? <p className="g5-nho">Không có chuyến nào khởi hành trong 7 ngày còn chỗ trống.</p>
-          : <div className="g5-cuon"><table className="g5-bang">
-            <thead><tr><th>Chuyến / khởi hành</th><th>Đã bán / chỗ mở</th><th>Giá bán</th><th>Hòa vốn</th>
-              <th>Lãi {Math.round(((d.thuc_ban[0]?.bien_muc_tieu) || 0.1) * 100)}%</th><th>Bán đủ khách</th><th /></tr></thead>
-            <tbody>{(hetBang ? d.thuc_ban : d.thuc_ban.slice(0, 6)).map((r: any) => {
-              const pt2 = r.cho_mo_ban ? Math.min(100, Math.round((r.cho_da_ban / r.cho_mo_ban) * 100)) : 0;
-              const co = r.khach_hoa_von != null;
-              const thieu = (n: number | null) => n == null ? <div className="ngay">không đạt được ở giá này</div>
-                : n - r.cho_da_ban > 0 ? <div className="ngay">còn thiếu <b className="cam">{n - r.cho_da_ban}</b> khách</div>
-                : <div className="ngay dat">đã đạt</div>;
-              return (
-              <tr key={r.id}>
-                <td data-n="" className="c-ma"><b className="ma">{r.code}</b><div className="ngay">{fmtD(r.start_date)} · {r.name}</div></td>
-                <td data-n="Đã bán / chỗ mở"><b>{r.cho_da_ban} / {r.cho_mo_ban}</b><div className="ngay">Còn {r.cho_con} chỗ</div>
-                  <div className="vach">{co && r.cho_mo_ban ? <s style={{ left: Math.min(100, (r.khach_hoa_von / r.cho_mo_ban) * 100) + "%" }} /> : null}
-                    <i style={{ width: pt2 + "%" }} /></div></td>
-                <td data-n="Giá bán">{vnd(r.gia_ban)} đ</td>
-                {co ? <>
-                  <td data-n="Hòa vốn"><b>{r.khach_hoa_von} khách</b>{thieu(r.khach_hoa_von)}</td>
-                  <td data-n="Lãi mục tiêu">{r.khach_dat_bien == null ? <span className="ngay">không đạt được ở giá này</span>
-                    : <><b>{r.khach_dat_bien} khách</b>{thieu(r.khach_dat_bien)}</>}</td>
-                  <td data-n="Bán đủ khách"><b className={"lai" + ((r.bien_khi_day ?? 0) < 0 ? " lo" : "")}>{r.bien_khi_day == null ? "—" : (r.bien_khi_day * 100).toFixed(1).replace(".", ",") + "%"}</b>
-                    <div className="ngay">nếu bán đủ {r.khach_toi_da} khách</div></td>
-                </> : <td colSpan={3} className="c-rong"><span className="nhan chua">Chưa có dự toán riêng — Điều hành nhập ba con số dự toán thì ba cột này tự hiện</span></td>}
-                <td className="c-nut"><button type="button" className="g5-cua" onClick={() => moToi(`/tours/${r.id}`)}>Chi tiết →</button></td>
-              </tr>); })}</tbody>
-          </table>
-          {d.thuc_ban.length > 6 && <button type="button" className="g5-them" onClick={() => setHetBang(!hetBang)}>
-            {hetBang ? "Thu gọn" : `Xem thêm ${d.thuc_ban.length - 6} chuyến`}</button>}
-          <p className="g5-nho">Vạch đỏ trên thanh tiến độ là điểm hòa vốn. Tính từ ba con số dự toán của chuyến; mức lãi đọc tham số «ngưỡng biên»; bán đủ = 45 khách, chuyến mở ít chỗ hơn thì tính theo số chỗ mở.</p>
-          </div>}
-      </section>
 
       {d && <details className="g5-nguon">
         <summary>Nguồn số liệu &amp; trạng thái</summary>

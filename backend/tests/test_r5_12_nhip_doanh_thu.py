@@ -81,7 +81,9 @@ def test_giao_dien_mot_khoi_tren_bon_ban():
     k = (GOC / "web/components/BanKdKhung.tsx").read_text(encoding="utf-8")
     assert "export function KhoiNhipDoanhThu" in k and "BieuDoDuong" in k
     gd = (GOC / "web/components/BanGdKdLe.tsx").read_text(encoding="utf-8")
-    assert '<KhoiNhipDoanhThu duong="/ban-kd-le/nhip" coToi={false} />' in gd, "bàn GĐ chỉ «Của phòng»"
+    # R5-14: khối nằm trong hàng tiền `HangTien` cùng Phải thu gọn.
+    assert '<HangTien duong="/ban-kd-le/nhip" coToi={false}' in gd, "bàn GĐ chỉ «Của phòng»"
+    assert "<KhoiNhipDoanhThu duong={duong} coToi={coToi} />" in k
     for f in ("BanTpKd", "BanTnKd", "BanNvKd"):
         t = (GOC / f"web/components/{f}.tsx").read_text(encoding="utf-8")
-        assert '<KhoiNhipDoanhThu duong="/ban-kd-le/vai/nhip" coToi />' in t and "<BieuDo12" not in t
+        assert '<HangTien duong="/ban-kd-le/vai/nhip" coToi' in t and "<BieuDo12" not in t

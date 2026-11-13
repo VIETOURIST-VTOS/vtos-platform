@@ -1,5 +1,5 @@
 "use client";
-import BanKdKhung, { BangDoiNgu, BangThucBan, KhoiNhipDoanhThu, KhoiPhaiThu, OSo, giaTriDt, so, type Tab } from "@/components/BanKdKhung";
+import BanKdKhung, { BangDoiNgu, BangThucBan, HangTien, OSo, so, type Tab } from "@/components/BanKdKhung";
 
 /** R5-7 · BÀN LÀM VIỆC TRƯỞNG NHÓM KINH DOANH — Chủ tịch duyệt bản xem trước 13/11/2026.
  *  Số CỦA NHÓM; giữ ô «Doanh thu của tôi» vì trưởng nhóm vẫn đi bán (Chủ tịch: «giữ»). Đội ngũ = người
@@ -33,22 +33,19 @@ export default function BanTnKd() {
     phamVi={(d) => `${d.don_vi?.ten || "chưa phân công"} · ${so(d.so_nguoi)} người`}
     tongQuan={({ d, dt, moToi }) => {
       const th = d?.the || {};
-      const dn = giaTriDt(th.doanh_thu), dtoi = giaTriDt(th.doanh_thu_toi);
       return <>
-        <p className="g5-nhom">KẾT QUẢ NHÓM · THÁNG NÀY</p>
-        <div className="g5-dai5">
-          <OSo nhan="Doanh thu nhóm" v={d ? dn.v : undefined} phu={dn.phu} lk="Chi tiết" bam={() => moToi("/fit")} />
-          <OSo nhan="Doanh thu của tôi" v={d ? dtoi.v : undefined} phu={d ? dtoi.phu : ""} lk="Của tôi" bam={() => moToi("/fit")} />
-          <OSo nhan="Booking nhóm" v={d ? so(th.booking_moi?.so) : undefined} phu={d ? `Tháng này · ${so(th.booking_moi?.chua_coc)} chưa cọc` : ""} lk="Booking" bam={() => moToi("/bookings?mang=le")} />
+        {/* R5-14: bỏ hai ô doanh thu (trùng khối Doanh thu – Chỉ tiêu, có nút «Của tôi»). */}
+        <p className="g5-nhom">VIỆC CẦN XỬ LÝ</p>
+        <div className="g5-dai3">
           <OSo nhan="Lead mới chưa liên hệ" nong v={d ? so(th.lead_moi?.so) : undefined} phu="Của người trong nhóm" lk="Lead" bam={() => moToi("/leads?tab=leads")} />
           <OSo nhan="Chăm sóc quá hạn" nong v={d ? so(th.cham_soc_qua_han?.so) : undefined} phu="Của người trong nhóm" lk="Chăm sóc" bam={() => moToi("/cham-soc")} />
-        </div>
-        <KhoiNhipDoanhThu duong="/ban-kd-le/vai/nhip" coToi />
-        <div className="g5-hai">
-          <BangDoiNgu ds={d?.doi_ngu || []} don />
-          <KhoiPhaiThu pt={d?.phai_thu} moToi={moToi} />
+          <OSo nhan="Booking nhóm" v={d ? so(th.booking_moi?.so) : undefined} phu={d ? `Tháng này · ${so(th.booking_moi?.chua_coc)} chưa cọc` : ""} lk="Booking" bam={() => moToi("/bookings?mang=le")} />
         </div>
         <BangThucBan ds={d?.thuc_ban} moToi={moToi} />
+        <p className="g5-nhom">TIỀN · THÁNG NÀY</p>
+        <HangTien duong="/ban-kd-le/vai/nhip" coToi pt={d?.phai_thu} moToi={moToi} />
+        <p className="g5-nhom">ĐỘI NGŨ</p>
+        <BangDoiNgu ds={d?.doi_ngu || []} don />
       </>;
     }} />;
 }

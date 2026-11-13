@@ -1,5 +1,5 @@
 "use client";
-import BanKdKhung, { DoiNguVaNhom, BangThucBan, KhoiNhipDoanhThu, KhoiPhaiThu, OSo, giaTriDt, so, tien, type Tab } from "@/components/BanKdKhung";
+import BanKdKhung, { DoiNguVaNhom, BangThucBan, HangTien, OSo, so, type Tab } from "@/components/BanKdKhung";
 
 /** R5-7 · BÀN LÀM VIỆC TRƯỞNG PHÒNG KINH DOANH LẺ — Chủ tịch duyệt bản xem trước 13/11/2026.
  *  Số CẢ PHÒNG (đơn vị được phân công và mọi đơn vị con); khối Đội ngũ xếp hạng từng người, khối Theo nhóm.
@@ -35,20 +35,20 @@ export default function BanTpKd() {
     phamVi={(d) => `${d.don_vi?.ten || "chưa phân công"} · ${so(d.so_nguoi)} người`}
     tongQuan={({ d, dt, moToi }) => {
       const th = d?.the || {};
-      const dtp = giaTriDt(th.doanh_thu);
       return <>
-        <p className="g5-nhom">KẾT QUẢ PHÒNG · THÁNG NÀY</p>
-        <div className="g5-dai5">
-          <OSo nhan="Doanh thu phòng" v={d ? dtp.v : undefined} phu={dtp.phu} lk="Doanh thu & chỉ tiêu" bam={() => moToi("/fit")} />
-          <OSo nhan="Booking mới" v={d ? so(th.booking_moi?.so) : undefined} phu={d ? `Tháng này · ${so(th.booking_moi?.chua_coc)} chưa cọc` : ""} lk="Booking" bam={() => moToi("/bookings?mang=le")} />
+        {/* R5-14 · Chủ tịch duyệt 14/11/2026: bỏ ô «Doanh thu phòng» và «Phải thu khách» (trùng hai khối ở hàng
+            tiền); khối khẩn «Chuyến cần thúc bán» lên ngay dưới dải việc; Doanh thu và Phải thu gọn đứng cạnh nhau. */}
+        <p className="g5-nhom">VIỆC CẦN XỬ LÝ</p>
+        <div className="g5-dai3">
           <OSo nhan="Lead chưa ai nhận" nong v={d ? so(th.lead_chua_nhan?.so) : undefined} phu="Toàn công ty · chưa phân người" lk="Phân lead" bam={() => moToi("/leads?tab=leads")} />
           <OSo nhan="Chăm sóc quá hạn" nong v={d ? so(th.cham_soc_qua_han?.so) : undefined} phu="Phiếu của người trong phòng" lk="Chăm sóc" bam={() => moToi("/cham-soc")} />
-          <OSo nhan="Phải thu khách" v={d ? (th.phai_thu?.so == null ? null : tien(th.phai_thu.so)) : undefined} chua="—" phu={d ? `${so(th.phai_thu?.so_booking || 0)} booking lẻ còn nợ` : ""} lk="Booking còn nợ" bam={() => moToi("/bookings?mang=le")} />
+          <OSo nhan="Booking mới" v={d ? so(th.booking_moi?.so) : undefined} phu={d ? `Tháng này · ${so(th.booking_moi?.chua_coc)} chưa cọc` : ""} lk="Booking" bam={() => moToi("/bookings?mang=le")} />
         </div>
-        <DoiNguVaNhom doi={d?.doi_ngu || []} nhom={d?.theo_nhom} dang={!d} />
-        <KhoiNhipDoanhThu duong="/ban-kd-le/vai/nhip" coToi />
-        <KhoiPhaiThu pt={d?.phai_thu} moToi={moToi} />
         <BangThucBan ds={d?.thuc_ban} moToi={moToi} />
+        <p className="g5-nhom">TIỀN · THÁNG NÀY</p>
+        <HangTien duong="/ban-kd-le/vai/nhip" coToi pt={d?.phai_thu} moToi={moToi} />
+        <p className="g5-nhom">ĐỘI NGŨ</p>
+        <DoiNguVaNhom doi={d?.doi_ngu || []} nhom={d?.theo_nhom} dang={!d} />
       </>;
     }} />;
 }
