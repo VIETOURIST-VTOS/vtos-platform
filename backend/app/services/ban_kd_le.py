@@ -39,12 +39,26 @@ def _o(so, nguon: str, ly_do: str = "", pham_vi: str = "kd_le") -> dict:
 
 
 def _doanh_thu_tinh_chi_tieu(db: Session, ky: str, ids: list[int]):
-    if not ids:
-        return None, "Chưa khai đơn vị Kinh doanh lẻ nên chưa có phạm vi để cộng."
+    """R5-9 (Chủ tịch 13/11/2026: «GĐ tính cả khối KD»): chưa khai đơn vị thì cộng MỌI booking tour lẻ của cả
+    khối Kinh doanh (luồng `le`, ngăn `khoi_kd`) thay vì để trống. Đã khai thì cộng theo cây như cũ."""
     try:
+        if not ids:
+            return DT.thang(db, ky, "le", None).get("tong_tinh_chi_tieu"), ""
         return DT.thang(db, ky, "", ids).get("tong_tinh_chi_tieu"), ""
-    except Exception as ex:  # noqa: BLE001 — một ô hỏng không được làm sập cả bàn
+    except Exception as ex:  # noqa: BLE001 — một ô hỏng không làm sập cả bàn
         return None, f"Không đọc được: {ex}"
+
+
+def doi_chieu_chu_tich(db: Session, d: date) -> dict:
+    """R5-9 · Số Lẻ trên màn Chủ tịch (khối «Doanh thu theo phòng») — đặt cạnh để đối chiếu. Đọc ĐÚNG
+    `dashboard.doanh_thu_phong`, không tính lại. Cơ sở: doanh thu chuyến, khác cơ sở chỉ tiêu (giá trị booking)."""
+    try:
+        from app.services import dashboard as DB
+        le = DB.doanh_thu_phong(db, d)["le"]
+        return {"thang": le.get("thang"), "chuyen_thang": le.get("chuyen_thang"),
+                "co_so": "Doanh thu chuyến — khối «Doanh thu theo phòng» trên màn Chủ tịch / TGĐ"}
+    except Exception:  # noqa: BLE001
+        return {"thang": None, "chuyen_thang": None, "co_so": ""}
 
 
 def tong_quan(db: Session, hom_nay: date | None = None) -> dict:
@@ -67,7 +81,13 @@ def tong_quan(db: Session, hom_nay: date | None = None) -> dict:
     # cả bảng chỉ tiêu phòng (bảng ấy tốn ~4 giây, mà bàn chỉ cần một con số của nó).
     lech = SEG.lech_quy_tac(db)["tong_lech"]
 
-    dt, ly_do_dt = _doanh_thu_tinh_chi_tieu(db, ky, don_vi)
+    dt_booking, ly_do_dt = _doanh_thu_tinh_chi_tieu(db, ky, don_vi)
+    doi_chieu = doi_chieu_chu_tich(db, d)
+    # R5-10 (Chủ tịch 13/11/2026 23:52): ô doanh thu của GĐ = doanh thu chuyến Lẻ tháng — đúng ô màn Chủ tịch / TGĐ.
+    # Tổng giá trị booking (cơ sở xếp hạng từng NV) trả riêng để màn hình ghi kèm, không thay chỗ.
+    dt = doi_chieu["thang"]
+    if dt is None:
+        ly_do_dt = "Không đọc được doanh thu theo phòng của màn Chủ tịch."
     co_du_toan = n - t["chua_du_co_so"]
     co_gia = sum(1 for r in rows if (r["gia_ban"] or 0) > 0)
     co_cpcd = sum(1 for r in rows if (r["chi_phi_co_dinh"] or 0) > 0)
@@ -76,7 +96,8 @@ def tong_quan(db: Session, hom_nay: date | None = None) -> dict:
         "chuyen_dang_ban": _o(t["chuyen"], "/ban-tour-le"),
         "cho_con": _o(t["cho_con"], "/ban-tour-le"),
         "sap_khoi_hanh": _o(t["sap_khoi_hanh"], "/ban-tour-le"),
-        "doanh_thu_chi_tieu": _o(dt, "/fit", ly_do_dt),   # R5-2: /kinh-doanh-le gộp vào /fit
+        "doanh_thu_chi_tieu": {**_o(dt, "dashboard.doanh_thu_phong · Lẻ (như màn Chủ tịch / TGĐ)", ly_do_dt),
+                               "tong_booking": dt_booking},   # R5-2: /kinh-doanh-le gộp vào /fit
     }
 
     # Bảy việc, đúng thứ tự bản vẽ đã duyệt. `toi` = màn đang giữ nghiệp vụ (bàn mở nó trong khung).
@@ -114,7 +135,8 @@ def tong_quan(db: Session, hom_nay: date | None = None) -> dict:
 
     from app.services import dem_tour as DEM
     gd = DEM.theo_giai_doan(db, hom_nay=d)
-    hoat_dong = {"dang_ban": t["chuyen"], "cho_con": t["cho_con"], "sap_khoi_hanh": t["sap_khoi_hanh"],
+    # R5-10: «Tour đang bán» và «Tour đang đi» đọc ĐÚNG khối «Tour theo giai đoạn» của màn Chủ tịch / TGĐ.
+    hoat_dong = {"dang_ban": gd.get("dang_ban"), "cho_con": t["cho_con"], "sap_khoi_hanh": t["sap_khoi_hanh"],
                  "dang_di": gd.get("dang_chay"), "nguon_dang_di": "dem_tour.theo_giai_doan (mọi tour, như trang chủ)"}
 
     san_sang = [
@@ -127,7 +149,9 @@ def tong_quan(db: Session, hom_nay: date | None = None) -> dict:
     ]
 
     return {"ngay": d.isoformat(), "the": the, "viec": viec, "hoat_dong": hoat_dong,
-            "san_sang": san_sang, "thuc_ban": thuc_ban(db, rows), "phai_thu": phai_thu_le(db, d)}
+            "san_sang": san_sang, "thuc_ban": thuc_ban(db, rows), "phai_thu": phai_thu_le(db, d),
+            "doi_chieu": doi_chieu,
+            "doanh_thu_pham_vi": "ca_khoi_kd" if not don_vi else "co_cau"}
 
 
 def thuc_ban(db: Session, rows: list | None = None) -> list[dict]:
@@ -157,10 +181,15 @@ def phai_thu_le(db: Session, hom_nay: date | None = None, sales_ids: list[int] |
     phòng (bàn GĐ). Danh sách rỗng khác None: rỗng → không có booking nào."""
     from app.models.core import Booking, Tour
     from app.services import han_cong_no as HCN
+    from datetime import timedelta
     d = hom_nay or date.today()
     khoang = HCN.khoang(d)
     nhom = {nhan: 0.0 for nhan, _, _ in khoang}
     so_bk, co = 0, False
+    # R5-9 (Chủ tịch 13/11/2026): chuyến đã đi QUÁ 30 NGÀY mà booking còn nợ tách ra «nợ cũ cần đối soát» —
+    # phần lớn là booking chưa ghi đã thu, không phải nợ thật. Tổng chính + nợ cũ = tổng cũ.
+    moc_cu = d - timedelta(days=30)
+    cu, so_cu = 0.0, 0
     q = (select(Booking, Tour).join(Tour, Tour.id == Booking.tour_id)
          .where(Booking.cancelled == False, Tour.tour_type.in_(SEG.LE_TYPES)))  # noqa: E712
     if sales_ids is not None:
@@ -168,18 +197,24 @@ def phai_thu_le(db: Session, hom_nay: date | None = None, sales_ids: list[int] |
     for bk, tour in db.execute(q).all():
         if SEG.mang_of(tour) != "le" or tour.start_date is None:
             continue
-        no = float(bk.amount or 0) - float(bk.paid or 0)
+        # R5-10: cùng công thức ô «Phải thu» màn Chủ tịch (`dashboard._so_du_no_vay_phai_thu`): giá trị − giảm giá − đã thu.
+        no = float(bk.amount or 0) - float(bk.discount or 0) - float(bk.paid or 0)
         if no <= 0.5:
+            continue
+        if tour.start_date < moc_cu:
+            cu += no; so_cu += 1
             continue
         co = True; so_bk += 1
         for nhan, tu, den in khoang:
             if tu <= tour.start_date <= den:
                 nhom[nhan] += no
                 break
+    no_cu = {"tong": cu if so_cu else None, "so_booking": so_cu,
+             "ghi": "Chuyến đã đi quá 30 ngày mà booking chưa ghi đã thu — Kế toán đối soát"}
     if not co:
         return {"nhom": {nhan: None for nhan in nhom}, "tong": None, "so_booking": 0,
-                "ly_do": "Không có booking tour lẻ nào còn nợ."}
-    return {"nhom": nhom, "tong": sum(nhom.values()), "so_booking": so_bk, "ly_do": ""}
+                "ly_do": "Không có booking tour lẻ nào còn nợ (trong 30 ngày qua và sắp tới).", "no_cu": no_cu}
+    return {"nhom": nhom, "tong": sum(nhom.values()), "so_booking": so_bk, "ly_do": "", "no_cu": no_cu}
 
 
 def doanh_thu_le(db: Session, nam: int) -> dict:

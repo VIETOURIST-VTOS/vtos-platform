@@ -78,7 +78,9 @@ def test_truong_nhom_thay_nhom_minh_truong_phong_thay_ca_phong():
     assert {x["ho_ten"] for x in tn["doi_ngu"]} == {"TN1", "NV1", "NV2"}
     assert tn["theo_nhom"] == []
     tp = S.tong_quan(s, u("tp"))
-    assert tp["the"]["doanh_thu"]["so"] == 95_000_000
+    # R5-10: tổng phòng = doanh thu chuyến như màn Chủ tịch; giá trị booking của phạm vi trả riêng.
+    assert tp["the"]["doanh_thu"]["co_so"] == "doanh_thu_chuyen"
+    assert tp["the"]["doanh_thu"]["tong_booking"] == 95_000_000
     assert len(tp["doi_ngu"]) == 6 and tp["doi_ngu"][0]["ho_ten"] == "NV3"
     assert [g["ma"] for g in tp["theo_nhom"]] == ["LE-N1", "LE-N2"]
     assert [g["tien"] for g in tp["theo_nhom"]] == [45_000_000, 50_000_000]
@@ -87,7 +89,8 @@ def test_truong_nhom_thay_nhom_minh_truong_phong_thay_ca_phong():
 def test_chi_tieu_chua_giao_la_none_giao_roi_thi_co():
     s, u, dv = _db()
     kq = S.tong_quan(s, u("nv1"))
-    assert kq["the"]["doanh_thu"]["chi_tieu"] is None
+    # R5-10 (Chủ tịch 14/11/2026): chưa giao riêng → chỉ tiêu mặc định theo vai (Chuyên viên 500 tr HCM).
+    assert kq["the"]["doanh_thu"]["chi_tieu"] == 500_000_000
     ky = f"{HOM_NAY:%Y-%m}"
     CT.dat(s, u("hc"), ky, 300_000_000, user_id=u("nv1").id, luong="le"); s.commit()
     CT.dat(s, u("hc"), ky, 900_000_000, don_vi_id=dv["n1"].id, luong="le"); s.commit()
@@ -95,7 +98,8 @@ def test_chi_tieu_chua_giao_la_none_giao_roi_thi_co():
     tn = S.tong_quan(s, u("tn1"))
     assert tn["the"]["doanh_thu"]["chi_tieu"] == 900_000_000
     assert next(x for x in tn["doi_ngu"] if x["ho_ten"] == "NV1")["chi_tieu"] == 300_000_000
-    assert next(x for x in tn["doi_ngu"] if x["ho_ten"] == "NV2")["chi_tieu"] is None
+    assert next(x for x in tn["doi_ngu"] if x["ho_ten"] == "NV2")["chi_tieu"] == 500_000_000
+    assert next(x for x in tn["doi_ngu"] if x["ho_ten"] == "TN1")["chi_tieu"] == 1_000_000_000
 
 
 def test_phai_thu_chi_cong_booking_trong_pham_vi():
@@ -124,9 +128,12 @@ def test_chua_phan_cong_thi_doc_nhom_ban_hang():
     tp = S.tong_quan(s, u("tp"))
     assert tp["nguon_pham_vi"] == "nhom_ban_hang" and not tp["canh_bao"] and tp["ghi_pham_vi"]
     assert {x["ho_ten"] for x in tp["doi_ngu"]} == {"TP", "TN1", "A", "B", "C", "D"}, "VPHP, DOAN_* không thuộc phòng Lẻ"
-    assert tp["the"]["doanh_thu"]["so"] == 30_000_000
+    assert tp["the"]["doanh_thu"]["tong_booking"] == 30_000_000
     assert {g["ma"] for g in tp["theo_nhom"]} == {"KD1", "KD2", "VPCT", "Chưa có nhóm"}
-    assert tp["the"]["doanh_thu"]["chi_tieu"] is None, "chưa có đơn vị thì chỉ tiêu phòng chưa giao"
+    # R5-10: chưa có đơn vị → chỉ tiêu phòng = cộng chỉ tiêu cá nhân: TP 1 tỷ + TN 1 tỷ + 4 NV × 500 tr = 4 tỷ.
+    assert tp["the"]["doanh_thu"]["chi_tieu"] == 4_000_000_000
+    kd1 = next(g for g in tp["theo_nhom"] if g["ma"] == "KD1")
+    assert kd1["chi_tieu"] == 1_500_000_000
     tn = S.tong_quan(s, u("tn1"))
     assert {x["ho_ten"] for x in tn["doi_ngu"]} == {"TN1", "A"} and tn["the"]["doanh_thu"]["so"] == 10_000_000
     assert tn["don_vi"]["ten"] == "Nhóm KD1"
@@ -148,3 +155,21 @@ def test_cua_chi_mo_cho_ba_vai_va_ba_ban_rieng():
     chung = (GOC / "web/components/BanKdKhung.tsx").read_text(encoding="utf-8")
     khoi = chung.split("<style>{`", 1)[1].split("`}</style>", 1)[0]
     assert "`" not in khoi
+
+
+def test_r5_10_chi_tieu_mac_dinh_va_moc_luong_co_ban():
+    """Chủ tịch 14/11/2026: NV 500 tr (tỉnh 300 tr), TN và TP 1 tỷ doanh số cá nhân; mốc lương cơ bản 200 tr
+    chỉ HIỆN (đạt / chưa), không đổi lương. Đặt tham số 0 → «chưa giao» (None), không phải 0."""
+    from app.services import rules as R
+    s, u, _ = _db()
+    assert S.chi_tieu_mac_dinh(s, u("nv1").id) == 500_000_000
+    assert S.chi_tieu_mac_dinh(s, u("tn1").id) == 1_000_000_000
+    assert S.chi_tieu_mac_dinh(s, u("tp").id) == 1_000_000_000
+    _ban(s, u, "nv1", 250_000_000, "A")
+    o = S.tong_quan(s, u("nv1"))["the"]["doanh_thu_toi"]
+    assert o["moc_lcb"] == 200_000_000 and o["dat_lcb"] is True
+    tn = S.tong_quan(s, u("tn1"))
+    nv2 = next(x for x in tn["doi_ngu"] if x["ho_ten"] == "NV2")
+    assert nv2["moc_lcb"] == 200_000_000 and nv2["dat_lcb"] is False
+    keys = [k for k, *_ in R.DEFAULT_PARAMS]
+    assert "chi_tieu_tn_kd_le" in keys and "chi_tieu_tp_kd_le" in keys
