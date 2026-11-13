@@ -79,11 +79,13 @@ def test_bay_viec_dung_thu_tu_va_nhan_toan_cong_ty():
         assert v["muc"] == "cho" or v["toi"].startswith("/"), v
 
 
-def test_chua_khai_don_vi_thi_doanh_thu_la_chua_do_khong_phai_0():
+def test_chua_khai_don_vi_thi_cong_ca_khoi_kd_khai_roi_thi_theo_cay():
     db = _db()
-    o = S.tong_quan(db)["the"]["doanh_thu_chi_tieu"]
-    assert o["so"] is None, "chưa có đơn vị Lẻ mà ô doanh thu ra số — đó là số điền tạm"
-    assert "đơn vị" in o["ly_do"]
+    # R5-9 (Chủ tịch 13/11/2026 «GĐ tính cả khối KD»): chưa có đơn vị Lẻ thì cộng cả khối KD — có số thật
+    # (ở đây 0 vì chưa bán booking nào), không còn để trống.
+    kq = S.tong_quan(db)
+    o = kq["the"]["doanh_thu_chi_tieu"]
+    assert kq["doanh_thu_pham_vi"] == "ca_khoi_kd" and o["so"] is not None and o["ly_do"] == ""
     db.add(DonViKD(ma="LE-1", ten="Phòng Lẻ 1", cap="phong", mang="le", hieu_luc_tu=HOM_NAY - dt.timedelta(days=30)))
     db.commit()
     o = S.tong_quan(db)["the"]["doanh_thu_chi_tieu"]
