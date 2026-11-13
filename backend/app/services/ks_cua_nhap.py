@@ -204,6 +204,9 @@ CUA_TAY = (
     "noi_dung_am_thuc",
     # AT-2a (29/10/2026): Điều hành / Marketing tải ảnh album, TP Điều hành duyệt — màn /nha-hang › Album ảnh.
     "anh_nha_hang",
+    # TR-8 (13/11/2026): Marketing / Điều hành / Kinh doanh tải ảnh tour — màn /tour-online › nút «Ảnh».
+    # Tải là hiện, không có bước duyệt (KS-16c 31/10/2026, nhắc lại cho cổng tour 13/11/2026).
+    "anh_tour",
     # AT-2b (29/10/2026): Điều hành / Marketing nhập món, tải thực đơn theo phiên bản — màn /nha-hang › Món ăn, Thực đơn.
     "mon_nha_hang", "thuc_don_ban", "thuc_don_trang",
     # AT-2c (29/10/2026): Chủ tịch giao người biên tập — màn /nha-hang › Hoàn thiện.

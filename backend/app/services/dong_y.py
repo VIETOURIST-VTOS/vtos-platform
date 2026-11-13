@@ -69,6 +69,38 @@ CAU_HOI = ("Anh/chị có đồng ý đăng công khai nhận xét này trên h�
 
 PHAM_VI = "ho_so_hdv_cong_khai"     # đồng ý cho ĐÚNG chỗ này, không suy rộng ra chỗ khác
 
+# ══ TR-6 · PHẠM VI THỨ HAI — TRANG BÁN TOUR (Chủ tịch duyệt 13/11/2026) ═══════════════════════
+# Chủ tịch duyệt đưa đánh giá lên `kh.vietourist.vn`. Trang ấy là NGOÀI INTERNET, rộng hơn hẳn
+# «hồ sơ hướng dẫn viên tại VTOS» mà câu hỏi cũ đã hỏi — và `ho_so_hdv.py` đã ghi sẵn luật cho
+# đúng tình huống này: «Mở ra ngoài internet là một phạm vi RỘNG HƠN điều khách đã đồng ý — phải
+# hỏi lại khách bằng một câu mới, không phải đổi một dòng cấu hình.»
+#
+# Nên: câu MỚI, phạm vi MỚI, hỏi từ nay trở đi.
+#
+# ĐÁNH GIÁ CŨ KHÔNG ĐƯỢC DÙNG CHO TRANG TOUR. Chúng mang `pham_vi = PHAM_VI`, và không có đường
+# nào nâng chúng lên — nâng là dùng lời đồng ý ra ngoài điều đã hỏi. Sổ trang tour bắt đầu từ 0
+# và đầy dần. Đây là cái giá của việc giữ đúng lời hứa, và nó là cái giá phải trả.
+#
+# VÌ SAO MỘT CÂU CHO CẢ HAI CHỖ, KHÔNG PHẢI HAI BẢN GHI. `dong_y_cong_khai` có
+# `UniqueConstraint("danh_gia_id")` — một nhận xét MỘT bản ghi, cố ý, để câu «nhận xét này hiện
+# được không» không bao giờ phải nối hai bảng. Thêm phạm vi thứ hai bằng cách ghi thêm dòng là
+# phá đúng cái khoá ấy. Nên câu mới hỏi GỘP cả hai chỗ, và khách trả lời một lần.
+PHAM_VI_2 = "ho_so_hdv_va_trang_tour"
+
+CAU_HOI_2 = ("Anh/chị có đồng ý đăng công khai nhận xét này trên hồ sơ hướng dẫn viên tại VTOS "
+             "và trên trang bán tour kh.vietourist.vn, không kèm tên và thông tin liên hệ của "
+             "anh/chị không?")
+
+# Phạm vi nào cho phép đăng ở NHỮNG CHỖ NÀO. Bảng này là chỗ duy nhất trả lời; đừng so chuỗi
+# `pham_vi` ở bất kỳ đâu khác.
+#
+# Bản ghi cũ (`PHAM_VI`) chỉ mở «ho_so_hdv» — đúng y câu đã hỏi họ, không hơn một chữ.
+NOI_CHO_PHEP: dict[str, tuple[str, ...]] = {
+    PHAM_VI:   ("ho_so_hdv",),
+    PHAM_VI_2: ("ho_so_hdv", "trang_tour"),
+}
+NOI_MAC_DINH = "ho_so_hdv"          # mọi cửa đã viết trước đợt này đều đang hỏi về chỗ này
+
 # Hạn của đường rút tự phục vụ. Dài hơn hẳn mã khảo sát: khách rút lúc nào cũng được trong suốt
 # thời gian lời nhận xét còn hiện, chứ không chỉ trong tuần họ vừa đi tour.
 RUT_SONG_NGAY = 730
@@ -154,7 +186,10 @@ def ghi_tra_loi(db: Session, dg: DanhGiaSauTour, tra_loi: str, nguon: str = "kha
         return r                                  # một nhận xét một bản ghi; hỏi lại không ghi đè
     r = DongYCongKhai(
         danh_gia_id=dg.id, care_id=dg.care_id, tour_id=dg.tour_id,
-        pham_vi=PHAM_VI, cau_hoi=CAU_HOI, tra_loi=tra_loi,
+        # TR-6 · 13/11/2026 — từ nay ghi phạm vi MỚI, vì câu hỏi khách vừa đọc là câu mới
+        # (`CAU_HOI_2`, xem `cau_hoi_dang_hoi()`). Bản ghi CŨ giữ nguyên `PHAM_VI` của chúng và
+        # không có đường nào nâng lên — chúng chỉ được đăng ở đúng chỗ đã hỏi.
+        pham_vi=PHAM_VI_2, cau_hoi=CAU_HOI_2, tra_loi=tra_loi,
         hoi_luc=datetime.now(), nguon=nguon,
         ma_rut=secrets.token_urlsafe(24) if tra_loi == "co" else "",
         ma_rut_het_han=(datetime.now() + timedelta(days=RUT_SONG_NGAY)) if tra_loi == "co" else None,
@@ -336,18 +371,32 @@ def go(db: Session, u, dg: DanhGiaSauTour, ly_do: str = "") -> dict:
 
 
 # ── CỬA ĐỌC CÔNG KHAI ─────────────────────────────────────────────────────────────────────────
-def cong_khai_duoc(r: DongYCongKhai | None) -> bool:
-    """ĐÚNG MỘT chỗ trả lời câu «nhận xét này có được hiện công khai không».
+def cong_khai_duoc(r: DongYCongKhai | None, noi: str = NOI_MAC_DINH) -> bool:
+    """ĐÚNG MỘT chỗ trả lời câu «nhận xét này có được hiện công khai KHÔNG, Ở CHỖ NÀO».
 
     Mọi cửa công khai hỏi hàm này. Dựng câu điều kiện thứ hai ở nơi khác là ngày hai câu lệch
     nhau thì một lời nhận xét khách đã rút vẫn nằm trên mạng, và không ai biết vì sao.
+
+    TR-6 · 13/11/2026 — THÊM THAM SỐ `noi`, MẶC ĐỊNH GIỮ NGUYÊN HÀNH VI CŨ.
+    Trước đợt này chỉ có một chỗ đăng nên câu hỏi chỉ cần «được hay không». Nay có hai chỗ —
+    hồ sơ hướng dẫn viên (trong VTOS) và trang bán tour (ngoài internet) — và hai chỗ ấy khách
+    đồng ý bằng HAI câu hỏi khác nhau. Hỏi «được hay không» mà không nói «ở đâu» là câu hỏi
+    thiếu vế, và vế thiếu ấy chính là chỗ một lời đồng ý bị dùng rộng hơn điều đã hỏi.
+
+    Mặc định `NOI_MAC_DINH` để mọi cửa viết trước đợt này chạy y như cũ, không phải sửa một dòng:
+    chúng đều đang hỏi về hồ sơ hướng dẫn viên.
     """
     if r is None:
         return False
-    return (r.tra_loi == "co"
+    if not (r.tra_loi == "co"
             and r.rut_luc is None
             and r.duyet_luc is not None
-            and r.duyet_ket_qua == "dang")
+            and r.duyet_ket_qua == "dang"):
+        return False
+    # Phạm vi lạ (dữ liệu cũ, hoặc ai đó gõ tay vào cơ sở dữ liệu) → KHÔNG đăng. Mặc định của
+    # `.get` là tuple rỗng, cố ý: không biết lời đồng ý ấy cho phép những đâu thì câu trả lời
+    # duy nhất đúng là «không», chứ không phải «chắc là được».
+    return noi in NOI_CHO_PHEP.get(r.pham_vi, ())
 
 
 def hang_doi(db: Session, u) -> dict:
@@ -391,7 +440,12 @@ def hang_doi(db: Session, u) -> dict:
         "cho_lau_nhat_ngay": max([d["cho_ngay"] or 0 for d in ds], default=0),
         "da_dang": da_dang, "da_rut": da_rut,
         "ban_duyet_duoc": duyet_duoc, "ban_duyet_bang": bang_quyen,
-        "cau_hoi": CAU_HOI,
+        # TR-6 · 13/11/2026 — câu ĐANG hỏi khách hôm nay. Từ đợt này có hai câu trong sổ: bản ghi
+        # cũ giữ `CAU_HOI` (chỉ hồ sơ HDV), bản ghi mới giữ `CAU_HOI_2` (thêm trang bán tour).
+        # Mỗi bản ghi mang NGUYÊN VĂN câu đã hỏi nó trong cột `cau_hoi` của chính nó — dòng này
+        # chỉ để người duyệt biết hôm nay mình đang hỏi khách điều gì, không phải để đọc thay.
+        "cau_hoi": CAU_HOI_2,
+        "cau_hoi_cu": CAU_HOI,
         "luu_y": ("Hàng đợi chỉ chứa nhận xét có đồng ý MỚI của Đợt HD-DG3. Nhận xét thu trước "
                   "đợt này không có đồng ý ấy nên không nằm đây — rỗng không có nghĩa là không "
                   "ai khen."),

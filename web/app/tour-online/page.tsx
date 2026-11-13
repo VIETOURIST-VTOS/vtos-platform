@@ -22,6 +22,20 @@ function Trang() {
   const [x, setX] = useState<any>(null);
   const [tab, setTab] = useState<"sp" | "web" | "don" | "mt">("sp");
   const [tim, setTim] = useState(""); const [loc, setLoc] = useState("");
+  const [locLo, setLocLo] = useState<"co_chuyen" | "tat_ca">("co_chuyen");   // TR-6b · phạm vi bật / đóng hàng loạt
+  // TR-9 (13/11/2026): hai ô nhập NGAY TRÊN TRANG, thay cho hộp thoại của trình duyệt.
+  // `window.prompt` / `window.confirm` CHẶN mọi thao tác tự động (trợ lý không bấm qua được) và
+  // trên điện thoại thì hộp thoại hệ thống rất khó thao tác. Báo cáo 13/11: người đi ghép link
+  // cho 22 tour thiếu ảnh bị kẹt đúng ở đây, không ghép được tour nào.
+  const [ghep, setGhep] = useState<any>(null);      // ghép link web ↔ sản phẩm
+  const [xacNhan, setXacNhan] = useState<any>(null); // xác nhận bật / đóng hàng loạt
+  // TR-8 (13/11/2026) · album ảnh tour. Đo cùng ngày: 13/85 tour trên cổng không có tấm ảnh nào,
+  // 22/33 tour đang mở bán thiếu ảnh. Nội dung đọc từ web cũ nên chỗ này chỉ vá được bằng cửa tải.
+  const [alb, setAlb] = useState<any>(null);         // album đang mở
+  const [lo, setLo] = useState<any>({ nhom: "diem_den", can_cu: "vtd_chup", chu_thich: "", credit: "", can_cu_ghi_chu: "" });
+  const [dangTai, setDangTai] = useState("");
+  const moAlbum = async (pid: number) => { try { setAlb(await api(`/tour-online/${pid}/album`)); } catch (e) { toast(errMsg(e), true); } };
+  const taiLaiAlbum = async () => { if (alb) setAlb(await api(`/tour-online/${alb.san_pham.id}/album`)); };
   const [sua, setSua] = useState<any>(null);
   const [web, setWeb] = useState<any[] | null>(null);
   const [don, setDon] = useState<any[] | null>(null); const [chiVat, setChiVat] = useState(false);
@@ -38,6 +52,9 @@ function Trang() {
     return sps.filter((p) => (!k || `${p.ma} ${p.ten} ${p.diem_den_suy}`.toLowerCase().includes(k))
       && (!loc || (loc === "chua_ghep" ? !p.link_web : loc === "loi" ? !!p.web.loi : loc === "mo_tt" ? p.mo_thanh_toan : loc === "co_chuyen" ? p.so_chuyen > 0 : loc === "thieu" ? (p.thieu || []).length > 0 : true)));
   }, [sps, tim, loc]);
+  // TR-6b · số sản phẩm mỗi phạm vi hàng loạt sẽ xét — in ra nút để người bấm biết mình đang đổi bao nhiêu.
+  // Máy chủ TỰ đếm lại khi nhận lệnh; con số này chỉ để xem trước, không phải con số quyết định.
+  const soLo = useMemo(() => ({ tat_ca: sps.length, co_chuyen: sps.filter((p) => p.so_chuyen > 0).length }), [sps]);
   if (!x) return <p>Đang tải…</p>;
   const duoc = x.duoc || {};
 
@@ -63,6 +80,28 @@ function Trang() {
           <option value="chua_ghep">Chưa ghép web</option><option value="loi">Đọc web lỗi</option><option value="mo_tt">Đang mở thanh toán</option>
           <option value="thieu">Thiếu nội dung ({sps.filter((p) => (p.thieu || []).length > 0).length})</option></select>
         <span className="muted">{ds.length} sản phẩm</span></div>
+      {/* TR-6b (13/11/2026) · BẬT / ĐÓNG HÀNG LOẠT — một lần bấm, MỘT giao dịch trên máy chủ.
+          Vì sao có khối này: bấm từng sản phẩm 380 lượt đã làm VTOS mất API hai lần đêm 13/11/2026.
+          Chỉ Chủ tịch / TGĐ thấy (`duoc.tt_chung`) — bằng đúng quyền của công tắc chung, vì mở cả kho
+          là quyết định kinh doanh, không phải việc thường ngày như mở một tour. */}
+      {duoc.tt_chung && <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 10,
+        padding: "8px 10px", borderRadius: 8, border: "1px solid var(--vien, #d7dce6)" }}>
+        <b>Bật / đóng hàng loạt:</b>
+        <select value={locLo} onChange={(e) => setLocLo(e.target.value as typeof locLo)} aria-label="Phạm vi bật / đóng hàng loạt">
+          <option value="co_chuyen">Chỉ sản phẩm có chuyến đang mở bán ({soLo.co_chuyen})</option>
+          <option value="tat_ca">Tất cả sản phẩm đang hoạt động ({soLo.tat_ca})</option></select>
+        {([[true, "Mở thanh toán"], [false, "Đóng thanh toán"]] as [boolean, string][]).map(([bat, nhan]) =>
+          <button key={nhan} className={`act ${bat ? "teal" : "grey"}`} disabled={busy}
+            onClick={() => setXacNhan({ bat, nhan, loc: locLo, so: soLo[locLo] })}>{nhan}</button>)}
+        <span className="muted" style={{ fontSize: 13 }}>Máy báo lại số sản phẩm THỰC SỰ đổi. Bấm lần hai ra 0 nghĩa là lần đầu đã ăn.
+          Khách vẫn cần công tắc chung ở trên cùng mở.</span>
+        {/* TR-9: hỏi lại NGAY TRÊN TRANG, không dùng hộp thoại trình duyệt. */}
+        {xacNhan && <div style={{ flexBasis: "100%", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap",
+          padding: "10px 12px", borderRadius: 8, border: "2px solid var(--accent, #14538D)" }}>
+          <b>{xacNhan.nhan} trực tuyến cho {xacNhan.so} sản phẩm ({xacNhan.loc === "co_chuyen" ? "có chuyến đang mở bán" : "tất cả đang hoạt động"})?</b>
+          <button className="act teal" disabled={busy} onClick={() => { const x = xacNhan; setXacNhan(null);
+            lam(() => api("/tour-online/thanh-toan-hang-loat", { method: "POST", json: { bat: x.bat, loc: x.loc } })); }}>Đồng ý, {xacNhan.nhan.toLowerCase()}</button>
+          <button className="act grey" onClick={() => setXacNhan(null)}>Hủy</button></div>}</div>}
       <div className="wrap"><table><thead><tr><th>Sản phẩm</th><th>Loại</th><th>Chuyến</th><th>Nội dung web</th><th>Nội dung trên cổng</th><th>Hồ sơ cổng</th><th>Thanh toán</th><th /></tr></thead>
         <tbody>{ds.map((p) => <tr key={p.id}>
           <td><b>{p.ma}</b><br />{p.ten}</td>
@@ -80,8 +119,105 @@ function Trang() {
             {duoc.ghep && <button className="act grey" disabled={busy} onClick={() => lam(() => api(`/tour-online/${p.id}/thanh-toan`, { method: "POST", json: { bat: !p.mo_thanh_toan } }))}>{p.mo_thanh_toan ? "Đóng" : "Mở"}</button>}</td>
           <td style={{ whiteSpace: "nowrap" }}>{duoc.sua && <button className="act grey" onClick={() => setSua({ id: p.id, ma: p.ma, diem_den: p.diem_den, noi_bat: p.noi_bat.join("\n"), wellness: p.wellness, phuong_tien_ds: p.phuong_tien_ds })}>Sửa hồ sơ</button>}
             {duoc.sua && p.link_web && <button className="act grey" disabled={busy} onClick={() => lam(() => api(`/tour-online/${p.id}/doc-web`, { method: "POST" }))}>Đọc lại web</button>}
-            {duoc.ghep && <button className="act grey" disabled={busy} onClick={() => { const u = window.prompt(`Link trang tour trên vietourist.com.vn cho ${p.ma} (để trống = bỏ ghép)`, p.link_web || ""); if (u !== null) lam(() => api(`/tour-online/${p.id}/ghep-web`, { method: "POST", json: { link_web: u.trim() } })); }}>Ghép link</button>}</td>
+            {duoc.ghep && <button className="act grey" disabled={busy} onClick={() => setGhep({ id: p.id, ma: p.ma, ten: p.ten, link: p.link_web || "" })}>{p.link_web ? "Sửa link" : "Ghép link"}</button>}
+            {/* TR-8: ảnh tải lên đứng TRƯỚC ảnh đọc từ web — số trên nút là ảnh ĐÃ TẢI, không gồm ảnh web. */}
+            <button className={`act ${p.so_anh_tai ? "teal" : "grey"}`} onClick={() => moAlbum(p.id)}>Ảnh{p.so_anh_tai ? ` (${p.so_anh_tai})` : ""}</button></td>
         </tr>)}</tbody></table></div>
+    </div>}
+
+    {/* TR-8 (13/11/2026) · ALBUM ẢNH TOUR.
+        Ảnh tải lên ĐỨNG TRƯỚC ảnh đọc từ vietourist.com.vn, không xoá ảnh web nào — vá được tour
+        nào hay tour ấy. Tải là HIỆN NGAY, không có bước duyệt (KS-16c 31/10, nhắc lại 13/11).
+        Gửi TỪNG TỆP một để báo được tiến độ và thử lại đúng tấm hỏng. */}
+    {alb && <div className="panel" style={{ border: "2px solid var(--accent, #3f66e0)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <h3 style={{ margin: 0 }}>Ảnh tour · {alb.san_pham.ma}</h3>
+        <button className="act grey" onClick={() => setAlb(null)}>Đóng</button></div>
+      <span className="muted">{alb.san_pham.ten}</span>
+      <span className="muted" style={{ fontSize: 13 }}>Đã tải <b>{alb.tong}</b>/{alb.toi_da} ảnh
+        · đọc từ web {alb.so_anh_web} ảnh · <b>ảnh tải lên hiện trước ảnh web trên cổng khách</b>.
+        Mỗi tệp tối đa {alb.toi_da_mb} MB, nhận JPG / PNG / WEBP. Máy tự thu nhỏ và <b>xoá dữ liệu
+        vị trí GPS</b> trong ảnh trước khi đưa ra ngoài.</span>
+
+      {alb.duoc_tai && <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end",
+        padding: "10px 12px", borderRadius: 8, border: "1px solid var(--vien, #d7dce6)", margin: "10px 0" }}>
+        <label>Nhóm ảnh<select value={lo.nhom} onChange={(e) => setLo({ ...lo, nhom: e.target.value })}>
+          {Object.entries(alb.nhom_anh).map(([k, t]) => <option key={k} value={k}>{t as string}</option>)}</select></label>
+        <label>Căn cứ quyền dùng<select value={lo.can_cu} onChange={(e) => setLo({ ...lo, can_cu: e.target.value })}>
+          {Object.entries(alb.can_cu_anh).map(([k, t]) => <option key={k} value={k}>{t as string}</option>)}</select></label>
+        <label style={{ flex: 1, minWidth: 180 }}>Chú thích (không bắt buộc)
+          <input value={lo.chu_thich} onChange={(e) => setLo({ ...lo, chu_thich: e.target.value })} /></label>
+        <label style={{ minWidth: 150 }}>Ghi công (nếu có)
+          <input value={lo.credit} onChange={(e) => setLo({ ...lo, credit: e.target.value })} /></label>
+        <label className="act teal" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", minHeight: 44, padding: "0 16px" }}>
+          {dangTai || "Chọn ảnh để tải lên"}
+          <input type="file" accept="image/jpeg,image/png,image/webp" multiple style={{ display: "none" }}
+            onChange={async (e) => {
+              const fs = Array.from(e.target.files || []); e.target.value = "";
+              let ok = 0, bo = 0;
+              for (let i = 0; i < fs.length; i++) {
+                setDangTai(`Đang tải ${i + 1}/${fs.length}…`);
+                const fd = new FormData();
+                fd.append("tep", fs[i]); fd.append("nhom", lo.nhom); fd.append("can_cu", lo.can_cu);
+                fd.append("chu_thich", lo.chu_thich); fd.append("credit", lo.credit);
+                fd.append("can_cu_ghi_chu", lo.can_cu_ghi_chu); fd.append("mo_ta_thay_the", "");
+                try { const r = await api<any>(`/tour-online/${alb.san_pham.id}/anh`, { method: "POST", body: fd }); r.moi ? ok++ : bo++; }
+                catch (ex) { toast(`${fs[i].name}: ${errMsg(ex)}`, true); }
+              }
+              setDangTai("");
+              toast(`Đã tải ${ok} ảnh${bo ? `, bỏ qua ${bo} ảnh trùng` : ""}`);
+              await taiLaiAlbum(); await tai();
+            }} /></label>
+        <span className="muted" style={{ fontSize: 12, flexBasis: "100%" }}>Chọn được nhiều tệp một lần — máy gửi lần lượt từng tấm
+          và báo đúng tấm nào hỏng. Ảnh trùng nội dung không tạo bản mới.</span></div>}
+
+      {!alb.anh.length ? <p className="muted">Chưa có ảnh nào tải lên. Cổng khách đang dùng {alb.so_anh_web} ảnh đọc từ web.</p>
+        : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 12 }}>
+          {alb.anh.map((x: any, i: number) => <div key={x.id} style={{ border: "1px solid var(--vien, #d7dce6)", borderRadius: 8, overflow: "hidden",
+            opacity: x.trang_thai === "an" ? 0.5 : 1 }}>
+            <img src={x.nho} alt={x.mo_ta_thay_the || x.chu_thich || `Ảnh ${i + 1} của ${alb.san_pham.ma}`}
+              style={{ width: "100%", aspectRatio: "16/9", objectFit: "cover", display: "block", background: "#eef2f5" }} />
+            <div style={{ padding: "6px 8px", display: "flex", flexDirection: "column", gap: 4 }}>
+              <small>{i === 0 ? <b>Ảnh bìa · </b> : null}{x.nhom_ten}{x.trang_thai === "an" ? " · ĐANG ẨN" : ""}</small>
+              <small className="muted">{x.can_cu_ten}{x.credit ? ` · ${x.credit}` : ""}</small>
+              <small className="muted">{x.rong}×{x.cao} · {x.tai_boi} · {x.tai_luc}</small>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {i > 0 && <button className="act grey" onClick={() => lam(async () => {
+                  const ids = alb.anh.map((y: any) => y.id); [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]];
+                  const r = await api(`/tour-online/${alb.san_pham.id}/anh/xep`, { method: "POST", json: { ids } });
+                  await taiLaiAlbum(); return r; })}>↑ Lên</button>}
+                <button className="act grey" onClick={() => lam(async () => {
+                  const r = await api(`/tour-online/anh/${x.id}/an`, { method: "POST", json: { an: x.trang_thai !== "an" } });
+                  await taiLaiAlbum(); return r; })}>{x.trang_thai === "an" ? "Cho hiện lại" : "Gỡ khỏi cổng"}</button>
+                <button className="act grey" onClick={() => setAlb({ ...alb, xoa: x.id })}>Xoá</button></div>
+              {alb.xoa === x.id && <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                <small><b>Xoá hẳn ảnh này?</b></small>
+                <button className="act teal" onClick={() => lam(async () => {
+                  const r = await api(`/tour-online/anh/${x.id}`, { method: "DELETE" });
+                  await taiLaiAlbum(); await tai(); return r; })}>Xoá</button>
+                <button className="act grey" onClick={() => setAlb({ ...alb, xoa: null })}>Thôi</button></div>}
+            </div></div>)}
+        </div>}
+    </div>}
+
+    {/* TR-9 (13/11/2026) · GHÉP LINK WEB — BIỂU MẪU TRÊN TRANG, KHÔNG DÙNG HỘP THOẠI.
+        Trước đây ô này là `window.prompt`. Hộp thoại của trình duyệt khoá cả trang: trợ lý không
+        bấm qua được, và trên điện thoại thì không dán link dài vào nổi. Báo cáo 13/11/2026: người
+        đi ghép link cho 22 tour thiếu ảnh kẹt đúng ở đây và không ghép được tour nào.
+        Biểu mẫu này đặt cạnh «Hồ sơ cổng» — cùng một chỗ, cùng một kiểu, mỗi nút vẫn một chỗ. */}
+    {ghep && <div className="panel" style={{ border: "2px solid var(--accent, #3f66e0)" }}>
+      <h3 style={{ marginTop: 0 }}>Ghép link web · {ghep.ma}</h3>
+      <span className="muted">{ghep.ten}</span>
+      <label>Link trang tour trên vietourist.com.vn
+        <input value={ghep.link} autoFocus placeholder="https://vietourist.com.vn/vn/tour/..."
+          onChange={(e) => setGhep({ ...ghep, link: e.target.value })} /></label>
+      <span className="muted" style={{ fontSize: 13 }}>Chỉ nhận địa chỉ trên vietourist.com.vn. Để TRỐNG rồi bấm Lưu
+        nghĩa là <b>bỏ ghép</b>. Ghép xong máy tự đọc ảnh, lịch trình và mục «Giá tour bao gồm» từ trang ấy.</span>
+      <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+        <button className="act teal" disabled={busy} onClick={() => lam(async () => {
+          const r = await api(`/tour-online/${ghep.id}/ghep-web`, { method: "POST", json: { link_web: ghep.link.trim() } });
+          setGhep(null); return r; })}>{ghep.link.trim() ? "Lưu và đọc web" : "Bỏ ghép"}</button>
+        <button className="act grey" onClick={() => setGhep(null)}>Hủy</button></div>
     </div>}
 
     {sua && <div className="panel" style={{ border: "2px solid var(--accent, #3f66e0)" }}>

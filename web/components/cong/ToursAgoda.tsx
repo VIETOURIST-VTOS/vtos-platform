@@ -34,6 +34,54 @@ const GIA: [string, string, (g: number) => boolean][] = [["d2", "Dưới 2 tri�
   ["t5", "Trên 5 triệu", (g) => g > 5e6]];
 /* TR-4: lọc giá dùng giá thật của chuyến; tour chưa có lịch (TR-3) dùng giá tham khảo trên web. */
 const giaLoc = (s: any): number | null => s.gia_tu ?? s.gia_tham_khao ?? null;
+
+/* TR-7 · 13/11/2026 — ĐO ĐƯỢC trên bản chạy thật: với phần lớn tour, `diem_den` CHÉP LẠI
+   nguyên tên tour (ví dụ TL001: tên «HỒ ĐA MI - LA NGÂU - THÁC BÀ 2 NGÀY 1 ĐÊM», điểm đến
+   cũng đúng chuỗi ấy — vì khi không ai khai điểm đến thì máy SUY từ tên). Nó chiếm nguyên một
+   ô trên thẻ, và trên điện thoại thì xuống hai dòng, mà không thêm một chữ thông tin nào.
+   Bỏ dấu rồi so: trùng thì KHÔNG hiện ô ấy nữa. Điểm đến khai khác tên thì vẫn hiện bình thường. */
+/* TR-7c · 13/11/2026 — DỮ LIỆU CÓ CẤU TRÚC (JSON-LD) CHO TRANG TOUR.
+   Đo trên bản chạy thật 13/11: trang có ĐÚNG 0 thẻ `application/ld+json`. Nghĩa là trong kết quả
+   tìm kiếm Google, tour của Vietourist chỉ là một dòng chữ xanh — không giá, không sao, không
+   ngày khởi hành — trong khi đối thủ nào khai đúng thì được hiện đủ. Đây là kênh đang mất trắng.
+
+   BA ĐIỀU ÉP, vì khai sai ở đây KHÔNG phải lỗi nhỏ: Google phạt trang khai dữ liệu không khớp
+   những gì người dùng nhìn thấy, và hình phạt là gỡ toàn bộ kết quả giàu của cả tên miền.
+    (1) CHỈ KHAI SAO KHI CÓ ĐÁNH GIÁ THẬT. Sổ đánh giá (TR-6) bắt đầu từ 0 vì phạm vi đồng ý cũ
+        không cho đăng ra ngoài. Không có đánh giá thì KHÔNG có `aggregateRating` — thà không có
+        sao còn hơn có sao bịa.
+    (2) CHỈ KHAI GIÁ KHI LÀ GIÁ ĐẶT ĐƯỢC. Tour chưa có lịch chỉ có «giá tham khảo theo bảng giá
+        trên web»; khai nó thành `offers.price` là hứa một mức giá khách bấm vào không mua được.
+    (3) SỐ KHAI PHẢI BẰNG SỐ TRÊN MÀN. Cùng `sp.gia_tu` mà thẻ giá đang hiện, không tính lại. */
+function jsonLd(sp: any, dg: any) {
+  const o: any = {
+    "@context": "https://schema.org", "@type": "Product",
+    name: sp.ten, sku: sp.ma,
+    brand: { "@type": "Brand", name: "Vietourist" },
+    ...(sp.anh?.length ? { image: sp.anh.slice(0, 10) } : {}),
+    ...(sp.noi_bat?.length ? { description: sp.noi_bat.join(" · ").slice(0, 300) } : {}),
+  };
+  if (typeof window !== "undefined") o.url = window.location.href;
+  if (sp.gia_tu) {                                   // (2) chỉ giá đặt được mới thành chào bán
+    o.offers = {
+      "@type": "Offer", price: String(sp.gia_tu), priceCurrency: "VND",
+      availability: "https://schema.org/InStock",
+      ...(o.url ? { url: o.url } : {}),
+    };
+  }
+  if (dg && dg.so_danh_gia > 0 && dg.diem_tb != null) {   // (1) không có đánh giá thì không có sao
+    o.aggregateRating = { "@type": "AggregateRating", ratingValue: String(dg.diem_tb),
+                          reviewCount: dg.so_danh_gia, bestRating: "5", worstRating: "1" };
+  }
+  return o;
+}
+
+const boDau = (s: string) => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "")
+  .replace(/đ/gi, "d").replace(/[^a-z0-9]+/gi, " ").trim().toLowerCase();
+const trungTen = (ten: string, diemDen: string) => {
+  const a = boDau(ten), b = boDau(diemDen);
+  return !b || a === b || a.includes(b);
+};
 const UD: [string, string, (s: any) => boolean][] = [["km", "Khuyến mại", (s) => s.khuyen_mai], ["gc", "Giờ chót", (s) => s.gio_chot], ["it", "Còn ít chỗ", (s) => s.it_cho]];
 
 function nhanh(k: string, homNay: string): [string, string] {
@@ -139,6 +187,11 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
   const [popKhach, setPopKhach] = useState(false);
   const [sp, setSp] = useState<any>(null);
   const [lt, setLt] = useState<any>(null);
+  // TR-6 · 13/11/2026 — đánh giá của tour đang xem. `null` là CHƯA ĐỌC XONG, khác hẳn
+  // `{so_danh_gia: 0}` là ĐÃ ĐỌC và chưa có đánh giá nào. Hai trạng thái ấy hiện ra màn hình
+  // bằng hai câu khác nhau; trộn làm một là nói với khách «tour này chưa ai đánh giá» trong khi
+  // thật ra mới chỉ là chưa tải xong.
+  const [dg, setDg] = useState<any>(null);
   const [chon, setChon] = useState<number | null>(null);
   const [buoc, setBuoc] = useState<"ds" | "sp" | "dat" | "doan" | "da_gui" | "don">(moDon ? "don" : "ds");
   const [don, setDon] = useState(moDon || "");
@@ -161,11 +214,44 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
     try {
       const o = await goiCong(`/mo/tour-online/san-pham/${id}?nguoi_lon=${q.nl}&tre_em=${q.te}`);
       setSp(o); setLt(o.lich_trinh); setBuoc("sp"); len(); datDuong(duongRieng("tours", id));
+      // TR-6 · đọc đánh giá SAU và RIÊNG, không chờ: cửa đánh giá hỏng hay chậm thì trang tour
+      // vẫn mở bình thường — khách vào đây để xem tour, không phải để xem đánh giá.
+      setDg(null);
+      goiCong(`/mo/tour-online/san-pham/${id}/danh-gia`).then(setDg).catch(() => setDg({ loi: true }));
       if (o.chua_co_lich) setYc((y: any) => ({ ...y, so_khach: Math.max(1, q.nl + q.te), tu: q.tu || y.tu, den: q.den || y.den }));   // TR-3
       const dau = (o.chuyen || []).find((c: any) => c.du_cho && (!q.tu || c.khoi_hanh >= q.tu) && (!q.den || c.khoi_hanh <= q.den));
       setChon(dau ? dau.tour_id : null);
     } catch (x: any) { setLoi(x.message); } finally { setBusy(false); }
   };
+
+  /** TR-6 · 13/11/2026 — THẺ TOUR LÀ LIÊN KẾT THẬT, không còn là nút.
+   *
+   *  VÌ SAO. `moSp()` CÓ đặt địa chỉ (`datDuong`), nhưng chỉ SAU khi đã mở tour — nên đứng ở
+   *  danh sách thì không có gì để sao chép, không bấm chuột giữa được, và Ctrl+bấm không mở
+   *  được tab mới. Trên một trang bán hàng, «mở ba tour ra ba tab rồi so» là thói quen rất
+   *  thường của người sắp tiêu vài triệu.
+   *
+   *  CÁCH MỞ KHÔNG ĐỔI MỘT LI. Vẫn `moSp()`, vẫn không tải lại cả trang. Thẻ <a> chỉ thêm một
+   *  địa chỉ thật vào thứ vốn đã có địa chỉ.
+   *
+   *  NHƯỜNG LẠI khi khách giữ Ctrl / Cmd / Shift / Alt, hoặc bấm nút chuột khác nút trái: đó
+   *  đúng là lúc khách CỐ Ý muốn hành vi gốc của trình duyệt. Chặn nó là lấy mất một thói quen
+   *  người ta dùng hằng ngày — và đó chính là lỗi mà đợt này sửa.
+   *
+   *  KIỂU DÁNG ĐỂ THẲNG TRONG `style`, KHÔNG THÊM VÀO `globals.css`: ba lớp `ksv-phbtn`,
+   *  `ksv-ten`, `ksv-btn` vốn viết cho thẻ <button>, mà <a> không mang kiểu mặc định của nút.
+   *  Ba dòng dưới trả lại đúng ba thứ <button> có sẵn mà <a> không có.
+   */
+  const moLk = (id: number) => ({
+    href: duongRieng("tours", id),
+    onClick: (e: any) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || (e.button ?? 0) !== 0) return;
+      e.preventDefault();
+      moSp(id);
+    },
+  });
+  const KIEU_LK = { textDecoration: "none", color: "inherit", cursor: "pointer" } as const;
+
   useEffect(() => {
     if (moDon) return;
     // P0-06: vừa đăng nhập giữa chừng → trả lại tìm kiếm, tour đang xem, ngày khởi hành, số khách; màn tự thiết kế tự đọc bản của nó.
@@ -218,9 +304,14 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
   const nhom = (tieuDe: string, muc: [string, string, (s: any) => boolean][], khoa: "loai" | "tl" | "gia" | "ud" | "pt", du = false,
                 them?: ReactNode) => {
     const co = du ? muc : muc.filter(([, , f]) => dem(f, khoa) > 0);
+    // TR-6 · 13/11/2026 — `aria-label` ở ô bên dưới là GIA CỐ, không phải sửa lỗi: ô vốn đã nằm
+    // trong <label> kèm chữ nên trình đọc màn hình đọc được. Thêm vào để tên ô mang luôn NHÓM
+    // của nó («Thời lượng: 2–3 ngày» thay vì trơ trọi «2–3 ngày») — sáu nhóm lọc dùng những chữ
+    // ngắn giống nhau, nghe rời ra thì không biết mình đang tích ở nhóm nào.
     return (co.length > 0 || !!them) && <div className="ksv-panel"><b>{tieuDe}</b>{co.map(([m, t, f]) =>
       <label key={khoa + m} className="ksv-chk" style={dem(f, khoa) === 0 ? { opacity: 0.55 } : undefined}><input type="checkbox" checked={(loc[khoa] as string[]).includes(m)}
         disabled={dem(f, khoa) === 0 && !(loc[khoa] as string[]).includes(m)}
+        aria-label={`${tieuDe}: ${t}`}
         onChange={(e) => setLoc({ ...loc, [khoa]: bat(loc[khoa] as string[], m, e.target.checked) })} /><span>{t}</span><small>{dem(f, khoa)}</small></label>)}{them}</div>;
   };
 
@@ -279,8 +370,20 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
         <input value={q.q} onChange={(e) => setQ({ ...q, q: e.target.value })} placeholder={q.tab === "nuoc_ngoai" ? "Nhật Bản, Hàn Quốc, Châu Âu…" : "Đà Lạt, Phú Quốc, Huế…"} aria-label="Điểm đến hoặc tên tour" /></span></label>
       <label className="ksv-sbox"><span style={{ flex: 1 }}><small>Khởi hành từ</small><select value={q.noi} onChange={(e) => setQ({ ...q, noi: e.target.value })} aria-label="Khởi hành từ">
         <option value="">Tất cả</option>{(ds?.noi_khoi_hanh || []).map((n: string) => <option key={n} value={n}>{n}</option>)}</select></span></label>
-      <div className="ksv-sbox ksv-dates"><label><small>Đi từ ngày</small><input type="date" value={q.tu} min={homNay} onChange={(e) => setQ({ ...q, tu: e.target.value })} aria-label="Đi từ ngày" /></label>
-        <label><small>Đến ngày</small><input type="date" value={q.den} min={q.tu || homNay} onChange={(e) => setQ({ ...q, den: e.target.value })} aria-label="Đến ngày" /></label></div>
+      {/* TR-6 · 13/11/2026 — NGÀY ĐỌC ĐƯỢC BẰNG TIẾNG VIỆT.
+          GIỮ `<input type="date">`, không thay bằng lịch tự viết: ô gốc mở đúng bộ chọn ngày của
+          điện thoại, dùng được bằng bàn phím, và đọc được bằng trình đọc màn hình — một lịch tự
+          viết thường mất cả ba thứ ấy.
+          Chỗ hỏng không nằm ở ô, mà ở CHỮ: ô gốc hiện ngày theo ngôn ngữ của TRÌNH DUYỆT, nên
+          máy để tiếng Anh in ra `mm/dd/yyyy` ngay giữa một trang tiếng Việt — và 03/04 là ngày 3
+          tháng 4 hay ngày 4 tháng 3 thì khách không đoán được, mà đoán sai là đi sai ngày.
+          Nên: ô giữ nguyên, và BÊN DƯỚI in lại ngày đã chọn bằng dd/mm/yyyy. Khách luôn có một
+          chỗ đọc được, dù trình duyệt của họ đặt tiếng gì. `ngayVn()` đã có sẵn trong tệp này. */}
+      <div className="ksv-sbox ksv-dates">
+        <label><small>Đi từ ngày{q.tu ? <> · <b>{ngayVn(q.tu)}</b></> : " (ngày/tháng/năm)"}</small>
+          <input type="date" value={q.tu} min={homNay} onChange={(e) => setQ({ ...q, tu: e.target.value })} aria-label="Đi từ ngày" /></label>
+        <label><small>Đến ngày{q.den ? <> · <b>{ngayVn(q.den)}</b></> : " (ngày/tháng/năm)"}</small>
+          <input type="date" value={q.den} min={q.tu || homNay} onChange={(e) => setQ({ ...q, den: e.target.value })} aria-label="Đến ngày" /></label></div>
       <div className="ksv-sbox" style={{ position: "relative" }}><button type="button" className="ksv-khach" aria-expanded={popKhach} onClick={() => setPopKhach(!popKhach)}><small>Khách</small><b>{soKhach}</b></button>
         {popKhach && <div className="ksv-pop" role="dialog" aria-label="Chọn số khách">{([["nl", "Người lớn", "từ 12 tuổi", 1], ["te", "Trẻ em", "2–11 tuổi", 0], ["eb", "Em bé", "dưới 2 tuổi", 0]] as [keyof Q, string, string, number][]).map(([k, t, m, min]) =>
           <div key={k} className="ksv-step"><span><b>{t}</b><br /><small className="ksv-muted">{m}</small></span><div>
@@ -390,7 +493,10 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
     const doan = sp.loai === "doan" || !!sp.chua_co_lich;
     const keo = (id: string) => (e: React.MouseEvent) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }); };
     const ngayLt: any[] = lt?.ngay || [];
-    return <div className="ksv tra">{css}{thanhTim(true)}
+    return <div className="ksv tra">{css}
+      {/* TR-7c: khai cho máy tìm kiếm ĐÚNG những gì màn hình đang hiện — xem jsonLd() ở đầu tệp. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd(sp, dg)) }} />
+      {thanhTim(true)}
       <button type="button" className="ksv-link" onClick={veDs}>← {q.tab === "nuoc_ngoai" ? "Tour nước ngoài" : "Tour trong nước"}</button>
       <div className="ksv-gal tra-gal">{anh.length ? anh.slice(0, 5).map((a, i) => <span key={a}><img src={a} alt={`${sp.ten} — ảnh ${i + 1}`} loading={i ? "lazy" : "eager"} referrerPolicy="no-referrer" /></span>)
         : <span style={{ gridColumn: "1 / -1", gridRow: "1 / 3" }}><AnhTrong ten={sp.ten} cao={300} /></span>}</div>
@@ -411,7 +517,13 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
           : sp.chua_co_lich ? (sp.gia_tham_khao ? <><span className="ksv-muted">Giá tham khảo từ</span><b className="ksv-big">₫ {vnd(sp.gia_tham_khao)}</b>
             <span className="ksv-muted">/ người lớn — theo bảng giá trên web; Sales báo giá chính xác theo ngày bạn chọn</span></> : <span className="ksv-muted">Giá liên hệ — Sales báo giá theo ngày bạn chọn.</span>)
           : <span className="ksv-muted">Báo giá theo hành trình và số khách.</span>}
-          {sp.link_web && <a className="ksv-link" href={sp.link_web} target="_blank" rel="noopener noreferrer">Xem trang tour trên vietourist.com.vn ↗</a>}</div>
+          {/* TR-6 · 13/11/2026 — HẠ CẤP, KHÔNG XOÁ.
+              Liên kết này đứng ngay cạnh giá, tức đúng chỗ khách đang quyết định mua, và nó
+              đưa khách RỜI cổng sang trang cũ — nơi không có nút đặt nào của VTOS. Đẩy khách ra
+              ở đúng giây ấy là tự đánh rơi đơn.
+              KHÔNG xoá hẳn, vì nội dung trang này ĐỌC TỪ trang ấy (Chủ tịch chốt 12/11/2026 giữ
+              nguyên cách đọc); giấu nguồn đi thì khách không còn đường đối chiếu. Nên nó lùi
+              xuống cuối phần nội dung, cạnh dòng ghi giờ đọc — xem mục «Nội dung đọc từ…». */}</div>
       </div>
 
       {doan ? formDoan : <section className="ksv-panel" id="tra-ngay" style={{ padding: 20 }}><div className="ksv-rhead"><h2 style={{ margin: 0, fontSize: 22 }}>Chọn ngày khởi hành</h2>
@@ -440,13 +552,51 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
         <div className="ksv-panel"><b>Giá không bao gồm</b>{sp.khong_bao_gom?.length ? <ul className="tra-ko">{sp.khong_bao_gom.map((x: string, i: number) => <li key={i}>{x}</li>)}</ul>
           : <span className="ksv-muted">Chi phí cá nhân và dịch vụ ngoài chương trình.</span>}</div>
       </section>
+      {/* ══ TR-6 · 13/11/2026 · ĐÁNH GIÁ CỦA KHÁCH ĐÃ ĐI ══════════════════════════════════════
+          BA TRẠNG THÁI, BA CÂU KHÁC NHAU — không gộp:
+            · `dg === null`      → đang đọc. KHÔNG in «chưa có đánh giá», vì chưa biết.
+            · `dg.loi`           → đọc hỏng. Im lặng: thiếu khối đánh giá không làm hỏng trang
+                                   bán tour, mà báo lỗi đỏ giữa trang thì làm.
+            · `so_danh_gia === 0` → đã đọc, thật sự chưa có. Nói thẳng là chưa có.
+          KHÔNG BAO GIỜ in «0/5». Tour mới mở mà hiện 0 sao thì thà đừng hiện gì — số ấy đúng về
+          phép tính nhưng sai về điều nó nói với khách.
+          Sổ bắt đầu từ 0 là có chủ ý: đánh giá thu trước 13/11/2026 mang phạm vi đồng ý cũ («hồ
+          sơ hướng dẫn viên tại VTOS») nên không được hiện ở đây. Xem `dong_y.py`. */}
+      {dg && !dg.loi && (
+        <section className="ksv-panel" style={{ padding: 20 }}>
+          <h2 style={{ margin: 0, fontSize: 20 }}>Khách đã đi nói gì</h2>
+          {dg.so_danh_gia > 0 ? <>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+              <b style={{ fontSize: 30, lineHeight: 1.1 }}>{dg.diem_tb}</b>
+              <span className="ksv-muted">/ 5 · {dg.so_danh_gia} khách đã chấm</span>
+            </div>
+            {dg.nhan_xet?.length > 0 ? <div style={{ display: "grid", gap: 12, marginTop: 14 }}>
+              {dg.nhan_xet.map((n: any, i: number) =>
+                <blockquote key={i} style={{ margin: 0, paddingLeft: 12, borderLeft: "3px solid #dce4ef" }}>
+                  <p style={{ margin: 0, lineHeight: 1.6 }}>{n.noi_dung}</p>
+                  <small className="ksv-muted">{n.diem != null ? `${n.diem}/5 · ` : ""}{n.thang || ""}</small>
+                </blockquote>)}
+            </div> : <small className="ksv-muted" style={{ display: "block", marginTop: 10 }}>
+              Khách đã chấm điểm nhưng chưa ai để lại nhận xét bằng chữ.</small>}
+            <small className="ksv-muted" style={{ display: "block", marginTop: 14 }}>
+              Chỉ hiện điểm do chính khách chấm sau chuyến đi, và chỉ những nhận xét khách đã đồng ý
+              đăng công khai. Không kèm tên và thông tin liên hệ của khách.</small>
+          </> : <p className="ksv-muted" style={{ margin: "8px 0 0" }}>
+            Tour này chưa có đánh giá nào được đăng công khai. Vietourist chỉ đăng nhận xét của khách
+            đã thật sự đi tour và đã đồng ý cho đăng — nên mục này đầy dần theo từng đoàn, không mua được.</p>}
+        </section>)}
       {sp.bang_gia_web?.length > 0 && <section className="ksv-panel"><b>Bảng giá theo đối tượng (trang tour)</b>{sp.bang_gia_web.map((b: any, i: number) =>
         <div key={i} className="ksv-sum"><span>{b.doi_tuong}</span><span>{b.gia ? `₫ ${vnd(b.gia)}` : b.ghi || "—"}</span></div>)}
         <small className="ksv-muted">Giá đặt online theo từng ngày khởi hành ở trên.</small></section>}
       <section className="ksv-panel" id="tra-cs" style={{ padding: 20 }}><h2 style={{ margin: 0, fontSize: 20 }}>Chính sách</h2>
         {!doan && <span>Đặt cọc {sp.coc_pt}% để giữ chỗ; phần còn lại trả trước ngày khởi hành {sp.dong_so_truoc} ngày (17:00). Đặt sau hạn đó: thanh toán toàn bộ.</span>}
         {sp.quy_dinh ? <p style={{ whiteSpace: "pre-line", margin: 0, lineHeight: 1.6 }}>{sp.quy_dinh}</p> : <span className="ksv-muted">Điều kiện hủy gửi kèm xác nhận đặt tour.</span>}
-        {sp.web_cap_nhat && <small className="ksv-muted">Nội dung đọc từ vietourist.com.vn lúc {sp.web_cap_nhat.replace("T", " ").slice(0, 16)}.</small>}</section>
+        {/* TR-6 · 13/11/2026 — liên kết nguồn về ĐÂY, cuối trang, cạnh dòng ghi giờ đọc. Trước
+            đợt này nó đứng cạnh giá và đẩy khách rời cổng đúng lúc đang quyết định mua. Ở đây nó
+            làm đúng việc của nó: cho khách đối chiếu nguồn, sau khi đã đọc xong chương trình. */}
+        {sp.web_cap_nhat && <small className="ksv-muted">Nội dung đọc từ vietourist.com.vn lúc {sp.web_cap_nhat.replace("T", " ").slice(0, 16)}.
+          {sp.link_web && <> <a className="ksv-link" href={sp.link_web} target="_blank" rel="noopener noreferrer">Đối chiếu trang gốc ↗</a></>}</small>}
+        {!sp.web_cap_nhat && sp.link_web && <small className="ksv-muted"><a className="ksv-link" href={sp.link_web} target="_blank" rel="noopener noreferrer">Đối chiếu trang gốc ↗</a></small>}</section>
     </div>;
   }
 
@@ -479,23 +629,46 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
               <option value="ngan">Ngắn ngày trước</option><option value="dai">Dài ngày trước</option></select></span></div>
         <section className="ksv-panel tra-doan-dt"><b>Tour đoàn theo yêu cầu</b><span className="ksv-muted">Gia đình, doanh nghiệp, hội nhóm — tự chọn điểm đến, khách sạn, bữa ăn, phương tiện và xem giá tạm tính ngay.</span>
           <button type="button" className="ksv-btn line" style={{ alignSelf: "flex-start" }} onClick={moDoan}>Tự thiết kế tour đoàn</button></section>
-        {kq.map((s: any) => <article key={s.id} className="ksv-card">
-          {(s.gio_chot || s.khuyen_mai) && <div className="ksv-bar"><span>{s.gio_chot ? "Giờ chót — khởi hành trong vài ngày tới" : "Đang khuyến mại"}</span>{s.it_cho && <em>Còn ít chỗ</em>}</div>}
+        {kq.map((s: any) => <article key={s.id} className="ksv-card tra-the">
+          {/* TR-7: nhãn giờ chót nói ĐÍCH DANH ngày khởi hành gần nhất. Chuẩn quốc tế: khan hiếm
+              phải CỤ THỂ mới đáng tin — «khởi hành 14/11» kiểm chứng được, «trong vài ngày tới»
+              thì không. Vẫn dùng chung đúng một trường `s.gio_chot` với ô lọc (KS-72 mục 1). */}
+          {(s.gio_chot || s.khuyen_mai) && <div className="ksv-bar"><span>{s.gio_chot
+            ? (s.khoi_hanh_gan?.[0] ? `Giờ chót — khởi hành ${ngayDep(s.khoi_hanh_gan[0])}` : "Giờ chót — khởi hành trong vài ngày tới")
+            : "Đang khuyến mại"}</span>{s.it_cho && <em>Còn ít chỗ</em>}</div>}
           <div className="ksv-crow">
-            <div className="ksv-ph"><button type="button" className="ksv-phbtn" onClick={() => moSp(s.id)} aria-label={`Xem ${s.ten}`}>
-              {s.anh?.[0] ? <img src={s.anh[0]} alt={s.ten} loading="lazy" referrerPolicy="no-referrer" /> : <AnhTrong ten={s.ten} />}</button>
-              {s.anh?.length > 1 && <span className="ksv-ct">{s.anh.length} ảnh</span>}</div>
-            <div className="ksv-info"><h3><button type="button" className="ksv-ten" onClick={() => moSp(s.id)}>{s.ten}</button></h3>
-              <span className="ksv-muted" style={{ fontSize: 13 }}>{s.ma} · {s.thoi_luong}{s.noi_khoi_hanh ? ` · khởi hành ${s.noi_khoi_hanh}` : ""}{s.phuong_tien?.length ? ` · ${s.phuong_tien.map((p: string) => PT[p] || p).join(", ")}` : ""}</span>
-              <div className="ksv-feat sm"><span>{s.loai_ten}</span>{s.wellness && <span>Wellness</span>}{s.diem_den && <span>{s.diem_den}</span>}{s.chua_co_lich && <span>Lịch khởi hành đang cập nhật</span>}</div>
+            <div className="ksv-ph"><a className="ksv-phbtn" {...moLk(s.id)} style={{ ...KIEU_LK, display: "block" }} aria-label={`Xem ${s.ten}`}>
+              {s.anh?.[0] ? <img src={s.anh[0]} alt={s.ten} loading="lazy" referrerPolicy="no-referrer" /> : <AnhTrong ten={s.ten} />}</a>
+              {s.anh?.length > 1 && <span className="ksv-ct">{s.anh.length} ảnh</span>}
+              {/* TR-7: trên điện thoại, «Wellness» chuyển lên góc ảnh và hàng ô nhỏ bị ẩn —
+                  xem `.tra-dt-only` ở cuối tệp. Trên máy tính thẻ này ẩn, hàng ô giữ nguyên. */}
+              {s.wellness && <span className="ksv-ct tra-well-b tra-dt-only">Wellness</span>}</div>
+            <div className="ksv-info"><h3><a className="ksv-ten" {...moLk(s.id)} style={KIEU_LK}>{s.ten}</a></h3>
+              <span className="ksv-muted tra-mt-only" style={{ fontSize: 13 }}>{s.ma} · {s.thoi_luong}{s.noi_khoi_hanh ? ` · khởi hành ${s.noi_khoi_hanh}` : ""}{s.phuong_tien?.length ? ` · ${s.phuong_tien.map((p: string) => PT[p] || p).join(", ")}` : ""}</span>
+              <div className="ksv-feat sm tra-mt-only"><span>{s.loai_ten}</span>{s.wellness && <span>Wellness</span>}{s.diem_den && !trungTen(s.ten, s.diem_den) && <span>{s.diem_den}</span>}{s.chua_co_lich && <span>Lịch khởi hành đang cập nhật</span>}</div>
+              {/* TR-7: bản GỘP cho điện thoại — dòng mô tả và hàng ô nhỏ nhập làm MỘT dòng
+                  («TL001 · 2N1Đ · TP HCM · Ô tô · Tour ghép»), đúng bản Chủ tịch duyệt 13/11.
+                  Hai dòng + một hàng ô cao 23px gộp lại còn một dòng 18px: bớt 44px mỗi thẻ.
+                  Đúng MỘT trong hai bản hiện ra, không bao giờ cả hai — xem `tra-mt-only`. */}
+              <span className="ksv-muted tra-dt-only tra-m1" style={{ fontSize: 12.5 }}>{[s.ma, s.thoi_luong,
+                s.noi_khoi_hanh, s.phuong_tien?.length ? s.phuong_tien.map((p: string) => PT[p] || p).join(", ") : null,
+                s.loai_ten, s.diem_den && !trungTen(s.ten, s.diem_den) ? s.diem_den : null,
+                s.chua_co_lich ? "Lịch khởi hành đang cập nhật" : null].filter(Boolean).join(" · ")}</span>
               {s.noi_bat?.length > 0 && <span className="ksv-hl">{s.noi_bat.slice(0, 3).join(" · ")}</span>}
               {s.khoi_hanh_gan?.length > 0 && <span className="ksv-where" style={{ fontSize: 13 }}>{s.so_chuyen} ngày khởi hành · gần nhất {s.khoi_hanh_gan.slice(0, 3).map((k: string) => ngayDep(k)).join(", ")}</span>}</div>
-            <div className="ksv-side">{s.gia_tu ? <><small className="ksv-muted">Từ</small>{s.gia_goc && <span className="ksv-old">₫ {vnd(s.gia_goc)}</span>}
+            {/* TR-7: khối giá bọc trong `tra-gia` để trên điện thoại GIÁ và NÚT nằm CÙNG một
+                hàng (bỏ được ba dòng xếp dọc). Trên máy tính không đổi gì — `tra-gia` chỉ là
+                một khối dọc bình thường, mọi luật mới nằm trong @media (max-width:900px). */}
+            <div className="ksv-side"><span className="tra-gia">{s.gia_tu ? <><small className="ksv-muted">Từ</small>{s.gia_goc && <span className="ksv-old">₫ {vnd(s.gia_goc)}</span>}
               <b className="ksv-big">₫ {vnd(s.gia_tu)}</b><small className="ksv-muted">/ khách{s.gia_tre_em && s.gia_tre_em !== s.gia_tu ? ` · trẻ em ₫ ${vnd(s.gia_tre_em)}` : ""}</small></>
               : s.chua_co_lich ? (s.gia_tham_khao ? <><small className="ksv-muted">Giá tham khảo từ</small><b className="ksv-big">₫ {vnd(s.gia_tham_khao)}</b><small className="ksv-muted">theo bảng giá trên web</small></>
                 : <span className="ksv-muted">Giá liên hệ</span>)
-              : <span className="ksv-muted">{s.loai === "doan" ? "Báo giá theo yêu cầu" : "Hết chỗ cho số khách đã chọn"}</span>}
-              <button type="button" className="ksv-btn wide" onClick={() => moSp(s.id)}>{s.loai === "doan" || s.chua_co_lich ? "Xem & gửi yêu cầu" : "Xem ngày đi"}</button></div>
+              : <span className="ksv-muted">{s.loai === "doan" ? "Báo giá theo yêu cầu" : "Hết chỗ cho số khách đã chọn"}</span>}</span>
+              {/* KHÔNG dùng `KIEU_LK` cho nút này: `color:inherit` sẽ ĐÈ màu chữ trắng mà lớp
+                  `.ksv-btn` đặt cho nền navy, và nút thành chữ sẫm trên nền sẫm. Chỉ bỏ gạch
+                  chân và trả lại cách căn giữa mà <button> có sẵn còn <a> thì không. */}
+              <a className="ksv-btn wide" {...moLk(s.id)}
+                 style={{ textDecoration: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}>{s.loai === "doan" || s.chua_co_lich ? "Xem & gửi yêu cầu" : "Xem ngày đi"}</a></div>
           </div></article>)}
         {ds && !kq.length && <section className="ksv-panel"><span>Không có tour khớp. Thử bỏ bớt bộ lọc, đổi khoảng ngày, hoặc gửi yêu cầu thiết kế tour riêng.</span></section>}
       </div>
@@ -554,4 +727,50 @@ const CSS = `
 @media (max-width:1100px){.tra-sbar{grid-template-columns:1fr 1fr}.tra-sbar .ksv-btn-tim{grid-column:span 2}}
 @media (max-width:900px){.tra-gal{grid-template-columns:1fr 1fr;grid-template-rows:200px 110px}.tra-gal>span:first-child{grid-column:1 / -1;grid-row:auto}.tra-gal>span:nth-child(n+4){display:none}}
 @media (max-width:640px){.tra-sbar{grid-template-columns:1fr}.tra-sbar .ksv-btn-tim{grid-column:auto}.tra-k4{grid-template-columns:1fr 1fr}.tra-ht{font-size:18px}}
+
+/* ── TR-7 · 13/11/2026 — THẺ TOUR TRÊN ĐIỆN THOẠI (Chủ tịch duyệt bản xem thử 13/11) ─────────
+   ĐO ĐƯỢC trên kh.vietourist.vn/tours, khung nhìn 390px, 85 thẻ:
+     thẻ trung vị 534px · thẻ cao nhất 726px · cả trang 50.455px = 67 màn phải cuộn.
+   Một thẻ cao 534px trên màn 844px nghĩa là khách thấy 1,5 tour mỗi màn. Các sàn quốc tế để
+   thẻ 260–340px. Đây là khoảng cách lớn nhất của cổng trên điện thoại — không phải thiếu
+   tính năng, mà là mỗi tour chiếm quá nhiều chỗ.
+
+   Bốn chỗ cắt, và số đo của từng chỗ trên thẻ trung vị:
+     · băng «Giờ chót» (29px) → đè lên ảnh, không ăn một hàng riêng nữa.
+     · ảnh 200px → dải 16:9 (≈179px ở bề ngang 318px), đúng tỷ lệ các sàn dùng.
+     · khối chữ 148px → ≈105px: tên tour tối đa 2 dòng, dòng ngày khởi hành gói trong 1 dòng,
+       đệm 14→11px. Tour tên dài không đẩy thẻ cao lên nữa.
+     · khối giá 155px → ≈72px: giá và nút về CÙNG một hàng thay vì bốn dòng xếp dọc.
+
+   MỌI LUẬT Ở ĐÂY NẰM TRONG «.tra-the». Lớp «.ksv-card» dùng chung với cổng khách sạn và cổng
+   nhà hàng; sửa thẳng vào «.ksv-*» là đổi luôn hai cổng kia mà không ai yêu cầu. Máy tính để
+   bàn cũng không đổi một pixel — tất cả nằm dưới @media (max-width:900px). */
+.tra-the .tra-dt-only{display:none}                     /* chỉ hiện trên điện thoại */
+@media (max-width:900px){
+  .tra-the .tra-dt-only{display:block}
+  .tra-the .ksv-ct.tra-well-b{left:auto;right:10px;bottom:auto;top:10px;
+    background:rgba(255,255,255,.94);color:#117a52;border-radius:99px;font-weight:700}
+  .tra-the .tra-mt-only{display:none}
+  .tra-the .tra-m1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tra-the{position:relative}
+  .tra-the .ksv-bar{position:absolute;left:0;top:10px;z-index:2;width:auto;max-width:76%;
+    padding:4px 10px;border-radius:0 6px 6px 0;background:#FEF3C7;color:#8A4B08;font-weight:700;
+    box-shadow:0 1px 3px rgba(0,0,0,.18)}
+  .tra-the .ksv-bar span{flex:0 1 auto;min-width:0}
+  .tra-the .ksv-bar em{background:#fff;color:#8A4B08}
+  .tra-the .ksv-ph{aspect-ratio:16 / 9}
+  .tra-the .ksv-ph img,.tra-the .ksv-trong{min-height:0;height:100%}
+  .tra-the .ksv-info{padding:11px 13px 0;gap:4px}
+  .tra-the .ksv-info h3{font-size:16px;line-height:1.3;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .tra-the .ksv-hl{display:none}                       /* điểm nổi bật: để dành trang chi tiết */
+  .tra-the .ksv-where{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tra-the .ksv-side{flex-direction:row;align-items:flex-end;justify-content:space-between;
+    gap:10px;border-top:0;padding:9px 13px 12px;margin-top:9px;
+    border-image:linear-gradient(to right,var(--ksv-line),var(--ksv-line)) 1;
+    box-shadow:inset 0 1px 0 var(--ksv-line)}
+  .tra-the .tra-gia{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+  .tra-the .ksv-big{font-size:21px}
+  .tra-the .ksv-side .ksv-btn{margin-top:0;width:auto;flex:0 0 auto;padding:0 16px;font-size:14.5px}
+}
 `;
