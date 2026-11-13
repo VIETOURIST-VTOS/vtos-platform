@@ -50,12 +50,18 @@ def _doanh_thu_tinh_chi_tieu(db: Session, ky: str, ids: list[int]):
 
 
 def doi_chieu_chu_tich(db: Session, d: date) -> dict:
-    """R5-9 · Số Lẻ trên màn Chủ tịch (khối «Doanh thu theo phòng») — đặt cạnh để đối chiếu. Đọc ĐÚNG
-    `dashboard.doanh_thu_phong`, không tính lại. Cơ sở: doanh thu chuyến, khác cơ sở chỉ tiêu (giá trị booking)."""
+    """R5-9 · Số Lẻ trên màn Chủ tịch (khối «Doanh thu theo phòng») — đặt cạnh để đối chiếu. Cơ sở: doanh
+    thu chuyến, khác cơ sở chỉ tiêu (giá trị booking).
+
+    R5-21 (Chủ tịch 14/11/2026 «load rất chậm»: bàn TP chờ 43 giây trên crm): bản trước gọi cả
+    `dashboard.doanh_thu_phong` — hàm ấy tính thêm LUỸ KẾ NĂM, tức `ket_qua_that.thang` cho từng tháng từ
+    đầu năm — chỉ để lấy MỘT ô của tháng này, và bàn TP gọi hai lần (≈ 24 lượt tính một tháng). Nay đọc
+    thẳng `ket_qua_that.thang` của tháng này: đúng dòng `thang_nay[...]` mà `doanh_thu_phong` dùng cho ô
+    «tháng», nên số không đổi — chỉ bỏ phần năm không ai đọc."""
     try:
-        from app.services import dashboard as DB
-        le = DB.doanh_thu_phong(db, d)["le"]
-        return {"thang": le.get("thang"), "chuyen_thang": le.get("chuyen_thang"),
+        from app.services import ket_qua_that as KQT
+        le = KQT.thang(db, f"{d:%Y-%m}")["theo_mang"]["le"]
+        return {"thang": le.get("doanh_thu"), "chuyen_thang": le.get("chuyen"),
                 "co_so": "Doanh thu chuyến — khối «Doanh thu theo phòng» trên màn Chủ tịch / TGĐ"}
     except Exception:  # noqa: BLE001
         return {"thang": None, "chuyen_thang": None, "co_so": ""}

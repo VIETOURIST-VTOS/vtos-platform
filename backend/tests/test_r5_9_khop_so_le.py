@@ -81,8 +81,10 @@ def test_man_chu_tich_xep_hang_le_doc_co_so_chi_tieu():
 def test_r5_10_tong_khop_ham_man_chu_tich():
     """R5-10 (Chủ tịch 13/11/2026 23:52): mọi ô có ở màn Chủ tịch đọc ĐÚNG hàm của màn Chủ tịch."""
     gd = (GOC / "backend/app/services/ban_kd_le.py").read_text(encoding="utf-8")
-    assert "DB.doanh_thu_phong(db, d)[\"le\"]" in gd                      # doanh thu chuyến Lẻ
+    # R5-21: đọc thẳng dòng tháng của `ket_qua_that.thang` — đúng dòng `doanh_thu_phong` dùng cho ô tháng;
+    # bằng số giữa hai đường canh ở test_r5_21_ban_tp_nhanh.
+    assert 'KQT.thang(db, f"{d:%Y-%m}")["theo_mang"]["le"]' in gd           # doanh thu chuyến Lẻ
     assert '"dang_ban": gd.get("dang_ban")' in gd                          # tour theo giai đoạn
     assert "float(bk.discount or 0)" in gd                                 # phải thu: − giảm giá như KPI
     vai = (GOC / "backend/app/services/ban_kd_vai.py").read_text(encoding="utf-8")
-    assert 'dt_pv = GD.doi_chieu_chu_tich(db, d)["thang"]' in vai and "GD.doanh_thu_le(db, nam)" in vai
+    assert 'doi_chieu = GD.doi_chieu_chu_tich(db, d)' in vai and 'dt_pv = doi_chieu["thang"]' in vai and "GD.doanh_thu_le(db, nam)" in vai
