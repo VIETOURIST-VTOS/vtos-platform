@@ -28,7 +28,7 @@ def test_sau_tab_v32_va_mo_trong_ban():
 
 def test_bang_chuyen_du_cot_va_gon():
     for chu in ("Hòa vốn", "Bán đủ khách", "còn thiếu", "Chi tiết →", 'className="vach"', "slice(0, 6)", "Xem thêm",
-                "datViecBan(", "HOẠT ĐỘNG TOUR LẺ", "Doanh thu – chỉ tiêu tour lẻ", "Phải thu khách hàng"):
+                "datViecBan(", "HOẠT ĐỘNG TOUR LẺ", "<KhoiNhipDoanhThu", "Phải thu khách hàng"):
         assert chu in BAN, chu
 
 

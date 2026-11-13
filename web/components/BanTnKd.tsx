@@ -1,5 +1,5 @@
 "use client";
-import BanKdKhung, { BangDoiNgu, BangThucBan, BieuDo12, KhoiPhaiThu, OSo, giaTriDt, so, type Tab } from "@/components/BanKdKhung";
+import BanKdKhung, { BangDoiNgu, BangThucBan, KhoiNhipDoanhThu, KhoiPhaiThu, OSo, giaTriDt, so, type Tab } from "@/components/BanKdKhung";
 
 /** R5-7 · BÀN LÀM VIỆC TRƯỞNG NHÓM KINH DOANH — Chủ tịch duyệt bản xem trước 13/11/2026.
  *  Số CỦA NHÓM; giữ ô «Doanh thu của tôi» vì trưởng nhóm vẫn đi bán (Chủ tịch: «giữ»). Đội ngũ = người
@@ -43,11 +43,11 @@ export default function BanTnKd() {
           <OSo nhan="Lead mới chưa liên hệ" nong v={d ? so(th.lead_moi?.so) : undefined} phu="Của người trong nhóm" lk="Lead" bam={() => moToi("/leads?tab=leads")} />
           <OSo nhan="Chăm sóc quá hạn" nong v={d ? so(th.cham_soc_qua_han?.so) : undefined} phu="Của người trong nhóm" lk="Chăm sóc" bam={() => moToi("/cham-soc")} />
         </div>
+        <KhoiNhipDoanhThu duong="/ban-kd-le/vai/nhip" coToi />
         <div className="g5-hai">
           <BangDoiNgu ds={d?.doi_ngu || []} don />
-          <BieuDo12 dt={dt} ten="Doanh thu – chỉ tiêu nhóm" />
+          <KhoiPhaiThu pt={d?.phai_thu} moToi={moToi} />
         </div>
-        <KhoiPhaiThu pt={d?.phai_thu} moToi={moToi} />
         <BangThucBan ds={d?.thuc_ban} moToi={moToi} />
       </>;
     }} />;

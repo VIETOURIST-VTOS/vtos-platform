@@ -48,7 +48,8 @@ function DatBaoNhieu({ lam, dich }: { lam: number; dich: number | undefined }) {
   return <span><b>{p}%</b> <small className="muted">/ {vnd(dich)}</small></span>;
 }
 
-export default function DoanhThuChiTieuKd() {
+/** `anNhip` (R5-12): trên bàn làm việc khối «Doanh thu – Chỉ tiêu» ở Tổng quan đã vẽ nhịp — không vẽ lặp. */
+export default function DoanhThuChiTieuKd({ anNhip = false }: { anNhip?: boolean } = {}) {
   const { user, toast } = useShell();
   const [ky, setKy] = useState(kyMacDinh());
   const [luong, setLuong] = useState("");
@@ -103,7 +104,7 @@ export default function DoanhThuChiTieuKd() {
   return (<>
     <h1>Kinh doanh {mang === "doan" ? "Đoàn" : "Lẻ"}</h1>
 
-    <NhipPhanDau d={nhip} />
+    {!anNhip && <NhipPhanDau d={nhip} />}
 
     <div className="panel">
       <div className="row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>

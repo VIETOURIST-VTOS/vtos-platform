@@ -1,5 +1,5 @@
 "use client";
-import BanKdKhung, { DoiNguVaNhom, BangThucBan, BieuDo12, KhoiPhaiThu, OSo, giaTriDt, so, tien, type Tab } from "@/components/BanKdKhung";
+import BanKdKhung, { DoiNguVaNhom, BangThucBan, KhoiNhipDoanhThu, KhoiPhaiThu, OSo, giaTriDt, so, tien, type Tab } from "@/components/BanKdKhung";
 
 /** R5-7 · BÀN LÀM VIỆC TRƯỞNG PHÒNG KINH DOANH LẺ — Chủ tịch duyệt bản xem trước 13/11/2026.
  *  Số CẢ PHÒNG (đơn vị được phân công và mọi đơn vị con); khối Đội ngũ xếp hạng từng người, khối Theo nhóm.
@@ -46,10 +46,8 @@ export default function BanTpKd() {
           <OSo nhan="Phải thu khách" v={d ? (th.phai_thu?.so == null ? null : tien(th.phai_thu.so)) : undefined} chua="—" phu={d ? `${so(th.phai_thu?.so_booking || 0)} booking lẻ còn nợ` : ""} lk="Booking còn nợ" bam={() => moToi("/bookings?mang=le")} />
         </div>
         <DoiNguVaNhom doi={d?.doi_ngu || []} nhom={d?.theo_nhom} dang={!d} />
-        <div className="g5-hai">
-          <BieuDo12 dt={dt} ten="Doanh thu – chỉ tiêu phòng" />
-          <KhoiPhaiThu pt={d?.phai_thu} moToi={moToi} />
-        </div>
+        <KhoiNhipDoanhThu duong="/ban-kd-le/vai/nhip" coToi />
+        <KhoiPhaiThu pt={d?.phai_thu} moToi={moToi} />
         <BangThucBan ds={d?.thuc_ban} moToi={moToi} />
       </>;
     }} />;

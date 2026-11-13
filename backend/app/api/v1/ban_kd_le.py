@@ -5,7 +5,7 @@ nhóm ấy cho mọi vai mở được màn mới.
 
 CHỈ ĐỌC. Bàn không có cửa ghi nào: mọi việc làm ở màn đang giữ nghiệp vụ, mở ngay trong bàn.
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
@@ -59,3 +59,25 @@ def vai_doanh_thu(nam: int = 0,
                   db: Session = Depends(get_db)):
     from datetime import date
     return VAI_S.doanh_thu_12(db, u, nam or date.today().year)
+
+
+# ─────────────── R5-12 · một khối Doanh thu – Chỉ tiêu kiểu đường lũy kế ───────────────
+@router.get("/nhip")
+def nhip_phong(ky: str = "thang", u: User = Depends(require_roles(*XEM, mo_ta="doanh thu – chỉ tiêu tour lẻ")),
+               db: Session = Depends(get_db)):
+    """Bàn GĐ KD: chỉ «Của phòng» (Chủ tịch chốt 14/11/2026)."""
+    try:
+        return VAI_S.nhip(db, u, "phong", ky)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.get("/vai/nhip")
+def vai_nhip(pham_vi: str = "phong", ky: str = "thang",
+             u: User = Depends(require_roles(*VAI_PHONG, mo_ta="doanh thu – chỉ tiêu trên bàn của tôi")),
+             db: Session = Depends(get_db)):
+    """Bàn TP / Trưởng nhóm / Chuyên viên: «Của phòng» hoặc «Của tôi» (chỉ chính người đăng nhập)."""
+    try:
+        return VAI_S.nhip(db, u, pham_vi, ky)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
