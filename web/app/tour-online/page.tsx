@@ -20,7 +20,13 @@ const VAI: Record<string, string> = { chutich: "Chủ tịch", tgd: "TGĐ", bks:
 function Trang() {
   const { toast } = useShell();
   const [x, setX] = useState<any>(null);
-  const [tab, setTab] = useState<"sp" | "web" | "don" | "mt">("sp");
+  const [tab, setTab] = useState<"sp" | "web" | "gy" | "don" | "mt">("sp");
+  // TR-11 (13/11/2026) · GỢI Ý THEO CHIỀU SẢN PHẨM → WEB.
+  // Tab «Tour trên web · ghép» đi chiều ngược lại: với mỗi tour web nó gợi ý một sản phẩm. Sản
+  // phẩm nào không phải «khớp nhất» của tour web nào thì không gợi ý nào trỏ tới — người ghép
+  // thấy nó ở mục «Chưa ghép web» nhưng phải TỰ DÒ trong 596 trang. Đo 13/11: 22 sản phẩm có
+  // chuyến đang mở bán mà chưa ghép link, nên cổng khách hiện chúng KHÔNG CÓ MỘT TẤM ẢNH NÀO.
+  const [gy, setGy] = useState<any>(null); const [gyDang, setGyDang] = useState(false);
   const [tim, setTim] = useState(""); const [loc, setLoc] = useState("");
   const [locLo, setLocLo] = useState<"co_chuyen" | "tat_ca">("co_chuyen");   // TR-6b · phạm vi bật / đóng hàng loạt
   // TR-9 (13/11/2026): hai ô nhập NGAY TRÊN TRANG, thay cho hộp thoại của trình duyệt.
@@ -50,7 +56,7 @@ function Trang() {
   const ds = useMemo(() => {
     const k = tim.trim().toLowerCase();
     return sps.filter((p) => (!k || `${p.ma} ${p.ten} ${p.diem_den_suy}`.toLowerCase().includes(k))
-      && (!loc || (loc === "chua_ghep" ? !p.link_web : loc === "loi" ? !!p.web.loi : loc === "mo_tt" ? p.mo_thanh_toan : loc === "co_chuyen" ? p.so_chuyen > 0 : loc === "thieu" ? (p.thieu || []).length > 0 : true)));
+      && (!loc || (loc === "chua_ghep" ? !p.link_web : loc === "loi" ? !!p.web.loi : loc === "mo_tt" ? p.mo_thanh_toan : loc === "co_chuyen" ? p.so_chuyen > 0 : loc === "thieu" ? (p.thieu || []).length > 0 : loc === "lech_ngay" ? (p.thieu || []).includes("lech_ngay") : true)));
   }, [sps, tim, loc]);
   // TR-6b · số sản phẩm mỗi phạm vi hàng loạt sẽ xét — in ra nút để người bấm biết mình đang đổi bao nhiêu.
   // Máy chủ TỰ đếm lại khi nhận lệnh; con số này chỉ để xem trước, không phải con số quyết định.
@@ -69,7 +75,8 @@ function Trang() {
         {x.tt_chung ? "Đóng thanh toán chung" : "Mở thanh toán chung"}</button>}
       <span className="muted" style={{ fontSize: 13 }}>Khách đặt online được khi công tắc chung VÀ công tắc của sản phẩm cùng mở.</span>
     </div>
-    <div style={{ display: "flex", gap: 6, margin: "8px 0", flexWrap: "wrap" }}>{([["sp", `Sản phẩm (${sps.length})`], ...(duoc.sua || duoc.ghep ? [["web", "Tour trên web · ghép"]] : []),
+    <div style={{ display: "flex", gap: 6, margin: "8px 0", flexWrap: "wrap" }}>{([["sp", `Sản phẩm (${sps.length})`], ...(duoc.sua || duoc.ghep ? [["web", "Tour trên web · ghép"],
+        ["gy", `Gợi ý link cho sản phẩm chưa ghép (${sps.filter((p: any) => !p.link_web).length})`]] : []),
       ...(duoc.don ? [["don", "Đơn đặt online"]] : []), ["mt", "Ma trận quản lý"]] as [typeof tab, string][]).map(([k, t]) =>
       <button key={k} className={`act ${tab === k ? "teal" : "grey"}`} aria-pressed={tab === k} onClick={() => setTab(k)}>{t}</button>)}</div>
 
@@ -78,7 +85,9 @@ function Trang() {
         <input placeholder="Mã, tên, điểm đến…" value={tim} onChange={(e) => setTim(e.target.value)} style={{ minWidth: 220 }} />
         <select value={loc} onChange={(e) => setLoc(e.target.value)}><option value="">Tất cả</option><option value="co_chuyen">Có chuyến mở bán</option>
           <option value="chua_ghep">Chưa ghép web</option><option value="loi">Đọc web lỗi</option><option value="mo_tt">Đang mở thanh toán</option>
-          <option value="thieu">Thiếu nội dung ({sps.filter((p) => (p.thieu || []).length > 0).length})</option></select>
+          <option value="thieu">Thiếu nội dung ({sps.filter((p) => (p.thieu || []).length > 0).length})</option>
+          {/* TR-11: để lọc riêng ra được những tour ĐANG NÓI SAI với khách — khác hẳn «còn thiếu». */}
+          <option value="lech_ngay">Lệch số ngày với web ({sps.filter((p: any) => (p.thieu || []).includes("lech_ngay")).length})</option></select>
         <span className="muted">{ds.length} sản phẩm</span></div>
       {/* TR-6b (13/11/2026) · BẬT / ĐÓNG HÀNG LOẠT — một lần bấm, MỘT giao dịch trên máy chủ.
           Vì sao có khối này: bấm từng sản phẩm 380 lượt đã làm VTOS mất API hai lần đêm 13/11/2026.
@@ -247,6 +256,44 @@ function Trang() {
           {!web.length && <tr><td colSpan={4} className="muted">Không đọc được tour nào.</td></tr>}</tbody></table></div>}
     </div>}
 
+    {/* TR-11 (13/11/2026) · DANH SÁCH VIỆC CHO NGƯỜI GHÉP, đi chiều SẢN PHẨM → WEB.
+        Tab trên đi chiều ngược và đó là chỗ hở: sản phẩm nào không phải «khớp nhất» của tour web
+        nào thì không gợi ý nào trỏ tới nó. Sản phẩm đang MỞ BÁN xếp lên đầu, vì đó là những tour
+        khách đang nhìn thấy trống ảnh ngay lúc này. Máy KHÔNG tự ghép: đo ngày 13/11 chỉ khoảng
+        một phần tư số sản phẩm có ứng viên đủ chắc, phần còn lại tên trên crm và trên web đặt
+        khác hẳn nhau và chỉ người làm tour mới biết trang nào là trang nào. */}
+    {tab === "gy" && <div className="panel">
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+        <button className="act teal" disabled={gyDang} onClick={async () => {
+          setGyDang(true);
+          try { setGy(await api("/tour-online/goi-y-link")); }
+          catch (e) { toast(errMsg(e), true); }
+          finally { setGyDang(false); }
+        }}>{gyDang ? "Đang đọc vietourist.com.vn…" : "Tìm link hợp cho sản phẩm chưa ghép"}</button>
+        {gy && <span className="muted" style={{ fontSize: 13 }}>
+          Đọc được {gy.so_web} tour trên web · {gy.so_chua_ghep} sản phẩm chưa ghép, trong đó <b>{gy.so_chua_ghep_dang_ban} đang mở bán</b>.
+          Máy chỉ bày ứng viên cùng độ dài; «Khá chắc» là điểm cao và bỏ xa ứng viên nhì — vẫn phải người xác nhận.</span>}</div>
+      {gy?.loi?.length > 0 && <p className="muted" style={{ fontSize: 13 }}>Đọc thiếu một phần web: {gy.loi.join("; ")}</p>}
+      {gy && <div className="wrap"><table><thead><tr><th>Sản phẩm chưa ghép</th><th>Trang web hợp nhất</th><th /></tr></thead>
+        <tbody>{gy.san_pham.map((o: any) => <tr key={o.pid}>
+          <td><b>{o.ma}</b> {o.ten}<br />
+            <small className="muted">{o.so_ngay ? `${o.so_ngay} ngày` : "không đọc được số ngày"}
+              {o.so_chuyen > 0 ? ` · ${o.so_chuyen} chuyến đang mở bán` : " · chưa mở bán"}</small>
+            {o.so_chuyen > 0 && <> <Tag cls="bad">Khách đang xem</Tag></>}</td>
+          <td>{o.ung_vien.length === 0 ? <span className="muted">Không có trang nào đủ hợp — tour này cần tải ảnh thẳng vào album, hoặc web chưa có bài đúng độ dài.</span>
+            : <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{o.ung_vien.map((v: any) => <div key={v.url}>
+              <a href={v.url} target="_blank" rel="noopener noreferrer">{v.ten}</a>{" "}
+              <small className="muted">({Math.round(v.diem * 100)}%{v.so_ngay ? ` · ${v.so_ngay} ngày` : ""})</small>
+              {duoc.ghep && <> <button className="act grey" style={{ margin: 0 }} disabled={busy}
+                onClick={() => lam(async () => {
+                  const r = await api(`/tour-online/${o.pid}/ghep-web`, { method: "POST", json: { link_web: v.url } });
+                  setGy(await api("/tour-online/goi-y-link")); return r;
+                })}>Ghép trang này</button></>}
+            </div>)}</div>}</td>
+          <td>{o.chac ? <Tag cls="ok">Khá chắc</Tag> : o.ung_vien.length ? <Tag cls="warn">Phải xem kỹ</Tag> : <span className="muted">—</span>}</td></tr>)}
+          {!gy.san_pham.length && <tr><td colSpan={3} className="muted">Mọi sản phẩm đều đã ghép link.</td></tr>}</tbody></table></div>}
+    </div>}
+
     {tab === "don" && <div className="panel">
       <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}><input type="checkbox" checked={chiVat} onChange={(e) => setChiVat(e.target.checked)} />Chỉ đơn cần hóa đơn GTGT công ty</label>
       {!don ? <p>Đang tải…</p> : <div className="wrap"><table><thead><tr><th>Mã</th><th>Tour</th><th>Khách</th><th>Tiền</th><th>Trạng thái</th><th>Email</th><th>Hóa đơn công ty</th></tr></thead>
@@ -282,5 +329,12 @@ function NoiDungCong({ p, ten }: { p: any; ten: Record<string, string> }) {
     : "Ghép link web, hoặc nhập «NGÀY 1:… NGÀY 2:…» vào ô Chương trình của sản phẩm.");
   if (th.includes("bao_gom")) goiY.push("Nhập mục «Giá tour bao gồm» trên web hoặc ô Dịch vụ của sản phẩm.");
   if (th.includes("tre_em")) goiY.push("Nhập giá trẻ em ở chuyến đang mở bán (Điều hành).");
-  return <>{th.map((k) => <Tag key={k} cls="warn">{ten[k] || k}</Tag>)}<div className="muted" style={{ fontSize: 12 }}>{goiY.join(" ")}</div></>;
+  // TR-11: cảnh báo này KHÁC HẲN mấy cái trên. Mấy cái trên nói «còn thiếu»; cái này nói «đang
+  // SAI» — khách đọc lịch trình, bảng giá và «bao gồm» của một tour khác độ dài. Nên nó nói ra
+  // ĐỦ HAI CON SỐ: thiếu số thì người đọc phải tự đi tìm, và phần lớn sẽ không đi.
+  if (th.includes("lech_ngay")) goiY.push(
+    `Tour ${p.so_ngay ?? "?"} ngày nhưng trang web đã ghép có ${p.web?.so_ngay ?? "?"} ngày lịch trình. `
+    + "Ghép lại đúng trang (nút «Sửa link»), hoặc gỡ link nếu web chưa có bài đúng độ dài.");
+  return <>{th.map((k) => <Tag key={k} cls={k === "lech_ngay" ? "bad" : "warn"}>{ten[k] || k}</Tag>)}
+    <div className="muted" style={{ fontSize: 12 }}>{goiY.join(" ")}</div></>;
 }
