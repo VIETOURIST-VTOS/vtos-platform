@@ -13,9 +13,12 @@ from app.db.session import get_db
 from app.models.core import User
 from app.services import ban_kd_le as S
 
-# Hẹp đúng bằng dòng "/ban-kd-le" của MENU_ROLES. Chủ tịch chốt 13/11/2026: Giám đốc KD làm việc
+# R5-5 (13/11/2026): bàn chạy ở /fit — màn của CẢ phòng Lẻ — nên phạm vi nhóm API rộng hơn bàn; hàng rào
+# THẬT của bàn là danh sách này (TP, trưởng nhóm, NV mở /fit gặp trang hai tab, gọi cửa này thì 403).
+# Gương: VAI_BAN_KD_LE ở web/components/Shell.tsx (phép thử so hai chỗ). Chủ tịch chốt 13/11/2026: Giám đốc KD làm việc
 # trên bàn; Chủ tịch, TGĐ (và hai vai đọc nền bks, robot_ks) mở để xem. tp_kd, tn_kd chưa vào đợt này.
-XEM = ("chutich", "tgd", "bks", "robot_ks", "gd_kd", "cntt")
+# R5-5: cntt rời danh sách — cntt không thuộc phòng Lẻ nên không mở được /fit, chỗ duy nhất còn bàn.
+XEM = ("chutich", "tgd", "bks", "robot_ks", "gd_kd")
 
 router = APIRouter(prefix="/api/v1/ban-kd-le", tags=["ban-kd-le"])
 

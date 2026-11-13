@@ -346,7 +346,7 @@ MAN_HINH_API = {
     # nới phạm vi vì đợt này. Điều hành xe không có dòng ở đây: `/xe` tự khai từ PR #744.
     # R5-2 · 13/11/2026: tab «Doanh thu & chỉ tiêu» gọi /kinh-doanh/*. KHÔNG khai /api/v1/bao-cao ở đây: nhân viên,
     # trưởng nhóm mở được /fit nhưng không được đọc báo cáo phòng — người có bảng chỉ tiêu nhận nhóm ấy qua dòng "/bao-cao".
-    "/fit":   ("/api/v1/kinh-doanh",),
+    "/fit":   ("/api/v1/kinh-doanh", "/api/v1/ban-kd-le"),   # R5-5: bàn GĐ KD lẻ chạy ở /fit; cửa tự gác vai (ban_kd_le.XEM)
     "/mice":  ("/api/v1/bao-cao",),
     "/op":    ("/api/v1/bao-cao",),
     "/guide": ("/api/v1/bao-cao",),
@@ -603,8 +603,6 @@ MAN_HINH_API = {
     # (`POST /tours/{id}/chuyen-dieu-hanh` và `.../tra-lai-kinh-doanh`), không nhân bản sang đây.
     "/sales-admin": ("/api/v1/sales-admin",),
     "/ban-tour-le": ("/api/v1/ban-tour-le",),
-    # R5 · 13/11/2026 — bàn GĐ Kinh doanh lẻ: một cửa đọc riêng, mọi màn khác mở trong khung theo quyền của chính nó.
-    "/ban-kd-le": ("/api/v1/ban-kd-le",),
     "/danh-gia": ("/api/v1/danh-gia",),
     # Đếm lượt mở cửa đọc (Đợt HD-Q2mh). CÙNG nhóm API với /danh-gia chứ không mở nhóm mới: cửa
     # `dem-luot` nằm trong chính nhóm ấy, và bốn vai mở được màn hình này đều đã có nhóm ấy sẵn
@@ -978,8 +976,6 @@ MENU_ROLES = {
     # Kinh doanh LẺ. Phòng Đoàn không có tên ở đây ("ý là PKDL, còn PKDĐ vẫn giữ nguyên") —
     # bàn của họ là /sales-admin và /ptgd-doan, và chỗ ngồi tour lẻ không phải việc của họ.
     "/ban-tour-le": BASE_VIEW + SALES + ("cntt",),
-    # R5 · 13/11/2026 (Chủ tịch chốt): GĐ Kinh doanh làm việc trên bàn; Chủ tịch, TGĐ xem. tp_kd, tn_kd chưa vào.
-    "/ban-kd-le": BASE_VIEW + ("gd_kd", "cntt"),
     # Đánh giá sau tour (25/9/2026). MÀN HÌNH mở cho cả khối Kinh doanh, nhưng HAI KHỐI VIỆC
     # trên đó có hai danh sách vai khác nhau, và ranh giới nằm ở MÁY CHỦ chứ không ở màn hình:
     #   · danh sách "khách chưa chấm" + cửa ghi hộ → cả nv_kd, tn_kd (khách của chính họ)

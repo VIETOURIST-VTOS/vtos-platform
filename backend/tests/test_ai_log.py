@@ -42,7 +42,9 @@ def test_moi_trang_giao_dien_deu_duoc_khai_quyen_hoac_co_trong_danh_sach_mo():
     # kho, và cửa máy chủ của nó khai ở tools/ks2_khai_quyen.CONG_KHAI kèm lý do.
     # `/cong` (CG-1) là cổng NGOÀI cho khách hàng / đối tác / cổ đông: phiên riêng (goiCong), không
     # dùng vai trò nhân viên nên không có gì để khai trong MENU_ROLES.
-    bo_qua = {"/login", "/tours/[id]", "/y-kien/[ma]", "/cong"}   # đăng nhập · trang con /tours · trang khách · cổng ngoài
+    # `/ban-kd-le` (R5-5, 13/11/2026): chỉ chuyển hướng sang /fit, không vẽ gì — miễn khai như /payroll ở
+    # ks_ma_tran.NGOAI_LE (test_ks_ma_tran kiểm nó vẫn chỉ là trang chuyển hướng).
+    bo_qua = {"/login", "/tours/[id]", "/y-kien/[ma]", "/cong", "/ban-kd-le"}   # đăng nhập · trang con /tours · trang khách · cổng ngoài
     for d, _, fs in os.walk(app_dir):
         if "page.tsx" not in fs: continue
         rel = os.path.relpath(d, app_dir).replace(os.sep, "/")

@@ -27,6 +27,8 @@ NGOAI_LE = {
     "cong": "Trang của người ở cổng NGOÀI – không có tài khoản VTOS nên không có vai trò; dữ liệu đi qua phiên cổng ngoài (khoá ký riêng), không qua MENU_ROLES.",
     "doi-mat-khau": "Tự đổi mật khẩu của chính mình – mọi tài khoản đều phải vào được.",
     "payroll": "Chỉ chuyển hướng sang /hr, không hiển thị dữ liệu; quyền nằm ở /hr.",
+    # R5-5 · 13/11/2026 — Chủ tịch «ok sửa»: một bàn, một đường dẫn. Người quyết: Chủ tịch.
+    "ban-kd-le": "Chỉ chuyển hướng sang /fit, không hiển thị dữ liệu; bàn GĐ KD lẻ và quyền của nó nằm ở /fit.",
 }
 
 

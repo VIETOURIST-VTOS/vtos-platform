@@ -37,6 +37,7 @@ KHONG_KHAI_QUYEN = {
     "login": "màn hình đăng nhập – chưa có phiên thì chưa có quyền",
     "cong": "không gian cổng ngoài (CG-1) – người dùng không có tài khoản VTOS; dữ liệu qua phiên cổng ngoài",
     "payroll": "chỉ chuyển hướng sang /hr, không vẽ gì",
+    "ban-kd-le": "R5-5 (13/11/2026): chỉ chuyển hướng sang /fit, không vẽ gì — bàn GĐ KD lẻ ở /fit",
     "doi-mat-khau": "ai cũng vào được, kể cả tài khoản còn mật khẩu tạm",
     "alerts": "cảnh báo nghiệp vụ – mở cho mọi vai trò",
     "reports": "báo cáo công việc – mở cho mọi vai trò",

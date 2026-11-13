@@ -17,6 +17,7 @@ WEB = Path(__file__).resolve().parents[2] / "web" / "app"
 # Trang được phép đứng ngoài khung, kèm lý do. Thêm tên vào đây phải kèm lý do thật.
 NGOAI_LE = {
     "payroll": "chỉ chuyển hướng sang /hr, không vẽ gì",
+    "ban-kd-le": "R5-5 (13/11/2026): chỉ chuyển hướng sang /fit, không vẽ gì",
     "login": "màn hình đăng nhập – chưa có phiên thì chưa có khung",
     # Thêm 13/9/2026 cùng đợt đưa VTOS thành app cài được. Trang này service worker bật lên khi
     # MÁY CHỦ KHÔNG VỚI TỚI – mà Shell thì gọi /auth/me ngay khi dựng, nên bọc nó vào Shell là cầm
