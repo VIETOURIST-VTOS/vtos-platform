@@ -2,7 +2,7 @@
 
 | Làn | Mã việc | Tệp sẽ đụng | Bắt đầu | Trạng thái |
 |---|---|---|---|---|
-| TC-KT | NH-1 — bộ đọc Sổ tiền gửi MISA đọc cột theo TÊN và xử lý hậu tố mã chứng từ | backend/app/services/banks.py, backend/tests/test_nh1_bo_doc_so_tien_gui.py, backend/tests/test_ci_hang_rao_main.py, .github/workflows/ci.yml, docs/dang-lam/tc-kt/NH-1.md | 09-11-2026 00:20 | đang làm |
+| TC-KT | NH-1 — bộ đọc Sổ tiền gửi MISA đọc cột theo TÊN và xử lý hậu tố mã chứng từ | backend/app/services/banks.py, backend/tests/test_nh1_bo_doc_so_tien_gui.py, backend/tests/test_ci_hang_rao_main.py, .github/workflows/ci.yml, docs/dang-lam/tc-kt/NH-1.md | 09-11-2026 00:20 | xong |
 
 Đo trên sổ thật 08/11/2026 sau khi nạp bản đồ chứng từ hai năm: gán được 10/27 dòng còn nằm
 trên `1121`, và CẢ MƯỜI khớp bằng lớp «chứng từ chỉ thuộc 1 ngân hàng» — không một dòng nào
