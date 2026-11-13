@@ -192,6 +192,9 @@ export const CAY_PHAN_HE: PhanHeCay[] = [
           { ma: "3.3.3", ten: "Yêu cầu đặt dịch vụ", href: "/requests?mang=le" },
           { ma: "3.3.4", ten: "Dịch vụ riêng lẻ", href: "/non-package" },
           { ma: "3.3.5", ten: "Chính sách bán hàng", href: "/bang-gia" },
+          // R5-16 (Chủ tịch duyệt 14/11/2026): «Giá & chính sách bán» của Lẻ thành màn «Chính sách bán» —
+          // chiết khấu theo vai, giá trẻ em, khuyến mãi; nối D06 đối tác / CTV và VTD Rewards. R5-21 trả nợ cây.
+          { ma: "3.3.5a", ten: "Chính sách bán (Lẻ)", href: "/chinh-sach-ban" },
           { ma: "3.3.6", ten: "Báo cáo kinh doanh", href: "/sales-reports?mang=le" },
           { ma: "3.3.7", ten: "Báo giá lẻ", href: "/bao-gia?mang=kd_le", them: true }
         ] },
