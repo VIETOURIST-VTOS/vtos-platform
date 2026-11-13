@@ -107,11 +107,31 @@ def test_phai_thu_chi_cong_booking_trong_pham_vi():
     assert S.tong_quan(s, u("tp"))["the"]["phai_thu"]["so"] == 17_000_000
 
 
-def test_chua_phan_cong_thi_canh_bao_khong_muon_pham_vi():
-    s, u, _ = _db()
-    s.add(User(username="tp2", full_name="TP2", role="tp_kd", password_hash="x")); s.commit()
-    kq = S.tong_quan(s, u("tp2"))
-    assert kq["canh_bao"] and kq["so_nguoi"] == 1 and kq["the"]["doanh_thu"]["so"] is None
+def test_chua_phan_cong_thi_doc_nhom_ban_hang():
+    """R5-8 (Chủ tịch 13/11/2026): chưa khai cơ cấu thì đọc `users.sales_group`. Phòng Lẻ = KD1–KD5, VPCT và
+    người chưa có nhóm; VPHP và DOAN_* không thuộc. Trưởng nhóm thấy người cùng nhóm."""
+    e = create_engine("sqlite://", future=True)
+    Base.metadata.create_all(e)
+    s = sessionmaker(bind=e, future=True)()
+    for ten, vai, nhom in (("tp", "tp_kd", ""), ("tn1", "tn_kd", "KD1"), ("a", "nv_kd", "KD1"), ("b", "nv_kd", "KD2"),
+                           ("c", "nv_kd", "VPCT"), ("d", "nv_kd", ""), ("e", "nv_kd", "VPHP"), ("f", "nv_kd", "DOAN_OB"),
+                           ("dh", "nv_dh", "")):
+        s.add(User(username=ten, full_name=ten.upper(), role=vai, sales_group=nhom, password_hash="x"))
+    s.commit()
+    u = lambda t: s.execute(select(User).where(User.username == t)).scalars().first()  # noqa: E731
+    _ban(s, u, "a", 10_000_000, "A"); _ban(s, u, "b", 20_000_000, "B"); _ban(s, u, "e", 40_000_000, "E")
+    _ban(s, u, "f", 80_000_000, "F")
+    tp = S.tong_quan(s, u("tp"))
+    assert tp["nguon_pham_vi"] == "nhom_ban_hang" and not tp["canh_bao"] and tp["ghi_pham_vi"]
+    assert {x["ho_ten"] for x in tp["doi_ngu"]} == {"TP", "TN1", "A", "B", "C", "D"}, "VPHP, DOAN_* không thuộc phòng Lẻ"
+    assert tp["the"]["doanh_thu"]["so"] == 30_000_000
+    assert {g["ma"] for g in tp["theo_nhom"]} == {"KD1", "KD2", "VPCT", "Chưa có nhóm"}
+    assert tp["the"]["doanh_thu"]["chi_tieu"] is None, "chưa có đơn vị thì chỉ tiêu phòng chưa giao"
+    tn = S.tong_quan(s, u("tn1"))
+    assert {x["ho_ten"] for x in tn["doi_ngu"]} == {"TN1", "A"} and tn["the"]["doanh_thu"]["so"] == 10_000_000
+    assert tn["don_vi"]["ten"] == "Nhóm KD1"
+    nv = S.tong_quan(s, u("a"))
+    assert nv["so_nguoi"] == 1 and nv["the"]["doanh_thu"]["so"] == 10_000_000
 
 
 def test_cua_chi_mo_cho_ba_vai_va_ba_ban_rieng():

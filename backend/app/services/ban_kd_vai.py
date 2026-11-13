@@ -36,6 +36,26 @@ from app.services import to_chuc_kd as TC
 VAI_BAN = {"tp_kd": "tp", "tn_kd": "tn", "nv_kd": "nv"}
 LUONG = "le"
 
+# ── R5-8 · NHÓM BÁN HÀNG KHI CHƯA KHAI CƠ CẤU (Chủ tịch chốt 13/11/2026) ─────────────────────────────
+# Trên web, Cơ cấu tổ chức Kinh doanh còn TRỐNG (42 tài khoản chưa xếp đơn vị) nhưng tài khoản đã có ô
+# `users.sales_group`. Chủ tịch chọn «bàn đọc ô nhóm bán hàng»: chưa ai được phân công thì
+#     Trưởng nhóm  → người cùng `sales_group`;
+#     Trưởng phòng → mọi người có `sales_group` thuộc phòng Lẻ dưới đây (kể cả người chưa có nhóm).
+# Phòng Lẻ = KD1–KD5, VPCT, và người để TRỐNG ô nhóm (Chủ tịch chọn). VPHP, DOAN_* KHÔNG thuộc.
+# Khi đã khai cơ cấu (/to-chuc-kd) thì cơ cấu thắng — đường này chỉ là đường dự phòng.
+NHOM_LE = ("KD1", "KD2", "KD3", "KD4", "KD5", "VPCT", "")
+VAI_NGUOI_BAN = ("nv_kd", "tn_kd")
+
+
+def _theo_nhom_ban_hang(db: Session, u: User, vai: str) -> list[int]:
+    """Người trong phạm vi bàn khi chưa có phân công cơ cấu — đọc `users.sales_group`."""
+    q = select(User).where(User.role.in_(VAI_NGUOI_BAN), User.active == True)  # noqa: E712
+    if vai == "tn":
+        q = q.where(User.sales_group == (u.sales_group or ""))
+    else:
+        q = q.where(User.sales_group.in_(NHOM_LE))
+    return sorted({x.id for x in db.execute(q).scalars()} | {u.id})
+
 
 def _cuoi(ky: str) -> date:
     y, m = int(ky[:4]), int(ky[5:])
@@ -65,14 +85,20 @@ def pham_vi(db: Session, u: User, ky: str) -> dict:
     vai = VAI_BAN.get(u.role, "")
     dv = TC.don_vi_cua(db, u.id, cuoi, LUONG)
     if vai == "nv":
-        return {"vai": vai, "don_vi_ids": None, "user_ids": [u.id], "don_vi": dv, "canh_bao": ""}
+        return {"vai": vai, "don_vi_ids": None, "user_ids": [u.id], "don_vi": dv, "canh_bao": "", "nguon": "chinh_minh"}
     pv = TC.pham_vi_xem(db, u, cuoi, LUONG)
     if pv is None:                                  # vai xem toàn cây (không xảy ra với tp/tn, giữ cho đủ)
         pv = [d.id for d in db.execute(select(DonViKD).where(DonViKD.mang == LUONG)).scalars()]
-    ids = sorted({n["user_id"] for n in TC.nguoi_trong(db, pv, cuoi)} | {u.id}) if pv else [u.id]
-    canh_bao = "" if pv else ("Bạn chưa được phân công vào đơn vị nào của Kinh doanh lẻ, nên bàn chỉ có số của "
-                              "chính bạn. Hành chính – Nhân sự phân công ở màn Cơ cấu tổ chức Kinh doanh.")
-    return {"vai": vai, "don_vi_ids": pv, "user_ids": ids, "don_vi": dv, "canh_bao": canh_bao}
+    if pv:
+        ids = sorted({n["user_id"] for n in TC.nguoi_trong(db, pv, cuoi)} | {u.id})
+        return {"vai": vai, "don_vi_ids": pv, "user_ids": ids, "don_vi": dv, "canh_bao": "", "nguon": "co_cau"}
+    # R5-8: chưa phân công → đọc ô nhóm bán hàng. Không có đơn vị nên chỉ tiêu NHÓM chưa giao được.
+    ids = _theo_nhom_ban_hang(db, u, vai)
+    ghi = (f"Phạm vi đọc theo ô nhóm bán hàng ({u.sales_group or 'chưa có nhóm'}) vì Cơ cấu tổ chức Kinh doanh "
+           "chưa khai. Muốn giao chỉ tiêu nhóm, Hành chính – Nhân sự khai ở màn Cơ cấu tổ chức Kinh doanh.")
+    return {"vai": vai, "don_vi_ids": None, "user_ids": ids, "don_vi": dv, "canh_bao": "", "ghi_pham_vi": ghi,
+            "nguon": "nhom_ban_hang",
+            "nhom": (u.sales_group or "") if vai == "tn" else ""}
 
 
 def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
@@ -88,10 +114,15 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
     ct_toi = _chi_tieu_nguoi(bang_ct, u.id)
     doi_ngu, theo_nhom, dt_pv, ct_pv = [], [], None, None
     if vai in ("tp", "tn"):
-        kq = DT.thang(db, ky, LUONG, p["don_vi_ids"] or [])
-        dt_pv = kq["tong_tinh_chi_tieu"] if p["don_vi_ids"] else None
+        if p["nguon"] == "co_cau":
+            kq = DT.thang(db, ky, LUONG, p["don_vi_ids"])
+            dt_pv = kq["tong_tinh_chi_tieu"]
+            ban = {o["user_id"]: o for o in kq["theo_nguoi"]}
+        else:                                       # R5-8: cộng đúng những người trong phạm vi nhóm bán hàng
+            kq = DT.thang(db, ky, LUONG, None)
+            ban = {o["user_id"]: o for o in kq["theo_nguoi"] if o["user_id"] in uids}
+            dt_pv = float(sum(o["tien"] for o in ban.values()))
         ct_pv = _chi_tieu_don_vi(bang_ct, p["don_vi"].id if p["don_vi"] else None)
-        ban = {o["user_id"]: o for o in kq["theo_nguoi"]}
         ten = {n["user_id"]: n for n in TC.nguoi_trong(db, p["don_vi_ids"], _cuoi(ky))} if p["don_vi_ids"] else {}
         for uid in uids:
             o = ban.get(uid, {})
@@ -100,7 +131,7 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
             ct = _chi_tieu_nguoi(bang_ct, uid)
             tien = float(o.get("tien", 0.0))
             doi_ngu.append({"user_id": uid, "ho_ten": usr.full_name if usr else str(uid),
-                            "don_vi": nguoi.get("don_vi") or o.get("don_vi", ""),
+                            "don_vi": nguoi.get("don_vi") or o.get("don_vi", "") or (usr.sales_group if usr else ""),
                             "vai": nguoi.get("vai", ""), "tien": tien, "so_booking": o.get("so_booking", 0),
                             "chi_tieu": ct, "ty_le": (tien / ct) if ct else None, "la_toi": uid == u.id})
         doi_ngu.sort(key=lambda x: -x["tien"])
@@ -114,6 +145,15 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
                 theo_nhom.append({"don_vi_id": c.id, "ten": c.ten, "ma": c.ma, "tien": tien,
                                   "so_nguoi": len(TC.nguoi_trong(db, [c.id], d)),
                                   "chi_tieu": ct, "ty_le": (tien / ct) if ct else None})
+        elif vai == "tp" and p["nguon"] == "nhom_ban_hang":
+            # R5-8: «Theo nhóm» gom theo ô nhóm bán hàng; chỉ tiêu nhóm chưa giao được (chưa có đơn vị).
+            g: dict[str, dict] = {}
+            for x in doi_ngu:
+                k = x["don_vi"] or "Chưa có nhóm"
+                o = g.setdefault(k, {"don_vi_id": k, "ten": k, "ma": k, "tien": 0.0, "so_nguoi": 0,
+                                     "chi_tieu": None, "ty_le": None})
+                o["tien"] += x["tien"]; o["so_nguoi"] += 1
+            theo_nhom = sorted(g.values(), key=lambda x: (x["ma"] == "Chưa có nhóm", x["ma"]))
 
     # ── Booking, lead, chăm sóc của phạm vi ────────────────────────────────────────────────────
     dau_thang = datetime.combine(d.replace(day=1), time.min)
@@ -166,7 +206,10 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
                      "tieu_de": f"{pt['so_booking']} booking khách còn nợ", "mo_ta": "Nhắc thu trước ngày đi"})
 
     return {"ngay": d.isoformat(), "ky": ky, "vai": vai, "ho_ten": u.full_name,
-            "don_vi": ({"id": p["don_vi"].id, "ten": p["don_vi"].ten} if p["don_vi"] else None),
+            "don_vi": ({"id": p["don_vi"].id, "ten": p["don_vi"].ten} if p["don_vi"] else
+                       ({"id": None, "ten": ("Nhóm " + p["nhom"]) if p.get("nhom") else
+                         ("Phòng Kinh doanh lẻ" if vai == "tp" else "")} if p["nguon"] == "nhom_ban_hang" else None)),
+            "nguon_pham_vi": p["nguon"], "ghi_pham_vi": p.get("ghi_pham_vi", ""),
             "so_nguoi": len(uids), "canh_bao": p["canh_bao"],
             "the": the, "doi_ngu": doi_ngu, "theo_nhom": theo_nhom, "viec": viec,
             "phai_thu": pt, "thuc_ban": GD.thuc_ban(db)}
@@ -191,7 +234,11 @@ def doanh_thu_12(db: Session, u: User, nam: int) -> dict:
             ct = _chi_tieu_nguoi(bang, u.id)
         else:
             p = pham_vi(db, u, ky)
-            dt = DT.thang(db, ky, LUONG, p["don_vi_ids"])["tong_tinh_chi_tieu"] if p["don_vi_ids"] else None
+            if p["nguon"] == "co_cau":
+                dt = DT.thang(db, ky, LUONG, p["don_vi_ids"])["tong_tinh_chi_tieu"]
+            else:                                   # R5-8: phạm vi theo nhóm bán hàng
+                dt = float(sum(o["tien"] for o in DT.thang(db, ky, LUONG, None)["theo_nguoi"]
+                               if o["user_id"] in p["user_ids"]))
             ct = _chi_tieu_don_vi(bang, p["don_vi"].id if p["don_vi"] else None)
         thang.append({"ky": ky, "doanh_thu": dt, "chi_tieu": ct})
     return {"nam": nam, "vai": vai, "thang": thang,
