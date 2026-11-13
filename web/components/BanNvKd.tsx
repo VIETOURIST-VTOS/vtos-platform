@@ -10,12 +10,12 @@ const TAB: Tab[] = [
   { ma: "khach", ten: "Khách của tôi", tieu_de: "Khách của tôi", the: [
     { ten: "Khách hàng & lead", mo_ta: "Lead được giao, lịch hẹn gọi lại", toi: "/leads?tab=leads" },
     { ten: "Hộp thư đa kênh", mo_ta: "Khách nhắn đang chờ trả lời", toi: "/inbox" },
-    { ten: "Báo giá", mo_ta: "Soạn báo giá gửi khách", toi: "/bao-gia?mang=kd_le" },
-    { ten: "Bàn bán tour lẻ", mo_ta: "Chuyến còn chỗ, giá bán", toi: "/ban-tour-le" }] },
+    { ten: "Bàn bán tour lẻ", mo_ta: "Chuyến còn chỗ, giá bán", toi: "/ban-tour-le" },
+    { ten: "Chính sách bán", mo_ta: "Chiết khấu, giá trẻ em, khuyến mãi, hoa hồng, điểm Rewards", toi: "/chinh-sach-ban" }] },
   { ma: "bk", ten: "Booking của tôi", tieu_de: "Booking của tôi", the: [
     { ten: "Booking & bảo lưu", mo_ta: "Giữ chỗ, cọc, thu tiền, hủy", toi: "/bookings?mang=le" },
     { ten: "Yêu cầu đặt dịch vụ", mo_ta: "Gửi Điều hành, theo dõi hạn xử lý", toi: "/requests?mang=le" },
-    { ten: "Dịch vụ lẻ", mo_ta: "Visa, vé, phòng, xe", toi: "/non-package" }] },
+    { ten: "Dịch vụ lẻ", mo_ta: "Visa, vé, phòng, xe, gửi khách hưởng hoa hồng", toi: "/non-package" }] },
   { ma: "cs", ten: "Chăm sóc", tieu_de: "Chăm sóc khách của tôi", the: [
     { ten: "Chăm sóc sau tour", mo_ta: "Phiếu tới hạn, ghi kết quả liên hệ", toi: "/cham-soc" },
     { ten: "Phản hồi & khiếu nại", mo_ta: "Hồ sơ khách của tôi", toi: "/khieu-nai" }] },

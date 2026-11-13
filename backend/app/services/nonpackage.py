@@ -89,7 +89,17 @@ def create(db: Session, u: User, d: dict) -> tuple[Tour, Booking]:
     # Cửa TẠO cũng phải qua cổng giá vốn — xem `_cong_gia_von`. Người bán gõ số vào đây thì cổng
     # nói ngay, chứ không nhận rồi bỏ im lặng: một ô nhập nuốt số là thứ chỉ phát hiện ra ở bảng
     # lãi lỗ ba tuần sau. Dịch vụ do Kinh doanh tạo sẽ có giá vốn TRỐNG cho tới khi Điều hành điền.
-    if d.get("cost_amount") or (d.get("supplier_name") or "").strip():
+    # R5-16 · Chủ tịch duyệt 14/11/2026: «Gửi khách – hưởng hoa hồng» — số trả đối tác là số theo thoả thuận
+    # với đối tác, người bán biết ngay lúc gửi khách; loại này người bán nhập luôn đối tác + số trả, không chờ
+    # Điều hành. Bắt buộc đủ hai ô, vì thiếu thì lãi = cả giá khách trả.
+    if st == "GUI_KHACH":
+        if not (d.get("supplier_name") or "").strip():
+            raise Gate("NP_NHAP", "Gửi khách: thiếu tên công ty đối tác nhận khách")
+        if float(d.get("cost_amount") or 0) <= 0:
+            raise Gate("NP_NHAP", "Gửi khách: thiếu số trả đối tác")
+        if float(d.get("cost_amount") or 0) > amount:
+            raise Gate("NP_NHAP", "Gửi khách: số trả đối tác lớn hơn giá khách trả")
+    elif d.get("cost_amount") or (d.get("supplier_name") or "").strip():
         _cong_gia_von(u)
     cost = max(0.0, float(d.get("cost_amount") or 0))
     sd = date.fromisoformat(d["service_date"]) if d.get("service_date") else date.today()
@@ -127,7 +137,8 @@ def update(db: Session, u: User, b: Booking, d: dict) -> Booking:
     # Cổng giá vốn đứng TRƯỚC mọi lệnh gán, không đứng cạnh ô nó canh: gán rồi mới từ chối là để
     # lại một bản ghi sửa dở trong phiên, và phiên ấy còn đi tiếp. Xem GIA_VON_ROLES ở đầu tệp —
     # KHÔNG có đường vòng theo `operator_id` hay `sales_id`: khối Kinh doanh gỡ hết.
-    if d.get("cost_amount") is not None or d.get("supplier_name") is not None:
+    if (d.get("cost_amount") is not None or d.get("supplier_name") is not None) and \
+            (d.get("service_type") or b.service_type or "").upper() != "GUI_KHACH":   # R5-16
         _cong_gia_von(u)
     before = {"gia": b.amount, "gia_von": b.cost_amount, "loai": b.service_type}
     if d.get("service_type"):

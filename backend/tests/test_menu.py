@@ -227,7 +227,9 @@ def test_da_xay_thi_phai_roi_khoi_chua_xay_va_tro_dung_man_hinh():
                       ("Chiến dịch", "/marketing"), ("Kế hoạch & ngân sách", "/marketing?tab=ngansach"),
                       ("Nội dung & thương hiệu", "/noi-dung"), ("Chăm sóc sau bán", "/cham-soc"),
                       ("Phản hồi & khiếu nại", "/khieu-nai"),
-                      ("Giá & chính sách bán", "/bang-gia"), ("Báo giá", "/bao-gia?mang=kd_le"),
+                      # R5-16 (14/11/2026): Lẻ bỏ soạn báo giá; «Giá & chính sách bán» → «Chính sách bán»;
+                      # bảng giá theo thời hạn dời sang nhóm MICE.
+                      ("Chính sách bán", "/chinh-sach-ban"), ("Bảng giá đoàn", "/bang-gia"),
                       ("Báo giá đoàn", "/bao-gia?mang=kd_doan"), ("Hợp đồng", "/hop-dong-khach"),
                       # V7 Đợt 3 (10/9/2026). Sự cố tour dùng BẢNG RIÊNG su_co_tour, không dùng lại
                       # bảng incidents – incidents là hồ sơ kỷ luật nhân viên, việc khác hẳn.

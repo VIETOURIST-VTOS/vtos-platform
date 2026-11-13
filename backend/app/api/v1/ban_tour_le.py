@@ -24,8 +24,8 @@ router = APIRouter(prefix="/api/v1/ban-tour-le", tags=["ban-tour-le"])
 
 
 @router.get("/ban-lam-viec")
-def ban_lam_viec(u: User = Depends(require_roles(*XEM, mo_ta="bàn bán tour lẻ")),
+def ban_lam_viec(pham_vi: str = "dang_ban", u: User = Depends(require_roles(*XEM, mo_ta="bàn bán tour lẻ")),
                  db: Session = Depends(get_db)):
     """Không nhận tham số kỳ: đây là danh sách chỗ ĐANG CÒN BÁN hôm nay, không phải báo cáo một
     tháng đã qua. Một ô chọn kỳ trên bảng chỗ trống là lời mời bán chỗ của chuyến đã khởi hành."""
-    return S.ban_lam_viec(db)
+    return S.ban_lam_viec(db, pham_vi)   # R5-16: «sap_mo_ban» / «da_di» chỉ xem

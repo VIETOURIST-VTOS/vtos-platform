@@ -40,7 +40,9 @@ function BanTourLe() {
   const [d, setD] = useState<any>(null);
   const [loc, setLoc] = useState<Loc>("tat");
   const [tim, setTim] = useState("");
-  const load = useCallback(() => api("/ban-tour-le/ban-lam-viec").then(setD).catch((e) => toast(errMsg(e), true)), [toast]);
+  // R5-16 · Chủ tịch 14/11/2026: «Lịch khởi hành» gộp vào đây — thêm hai phạm vi CHỈ XEM.
+  const [phamVi, setPhamVi] = useState<"dang_ban" | "sap_mo_ban" | "da_di">("dang_ban");
+  const load = useCallback(() => api(`/ban-tour-le/ban-lam-viec?pham_vi=${phamVi}`).then(setD).catch((e) => toast(errMsg(e), true)), [toast, phamVi]);
   useEffect(() => { load(); }, [load]);
 
   const all: any[] = d?.rows || [];
@@ -66,12 +68,20 @@ function BanTourLe() {
     <div className="btl-dau"><h1>Bàn bán tour lẻ</h1>
       <p>Chuyến lẻ đang bán, sắp theo ngày khởi hành gần nhất. Lịch do Phòng Điều hành mở — xem còn chỗ và còn lời bao nhiêu trước khi trả lời khách.</p></div>
 
-    <div className="btl-o5">
+    {phamVi === "dang_ban" && <div className="btl-o5">
       <div className="o"><b>{vnd(T.chuyen)}</b><span>Chuyến đang bán</span></div>
       <div className="o"><b>{vnd(T.cho_con)}</b><span>Chỗ còn trống</span></div>
       <div className={"o" + (T.sap_khoi_hanh ? " hong" : "")}><b>{vnd(T.sap_khoi_hanh)}</b><span>Khởi hành trong 7 ngày</span></div>
       <div className={"o" + (T.chua_hoa_von ? " hong" : "")}><b>{vnd(T.chua_hoa_von)}</b><span>Chưa bán đủ số khách hòa vốn</span></div>
       <div className="o mo"><b>{vnd(T.chua_du_co_so)}</b><span>Chưa có dự toán riêng</span></div>
+    </div>}
+
+    <div className="btl-loc">
+      <div className="btl-seg btl-pv" role="group" aria-label="Phạm vi chuyến">
+        {([["dang_ban", "Đang bán"], ["sap_mo_ban", "Sắp mở bán (nháp)"], ["da_di", "Đã đi"]] as const).map(([k, t]) =>
+          <button key={k} type="button" aria-pressed={phamVi === k} onClick={() => { setD(null); setPhamVi(k); }}>{t}<em>{d?.dem_pham_vi?.[k] ?? ""}</em></button>)}
+      </div>
+      {phamVi !== "dang_ban" && <span className="btl-chi">Chỉ xem{phamVi === "sap_mo_ban" ? " — chuyến Điều hành đã tạo, chưa duyệt nên chưa bán được" : " — chuyến đã khởi hành"}{d?.cat_bot ? ` · hiện ${vnd((d.rows || []).length)} chuyến gần nhất, còn ${vnd(d.cat_bot)} chuyến cũ hơn` : ""}</span>}
     </div>
 
     {/* Lời lưu ý do MÁY CHỦ gửi xuống, không viết cứng ở đây: câu này là một phần của con số. */}
@@ -99,7 +109,7 @@ function BanTourLe() {
             return <tr key={r.id}>
               <td data-n=""><Link className="ma" href={`/tours/${r.id}`}>{r.code}</Link><span className="ten">{r.name}</span></td>
               <td data-n="Khởi hành" className="ngay"><b>{fmtD(r.start_date)}</b>
-                <span className={"con" + (r.days_left <= 7 ? " gap" : "")}>{r.days_left <= 0 ? "đi hôm nay" : `còn ${r.days_left} ngày`}</span></td>
+                <span className={"con" + (r.days_left >= 0 && r.days_left <= 7 ? " gap" : "")}>{r.days_left < 0 ? `đã đi ${-r.days_left} ngày` : r.days_left === 0 ? "đi hôm nay" : `còn ${r.days_left} ngày`}</span></td>
               <td data-n="Chỗ" className="cho"><div className="s"><b>{r.cho_da_ban} / {r.cho_mo_ban}</b><small>còn {r.cho_con}</small></div>
                 <div className="bar"><i style={{ width: p + "%" }} />{r.khach_hoa_von != null && r.cho_mo_ban ? <s style={{ left: Math.min(100, (r.khach_hoa_von / r.cho_mo_ban) * 100) + "%" }} /> : null}</div></td>
               <td data-n="Giá bán" className="so gia">{vnd(r.gia_ban)}</td>
@@ -143,6 +153,8 @@ function BanTourLe() {
 .btl-seg button{font:inherit;font-size:12.5px;font-weight:700;border:0;background:none;color:var(--chu);padding:7px 13px;border-radius:999px;cursor:pointer;min-height:36px}
 .btl-seg button[aria-pressed=true]{background:linear-gradient(120deg,var(--n2),var(--n1));color:#fff}
 .btl-seg button em{font-style:normal;font-size:11px;opacity:.75;margin-left:5px}
+.btl-pv{background:var(--nn)}
+.btl-chi{font-size:12.5px;color:var(--mo);font-weight:600}
 .btl-tim{flex:1;min-width:180px;max-width:320px;margin-left:auto;font:inherit;font-size:13px;background:#fff;border:1px solid var(--vien);border-radius:999px;padding:9px 14px;color:var(--chu)}
 .btl-tim:focus{outline:2px solid var(--n3);outline-offset:1px}
 .btl-bang{background:#fff;border:1px solid var(--vien);border-radius:16px;overflow:hidden}

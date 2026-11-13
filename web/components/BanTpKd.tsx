@@ -8,10 +8,8 @@ const TAB: Tab[] = [
   { ma: "tq", ten: "Tổng quan", the: [] },
   { ma: "ban", ten: "Bán hàng", the: [
     { ten: "Bàn bán tour lẻ", mo_ta: "Chỗ trống, ngày đi và dự toán chuyến", toi: "/ban-tour-le" },
-    { ten: "Lịch khởi hành", mo_ta: "Danh sách chuyến tour lẻ", toi: "/tours?mang=le" },
-    { ten: "Báo giá", mo_ta: "Soạn nháp, kiểm tra biên trước khi gửi khách", toi: "/bao-gia?mang=kd_le" },
-    { ten: "Giá & chính sách bán", mo_ta: "Bảng giá và thời hạn áp dụng", toi: "/bang-gia" },
-    { ten: "Dịch vụ lẻ", mo_ta: "Visa, vé, phòng, xe và dịch vụ rời", toi: "/non-package" }] },
+    { ten: "Chính sách bán", mo_ta: "Chiết khấu, giá trẻ em, khuyến mãi · hoa hồng đối tác/CTV · điểm Rewards", toi: "/chinh-sach-ban" },
+    { ten: "Dịch vụ lẻ", mo_ta: "Visa, vé, phòng, xe, gửi khách hưởng hoa hồng", toi: "/non-package" }] },
   { ma: "khach", ten: "Khách & booking", tieu_de: "Khách & booking", the: [
     { ten: "Khách hàng & phân lead", mo_ta: "Lead mới, giao người chăm, nguồn khách", toi: "/leads?tab=leads" },
     { ten: "Hộp thư đa kênh", mo_ta: "Hội thoại và khách chờ sale", toi: "/inbox" },
