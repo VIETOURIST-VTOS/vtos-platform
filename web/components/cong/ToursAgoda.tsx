@@ -200,6 +200,10 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
     vat: false, mst: "", cty: "", dc: "", vat_email: "", dong_y: false, khach: [] as any[] });
   const [yc, setYc] = useState<any>({ so_khach: 20, tu: "", den: "", noi: "", ngan_sach: "", hang_ks: "", cong_ty: "", hoa_don: false, dien_thoai: "", ghi_chu: "", dong_y: false });
   const [loi, setLoi] = useState(""); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState("");
+  // TR-13: trang tour gập theo ngày và theo mục chính sách (Chủ tịch duyệt bản xem thử 14-11-2026)
+  const [moNgay, setMoNgay] = useState<Record<number, boolean>>({ 1: true });
+  const [moHet, setMoHet] = useState(false);
+  const [moCs, setMoCs] = useState<Record<number, boolean>>({ 0: true });
   const len = () => { try { window.scrollTo(0, 0); } catch { /* bỏ qua */ } };
   const datDuong = (p: string) => { try { window.history.replaceState(null, "", p); } catch { /* bỏ qua */ } };
 
@@ -213,7 +217,7 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
     setLoi(""); setBusy(true);
     try {
       const o = await goiCong(`/mo/tour-online/san-pham/${id}?nguoi_lon=${q.nl}&tre_em=${q.te}`);
-      setSp(o); setLt(o.lich_trinh); setBuoc("sp"); len(); datDuong(duongRieng("tours", id));
+      setSp(o); setLt(o.lich_trinh); setBuoc("sp"); setMoNgay({ 1: true }); setMoHet(false); setMoCs({ 0: true }); len(); datDuong(duongRieng("tours", id));
       // TR-6 · đọc đánh giá SAU và RIÊNG, không chờ: cửa đánh giá hỏng hay chậm thì trang tour
       // vẫn mở bình thường — khách vào đây để xem tour, không phải để xem đánh giá.
       setDg(null);
@@ -493,6 +497,18 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
     const doan = sp.loai === "doan" || !!sp.chua_co_lich;
     const keo = (id: string) => (e: React.MouseEvent) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }); };
     const ngayLt: any[] = lt?.ngay || [];
+    const nhanhTour: [string, string][] = [];
+    if (sp.thoi_luong) nhanhTour.push(["Thời lượng", sp.thoi_luong]);
+    if (sp.noi_khoi_hanh) nhanhTour.push(["Khởi hành từ", sp.noi_khoi_hanh]);
+    if (sp.phuong_tien?.length) nhanhTour.push(["Phương tiện", sp.phuong_tien.map((pt: string) => PT[pt] || pt).join(", ")]);
+    if (sp.loai_ten) nhanhTour.push(["Loại tour", sp.loai_ten]);
+    if (sp.diem_den) nhanhTour.push(["Điểm đến", sp.diem_den]);
+    // TR-13: mỗi mục chính sách chỉ dựng từ dữ liệu có thật của sản phẩm — không bịa thêm điều khoản.
+    const csMuc: [string, string][] = [];
+    if (!doan) csMuc.push(["Đặt cọc và thanh toán",
+      `Đặt cọc ${sp.coc_pt}% để giữ chỗ; phần còn lại trả trước ngày khởi hành ${sp.dong_so_truoc} ngày (17:00). Đặt sau hạn đó: thanh toán toàn bộ.`]);
+    csMuc.push(sp.quy_dinh ? ["Quy định của chương trình", String(sp.quy_dinh)]
+      : ["Điều kiện hủy và đổi", "Điều kiện hủy gửi kèm xác nhận đặt tour."]);
     return <div className="ksv tra">{css}
       {/* TR-7c: khai cho máy tìm kiếm ĐÚNG những gì màn hình đang hiện — xem jsonLd() ở đầu tệp. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd(sp, dg)) }} />
@@ -508,9 +524,10 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
         <div className="ksv-panel" style={{ padding: 20 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}><h2 style={{ margin: 0, fontSize: 26 }}>{sp.ten}</h2>
             <span className="tra-tag">{sp.loai_ten}</span>{sp.wellness && <span className="tra-tag ok">Wellness &amp; retreat</span>}{sp.chua_co_lich && <span className="tra-tag">Lịch khởi hành đang cập nhật</span>}{sp.gio_chot && <span className="tra-tag hot">Giờ chót</span>}</div>
-          <span className="ksv-muted">{sp.ma} · {sp.thoi_luong}{sp.noi_khoi_hanh ? ` · khởi hành ${sp.noi_khoi_hanh}` : ""}{sp.phuong_tien?.length ? ` · ${sp.phuong_tien.map((p: string) => PT[p] || p).join(", ")}` : ""}</span>
-          {sp.khoi_hanh_text && <span>Lịch khởi hành: {sp.khoi_hanh_text}</span>}
-          {sp.noi_bat?.length > 0 && <ul className="tra-nb">{sp.noi_bat.map((x: string) => <li key={x}>{x}</li>)}</ul>}
+          <span className="tra-ma">{sp.ma}</span>
+          {nhanhTour.length > 0 && <dl className="tra-facts">{nhanhTour.map(([n, v]) => <div key={n}><dt>{n}</dt><dd>{v}</dd></div>)}</dl>}
+          {sp.khoi_hanh_text && <span className="ksv-muted">Lịch khởi hành: {sp.khoi_hanh_text}</span>}
+          {sp.noi_bat?.length > 0 && <div className="tra-nbg">{sp.noi_bat.map((x: string, i: number) => <div key={x} className="tra-nbc"><b>{i + 1}</b><span>{x}</span></div>)}</div>}
         </div>
         <div className="ksv-panel">{sp.gia_tu ? <><span className="ksv-muted">Giá từ</span>{sp.gia_goc && <span className="ksv-old">₫ {vnd(sp.gia_goc)}</span>}
           <b className="ksv-big">₫ {vnd(sp.gia_tu)}</b><span className="ksv-muted">/ người lớn · trẻ em ₫ {vnd(sp.gia_tre_em)}</span></>
@@ -526,7 +543,7 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
               xuống cuối phần nội dung, cạnh dòng ghi giờ đọc — xem mục «Nội dung đọc từ…». */}</div>
       </div>
 
-      {doan ? formDoan : <section className="ksv-panel" id="tra-ngay" style={{ padding: 20 }}><div className="ksv-rhead"><h2 style={{ margin: 0, fontSize: 22 }}>Chọn ngày khởi hành</h2>
+      {doan ? formDoan : <section className="ksv-panel" id="tra-ngay" style={{ padding: 20 }}><div className="ksv-rhead"><h2 className="tra-h" style={{ margin: 0, fontSize: 22 }}>Chọn ngày khởi hành</h2>
         <span className="ksv-muted">{soKhach}</span></div>
         <div className="tra-dates" role="group" aria-label="Ngày khởi hành">{sp.chuyen.map((c: any) => <button key={c.tour_id} type="button" disabled={!c.du_cho}
           className={`tra-dt${chon === c.tour_id ? " on" : ""}${c.du_cho ? "" : " off"}`} aria-pressed={chon === c.tour_id} onClick={() => setChon(c.tour_id)}>
@@ -538,19 +555,42 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
           <span className="ksv-muted">{sp.mo_thanh_toan ? `Giữ chỗ bằng cọc ${sp.coc_pt}% hoặc trả đủ · thẻ / QR` : "Thanh toán trực tuyến sắp mở — gửi yêu cầu giữ chỗ, Sales gọi lại"}</span></div>
       </section>}
 
-      <section className="ksv-panel" id="tra-lt" style={{ padding: 20 }}><h2 style={{ margin: 0, fontSize: 22 }}>Lịch trình</h2>
-        {ngayLt.length ? <ol className="tra-lt">{ngayLt.map((n: any) => <li key={n.ngay}><b>Ngày {n.ngay}{n.tieu_de ? ` · ${String(n.tieu_de).replace(/^\s*ng[aà]y\s*0?\d+\s*[:.\-–·]?\s*/i, "")}` : ""}</b>
-          {(n.bua?.length > 0 || n.khach_san) && <small className="ksv-muted">{n.bua?.length ? `Bữa: ${n.bua.map((b: string) => BUA[b] || b).join(", ")}` : ""}{n.khach_san ? ` · ${n.khach_san}` : ""}</small>}
-          {n.noi_dung && <p>{n.noi_dung}</p>}
-          {n.anh?.length > 0 && <div className="tra-lt-anh">{n.anh.slice(0, 3).map((a: string) => <img key={a} src={a} alt={`Ngày ${n.ngay}`} loading="lazy" referrerPolicy="no-referrer" />)}</div>}</li>)}</ol>
+      {/* TR-13 · Lịch trình gập từng ngày; giữa hai ngày là dải «Đêm N · nơi nghỉ» lấy từ chính
+          khách sạn của ngày đó. Trang cũ đổ hết chữ ra một mạch: tour 6 ngày thì khách phải cuộn
+          qua toàn bộ ngày 1–5 mới thấy ngày 6, và không ai đọc hết. */}
+      <section className="ksv-panel" id="tra-lt" style={{ padding: 20 }}><div className="ksv-rhead"><h2 className="tra-h" style={{ margin: 0, fontSize: 22 }}>Lịch trình</h2>
+        {ngayLt.length > 1 && <button type="button" className="tra-mo" onClick={() => { const h = !moHet; setMoHet(h); setMoNgay(h ? Object.fromEntries(ngayLt.map((n: any) => [n.ngay, true])) : {}); }}>{moHet ? "Thu gọn tất cả" : "Mở tất cả các ngày"}</button>}</div>
+        {ngayLt.length ? <div className="tra-days">{ngayLt.map((n: any, i: number) => {
+          const mo = !!moNgay[n.ngay];
+          const ten = n.tieu_de ? String(n.tieu_de).replace(/^\s*ng[aà]y\s*0?\d+\s*[:.\-–·]?\s*/i, "") : "";
+          return <div key={n.ngay}>
+            <div className={`tra-day${mo ? " on" : ""}`}>
+              <button type="button" className="tra-dhead" aria-expanded={mo} onClick={() => setMoNgay({ ...moNgay, [n.ngay]: !mo })}>
+                <span className="tra-dno" aria-hidden="true">{n.ngay}</span>
+                <span className="tra-dmid"><small>Ngày {n.ngay}</small><b>{ten || "Chương trình trong ngày"}</b>
+                  {(n.bua?.length > 0 || n.khach_san) && <span className="tra-chips2">{(n.bua || []).map((b: string) => <em key={b}>Ăn {BUA[b] || b}</em>)}{n.khach_san && <em>Nghỉ: {n.khach_san}</em>}</span>}</span>
+                <span className="tra-dsign" aria-hidden="true">{mo ? "−" : "+"}</span></button>
+              {mo && <div className="tra-dbody">
+                {n.noi_dung ? <p>{n.noi_dung}</p> : <span className="ksv-muted">Nội dung ngày này đang cập nhật.</span>}
+                {n.anh?.length > 0 && <div className="tra-lt-anh">{n.anh.slice(0, 3).map((a: string) => <img key={a} src={a} alt={`Ngày ${n.ngay}`} loading="lazy" referrerPolicy="no-referrer" />)}</div>}
+                {(n.khach_san || n.bua?.length > 0) && <div className="tra-dfoot">
+                  <div><small>Nghỉ đêm</small><b>{n.khach_san || (i === ngayLt.length - 1 ? "Không — kết thúc tour" : "Đang cập nhật")}</b></div>
+                  <div><small>Bữa ăn</small><b>{n.bua?.length ? n.bua.map((b: string) => BUA[b] || b).join(", ") : "Theo chương trình"}</b></div></div>}
+              </div>}
+            </div>
+            {i < ngayLt.length - 1 && n.khach_san && <div className="tra-dnoi"><span>Đêm {n.ngay} · {n.khach_san}</span></div>}
+          </div>;
+        })}</div>
           : lt?.van_ban ? <p style={{ whiteSpace: "pre-line", margin: 0, lineHeight: 1.65 }}>{lt.van_ban}</p>
           : <span className="ksv-muted">Chương trình chi tiết đang cập nhật — Sales gửi kèm xác nhận.</span>}</section>
 
       <section className="ksv-grid2" id="tra-bg">
-        <div className="ksv-panel"><b>Giá bao gồm</b>{sp.bao_gom?.length ? <ul className="tra-ok">{sp.bao_gom.map((x: string, i: number) => <li key={i}>{x}</li>)}</ul>
-          : sp.dich_vu ? <p style={{ whiteSpace: "pre-line", margin: 0 }}>{sp.dich_vu}</p> : <span className="ksv-muted">Đang cập nhật.</span>}</div>
-        <div className="ksv-panel"><b>Giá không bao gồm</b>{sp.khong_bao_gom?.length ? <ul className="tra-ko">{sp.khong_bao_gom.map((x: string, i: number) => <li key={i}>{x}</li>)}</ul>
-          : <span className="ksv-muted">Chi phí cá nhân và dịch vụ ngoài chương trình.</span>}</div>
+        <div className="ksv-panel tra-inc"><div className="tra-ihead ok"><b>GIÁ BAO GỒM</b>{sp.bao_gom?.length > 0 && <em>{sp.bao_gom.length} mục</em>}</div>
+          {sp.bao_gom?.length ? <ul className="tra-ok">{sp.bao_gom.map((x: string, i: number) => <li key={i}>{x}</li>)}</ul>
+            : sp.dich_vu ? <p style={{ whiteSpace: "pre-line", margin: 0 }}>{sp.dich_vu}</p> : <span className="ksv-muted">Đang cập nhật.</span>}</div>
+        <div className="ksv-panel tra-inc no"><div className="tra-ihead no"><b>GIÁ KHÔNG BAO GỒM</b>{sp.khong_bao_gom?.length > 0 && <em>{sp.khong_bao_gom.length} mục</em>}</div>
+          {sp.khong_bao_gom?.length ? <ul className="tra-ko">{sp.khong_bao_gom.map((x: string, i: number) => <li key={i}>{x}</li>)}</ul>
+            : <span className="ksv-muted">Chi phí cá nhân và dịch vụ ngoài chương trình.</span>}</div>
       </section>
       {/* ══ TR-6 · 13/11/2026 · ĐÁNH GIÁ CỦA KHÁCH ĐÃ ĐI ══════════════════════════════════════
           BA TRẠNG THÁI, BA CÂU KHÁC NHAU — không gộp:
@@ -564,7 +604,7 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
           sơ hướng dẫn viên tại VTOS») nên không được hiện ở đây. Xem `dong_y.py`. */}
       {dg && !dg.loi && (
         <section className="ksv-panel" style={{ padding: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 20 }}>Khách đã đi nói gì</h2>
+          <h2 className="tra-h" style={{ margin: 0, fontSize: 20 }}>Khách đã đi nói gì</h2>
           {dg.so_danh_gia > 0 ? <>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
               <b style={{ fontSize: 30, lineHeight: 1.1 }}>{dg.diem_tb}</b>
@@ -585,18 +625,26 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
             Tour này chưa có đánh giá nào được đăng công khai. Vietourist chỉ đăng nhận xét của khách
             đã thật sự đi tour và đã đồng ý cho đăng — nên mục này đầy dần theo từng đoàn, không mua được.</p>}
         </section>)}
-      {sp.bang_gia_web?.length > 0 && <section className="ksv-panel"><b>Bảng giá theo đối tượng (trang tour)</b>{sp.bang_gia_web.map((b: any, i: number) =>
-        <div key={i} className="ksv-sum"><span>{b.doi_tuong}</span><span>{b.gia ? `₫ ${vnd(b.gia)}` : b.ghi || "—"}</span></div>)}
-        <small className="ksv-muted">Giá đặt online theo từng ngày khởi hành ở trên.</small></section>}
-      <section className="ksv-panel" id="tra-cs" style={{ padding: 20 }}><h2 style={{ margin: 0, fontSize: 20 }}>Chính sách</h2>
-        {!doan && <span>Đặt cọc {sp.coc_pt}% để giữ chỗ; phần còn lại trả trước ngày khởi hành {sp.dong_so_truoc} ngày (17:00). Đặt sau hạn đó: thanh toán toàn bộ.</span>}
-        {sp.quy_dinh ? <p style={{ whiteSpace: "pre-line", margin: 0, lineHeight: 1.6 }}>{sp.quy_dinh}</p> : <span className="ksv-muted">Điều kiện hủy gửi kèm xác nhận đặt tour.</span>}
+      {sp.bang_gia_web?.length > 0 && <section className="ksv-panel" style={{ padding: 20 }}><h2 className="tra-h" style={{ margin: 0, fontSize: 20 }}>Giá theo đối tượng</h2>
+        <div className="tra-tbl"><table><thead><tr><th scope="col">Đối tượng</th><th scope="col">Giá / khách</th></tr></thead>
+          <tbody>{sp.bang_gia_web.map((b: any, i: number) => <tr key={i}><td>{b.doi_tuong}</td><td>{b.gia ? `₫ ${vnd(b.gia)}` : b.ghi || "—"}</td></tr>)}</tbody></table></div>
+        <small className="ksv-muted">Giá niêm yết trên trang tour. Giá đặt online theo từng ngày khởi hành ở trên.</small></section>}
+      {/* TR-13 · Chính sách tách thành từng mục gập. Bên bán tour nước ngoài có 5 mục; mình chỉ
+          dựng được 2 từ dữ liệu CÓ THẬT — dựng đủ 5 cho đẹp mục lục nghĩa là bịa điều khoản,
+          thứ ràng buộc hai bên khi có tranh chấp. */}
+      <section id="tra-cs" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <h2 className="tra-h" style={{ margin: 0, fontSize: 20 }}>Chính sách và điều khoản</h2>
+        {csMuc.map(([ten, chu], i) => <div key={ten} className={`tra-cs${moCs[i] ? " on" : ""}`}>
+          <button type="button" className="tra-cshead" aria-expanded={!!moCs[i]} onClick={() => setMoCs({ ...moCs, [i]: !moCs[i] })}>
+            <span className="tra-csno" aria-hidden="true">{i + 1}</span><b>{ten}</b><em aria-hidden="true">{moCs[i] ? "−" : "+"}</em></button>
+          {moCs[i] && <div className="tra-csbody"><p>{chu}</p></div>}</div>)}
         {/* TR-6 · 13/11/2026 — liên kết nguồn về ĐÂY, cuối trang, cạnh dòng ghi giờ đọc. Trước
             đợt này nó đứng cạnh giá và đẩy khách rời cổng đúng lúc đang quyết định mua. Ở đây nó
             làm đúng việc của nó: cho khách đối chiếu nguồn, sau khi đã đọc xong chương trình. */}
         {sp.web_cap_nhat && <small className="ksv-muted">Nội dung đọc từ vietourist.com.vn lúc {sp.web_cap_nhat.replace("T", " ").slice(0, 16)}.
           {sp.link_web && <> <a className="ksv-link" href={sp.link_web} target="_blank" rel="noopener noreferrer">Đối chiếu trang gốc ↗</a></>}</small>}
-        {!sp.web_cap_nhat && sp.link_web && <small className="ksv-muted"><a className="ksv-link" href={sp.link_web} target="_blank" rel="noopener noreferrer">Đối chiếu trang gốc ↗</a></small>}</section>
+        {!sp.web_cap_nhat && sp.link_web && <small className="ksv-muted"><a className="ksv-link" href={sp.link_web} target="_blank" rel="noopener noreferrer">Đối chiếu trang gốc ↗</a></small>}
+      </section>
     </div>;
   }
 
@@ -726,6 +774,70 @@ const CSS = `
 .tra-a{display:inline-flex;align-items:center;text-decoration:none}
 @media (max-width:1100px){.tra-sbar{grid-template-columns:1fr 1fr}.tra-sbar .ksv-btn-tim{grid-column:span 2}}
 @media (max-width:900px){.tra-gal{grid-template-columns:1fr 1fr;grid-template-rows:200px 110px}.tra-gal>span:first-child{grid-column:1 / -1;grid-row:auto}.tra-gal>span:nth-child(n+4){display:none}}
+/* TR-13 · navy sáng làm điểm nhấn cho trang chương trình tour (Chủ tịch duyệt bản xem thử 14/11/2026) */
+.tra{--tra-navy:#1a4fa3;--tra-navy-s:#eff4fd;--tra-navy-l:#d3e0f6}
+.tra-h{display:flex;align-items:center;gap:11px}
+.tra-h::before{content:"";flex:none;width:4px;height:24px;border-radius:2px;background:var(--tra-navy)}
+.tra-ma{align-self:flex-start;background:var(--tra-navy);color:#fff;font-size:12px;font-weight:700;letter-spacing:.05em;border-radius:5px;padding:3px 9px}
+.tra-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;margin:2px 0 0;background:var(--tra-navy-l);border:1px solid var(--tra-navy-l);border-top:3px solid var(--tra-navy);border-radius:10px;overflow:hidden}
+.tra-facts>div{background:#fff;padding:12px 14px}
+.tra-facts dt{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#5b82c4;font-weight:700}
+.tra-facts dd{margin:4px 0 0;font-size:15px;font-weight:600}
+.tra-nbg{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.tra-nbc{display:flex;gap:9px;align-items:flex-start;background:#fafcff;border:1px solid var(--tra-navy-l);border-top:3px solid var(--tra-navy);border-radius:10px;padding:12px 14px}
+.tra-nbc b{flex:none;width:24px;height:24px;border-radius:6px;background:#e6eefc;color:var(--tra-navy);display:flex;align-items:center;justify-content:center;font-size:12px}
+.tra-nbc span{font-size:14px;line-height:1.5}
+.tra-mo{min-height:44px;padding:0 18px;border-radius:99px;border:1px solid #c3d6f2;background:var(--tra-navy-s);color:var(--tra-navy);font-weight:700;cursor:pointer}
+.tra-mo:focus-visible{outline:2px solid var(--tra-navy)}
+.tra-days{display:flex;flex-direction:column}
+.tra-day{border:1px solid var(--tra-navy-l);border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(26,79,163,.05)}
+.tra-dhead{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:44px;display:flex;gap:13px;align-items:flex-start;padding:14px 16px;background:#fafcff;border-left:4px solid var(--tra-navy)}
+.tra-day.on .tra-dhead{background:linear-gradient(135deg,#2e63b8,#10306b);color:#fff}
+.tra-dhead:focus-visible{outline:2px solid var(--tra-navy);outline-offset:-2px}
+.tra-dno{flex:none;width:32px;height:32px;border-radius:50%;background:#e6eefc;color:var(--tra-navy);display:flex;align-items:center;justify-content:center;font-weight:700}
+.tra-day.on .tra-dno{background:rgba(255,255,255,.18);color:#fff}
+.tra-dmid{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.tra-dmid small{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#5b82c4;font-weight:700}
+.tra-day.on .tra-dmid small{color:#afc9ee}
+.tra-dmid b{font-size:17px;line-height:1.35}
+.tra-dsign{flex:none;padding-top:4px;font-size:22px;line-height:1;color:#5b82c4}
+.tra-day.on .tra-dsign{color:#afc9ee}
+.tra-chips2{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+.tra-chips2 em{font-style:normal;font-size:12px;font-weight:600;color:#3a5a8c;background:var(--tra-navy-s);border:1px solid var(--tra-navy-l);border-radius:99px;padding:2px 10px}
+.tra-day.on .tra-chips2 em{color:#e3edfb;background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.26)}
+.tra-dbody{display:flex;flex-direction:column;gap:12px;padding:16px;background:#fff}
+.tra-dbody p{margin:0;white-space:pre-line;line-height:1.65;max-width:80ch}
+.tra-dfoot{display:flex;flex-wrap:wrap;gap:1px;background:var(--tra-navy-l);border:1px solid var(--tra-navy-l);border-radius:8px;overflow:hidden}
+.tra-dfoot>div{flex:1 1 180px;display:flex;flex-direction:column;gap:3px;background:#fafcff;padding:10px 14px}
+.tra-dfoot small{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#5b82c4;font-weight:700}
+.tra-dnoi{display:flex;align-items:center;gap:12px;padding:12px 0 12px 18px}
+.tra-dnoi::before{content:"";width:2px;height:30px;background:repeating-linear-gradient(var(--tra-navy) 0 5px,transparent 5px 10px)}
+.tra-dnoi span{font-size:13px;font-weight:600;color:var(--tra-navy);background:var(--tra-navy-s);border:1px dashed #a8c3ec;border-radius:99px;padding:5px 14px}
+.tra-inc{border-top:3px solid var(--tra-navy)}
+.tra-ihead{display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--ksv-line)}
+.tra-ihead b{font-size:13px;letter-spacing:.06em}
+.tra-ihead.ok b{color:var(--ksv-ok)}.tra-ihead.no b{color:#a3261b}
+.tra-ihead em{font-style:normal;font-size:11px;font-weight:600;color:#5b82c4;background:var(--tra-navy-s);border-radius:99px;padding:2px 8px}
+.tra-tbl{border:1px solid var(--tra-navy-l);border-radius:10px;overflow:hidden}
+.tra-tbl table{width:100%;border-collapse:collapse;font-size:15px}
+.tra-tbl th{background:var(--tra-navy);color:#fff;text-align:left;padding:12px 16px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;font-weight:600}
+.tra-tbl th:last-child,.tra-tbl td:last-child{text-align:right}
+.tra-tbl td{padding:13px 16px;border-bottom:1px solid #e6edf6}
+.tra-tbl tr:last-child td{border-bottom:0}
+.tra-tbl tbody tr:nth-child(even) td{background:#fafcff}
+.tra-tbl td:first-child{font-weight:700}
+.tra-tbl td:last-child{font-weight:700;color:var(--tra-navy);font-variant-numeric:tabular-nums}
+.tra-cs{background:#fff;border:1px solid var(--tra-navy-l);border-left:4px solid var(--tra-navy);border-radius:10px;overflow:hidden}
+.tra-cshead{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:44px;display:flex;align-items:center;gap:12px;padding:14px 16px}
+.tra-cs.on .tra-cshead{background:var(--tra-navy-s)}
+.tra-cshead:focus-visible{outline:2px solid var(--tra-navy);outline-offset:-2px}
+.tra-csno{flex:none;width:26px;height:26px;border-radius:7px;background:#e6eefc;color:var(--tra-navy);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.tra-cshead b{flex:1 1 auto;font-size:16px}
+.tra-cshead em{font-style:normal;font-size:20px;line-height:1;color:var(--tra-navy)}
+.tra-csbody{padding:4px 16px 16px 54px}
+.tra-csbody p{margin:0;white-space:pre-line;line-height:1.65}
+@media (max-width:640px){.tra-dbody{padding:14px}.tra-csbody{padding:4px 14px 14px}.tra-dnoi{padding-left:10px}}
+.tra-inc.no{border-top-color:#8a3b2e}
 @media (max-width:640px){.tra-sbar{grid-template-columns:1fr}.tra-sbar .ksv-btn-tim{grid-column:auto}.tra-k4{grid-template-columns:1fr 1fr}.tra-ht{font-size:18px}}
 
 /* ── TR-7 · 13/11/2026 — THẺ TOUR TRÊN ĐIỆN THOẠI (Chủ tịch duyệt bản xem thử 13/11) ─────────
