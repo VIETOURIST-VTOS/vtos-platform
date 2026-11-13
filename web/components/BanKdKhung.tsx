@@ -8,6 +8,7 @@ import { useHomNay } from "@/components/DauManHinh01";
 import NutLich90, { VAI_NUT_LICH_90 } from "@/components/NutLich90";
 import { api, vnd, fmtD } from "@/lib/api";
 import { errMsg } from "@/components/ui";
+import { BieuDoDuong, gonSo } from "@/components/BieuDo";
 
 /** R5-7 · KHUNG CHUNG của ba bàn phòng Kinh doanh lẻ (Trưởng phòng, Trưởng nhóm, Chuyên viên) — Chủ tịch
  *  duyệt bản xem trước 13/11/2026. Ba bàn là BA TỆP RIÊNG (`BanTpKd`, `BanTnKd`, `BanNvKd`), mỗi tệp tự
@@ -58,6 +59,81 @@ export function giaTriDt(o: any): { v: any; phu: string } {
   const lcb = o.moc_lcb ? ` · mốc lương cơ bản ${tien(o.moc_lcb)}: ${o.dat_lcb ? "đã đạt" : "chưa đạt"}` : "";
   return { v: <>{tien(o.so)} <small>/ {ct == null ? "chưa giao" : tien(ct)}</small></>,
            phu: (ct ? `Đạt ${pct(o.so / ct)} chỉ tiêu tháng` : "Chỉ tiêu tháng chưa giao") + lcb };
+}
+
+/** R5-12 · 14/11/2026 (Chủ tịch duyệt bản xem trước): MỘT khối «Doanh thu – Chỉ tiêu» cho bàn GĐ KD, TP,
+ *  Trưởng nhóm, Chuyên viên — đường lũy kế + nhịp cần đi như «Nhịp phấn đấu» (vẽ bằng `BieuDoDuong` chung).
+ *  «Của phòng» = doanh thu chuyến Lẻ (cùng số màn Chủ tịch / TGĐ); «Của tôi» = giá trị booking của chính
+ *  mình. Bàn GĐ chỉ «Của phòng» (`coToi` = false). Mọi con số tính ở máy chủ (`ban_kd_vai.nhip`). */
+export function KhoiNhipDoanhThu({ duong, coToi }: { duong: string; coToi: boolean }) {
+  const [pv, setPv] = useState<"phong" | "toi">("phong");
+  const [ky, setKy] = useState<"thang" | "quy" | "nam">("thang");
+  const [d, setD] = useState<any>(null);
+  const [loi, setLoi] = useState("");
+  useEffect(() => {
+    setD(null); setLoi("");
+    api(`${duong}?ky=${ky}${coToi ? `&pham_vi=${pv}` : ""}`).then(setD).catch((e) => setLoi(errMsg(e)));
+  }, [duong, coToi, pv, ky]);
+  const diem: any[] = d?.diem || [];
+  const nhan = diem.map((x) => x.nhan);
+  const lech = d?.lech;
+  const bac = d?.bac;
+  const nut = <div className="nh-cum">
+    {coToi && <div className="nh-seg" role="group" aria-label="Phạm vi">
+      {([["phong", "Của phòng"], ["toi", "Của tôi"]] as const).map(([k, t]) =>
+        <button key={k} type="button" aria-pressed={pv === k} onClick={() => setPv(k)}>{t}</button>)}
+    </div>}
+    <div className="nh-seg" role="group" aria-label="Kỳ">
+      {([["thang", "Tháng"], ["quy", "Quý"], ["nam", "Năm"]] as const).map(([k, t]) =>
+        <button key={k} type="button" aria-pressed={ky === k} onClick={() => setKy(k)}>{t}</button>)}
+    </div>
+  </div>;
+  return <section className="g5-khoi nh-khoi" aria-label="Doanh thu – chỉ tiêu">
+    <div className="g5-dau"><h2>Doanh thu – chỉ tiêu · {pv === "phong" ? "Của phòng" : "Của tôi"}</h2>{nut}</div>
+    {loi ? <p className="g5-loi">Không đọc được doanh thu: {loi}</p> : !d ? <p className="g5-nho">Đang đọc doanh thu…</p> : <>
+      <div className="nh-o4">
+        <div><b>{tien(d.da)}</b><small>Lũy kế · {d.ten_ky}</small></div>
+        <div><b>{d.chi_tieu == null ? "chưa giao" : tien(d.chi_tieu)}</b><small>Chỉ tiêu kỳ{d.pham_vi === "phong" ? ` · cộng ${d.so_nguoi} người` : ""}</small></div>
+        <div><b>{d.ty_le == null ? "—" : pct(d.ty_le)}</b><small>Tỷ lệ đạt</small></div>
+        <div className={lech == null ? "" : lech >= 0 ? "tot" : "xau"}><b>{lech == null ? "—" : (lech >= 0 ? "+" : "−") + gonSo(Math.abs(lech))}</b>
+          <small>{lech == null ? "Chưa có nhịp" : lech >= 0 ? "Trên nhịp" : "Dưới nhịp"}</small></div>
+      </div>
+      <BieuDoDuong
+        ten={`Nhịp ${d.ten_ky.toLowerCase()}`}
+        phu={d.co_so === "doanh_thu_chuyen"
+          ? "Doanh thu chuyến Lẻ — cùng số khối «Doanh thu theo phòng» trên màn Chủ tịch / TGĐ. Chỉ tiêu phòng = cộng chỉ tiêu từng người."
+          : "Giá trị booking theo ngày tour kết thúc — cùng cơ sở với bảng chấm chỉ tiêu."}
+        ds={[{ ten: "Lũy kế doanh thu", lop: "d1", diem: diem.map((x) => ({ nhan: x.nhan, gt: x.luy_ke })) },
+             { ten: "Nhịp cần đi", lop: "d2", diem: diem.map((x) => ({ nhan: x.nhan, gt: x.nhip })) }]}
+        nhan={nhan}
+        dinh_dang="tien"
+        moc={d.chi_tieu != null ? { gt: d.chi_tieu, nhan: `Chỉ tiêu ${gonSo(d.chi_tieu)}` } : null}
+        chan={<span className="nh-chan">
+          {lech == null ? "Chỉ tiêu chưa giao cho phạm vi này — chỉ vẽ đường lũy kế." : <>
+            <b className={lech >= 0 ? "tot" : "xau"}>{lech >= 0 ? "Trên" : "Dưới"} nhịp {vnd(Math.abs(lech))}</b>
+            {" "}· còn <b>{vnd(d.con_phai)}</b> trong {d.con_don_vi} {d.don_vi} nữa
+            {d.con_phai > 0 && d.con_don_vi > 0 && <> → mỗi {d.don_vi} cần <b>{gonSo(d.moi_don_vi)}</b></>}</>}
+          {bac?.dang_o && <> · đang ở <b>{bac.dang_o.bac}</b> ({bac.dang_o.pct_moc}% mốc)</>}
+          {bac?.ke_tiep && <> · còn <b>{vnd(bac.ke_tiep.con_thieu)}</b> nữa lên <b>{bac.ke_tiep.bac}</b></>}
+        </span>}
+      />
+    </>}
+    {/* Không dùng dấu backtick trong khối style dưới đây (bài học MKT-6/7). */}
+    <style>{`
+.nh-khoi .g5-dau{flex-wrap:wrap;gap:10px}
+.nh-cum{display:flex;gap:8px;flex-wrap:wrap}
+.nh-seg{display:inline-flex;background:#eef3fb;border-radius:999px;padding:3px;gap:2px}
+.nh-seg button{font:inherit;font-size:12.5px;font-weight:600;border:0;background:transparent;color:#1d3a68;border-radius:999px;padding:6px 12px;cursor:pointer}
+.nh-seg button[aria-pressed="true"]{background:#fff;color:#1f4f97;box-shadow:0 1px 4px rgba(31,79,151,.18)}
+.nh-o4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.nh-o4>div{border:1px solid #e6ecf5;border-radius:12px;padding:10px 12px;background:linear-gradient(180deg,#f3f7fd,#fff);min-width:0}
+.nh-o4 b{display:block;font-size:20px;font-weight:800;color:#1f4f97}
+.nh-o4 small{font-size:12px;color:#7d8ca3}
+.nh-o4 .tot b,.nh-chan .tot{color:#1c7a52}.nh-o4 .xau b,.nh-chan .xau{color:#b3281f}
+.nh-chan{font-size:12.5px;color:#7d8ca3}.nh-chan b{color:#1d3a68}
+@media(max-width:720px){.nh-o4{grid-template-columns:repeat(2,minmax(0,1fr))}.nh-o4 b{font-size:17px}}
+`}</style>
+  </section>;
 }
 
 /** Biểu đồ 12 tháng doanh thu – chỉ tiêu của phạm vi bàn. */
@@ -232,7 +308,7 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
   const { toast, datViecBan, user } = useShell();
   const homNay = useHomNay();
   const [d, setD] = useState<any>(null);
-  const [dt, setDt] = useState<any>(null);
+  const dt = null;
   const [loi, setLoi] = useState("");
   const [tab, setTab] = useState(tabs[0].ma);
   const [mo, setMo] = useState<The | null>(null);
@@ -247,9 +323,7 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
       .catch((e) => { setLoi(errMsg(e)); toast(errMsg(e), true); });
   }, []); // eslint-disable-line
   useEffect(() => { tai(); }, [tai]);
-  useEffect(() => {
-    api(`/ban-kd-le/vai/doanh-thu?nam=${new Date().getFullYear()}`).then(setDt).catch(() => setDt({ loi: true }));
-  }, []);
+  // R5-12: khối «Doanh thu – Chỉ tiêu» tự đọc `/vai/nhip`; biểu đồ cột 12 tháng (`/vai/doanh-thu`) đã bỏ.
 
   const moTab = (ma: string) => { setTab(ma); setMo(null); setKhung(null); if (ma === tabs[0].ma) tai(); };
   const moThe = (t: The) => { setMo(t); setKhung(t.toi || null); window.scrollTo({ top: 0 }); };
@@ -291,7 +365,7 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
       <b>{mo.ten}</b>
     </div>}
     {mo && khung && <KhungNhung key={khung} toi={khung} ten={mo.ten} cuaBan={laKd} ngoai={ngoaiKhung} anDauBan />}
-    {mo && !khung && mo.noi === "doanh-thu" && <DoanhThuChiTieuKd />}
+    {mo && !khung && mo.noi === "doanh-thu" && <DoanhThuChiTieuKd anNhip />}
     {mo && !khung && mo.noi === "bang" && <TrangPhanHe khoa="kdle" khongThanh />}
 
     {!mo && tab !== tabs[0].ma && <>

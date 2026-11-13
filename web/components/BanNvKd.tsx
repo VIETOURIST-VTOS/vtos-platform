@@ -1,5 +1,5 @@
 "use client";
-import BanKdKhung, { BangThucBan, BieuDo12, KhoiPhaiThu, OSo, giaTriDt, so, tien, type Tab } from "@/components/BanKdKhung";
+import BanKdKhung, { BangThucBan, KhoiNhipDoanhThu, KhoiPhaiThu, OSo, giaTriDt, so, tien, type Tab } from "@/components/BanKdKhung";
 
 /** R5-7 · BÀN LÀM VIỆC CHUYÊN VIÊN KINH DOANH — Chủ tịch duyệt bản xem trước 13/11/2026.
  *  CHỈ SỐ CỦA CHÍNH MÌNH (Chủ tịch: «chỉ của mình») — máy chủ không trả dòng của người khác.
@@ -43,8 +43,8 @@ export default function BanNvKd() {
           <OSo nhan="Khách còn nợ" nong v={d ? (th.phai_thu?.so == null ? null : tien(th.phai_thu.so)) : undefined} chua="—" phu={d ? `${so(th.phai_thu?.so_booking || 0)} booking · nhắc trước ngày đi` : ""} lk="Nhắc thu" bam={() => moToi("/bookings?mang=le")} />
           <OSo nhan="Chăm sóc quá hạn" nong v={d ? so(th.cham_soc_qua_han?.so) : undefined} phu={d ? `${so(th.cham_soc_qua_han?.toi_han)} phiếu tới hạn` : ""} lk="Chăm sóc" bam={() => moToi("/cham-soc")} />
         </div>
-        <div className="g5-hai">
-          <BieuDo12 dt={dt} ten="Doanh thu – chỉ tiêu của tôi" />
+        <KhoiNhipDoanhThu duong="/ban-kd-le/vai/nhip" coToi />
+        <div>
           <section className="g5-khoi" aria-label="Việc hôm nay">
             <div className="g5-dau"><h2>Việc hôm nay</h2><span>Cũng hiện ở nút Công việc</span></div>
             {!d ? <p className="g5-nho">Đang đọc số…</p> : (d.viec || []).length === 0 ? <p className="g5-nho">Không có việc tồn.</p> :

@@ -8,7 +8,7 @@ import { useHomNay } from "@/components/DauManHinh01";
 import NutLich90, { VAI_NUT_LICH_90 } from "@/components/NutLich90";
 import { api, vnd, fmtD } from "@/lib/api";
 import { errMsg } from "@/components/ui";
-import { DoiNguVaNhom } from "@/components/BanKdKhung";
+import { DoiNguVaNhom, KhoiNhipDoanhThu } from "@/components/BanKdKhung";
 
 /** R5-4 · BÀN LÀM VIỆC GIÁM ĐỐC KINH DOANH LẺ THEO MẪU v32 — Chủ tịch 13/11/2026 05:49:
  *  «giao diện bàn làm việc của GĐKD chưa giống theo mẫu đề xuất» (vietourist-vtd-v32-demo
@@ -104,12 +104,6 @@ export default function BanGdKdLe() {
   const [khung, setKhung] = useState<string | null>(null);
   const [hetBang, setHetBang] = useState(false);   // bảng chuyến: 6 dòng đầu, bấm để xem hết
 
-  const [dt, setDt] = useState<any>(null);
-  const [kyDt, setKyDt] = useState<"thang" | "quy" | "nam">("nam");
-  const taiDt = useCallback(() => {
-    api(`/ban-kd-le/doanh-thu?nam=${new Date().getFullYear()}`).then(setDt).catch(() => setDt({ loi: true }));
-  }, []);
-  useEffect(() => { taiDt(); }, [taiDt]);
   const tai = useCallback(() => {
     api("/ban-kd-le/tong-quan").then((r) => { setD(r); setLoi(""); })
       .catch((e) => { setLoi(errMsg(e)); toast(errMsg(e), true); });
@@ -159,14 +153,6 @@ export default function BanGdKdLe() {
   const viec: any[] = d?.viec || [];
   const hd = d?.hoat_dong;
   const pt = d?.phai_thu;
-  // Doanh thu – chỉ tiêu: kỳ đang chọn tô đậm trên cùng 12 cột (khuôn TC-44 của Chủ tịch).
-  const thangNay = new Date().getMonth() + 1;
-  const trongKy = (m: number) => kyDt === "nam" || (kyDt === "thang" ? m === thangNay : Math.ceil(m / 3) === Math.ceil(thangNay / 3));
-  const dsT: any[] = dt?.thang || [];
-  const cong = (k: string) => { const v = dsT.filter((x, i) => trongKy(i + 1) && x[k] != null).map((x) => x[k]); return v.length ? v.reduce((a: number, b: number) => a + b, 0) : null; };
-  const dtKy = cong("doanh_thu"), ctKy = cong("chi_tieu");
-  const dinh = Math.max(1, ...dsT.map((x) => Math.max(x.doanh_thu || 0, x.chi_tieu || 0)));
-  const nhanKy = kyDt === "nam" ? `Năm ${dt?.nam || ""}` : kyDt === "quy" ? `Quý ${Math.ceil(thangNay / 3)}/${dt?.nam || ""}` : `Tháng ${thangNay}/${dt?.nam || ""}`;
 
   return (<div className="g5">
     {/* R5-6 · Chủ tịch duyệt 13/11/2026: thanh ngang ĐỒNG NHẤT với bàn Chủ tịch và GĐ đội xe — cùng lớp
@@ -189,7 +175,7 @@ export default function BanGdKdLe() {
       <b>{mo.ten}</b>
     </div>}
     {mo && khung && <KhungNhung key={khung} toi={khung} ten={mo.ten} cuaBan={laKd} ngoai={ngoaiKhung} anDauBan />}
-    {mo && !khung && mo.noi === "doanh-thu" && <DoanhThuChiTieuKd />}
+    {mo && !khung && mo.noi === "doanh-thu" && <DoanhThuChiTieuKd anNhip />}
     {mo && !khung && mo.noi === "bang" && <TrangPhanHe khoa="kdle" khongThanh />}
 
     {!mo && tab !== "tq" && <>
@@ -215,37 +201,10 @@ export default function BanGdKdLe() {
         <OSo nhan="Khách tiềm năng mới" v={null} phu="Chưa có nguồn · không thay bằng 0 (Marketing)" lk="Cửa nhập" bam={() => moToi("/leads?tab=leads")} />
       </div>
 
-      <div className="g5-hai">
-        <section className="g5-khoi" aria-label="Doanh thu – chỉ tiêu tour lẻ">
-          <div className="g5-dau"><h2>Doanh thu – chỉ tiêu tour lẻ</h2><span>{nhanKy}</span></div>
-          <div className="g5-ky" role="group" aria-label="Kỳ">
-            {([["thang", "Tháng"], ["quy", "Quý"], ["nam", "Năm"]] as const).map(([k, ten]) => (
-              <button key={k} type="button" aria-pressed={kyDt === k} onClick={() => setKyDt(k)}>{ten}</button>))}
-          </div>
-          {!dt ? <p className="g5-nho">Đang đọc doanh thu…</p> : dt.loi ? <p className="g5-loi">Không đọc được doanh thu.</p> : <>
-            <div className="g5-ba">
-              {/* R5-10 · 13/11/2026 (Chủ tịch: «khớp với số liệu bàn Chủ tịch… cách tính đồng nhất»): doanh thu
-                  chuyến — cùng hàm với khối «Doanh thu theo phòng» của màn Chủ tịch / TGĐ; tỷ lệ đạt chia cùng số ấy. */}
-              <div><b>{dtKy == null ? "chưa có" : tien(dtKy)}</b><small>Doanh thu · {nhanKy}</small></div>
-              <div><b>{ctKy == null ? "chưa giao" : tien(ctKy)}</b><small>Chỉ tiêu</small></div>
-              <div className="dat"><b>{dtKy != null && ctKy ? Math.round((dtKy / ctKy) * 100) + "%" : "—"}</b><small>Tỷ lệ đạt</small></div>
-            </div>
-            {dt.ly_do_chi_tieu && <p className="g5-nho">{dt.ly_do_chi_tieu}</p>}
-            <p className="g5-nho">Cùng số và cùng cách tính với khối «Doanh thu theo phòng · Lẻ» trên màn Chủ tịch / TGĐ (doanh thu chuyến).{the.doanh_thu_chi_tieu?.tong_booking != null && <> Tổng giá trị booking tháng này — cơ sở xếp hạng từng NV: <b>{tien(the.doanh_thu_chi_tieu.tong_booking)}</b>.</>}</p>
-            <div className="g5-chu"><span><i className="c" />Doanh thu</span><span><i className="k" />Chỉ tiêu tháng</span></div>
-            <div className="g5-bd" role="img" aria-label="Doanh thu và chỉ tiêu tour lẻ 12 tháng">
-              {dsT.map((x, i) => (
-                <div key={x.ky} className={"g5-c" + (trongKy(i + 1) ? " on" : "")} title={`${x.ky}: ${x.doanh_thu == null ? "chưa có" : tien(x.doanh_thu)}`}>
-                  <div className="g5-c-o">
-                    {x.chi_tieu != null && <s style={{ bottom: (x.chi_tieu / dinh) * 100 + "%" }} />}
-                    {x.doanh_thu != null && <i style={{ height: Math.max(1, (x.doanh_thu / dinh) * 100) + "%" }} />}
-                  </div>
-                  <span>T{i + 1}</span>
-                </div>))}
-            </div>
-          </>}
-        </section>
+      {/* R5-12 · Chủ tịch 14/11/2026: một khối đường lũy kế; bàn GĐ chỉ «Của phòng». */}
+      <KhoiNhipDoanhThu duong="/ban-kd-le/nhip" coToi={false} />
 
+      <div>
         <section className="g5-khoi" aria-label="Phải thu khách hàng">
           <div className="g5-dau"><h2>Phải thu khách hàng</h2><span>Booking tour lẻ · theo hạn</span></div>
           {!d ? <p className="g5-nho">Đang đọc số…</p> : !pt || pt.tong == null ? <p className="g5-nho">{pt?.ly_do || "chưa đo"}</p> : <>

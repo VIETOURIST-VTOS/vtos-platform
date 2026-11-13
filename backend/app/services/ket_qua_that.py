@@ -299,6 +299,17 @@ def _theo_mang(ds: list[Tour], so: dict) -> dict:
     return ra
 
 
+def _theo_ngay_mang(ds: list[Tour], so: dict) -> dict:
+    """{ngăn: {"YYYY-MM-DD": doanh thu}} — ngày ghi = ngày đóng số, chưa đóng thì ngày khởi hành."""
+    from app.services import segments as SEG
+    ra: dict[str, dict[str, float]] = {m: {} for m in NGAN}
+    for t in ds:
+        m = SEG.mang_of(t) or {"non_package": "dich_vu_le", "thue_xe": "thue_xe"}.get(t.tour_type, "khac")
+        n = (t.closed_at.date() if t.closed_at is not None else t.start_date).isoformat()
+        ra[m][n] = ra[m].get(n, 0.0) + _dt_so(so, t)
+    return ra
+
+
 def thang(db: Session, ky: str, nho: dict | None = None) -> dict:
     """Doanh thu và lãi tour của MỘT tháng, phạm vi Vietourist mẹ.
 
@@ -453,6 +464,10 @@ def thang(db: Session, ky: str, nho: dict | None = None) -> dict:
         # thiếu 10,5 tỷ so với con số ngay phía trên nó trên CÙNG MỘT màn hình — đúng lỗi TC-98
         # vừa sửa ngày 07/10, chỉ là lặp lại ở chiều ngược.
         "theo_mang": _theo_mang(co_dt, so),
+        # R5-12 · 14/11/2026: CÙNG tập `co_dt`, chia thêm theo NGÀY GHI của chuyến (ngày đóng số nếu
+        # đã đóng, ngày khởi hành nếu chưa — đúng hai mốc của luật A), để bàn Kinh doanh vẽ đường
+        # lũy kế theo ngày mà cuối kỳ cộng ra ĐÚNG ô `theo_mang`. Thêm khoá, không đổi khoá nào.
+        "theo_ngay_mang": _theo_ngay_mang(co_dt, so),
     }
     if nho is not None:
         nho[khoa] = ra

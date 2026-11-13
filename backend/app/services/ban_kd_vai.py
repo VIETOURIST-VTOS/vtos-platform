@@ -204,9 +204,7 @@ def doi_ngu_ca_phong(db: Session, nguoi_xem: int = 0, hom_nay: date | None = Non
             nhom.append({"don_vi_id": c.id, "ten": c.ten, "ma": c.ma, "tien": tien, "so_nguoi": so_ng,
                          "chi_tieu": ct, "ty_le": (tien / ct) if ct else None})
         return {"nguon": "co_cau", "doi_ngu": doi, "theo_nhom": nhom}
-    q = select(User).where(User.role.in_(VAI_NGUOI_BAN + ("tp_kd",)), User.active == True,  # noqa: E712
-                           func.coalesce(User.sales_group, "").in_(NHOM_LE))
-    uids = sorted({x.id for x in db.execute(q).scalars()})
+    uids = nguoi_phong_le(db, d)
     kq = DT.thang(db, ky, LUONG, None)
     ban = {o["user_id"]: o for o in kq["theo_nguoi"] if o["user_id"] in uids}
     doi = [_dong(db, bang_ct, uid, ban.get(uid, {}), {}, nguoi_xem) for uid in uids]
@@ -375,3 +373,104 @@ def doanh_thu_12(db: Session, u: User, nam: int) -> dict:
     return {"nam": nam, "vai": vai, "thang": thang,
             "co_so": ("Doanh thu chuyến Lẻ — cùng số khối «Doanh thu theo phòng» trên màn Chủ tịch / TGĐ." if vai == "tp"
                       else "Giá trị booking chưa huỷ, kỳ theo tháng ngày tour kết thúc (cùng cơ sở xếp hạng NV).")}
+
+
+# ══ R5-12 · MỘT KHỐI «DOANH THU – CHỈ TIÊU» KIỂU ĐƯỜNG LŨY KẾ (Chủ tịch duyệt 14/11/2026) ═════════
+# «2 cái doanh thu & chỉ tiêu này em làm chung 1 biểu đồ cho tất cả trên bàn làm việc của GĐKD, TP,
+# NV đều thấy được của phòng và của tôi, dùng biểu đồ giống hình 1» (hình 1 = Nhịp phấn đấu).
+# Chốt thêm: bàn GĐ chỉ «Của phòng»; chỉ tiêu phòng = CỘNG chỉ tiêu cá nhân (NV 500 tr, TN/TP 1 tỷ —
+# `_chi_tieu_nguoi`, nên NV văn phòng tỉnh vẫn 300 tr và số Chủ tịch đã giao riêng vẫn thắng).
+#   «phong» — doanh thu CHUYẾN Lẻ (`ket_qua_that`, cùng số khối «Doanh thu theo phòng» màn Chủ tịch),
+#             theo ngày ghi của chuyến.
+#   «toi»   — giá trị booking Lẻ của chính người xem theo ngày tour kết thúc (cơ sở chấm chỉ tiêu).
+# Kỳ: thang = theo ngày · quy = theo tuần (13 tuần) · nam = theo tháng. Điểm sau hôm nay để RỖNG
+# (đường lũy kế dừng ở hôm nay), đường nhịp đi hết kỳ.
+
+def nguoi_phong_le(db: Session, d: date) -> list[int]:
+    """Người của phòng Lẻ: cây cơ cấu «le» nếu đã khai, chưa khai thì ô nhóm bán hàng (R5-8)."""
+    pv = [x.id for x in db.execute(select(DonViKD).where(DonViKD.mang == LUONG)).scalars() if x.dang_hieu_luc(d)]
+    nguoi = TC.nguoi_trong(db, pv, _cuoi(f"{d:%Y-%m}")) if pv else []
+    if nguoi:
+        return sorted({n["user_id"] for n in nguoi})
+    q = select(User).where(User.role.in_(VAI_NGUOI_BAN + ("tp_kd",)), User.active == True,  # noqa: E712
+                           func.coalesce(User.sales_group, "").in_(NHOM_LE))
+    return sorted({x.id for x in db.execute(q).scalars()})
+
+
+def _ct_thang(db: Session, ky: str, uids: list[int]):
+    bang = CT.tra_cuu(db, ky)
+    cts = [c for c in (_chi_tieu_nguoi(bang, u, db) for u in uids) if c]
+    return float(sum(cts)) if cts else None
+
+
+def _dt_phong_ngay(db: Session, ky: str) -> dict[str, float]:
+    from app.services import ket_qua_that as KQT
+    return dict(KQT.thang(db, ky)["theo_ngay_mang"].get("le", {}))
+
+
+def _dt_toi_ngay(db: Session, uid: int, ky: str) -> dict[str, float]:
+    ra: dict[str, float] = {}
+    for r in DT.cua_nguoi(db, uid, ky, LUONG)["rows"]:
+        ra[r["ket_thuc"]] = ra.get(r["ket_thuc"], 0.0) + float(r["tien"])
+    return ra
+
+
+def nhip(db: Session, u: User | None, pham_vi: str, ky_loai: str, hom_nay: date | None = None) -> dict:
+    d = hom_nay or date.today()
+    if pham_vi not in ("phong", "toi") or ky_loai not in ("thang", "quy", "nam"):
+        raise ValueError("pham_vi phải là phong/toi, ky phải là thang/quy/nam")
+    if pham_vi == "toi" and u is None:
+        raise ValueError("«Của tôi» cần người đăng nhập")
+    uids = nguoi_phong_le(db, d) if pham_vi == "phong" else [u.id]
+    theo_ngay = (lambda ky: _dt_phong_ngay(db, ky)) if pham_vi == "phong" else (lambda ky: _dt_toi_ngay(db, u.id, ky))
+    ct_thang = _ct_thang(db, f"{d:%Y-%m}", uids)
+
+    if ky_loai == "thang":
+        ky = f"{d:%Y-%m}"
+        so = monthrange(d.year, d.month)[1]
+        tn = theo_ngay(ky)
+        nhan = [f"{i:02d}" for i in range(1, so + 1)]
+        gia = [tn.get(date(d.year, d.month, i).isoformat(), 0.0) for i in range(1, so + 1)]
+        idx, ct, ten = d.day - 1, ct_thang, f"Tháng {d.month}/{d.year}"
+        don_vi = "ngày"
+    elif ky_loai == "quy":
+        q0 = (d.month - 1) // 3 * 3 + 1
+        dau = date(d.year, q0, 1)
+        gia = [0.0] * 13
+        for m in range(q0, q0 + 3):
+            for n, v in theo_ngay(f"{d.year}-{m:02d}").items():
+                gia[min(12, (date.fromisoformat(n) - dau).days // 7)] += v
+        nhan = [f"Tuần {i}" for i in range(1, 14)]
+        idx, ct, ten = min(12, (d - dau).days // 7), (ct_thang * 3 if ct_thang else None), f"Quý {(q0 + 2) // 3}/{d.year}"
+        don_vi = "tuần"
+    else:
+        gia = [float(sum(theo_ngay(f"{d.year}-{m:02d}").values())) if m <= d.month else 0.0 for m in range(1, 13)]
+        nhan = [f"T{m}" for m in range(1, 13)]
+        idx, ct, ten = d.month - 1, (ct_thang * 12 if ct_thang else None), f"Năm {d.year}"
+        don_vi = "tháng"
+
+    n = len(gia)
+    luy, s = [], 0.0
+    for i, v in enumerate(gia):
+        s += v
+        luy.append(round(s) if i <= idx else None)
+    da = float(luy[idx] or 0)
+    nhip_ds = [round(ct * (i + 1) / n) if ct else None for i in range(n)]
+    nhip_nay = nhip_ds[idx]
+    con = n - 1 - idx
+    con_phai = max(0.0, ct - da) if ct else None
+    bac = None
+    if pham_vi == "toi" and ky_loai == "thang" and u.role == "nv_kd":
+        nh = DT.nhip_cua_nguoi(db, u.id, f"{d:%Y-%m}", "le")
+        bac = {"dang_o": nh.get("bac_dang_o"), "ke_tiep": nh.get("bac_ke_tiep")}
+    return {
+        "pham_vi": pham_vi, "ky": ky_loai, "ten_ky": ten, "don_vi": don_vi,
+        "co_so": ("doanh_thu_chuyen" if pham_vi == "phong" else "gia_tri_booking"),
+        "so_nguoi": len(uids),
+        "chi_tieu": ct, "da": da, "ty_le": (da / ct) if ct else None,
+        "nhip_hom_nay": nhip_nay, "lech": (da - nhip_nay) if nhip_nay is not None else None,
+        "con_phai": con_phai, "con_don_vi": con,
+        "moi_don_vi": (con_phai / max(1, con)) if con_phai is not None else None,
+        "diem": [{"nhan": nhan[i], "luy_ke": luy[i], "nhip": nhip_ds[i]} for i in range(n)],
+        "hom_nay": idx, "bac": bac,
+    }
