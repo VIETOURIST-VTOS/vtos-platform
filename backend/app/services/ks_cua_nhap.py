@@ -28,6 +28,9 @@ có bảng chưa gộp về (chuỗi bán hàng V6), và bảng đã bỏ thì d
 from sqlalchemy.orm import Session
 
 CUA_TAY = (
+# R5-16 14/11/2026. Chính sách bán của Phòng KD Lẻ: GĐ KD / Trưởng phòng KD ban hành từng bản ở màn
+# /chinh-sach-ban (`POST /api/v1/ban-hang/chinh-sach`). Máy không sinh dòng nào — cửa tay thật.
+"chinh_sach_ban",
 # ĐỢT QUY-1 04/11/2026. Sổ quỹ tiền mặt: Kế toán và thủ quỹ lập từng phiếu qua cửa
 # `POST /api/v1/quy/phieu` (khối «Sổ quỹ» màn /collections — Đợt QUY-2). Máy KHÔNG sinh một phiếu
 # quỹ nào: mỗi phiếu là một tờ chứng từ có người lập, nên đây là cửa tay thật.
