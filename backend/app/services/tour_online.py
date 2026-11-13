@@ -1097,8 +1097,46 @@ def doc_khach_san(tieu_de: str, noi_dung: str = "") -> str:
     return ""
 
 
+# TR-16 · CẮT THÂN NGÀY THEO MỐC GIỜ.
+# Chủ tịch duyệt bản xem thử 14-11-2026. TR-14 tách được ngày ra khỏi bài web, nhưng thân mỗi
+# ngày vẫn về dưới dạng MỘT KHỐI CHỮ LIỀN — bài gốc gói cả ngày vào một dòng, không có ký tự
+# xuống dòng nào. Trên trang thật khối ấy dài hơn hai mươi dòng xám, không ai đọc hết.
+# Mà chính khối ấy CÓ SẴN mốc giờ bên trong: «07h15: Xe và hướng dẫn viên…», «Trưa: Quý khách
+# dùng cơm…», «Chiều: Tham quan Tanyoli…», «Tối: Đoàn dùng bữa…». Chỉ là chưa ai cắt.
+_MOC_GIO = re.compile(
+    r"(?:(?<=^)|(?<=[\s.;:!?)\u2013\u2014-]))"                       # đứng đầu dòng hoặc sau dấu câu
+    r"((?:\d{1,2}\s*[hg]\s*\d{0,2})|S[áa]ng|Tr[ưu]a|Chi[ềe]u|T[ốo]i|Đ[êe]m|Khuya|Sau\s+đ[óo])"
+    r"\s*[:.\u2013\u2014-]\s+", re.IGNORECASE)
+TOI_THIEU_DOAN = 2
+
+
+def tach_doan(noi_dung: str) -> list[dict]:
+    """Thân một ngày → từng đoạn có mốc giờ. Dưới hai mốc thì trả rỗng, để nguyên khối chữ.
+
+    Ép «ít nhất hai mốc» để một đoạn văn tình cờ mở đầu bằng «Sáng:» không bị xé làm đôi rồi
+    hiện ra như một đường thời gian chỉ có một chặng — trông còn tệ hơn khối chữ ban đầu.
+    """
+    t = _sach(noi_dung or "").replace("\r", "")
+    if not t:
+        return []
+    moc = list(_MOC_GIO.finditer(t))
+    if len(moc) < TOI_THIEU_DOAN:
+        return []
+    ra: list[dict] = []
+    dau = t[:moc[0].start()].strip(" .;:\u2013\u2014-\n")
+    if dau:
+        ra.append({"luc": "", "chu": dau})
+    for k, m in enumerate(moc):
+        het = moc[k + 1].start() if k + 1 < len(moc) else len(t)
+        chu = t[m.end():het].strip(" .;:\n")
+        luc = _sach(m.group(1)).replace(" ", "")
+        if chu:
+            ra.append({"luc": luc[:12], "chu": chu[:1500]})
+    return ra if len(ra) >= TOI_THIEU_DOAN else []
+
+
 def ngay_day_du(ds: list[dict], ngay_cuoi_khong_nghi: bool = True) -> list[dict]:
-    """Đắp bữa ăn và nơi nghỉ vào từng ngày đọc từ web / từ chương trình sản phẩm."""
+    """Đắp bữa ăn, nơi nghỉ và các đoạn theo mốc giờ vào từng ngày."""
     ra = []
     for i, x in enumerate(ds):
         td = str(x.get("tieu_de") or "")
@@ -1106,6 +1144,7 @@ def ngay_day_du(ds: list[dict], ngay_cuoi_khong_nghi: bool = True) -> list[dict]
         cuoi = ngay_cuoi_khong_nghi and i == len(ds) - 1
         ra.append({**x, "tieu_de": bo_cum_bua(td) or td,
                    "bua": doc_bua(td),
+                   "doan": tach_doan(nd),
                    "khach_san": "" if cuoi else doc_khach_san(td, nd)})
     return ra
 
