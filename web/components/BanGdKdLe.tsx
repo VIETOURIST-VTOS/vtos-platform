@@ -240,19 +240,19 @@ export default function BanGdKdLe() {
                 : <div className="ngay dat">đã đạt</div>;
               return (
               <tr key={r.id}>
-                <td><b className="ma">{r.code}</b><div className="ngay">{fmtD(r.start_date)} · {r.name}</div></td>
-                <td><b>{r.cho_da_ban} / {r.cho_mo_ban}</b><div className="ngay">Còn {r.cho_con} chỗ</div>
+                <td data-n="" className="c-ma"><b className="ma">{r.code}</b><div className="ngay">{fmtD(r.start_date)} · {r.name}</div></td>
+                <td data-n="Đã bán / chỗ mở"><b>{r.cho_da_ban} / {r.cho_mo_ban}</b><div className="ngay">Còn {r.cho_con} chỗ</div>
                   <div className="vach">{co && r.cho_mo_ban ? <s style={{ left: Math.min(100, (r.khach_hoa_von / r.cho_mo_ban) * 100) + "%" }} /> : null}
                     <i style={{ width: pt2 + "%" }} /></div></td>
-                <td>{vnd(r.gia_ban)} đ</td>
+                <td data-n="Giá bán">{vnd(r.gia_ban)} đ</td>
                 {co ? <>
-                  <td><b>{r.khach_hoa_von} khách</b>{thieu(r.khach_hoa_von)}</td>
-                  <td>{r.khach_dat_bien == null ? <span className="ngay">không đạt được ở giá này</span>
+                  <td data-n="Hòa vốn"><b>{r.khach_hoa_von} khách</b>{thieu(r.khach_hoa_von)}</td>
+                  <td data-n="Lãi mục tiêu">{r.khach_dat_bien == null ? <span className="ngay">không đạt được ở giá này</span>
                     : <><b>{r.khach_dat_bien} khách</b>{thieu(r.khach_dat_bien)}</>}</td>
-                  <td><b className={"lai" + ((r.bien_khi_day ?? 0) < 0 ? " lo" : "")}>{r.bien_khi_day == null ? "—" : (r.bien_khi_day * 100).toFixed(1).replace(".", ",") + "%"}</b>
+                  <td data-n="Bán đủ khách"><b className={"lai" + ((r.bien_khi_day ?? 0) < 0 ? " lo" : "")}>{r.bien_khi_day == null ? "—" : (r.bien_khi_day * 100).toFixed(1).replace(".", ",") + "%"}</b>
                     <div className="ngay">nếu bán đủ {r.khach_toi_da} khách</div></td>
-                </> : <td colSpan={3}><span className="nhan chua">Chưa có dự toán riêng — Điều hành nhập ba con số dự toán thì ba cột này tự hiện</span></td>}
-                <td><button type="button" className="g5-cua" onClick={() => moToi(`/tours/${r.id}`)}>Chi tiết →</button></td>
+                </> : <td colSpan={3} className="c-rong"><span className="nhan chua">Chưa có dự toán riêng — Điều hành nhập ba con số dự toán thì ba cột này tự hiện</span></td>}
+                <td className="c-nut"><button type="button" className="g5-cua" onClick={() => moToi(`/tours/${r.id}`)}>Chi tiết →</button></td>
               </tr>); })}</tbody>
           </table>
           {d.thuc_ban.length > 6 && <button type="button" className="g5-them" onClick={() => setHetBang(!hetBang)}>

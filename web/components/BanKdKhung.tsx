@@ -88,7 +88,7 @@ export function KhoiNhipDoanhThu({ duong, coToi }: { duong: string; coToi: boole
         <button key={k} type="button" aria-pressed={ky === k} onClick={() => setKy(k)}>{t}</button>)}
     </div>
   </div>;
-  return <section className="g5-khoi nh-khoi" aria-label="Doanh thu – chỉ tiêu">
+  return <section className={"g5-khoi nh-khoi nh-ky-" + ky} aria-label="Doanh thu – chỉ tiêu">
     <div className="g5-dau"><h2>Doanh thu – chỉ tiêu · {pv === "phong" ? "Của phòng" : "Của tôi"}</h2>{nut}</div>
     {loi ? <p className="g5-loi">Không đọc được doanh thu: {loi}</p> : !d ? <p className="g5-nho">Đang đọc doanh thu…</p> : <>
       <div className="nh-o4">
@@ -212,14 +212,14 @@ export function BangDoiNgu({ ds, coNhom, don }: { ds: any[]; coNhom?: boolean; d
         <thead><tr><th>#</th><th>Người</th>{coNhom && <th>Nhóm</th>}<th>Doanh thu</th><th>Chỉ tiêu</th><th>Đạt</th><th>Mốc lương cơ bản</th><th>Booking</th></tr></thead>
         <tbody>{ds.map((x, i) => (
           <tr key={x.user_id}>
-            <td><span className={"dn-hang" + (i === 0 && x.tien > 0 ? " v1" : "")}>{i + 1}</span></td>
-            <td><b>{x.ho_ten}</b>{x.la_toi && <span className="dn-toi">tôi</span>}</td>
-            {coNhom && <td>{x.don_vi ? <span className="dn-nhom">{x.don_vi}</span> : "—"}</td>}
-            <td>{tien(x.tien)}</td>
-            <td>{x.chi_tieu == null ? <span className="dn-mo">chưa giao</span> : tien(x.chi_tieu)}</td>
-            <td>{x.ty_le == null ? "—" : <><span className="dn-tr"><i style={{ width: Math.min(100, x.ty_le * 100) + "%" }} /></span>{pct(x.ty_le)}</>}</td>
-            <td>{x.moc_lcb == null ? "—" : <span className={"dn-lcb" + (x.dat_lcb ? " dat" : "")}>{x.dat_lcb ? "Đạt" : "Chưa"} {tien(x.moc_lcb)}</span>}</td>
-            <td>{x.so_booking}</td>
+            <td className="c-hang"><span className={"dn-hang" + (i === 0 && x.tien > 0 ? " v1" : "")}>{i + 1}</span></td>
+            <td className="c-ten"><b>{x.ho_ten}</b>{x.la_toi && <span className="dn-toi">tôi</span>}</td>
+            {coNhom && <td className="c-nhom">{x.don_vi ? <span className="dn-nhom">{x.don_vi}</span> : "—"}</td>}
+            <td className="c-dt" data-n="Doanh thu">{tien(x.tien)}</td>
+            <td className="c-ct" data-n="Chỉ tiêu">{x.chi_tieu == null ? <span className="dn-mo">chưa giao</span> : tien(x.chi_tieu)}</td>
+            <td className="c-dat">{x.ty_le == null ? "—" : <><span className="dn-tr"><i style={{ width: Math.min(100, x.ty_le * 100) + "%" }} /></span>{pct(x.ty_le)}</>}</td>
+            <td className="c-lcb">{x.moc_lcb == null ? "—" : <span className={"dn-lcb" + (x.dat_lcb ? " dat" : "")}>{x.dat_lcb ? "Đạt" : "Chưa"} {tien(x.moc_lcb)}</span>}</td>
+            <td className="c-bk" data-n="Booking">{x.so_booking}</td>
           </tr>))}</tbody>
       </table></div>}
   </section>;
@@ -283,18 +283,18 @@ export function BangThucBan({ ds, moToi }: { ds: any[] | undefined; moToi: (t: s
             : n - r.cho_da_ban > 0 ? <div className="ngay">còn thiếu <b className="cam">{n - r.cho_da_ban}</b> khách</div>
             : <div className="ngay dat">đã đạt</div>;
           return <tr key={r.id}>
-            <td><b className="ma">{r.code}</b><div className="ngay">{fmtD(r.start_date)} · {r.name}</div></td>
-            <td><b>{r.cho_da_ban} / {r.cho_mo_ban}</b><div className="ngay">Còn {r.cho_con} chỗ</div>
+            <td data-n="" className="c-ma"><b className="ma">{r.code}</b><div className="ngay">{fmtD(r.start_date)} · {r.name}</div></td>
+            <td data-n="Đã bán / chỗ mở"><b>{r.cho_da_ban} / {r.cho_mo_ban}</b><div className="ngay">Còn {r.cho_con} chỗ</div>
               <div className="vach">{co && r.cho_mo_ban ? <s style={{ left: Math.min(100, (r.khach_hoa_von / r.cho_mo_ban) * 100) + "%" }} /> : null}
                 <i style={{ width: p + "%" }} /></div></td>
-            <td>{vnd(r.gia_ban)} đ</td>
+            <td data-n="Giá bán">{vnd(r.gia_ban)} đ</td>
             {co ? <>
-              <td><b>{r.khach_hoa_von} khách</b>{thieu(r.khach_hoa_von)}</td>
-              <td>{r.khach_dat_bien == null ? <span className="ngay">không đạt được ở giá này</span> : <><b>{r.khach_dat_bien} khách</b>{thieu(r.khach_dat_bien)}</>}</td>
-              <td><b className={"lai" + ((r.bien_khi_day ?? 0) < 0 ? " lo" : "")}>{r.bien_khi_day == null ? "—" : (r.bien_khi_day * 100).toFixed(1).replace(".", ",") + "%"}</b>
+              <td data-n="Hòa vốn"><b>{r.khach_hoa_von} khách</b>{thieu(r.khach_hoa_von)}</td>
+              <td data-n="Lãi mục tiêu">{r.khach_dat_bien == null ? <span className="ngay">không đạt được ở giá này</span> : <><b>{r.khach_dat_bien} khách</b>{thieu(r.khach_dat_bien)}</>}</td>
+              <td data-n="Bán đủ khách"><b className={"lai" + ((r.bien_khi_day ?? 0) < 0 ? " lo" : "")}>{r.bien_khi_day == null ? "—" : (r.bien_khi_day * 100).toFixed(1).replace(".", ",") + "%"}</b>
                 <div className="ngay">nếu bán đủ {r.khach_toi_da} khách</div></td>
-            </> : <td colSpan={3}><span className="nhan chua">Chưa có dự toán riêng — Điều hành nhập dự toán thì ba cột này tự hiện</span></td>}
-            <td><button type="button" className="g5-cua" onClick={() => moToi(`/tours/${r.id}`)}>Chi tiết →</button></td>
+            </> : <td colSpan={3} className="c-rong"><span className="nhan chua">Chưa có dự toán riêng — Điều hành nhập dự toán thì ba cột này tự hiện</span></td>}
+            <td className="c-nut"><button type="button" className="g5-cua" onClick={() => moToi(`/tours/${r.id}`)}>Chi tiết →</button></td>
           </tr>; })}</tbody>
       </table>
       {ds.length > 6 && <button type="button" className="g5-them" onClick={() => setHet(!het)}>{het ? "Thu gọn" : `Xem thêm ${ds.length - 6} chuyến`}</button>}
