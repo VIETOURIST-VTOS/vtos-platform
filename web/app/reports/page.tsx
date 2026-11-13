@@ -273,7 +273,7 @@ function TongHop() {
         {d.cac_phong.map((p: any) => <option key={p.ma} value={p.ma}>{p.ten}</option>)}</select></label>
       <label>Trạng thái<select value={loc} onChange={(e) => setLoc(e.target.value)}><option value="">Tất cả</option>
         {BA.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-      <span className="muted" style={{ marginLeft: "auto" }}>Mốc dữ liệu {fmtDT(d.as_of)} (giờ VN){d.chi_trang_thai ? " · bạn xem trạng thái cả công ty, nội dung chỉ phòng mình" : ""}</span>
+      <span className="muted" style={{ marginLeft: "auto" }}>Mốc dữ liệu {fmtDT(d.as_of)} (giờ VN){d.chi_trang_thai ? " · bạn xem trạng thái cả công ty, nội dung chỉ phòng mình" : d.pham_vi === "nhom" ? " · báo cáo của người trong nhóm bạn — chỉ đọc, xem xét do Trưởng phòng" : ""}</span>
     </div>
     <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", marginTop: 10 }}>
       {BA.map(([k, l, g, c]) => <button key={k} className="panel" aria-pressed={loc === k} onClick={() => setLoc(loc === k ? "" : k)}
@@ -359,7 +359,7 @@ function Reports() {
     <h1>Báo cáo công việc (Điều 12) &amp; ca trực page</h1>
     <p className="muted">Mọi nhân viên văn phòng (trừ HDV, tài xế, Ban TGĐ) nộp báo cáo 5 phần <b>trước 0 giờ ngày kế tiếp</b> mỗi ngày làm việc (Thứ Hai – Thứ Bảy); nghỉ cả ngày đã duyệt thì không phải nộp. Robot chấm điểm nháp, trưởng phòng chấm chính thức; thiếu 1 ngày → nhắc nhở, 2 ngày liên tiếp → chuyển HCNS. Xếp loại tháng A/B/C/D là cảnh báo sớm, căn cứ đánh giá 3 tháng.</p>
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-      {[["mine", "Báo cáo của tôi"], ...(xemXet ? [["all", "Tổng hợp phòng"]] : []), ...(role === "chutich" ? [["kiem", "Kiêm nhiệm"]] : []), ["shifts", "Ca trực page"]].map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}
+      {[["mine", "Báo cáo của tôi"], ...(xemXet ? [["all", role === "tn_kd" ? "Tổng hợp nhóm" : "Tổng hợp phòng"]] : []), ...(role === "chutich" ? [["kiem", "Kiêm nhiệm"]] : []), ["shifts", "Ca trực page"]].map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}
       <label style={{ marginLeft: "auto" }}>Tháng <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /></label>
     </div>
 

@@ -23,7 +23,7 @@ const TAB: Tab[] = [
     { ten: "Cơ cấu tổ chức", mo_ta: "Phòng → nhóm → người", toi: "/to-chuc-kd" },
     { ten: "Báo cáo công việc", mo_ta: "Báo cáo ngày / tuần của người trong phòng", toi: "/reports" }] },
   { ma: "ct", ten: "Chỉ tiêu & báo cáo", tieu_de: "Chỉ tiêu & báo cáo", the: [
-    { ten: "Doanh thu & chỉ tiêu", mo_ta: "Theo người, theo nhóm, theo kỳ", noi: "doanh-thu" },
+    { ten: "Chỉ tiêu theo người & nhóm", mo_ta: "Xem từng booking tính chỉ tiêu, giao chỉ tiêu", noi: "doanh-thu" },
     { ten: "Báo cáo bán hàng", mo_ta: "Bán tour, nhắc thu, hủy chỗ", toi: "/sales-reports?mang=le" },
     { ten: "Bảng chỉ tiêu phòng", mo_ta: "Ngày / tuần / tháng", noi: "bang" }] },
 ];
