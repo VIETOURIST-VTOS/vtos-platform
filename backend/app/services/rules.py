@@ -301,6 +301,12 @@ DEFAULT_PARAMS = [
     # Tỷ lệ 5:3 giữa HCM và tỉnh giữ đúng như bảng chính sách đang dùng (200:120).
     ("dich_dt_nv_le_hcm", "500000000", "ĐÍCH PHẤN ĐẤU doanh thu NV kinh doanh lẻ HCM — vạch đích trên biểu đồ, KHÔNG dùng tính hoa hồng", "đồng/tháng", "Chủ tịch chốt 28/9/2026"),
     ("dich_dt_nv_le_tinh", "300000000", "ĐÍCH PHẤN ĐẤU doanh thu NV kinh doanh lẻ Cần Thơ và văn phòng tỉnh — giữ tỷ lệ 5:3 so với HCM như bảng chính sách", "đồng/tháng", "Chủ tịch chốt 28/9/2026"),
+    # R5-10 · 14/11/2026 (Chủ tịch): chỉ tiêu DOANH SỐ CÁ NHÂN tự bán của Trưởng nhóm và Trưởng phòng KD lẻ —
+    # 1 tỷ/tháng (Chuyên viên dùng hai khóa đích ở trên: 500 tr HCM / 300 tr tỉnh). Dùng làm chỉ tiêu MẶC ĐỊNH
+    # trên bàn khi Chủ tịch chưa giao số riêng cho người ấy ở /fit; giao riêng thì số giao thắng. KHÔNG tham gia
+    # phép tính lương hay hoa hồng nào. Đặt 0 trên màn Chính sách là tắt (bàn ghi «chưa giao»).
+    ("chi_tieu_tn_kd_le", "1000000000", "CHỈ TIÊU doanh số cá nhân Trưởng nhóm KD lẻ (mặc định khi chưa giao riêng) — KHÔNG dùng tính lương", "đồng/tháng", "Chủ tịch chốt 14/11/2026"),
+    ("chi_tieu_tp_kd_le", "1000000000", "CHỈ TIÊU doanh số cá nhân Trưởng phòng KD lẻ (mặc định khi chưa giao riêng) — KHÔNG dùng tính lương", "đồng/tháng", "Chủ tịch chốt 14/11/2026"),
     ("dich_ln_nv_doan", "50000000", "ĐÍCH PHẤN ĐẤU lợi nhuận NV kinh doanh đoàn — vạch đích trên biểu đồ, KHÔNG dùng tính hoa hồng", "đồng/tháng", "Chủ tịch chốt 28/9/2026"),
 
     ("thang_f_bang", "65:0,70:0,90:0,100:0,110:0.5,130:0.8,160:1.1,200:1.4,250:1.7,300:2,350:2.3,400:2.6,450:2.9,500:3.2,550:3.5,600:3.8,700:4.1,800:4.4,900:4.7,1000:5",

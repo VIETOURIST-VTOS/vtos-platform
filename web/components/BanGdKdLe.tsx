@@ -8,6 +8,7 @@ import { useHomNay } from "@/components/DauManHinh01";
 import NutLich90, { VAI_NUT_LICH_90 } from "@/components/NutLich90";
 import { api, vnd, fmtD } from "@/lib/api";
 import { errMsg } from "@/components/ui";
+import { DoiNguVaNhom } from "@/components/BanKdKhung";
 
 /** R5-4 · BÀN LÀM VIỆC GIÁM ĐỐC KINH DOANH LẺ THEO MẪU v32 — Chủ tịch 13/11/2026 05:49:
  *  «giao diện bàn làm việc của GĐKD chưa giống theo mẫu đề xuất» (vietourist-vtd-v32-demo
@@ -223,11 +224,14 @@ export default function BanGdKdLe() {
           </div>
           {!dt ? <p className="g5-nho">Đang đọc doanh thu…</p> : dt.loi ? <p className="g5-loi">Không đọc được doanh thu.</p> : <>
             <div className="g5-ba">
+              {/* R5-10 · 13/11/2026 (Chủ tịch: «khớp với số liệu bàn Chủ tịch… cách tính đồng nhất»): doanh thu
+                  chuyến — cùng hàm với khối «Doanh thu theo phòng» của màn Chủ tịch / TGĐ; tỷ lệ đạt chia cùng số ấy. */}
               <div><b>{dtKy == null ? "chưa có" : tien(dtKy)}</b><small>Doanh thu · {nhanKy}</small></div>
               <div><b>{ctKy == null ? "chưa giao" : tien(ctKy)}</b><small>Chỉ tiêu</small></div>
               <div className="dat"><b>{dtKy != null && ctKy ? Math.round((dtKy / ctKy) * 100) + "%" : "—"}</b><small>Tỷ lệ đạt</small></div>
             </div>
             {dt.ly_do_chi_tieu && <p className="g5-nho">{dt.ly_do_chi_tieu}</p>}
+            <p className="g5-nho">Cùng số và cùng cách tính với khối «Doanh thu theo phòng · Lẻ» trên màn Chủ tịch / TGĐ (doanh thu chuyến).{the.doanh_thu_chi_tieu?.tong_booking != null && <> Tổng giá trị booking tháng này — cơ sở xếp hạng từng NV: <b>{tien(the.doanh_thu_chi_tieu.tong_booking)}</b>.</>}</p>
             <div className="g5-chu"><span><i className="c" />Doanh thu</span><span><i className="k" />Chỉ tiêu tháng</span></div>
             <div className="g5-bd" role="img" aria-label="Doanh thu và chỉ tiêu tour lẻ 12 tháng">
               {dsT.map((x, i) => (
@@ -254,8 +258,12 @@ export default function BanGdKdLe() {
             <p className="g5-nho">Tổng phải thu <b>{tien(pt.tong)}</b> · <b>{so(pt.so_booking)}</b> booking còn nợ. Hạn = ngày khởi hành của chuyến.</p>
             <button type="button" className="g5-cua" onClick={() => moToi("/bookings?mang=le")}>Xem booking còn nợ →</button>
           </>}
+          {pt?.no_cu?.tong != null && <p className="g5-nho g5-nocu">+ Nợ cũ cần đối soát: <b>{tien(pt.no_cu.tong)}</b> · {so(pt.no_cu.so_booking)} booking — {pt.no_cu.ghi}. Cộng hai phần = số phải thu tour lẻ đầy đủ.</p>}
         </section>
       </div>
+
+      {/* R5-11 · Chủ tịch duyệt 14/11/2026: Đội ngũ + Theo nhóm của cả phòng Lẻ — cùng khối, cùng cách tính bàn TP. */}
+      <DoiNguVaNhom doi={d?.doi_ngu || []} nhom={d?.theo_nhom} dang={!d} />
 
       <section className="g5-khoi" aria-label="Chuyến cần thúc bán">
         <div className="g5-dau"><div><h2>Chuyến cần thúc bán</h2>
@@ -371,6 +379,7 @@ export default function BanGdKdLe() {
 .g5-bang .vach i{display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,var(--g5-ns-a),var(--g5-ns-c))}
 .g5-bang .nhan{display:inline-block;font-size:11.5px;font-weight:600;border-radius:6px;padding:4px 9px}
 .g5-bang .nhan.chua{background:#fbf3e0;color:#8d6200}.g5-bang .nhan.dat{background:#e8f5ef;color:#1c6f50}.g5-bang .nhan.duoi{background:#fdeceb;color:#b3281f}
+.g5-nocu{border-top:1px dashed var(--g5-line);padding-top:8px;color:#8d6200}
 .g5-loi{color:var(--vtos-danger);margin:0}
 .g5-nhom{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;letter-spacing:.12em;color:var(--g5-ns-b);margin:2px 0 -6px}
 .g5-nhom::before{content:"";width:4px;height:14px;border-radius:3px;background:linear-gradient(var(--g5-ns-a),var(--g5-ns-b))}

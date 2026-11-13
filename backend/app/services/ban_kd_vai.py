@@ -62,10 +62,54 @@ def _cuoi(ky: str) -> date:
     return date(y, m, monthrange(y, m)[1])
 
 
-def _chi_tieu_nguoi(bang: dict, uid: int):
-    """Chỉ tiêu đã giao cho MỘT người: ưu tiên luồng «le», rồi «tat_ca». Không có → None (chưa giao)."""
+def _chi_tieu_nguoi(bang: dict, uid: int, db: Session | None = None):
+    """Chỉ tiêu của MỘT người: số Chủ tịch đã GIAO riêng (luồng «le», rồi «tat_ca») thắng; chưa giao thì lấy
+    chỉ tiêu MẶC ĐỊNH theo vai (R5-10, Chủ tịch 14/11/2026): Chuyên viên = đích `dich_dt_nv_le_hcm` / `_tinh`
+    theo văn phòng (500 tr / 300 tr), Trưởng nhóm `chi_tieu_tn_kd_le`, Trưởng phòng `chi_tieu_tp_kd_le` (1 tỷ).
+    Tham số đặt 0 → None («chưa giao»), không phải 0."""
     v = bang["nguoi"].get(f"{uid}|le")
-    return v if v is not None else bang["nguoi"].get(f"{uid}|tat_ca")
+    v = v if v is not None else bang["nguoi"].get(f"{uid}|tat_ca")
+    if v is not None or db is None:
+        return v
+    return chi_tieu_mac_dinh(db, uid)
+
+
+def _tham_so(db: Session, khoa: str):
+    from app.services import rules as R
+    try:
+        v = R.get_param(db, khoa)
+    except KeyError:
+        return None
+    return v if v else None
+
+
+def chi_tieu_mac_dinh(db: Session, uid: int):
+    """Chỉ tiêu mặc định theo vai — xem `_chi_tieu_nguoi`."""
+    from app.models.hr import Employee
+    from app.services import hr as HR
+    u = db.get(User, uid)
+    if u is None:
+        return None
+    if u.role == "tp_kd":
+        return _tham_so(db, "chi_tieu_tp_kd_le")
+    if u.role == "tn_kd":
+        return _tham_so(db, "chi_tieu_tn_kd_le")
+    if u.role == "nv_kd":
+        hcm, tinh = _tham_so(db, "dich_dt_nv_le_hcm"), _tham_so(db, "dich_dt_nv_le_tinh")
+        e = db.execute(select(Employee).where(Employee.user_id == uid)).scalars().first()
+        return HR.moc_of(e, hcm, tinh) if (e and hcm and tinh) else hcm
+    return None
+
+
+def moc_luong_co_ban(db: Session, uid: int):
+    """Mốc nhận lương cơ bản (Chủ tịch 14/11/2026: «mức nhận lương cơ bản là 200 triệu») — ĐỌC tham số mốc
+    chỉ tiêu đang dùng tính hoa hồng (`moc_chi_tieu_hcm` 200 tr / `moc_chi_tieu_cantho` 120 tr), theo văn phòng.
+    Chỉ để HIỆN trên bàn (đạt / chưa đạt); cách tính lương không đổi."""
+    from app.models.hr import Employee
+    from app.services import hr as HR
+    hcm, ct = _tham_so(db, "moc_chi_tieu_hcm"), _tham_so(db, "moc_chi_tieu_cantho")
+    e = db.execute(select(Employee).where(Employee.user_id == uid)).scalars().first()
+    return HR.moc_of(e, hcm, ct) if (e and hcm and ct) else hcm
 
 
 def _chi_tieu_don_vi(bang: dict, dv_id: int | None):
@@ -101,6 +145,76 @@ def pham_vi(db: Session, u: User, ky: str) -> dict:
             "nhom": (u.sales_group or "") if vai == "tn" else ""}
 
 
+def _dong(db: Session, bang_ct: dict, uid: int, o: dict, nguoi: dict, nguoi_xem: int) -> dict:
+    """Một dòng bảng Đội ngũ (dùng chung bàn TP và bàn GĐ KD — R5-11)."""
+    usr = db.get(User, uid)
+    ct = _chi_tieu_nguoi(bang_ct, uid, db)
+    tien = float(o.get("tien", 0.0))
+    moc = moc_luong_co_ban(db, uid)
+    return {"user_id": uid, "ho_ten": usr.full_name if usr else str(uid),
+            "don_vi": nguoi.get("don_vi") or o.get("don_vi", "") or (usr.sales_group if usr else ""),
+            "vai": nguoi.get("vai", ""), "vai_dang_nhap": usr.role if usr else "",
+            "tien": tien, "so_booking": o.get("so_booking", 0),
+            "chi_tieu": ct, "ty_le": (tien / ct) if ct else None, "la_toi": uid == nguoi_xem,
+            "moc_lcb": moc, "dat_lcb": (tien >= moc) if moc else None}
+
+
+def _gom_theo_nhom_ban_hang(doi_ngu: list[dict]) -> list[dict]:
+    """R5-8: «Theo nhóm» gom theo ô nhóm bán hàng; chỉ tiêu nhóm = cộng chỉ tiêu cá nhân (R5-10)."""
+    g: dict[str, dict] = {}
+    for x in doi_ngu:
+        k = x["don_vi"] or "Chưa có nhóm"
+        o = g.setdefault(k, {"don_vi_id": k, "ten": k, "ma": k, "tien": 0.0, "so_nguoi": 0,
+                             "chi_tieu": None, "ty_le": None})
+        o["tien"] += x["tien"]; o["so_nguoi"] += 1
+        if x["chi_tieu"]:
+            o["chi_tieu"] = (o["chi_tieu"] or 0.0) + x["chi_tieu"]
+    for o in g.values():
+        o["ty_le"] = (o["tien"] / o["chi_tieu"]) if o["chi_tieu"] else None
+    return sorted(g.values(), key=lambda x: (x["ma"] == "Chưa có nhóm", x["ma"]))
+
+
+def doi_ngu_ca_phong(db: Session, nguoi_xem: int = 0, hom_nay: date | None = None) -> dict:
+    """R5-11 (Chủ tịch duyệt 14/11/2026: «bổ sung 2 khung này vào bàn làm việc của GĐ KD»): Đội ngũ + Theo nhóm
+    của CẢ phòng Lẻ cho bàn GĐ KD. Cơ cấu đã khai → mọi người trong cây «le», nhóm = đơn vị lá; chưa khai →
+    đọc ô nhóm bán hàng (NHOM_LE, gồm Chuyên viên, Trưởng nhóm, Trưởng phòng). Cùng cách tính với bàn TP."""
+    d = hom_nay or date.today()
+    ky = f"{d:%Y-%m}"
+    cuoi = _cuoi(ky)
+    bang_ct = CT.tra_cuu(db, ky)
+    dv_all = [x for x in db.execute(select(DonViKD).where(DonViKD.mang == LUONG)).scalars() if x.dang_hieu_luc(d)]
+    pv = [x.id for x in dv_all]
+    nguoi = TC.nguoi_trong(db, pv, cuoi) if pv else []
+    if nguoi:
+        kq = DT.thang(db, ky, LUONG, pv)
+        ban = {o["user_id"]: o for o in kq["theo_nguoi"]}
+        ten = {n["user_id"]: n for n in nguoi}
+        doi = [_dong(db, bang_ct, uid, ban.get(uid, {}), ten[uid], nguoi_xem) for uid in sorted(ten)]
+        doi.sort(key=lambda x: -x["tien"])
+        co_con = {x.cha_id for x in dv_all if x.cha_id}
+        dvt = {x["don_vi_id"]: x for x in kq["theo_don_vi"]}
+        nhom = []
+        for c in sorted((x for x in dv_all if x.id not in co_con), key=lambda x: x.ma):
+            ct = _chi_tieu_don_vi(bang_ct, c.id)
+            tien = float(dvt.get(c.id, {}).get("tien", 0.0))
+            so_ng = len(TC.nguoi_trong(db, [c.id], d))
+            if ct is None:
+                cts = [x["chi_tieu"] for x in doi if x["chi_tieu"] and x["don_vi"] == c.ten]
+                ct = float(sum(cts)) if cts else None
+            nhom.append({"don_vi_id": c.id, "ten": c.ten, "ma": c.ma, "tien": tien, "so_nguoi": so_ng,
+                         "chi_tieu": ct, "ty_le": (tien / ct) if ct else None})
+        return {"nguon": "co_cau", "doi_ngu": doi, "theo_nhom": nhom}
+    q = select(User).where(User.role.in_(VAI_NGUOI_BAN + ("tp_kd",)), User.active == True,  # noqa: E712
+                           func.coalesce(User.sales_group, "").in_(NHOM_LE))
+    uids = sorted({x.id for x in db.execute(q).scalars()})
+    kq = DT.thang(db, ky, LUONG, None)
+    ban = {o["user_id"]: o for o in kq["theo_nguoi"] if o["user_id"] in uids}
+    doi = [_dong(db, bang_ct, uid, ban.get(uid, {}), {}, nguoi_xem) for uid in uids]
+    doi.sort(key=lambda x: -x["tien"])
+    return {"nguon": "nhom_ban_hang", "doi_ngu": doi, "theo_nhom": _gom_theo_nhom_ban_hang(doi)}
+
+
+
 def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
     d = hom_nay or date.today()
     ky = f"{d:%Y-%m}"
@@ -111,8 +225,8 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
     # ── Doanh thu tính chỉ tiêu ─────────────────────────────────────────────────────────────────
     cua_toi = DT.cua_nguoi(db, u.id, ky, LUONG)
     dt_toi = cua_toi["tien"]
-    ct_toi = _chi_tieu_nguoi(bang_ct, u.id)
-    doi_ngu, theo_nhom, dt_pv, ct_pv = [], [], None, None
+    ct_toi = _chi_tieu_nguoi(bang_ct, u.id, db)
+    doi_ngu, theo_nhom, dt_pv, ct_pv, tong_booking_pv = [], [], None, None, None
     if vai in ("tp", "tn"):
         if p["nguon"] == "co_cau":
             kq = DT.thang(db, ky, LUONG, p["don_vi_ids"])
@@ -123,18 +237,22 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
             ban = {o["user_id"]: o for o in kq["theo_nguoi"] if o["user_id"] in uids}
             dt_pv = float(sum(o["tien"] for o in ban.values()))
         ct_pv = _chi_tieu_don_vi(bang_ct, p["don_vi"].id if p["don_vi"] else None)
+        tong_booking_pv = dt_pv
+        if vai == "tp":
+            # R5-10 (Chủ tịch 13/11/2026 23:52: «sửa lại cho khớp với số liệu bàn Chủ tịch… cách tính đồng nhất,
+            # gồm cả bàn TGĐ»): tổng phòng = doanh thu CHUYẾN Lẻ của tháng — đúng ô «Doanh thu theo phòng · Lẻ»
+            # trên màn Chủ tịch / TGĐ (`dashboard.doanh_thu_phong`), không tính lại. Từng người vẫn là giá trị
+            # booking (Chủ tịch chọn «giữ giá trị booking cho từng người»), nên cộng từng người không ra tổng phòng.
+            dt_pv = GD.doi_chieu_chu_tich(db, d)["thang"]
         ten = {n["user_id"]: n for n in TC.nguoi_trong(db, p["don_vi_ids"], _cuoi(ky))} if p["don_vi_ids"] else {}
         for uid in uids:
-            o = ban.get(uid, {})
-            nguoi = ten.get(uid) or {}
-            usr = db.get(User, uid)
-            ct = _chi_tieu_nguoi(bang_ct, uid)
-            tien = float(o.get("tien", 0.0))
-            doi_ngu.append({"user_id": uid, "ho_ten": usr.full_name if usr else str(uid),
-                            "don_vi": nguoi.get("don_vi") or o.get("don_vi", "") or (usr.sales_group if usr else ""),
-                            "vai": nguoi.get("vai", ""), "tien": tien, "so_booking": o.get("so_booking", 0),
-                            "chi_tieu": ct, "ty_le": (tien / ct) if ct else None, "la_toi": uid == u.id})
+            doi_ngu.append(_dong(db, bang_ct, uid, ban.get(uid, {}), ten.get(uid) or {}, u.id))
         doi_ngu.sort(key=lambda x: -x["tien"])
+        if ct_pv is None:
+            # R5-10: đơn vị chưa được giao chỉ tiêu → chỉ tiêu nhóm / phòng = cộng chỉ tiêu cá nhân của người trong
+            # phạm vi (Chủ tịch 14/11/2026: «1 tỷ là doanh số cá nhân; nhóm/phòng = cộng cá nhân»).
+            cts = [x["chi_tieu"] for x in doi_ngu if x["chi_tieu"]]
+            ct_pv = float(sum(cts)) if cts else None
         if vai == "tp" and p["don_vi"] is not None:
             con = [c for c in db.execute(select(DonViKD).where(DonViKD.cha_id == p["don_vi"].id)).scalars()
                    if c.dang_hieu_luc(d)]
@@ -147,13 +265,7 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
                                   "chi_tieu": ct, "ty_le": (tien / ct) if ct else None})
         elif vai == "tp" and p["nguon"] == "nhom_ban_hang":
             # R5-8: «Theo nhóm» gom theo ô nhóm bán hàng; chỉ tiêu nhóm chưa giao được (chưa có đơn vị).
-            g: dict[str, dict] = {}
-            for x in doi_ngu:
-                k = x["don_vi"] or "Chưa có nhóm"
-                o = g.setdefault(k, {"don_vi_id": k, "ten": k, "ma": k, "tien": 0.0, "so_nguoi": 0,
-                                     "chi_tieu": None, "ty_le": None})
-                o["tien"] += x["tien"]; o["so_nguoi"] += 1
-            theo_nhom = sorted(g.values(), key=lambda x: (x["ma"] == "Chưa có nhóm", x["ma"]))
+            theo_nhom = _gom_theo_nhom_ban_hang(doi_ngu)
 
     # ── Booking, lead, chăm sóc của phạm vi ────────────────────────────────────────────────────
     dau_thang = datetime.combine(d.replace(day=1), time.min)
@@ -178,8 +290,11 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
     the = {
         "doanh_thu": _o(dt_pv if vai in ("tp", "tn") else dt_toi,
                         p["canh_bao"] or "chưa có doanh thu",
-                        chi_tieu=ct_pv if vai in ("tp", "tn") else ct_toi),
-        "doanh_thu_toi": _o(dt_toi, chi_tieu=ct_toi),
+                        chi_tieu=ct_pv if vai in ("tp", "tn") else ct_toi,
+                        co_so=("doanh_thu_chuyen" if vai == "tp" else "gia_tri_booking"),
+                        tong_booking=(tong_booking_pv if vai in ("tp", "tn") else None)),
+        "doanh_thu_toi": _o(dt_toi, chi_tieu=ct_toi, moc_lcb=moc_luong_co_ban(db, u.id),
+                            dat_lcb=(dt_toi >= moc_luong_co_ban(db, u.id)) if moc_luong_co_ban(db, u.id) else None),
         "booking_moi": _o(bk_moi, chua_coc=bk_chua_coc),
         "lead_moi": _o(lead_moi),
         "lead_chua_nhan": _o(lead_chua_nhan, "chỉ Trưởng phòng phân lead", pham_vi="toan_cong_ty"),
@@ -212,7 +327,9 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
             "nguon_pham_vi": p["nguon"], "ghi_pham_vi": p.get("ghi_pham_vi", ""),
             "so_nguoi": len(uids), "canh_bao": p["canh_bao"],
             "the": the, "doi_ngu": doi_ngu, "theo_nhom": theo_nhom, "viec": viec,
-            "phai_thu": pt, "thuc_ban": GD.thuc_ban(db)}
+            "phai_thu": pt, "thuc_ban": GD.thuc_ban(db),
+            # R5-9: số Lẻ trên màn Chủ tịch để đối chiếu (doanh thu chuyến — cơ sở khác ô doanh thu ở đây).
+            "doi_chieu": GD.doi_chieu_chu_tich(db, d) if vai in ("tp", "tn") else None}
 
 
 def doanh_thu_12(db: Session, u: User, nam: int) -> dict:
@@ -223,6 +340,7 @@ def doanh_thu_12(db: Session, u: User, nam: int) -> dict:
     nay = date.today()
     vai = VAI_BAN.get(u.role, "")
     thang = []
+    gd_nam = None
     for m in range(1, 13):
         ky = f"{nam}-{m:02d}"
         if date(nam, m, 1) > nay:
@@ -231,7 +349,17 @@ def doanh_thu_12(db: Session, u: User, nam: int) -> dict:
         bang = CT.tra_cuu(db, ky)
         if vai == "nv":
             dt = DT.cua_nguoi(db, u.id, ky, LUONG)["tien"]
-            ct = _chi_tieu_nguoi(bang, u.id)
+            ct = _chi_tieu_nguoi(bang, u.id, db)
+        elif vai == "tp":
+            # R5-10: biểu đồ phòng = doanh thu chuyến Lẻ, cùng hàm biểu đồ bàn GĐ và khối Chủ tịch.
+            if gd_nam is None:
+                gd_nam = GD.doanh_thu_le(db, nam)["thang"]
+            dt = gd_nam[m - 1]["doanh_thu"]
+            p = pham_vi(db, u, ky)
+            ct = _chi_tieu_don_vi(bang, p["don_vi"].id if p["don_vi"] else None)
+            if ct is None:
+                cts = [c for c in (_chi_tieu_nguoi(bang, x, db) for x in p["user_ids"]) if c]
+                ct = float(sum(cts)) if cts else None
         else:
             p = pham_vi(db, u, ky)
             if p["nguon"] == "co_cau":
@@ -240,6 +368,10 @@ def doanh_thu_12(db: Session, u: User, nam: int) -> dict:
                 dt = float(sum(o["tien"] for o in DT.thang(db, ky, LUONG, None)["theo_nguoi"]
                                if o["user_id"] in p["user_ids"]))
             ct = _chi_tieu_don_vi(bang, p["don_vi"].id if p["don_vi"] else None)
+            if ct is None:
+                cts = [c for c in (_chi_tieu_nguoi(bang, x, db) for x in p["user_ids"]) if c]
+                ct = float(sum(cts)) if cts else None
         thang.append({"ky": ky, "doanh_thu": dt, "chi_tieu": ct})
     return {"nam": nam, "vai": vai, "thang": thang,
-            "co_so": "Giá trị booking chưa huỷ, kỳ theo tháng ngày tour kết thúc (cùng cơ sở chỉ tiêu)."}
+            "co_so": ("Doanh thu chuyến Lẻ — cùng số khối «Doanh thu theo phòng» trên màn Chủ tịch / TGĐ." if vai == "tp"
+                      else "Giá trị booking chưa huỷ, kỳ theo tháng ngày tour kết thúc (cùng cơ sở xếp hạng NV).")}
