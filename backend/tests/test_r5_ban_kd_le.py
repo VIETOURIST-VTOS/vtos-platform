@@ -119,7 +119,11 @@ def test_chuyen_can_thuc_ban_chi_lay_7_ngay_con_cho_trong_nhieu_dung_dau():
 
 
 def test_ba_cho_khai_vai_khop_nhau():
-    menu = set(AC.MENU_ROLES["/ban-kd-le"])
+    # R5-5: bàn chỉ còn ở /fit; hàng rào thật là API.XEM, nhóm API tới được qua /fit, và mọi vai của bàn mở được /fit.
+    menu = set(API.XEM)
+    assert "/api/v1/ban-kd-le" in AC.MAN_HINH_API["/fit"]
+    assert "/ban-kd-le" not in AC.MENU_ROLES
+    assert menu <= set(AC.MENU_ROLES["/fit"]), "vai của bàn mà không mở được /fit"
     assert set(API.XEM) == menu
     m = re.search(r"export const VAI_BAN_KD_LE = \[([^\]]*)\]", SHELL)
     assert m, "Shell.tsx mất VAI_BAN_KD_LE"
@@ -176,3 +180,11 @@ def test_phai_thu_le_chia_theo_ngay_khoi_hanh():
         bk.paid = bk.amount
     db.commit()
     assert S.phai_thu_le(db)["tong"] is None, "không ai nợ thì None kèm lý do, không phải 0"
+
+
+def test_r5_5_mot_duong_dan():
+    """R5-5 · Chủ tịch «ok sửa»: một bàn, một đường dẫn — /ban-kd-le chỉ chuyển về /fit, thanh dọc không còn mục riêng."""
+    trang = (GOC / "web/app/ban-kd-le/page.tsx").read_text(encoding="utf-8")
+    assert 'location.replace("/fit")' in trang and "BanGdKdLe" not in trang and len(trang) < 400
+    assert '"/ban-kd-le"]' not in SHELL, "thanh dọc còn mục Bàn làm việc GĐ Kinh doanh lẻ riêng"
+    assert 'h.startsWith("/ban-kd-le")' not in TRANG

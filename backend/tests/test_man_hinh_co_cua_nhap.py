@@ -152,13 +152,8 @@ BAN_LAM_VIEC = {
                  # Đối soát dữ liệu. Không dựng ô ghi trên bàn — chăm một lead là việc
                  # phải mở lead ấy ra đọc, không phải việc gạch một dòng trong danh sách.
                  "POST qua /marketing: tab Khách tiềm năng & Sales · tab Đối soát dữ liệu"),
-    # R5 · 13/11/2026 — bàn Giám đốc Kinh doanh lẻ (Chủ tịch duyệt bản xem trước). Chỉ đọc theo đúng
-    # phạm vi Chủ tịch chốt; cửa ghi của vai nằm ở các màn gốc, và bàn MỞ CHÚNG NGAY TRONG BÀN
-    # (KhungNhung) chứ không dựng bản sao: giao chỉ tiêu ở /fit (tab doanh thu, R5-2), sửa dữ liệu gốc tour ở
-    # /tours, ghi kết quả chăm sóc ở /cham-soc, trả lời khách ở /inbox.
-    "/ban-kd-le": ("Bàn làm việc Giám đốc Kinh doanh lẻ: bốn thẻ số, bảy việc cần xử lý, sẵn sàng bán và chuyến cần thúc bán. Không sở hữu con số nào của riêng mình — mọi ô đọc lại hàm của màn gốc (bàn bán tour lẻ, cơ cấu tổ chức, chăm sóc, hộp thư, bảng chỉ tiêu).",
-                   ("/ban-kd-le/tong-quan",),
-                   "POST qua các màn mở trong bàn: /fit (giao chỉ tiêu) · /tours · /cham-soc · /inbox"),
+    # R5 (13/11/2026) từng có dòng "/ban-kd-le" ở đây. R5-5: bàn dời vào /fit, /ban-kd-le chỉ chuyển hướng (miễn khai
+    # quyền ở ks_ma_tran.NGOAI_LE) — không còn là màn hình của danh mục.
 }
 
 # ── NHẬT KÝ MÁY GHI — nhóm ĐẾM RIÊNG, mở ngày 16/10/2026 ───────────────────────────────────────

@@ -706,7 +706,7 @@ PHAM_VI_DA_CHOT = {
     #
     # Vòng HD-DG3 đầu (PR #378) KHÔNG cập nhật bảng này. Không ai thấy, vì PR ấy chết ở bước
     # ruff chạy TRƯỚC mọi phép thử — bảng chốt chưa từng được hỏi. Ghép lại 17/10 mới lộ ra.
-    "chutich": 155, "tgd": 155, "bks": 155, "cntt": 137,   # +1 R5 13/11/2026: /api/v1/ban-kd-le (cả gd_kd, robot_ks) — bàn GĐ Kinh doanh lẻ
+    "chutich": 155, "tgd": 155, "bks": 155, "cntt": 136,   # +1 R5 13/11/2026: /api/v1/ban-kd-le (cả gd_kd, robot_ks) — bàn GĐ Kinh doanh lẻ; R5-5: cntt −1 (bàn chỉ còn ở /fit, cntt không thuộc phòng Lẻ)
     "ir_phapche": 22,   # +1 KS-10 29/10/2026: /api/v1/don-khach-san-ota (cả tp_dh, robot_ks) — màn Đơn phòng OTA của Điều hành   # +1 NCC-1 28/10/2026: /api/v1/cong-ncc (cả tp_dh, nv_dh, gd_kd, ketoan, ketoan_truong, nv_mkt, ptgd_mkt, robot_ks); +1 CD-1 28/10/2026: /api/v1/ir-cong-co-dong (cả ir_phapche, robot_ks); +1 KS-2 28/10/2026: /api/v1/doi-soat-ota (cả ketoan, ketoan_truong); +1 KS-1 28/10/2026: /api/v1/khach-san-ota; +2 KH-4 27/10/2026: /api/v1/yeu-cau-khach, /api/v1/gop-y-lanh-dao; +1 CG-1 26/10/2026: /api/v1/tai-khoan-ngoai; +1 DH-1 26/10/2026: /api/v1/hoa-hong-d06; +1 KH-2 26/10/2026: /api/v1/nha-hang; +1 KH-3 26/10/2026: /api/v1/rewards (Kinh doanh, Sale Admin, Kế toán, Marketing)
     # ── 17/10/2026 · hcns 71 → 72, ĐỢT R3b ───────────────────────────────────────────
     # Nhóm duy nhất thêm là "/api/v1/hach-toan", và chỉ vì một lẽ: danh mục BỘ PHẬN nằm ở
@@ -738,7 +738,7 @@ PHAM_VI_DA_CHOT = {
     # màn hình ấy ("/api/v1/quyet-toan-tour") ông đã có sẵn từ màn hình Tour. ptgd_doan KHÔNG đổi số:
     # ông đã có cả hai tiền tố từ /doc-chung-tu và /tours – tức là trước bản này ông gọi được API nạp
     # dữ liệu mà không có màn hình nào để bấm, đúng loại lệch bản rà 09/9 đi tìm.
-    "ptgd_mkt": 63, "nv_kd": 60, "tn_kd": 60, "tp_kd": 65, "nv_mkt": 46,   # +1 KH-4: /api/v1/yeu-cau-khach
+    "ptgd_mkt": 63, "nv_kd": 61, "tn_kd": 61, "tp_kd": 66, "nv_mkt": 46,   # +1 KH-4: /api/v1/yeu-cau-khach · +1 R5-5 (13/11/2026): /api/v1/ban-kd-le tới qua /fit — cửa tự gác vai (ban_kd_le.XEM), TP/TN/NV gọi là 403
     # nv_visa 17 → 16 ngày 10/9/2026: SIẾT, và là lần siết có chủ ý. Chủ tịch chốt bộ phận Visa
     # THUỘC Phòng Điều hành, nên người chịu trách nhiệm về con số của Visa là Trưởng phòng Điều hành.
     # Chuyên viên visa rời màn hình /bao-cao – vẫn làm và vẫn thấy hồ sơ của mình ở màn hình Visa,
