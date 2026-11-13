@@ -368,7 +368,7 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
   const thanhTim = (gon = false) => <form className={`tra-hero${gon ? " gon" : ""}`} onSubmit={(e) => { e.preventDefault(); setBuoc("ds"); setSp(null); setLoc(LOC0); tim(); datDuong(duongRieng("tours")); }}>
     <div className="tra-tabs" role="tablist" aria-label="Khu vực">{[["trong_nuoc", "Tour trong nước"], ["nuoc_ngoai", "Tour nước ngoài"]].map(([k, t]) =>
       <button key={k} type="button" role="tab" aria-selected={q.tab === k} className={q.tab === k ? "on" : ""} onClick={() => { const qq = { ...q, tab: k }; setQ(qq); setLoc(LOC0); setBuoc("ds"); setSp(null); tim(qq); }}>{t}</button>)}</div>
-    {!gon && <b className="tra-ht">Tour trọn gói Vietourist · khởi hành mỗi tuần</b>}
+    {!gon && <h1 className="tra-ht">Tour trọn gói Vietourist · khởi hành mỗi tuần</h1>}
     <div className="tra-sbar">
       <label className="ksv-sbox"><span style={{ flex: 1, minWidth: 0 }}><small>Điểm đến hoặc tên tour</small>
         <input value={q.q} onChange={(e) => setQ({ ...q, q: e.target.value })} placeholder={q.tab === "nuoc_ngoai" ? "Nhật Bản, Hàn Quốc, Châu Âu…" : "Đà Lạt, Phú Quốc, Huế…"} aria-label="Điểm đến hoặc tên tour" /></span></label>
@@ -511,7 +511,7 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
       `Đặt cọc ${sp.coc_pt}% để giữ chỗ; phần còn lại trả trước ngày khởi hành ${sp.dong_so_truoc} ngày (17:00). Đặt sau hạn đó: thanh toán toàn bộ.`]);
     csMuc.push(sp.quy_dinh ? ["Quy định của chương trình", String(sp.quy_dinh)]
       : ["Điều kiện hủy và đổi", "Điều kiện hủy gửi kèm xác nhận đặt tour."]);
-    return <div className="ksv tra">{css}
+    return <main className="ksv tra">{css}
       {/* TR-7c: khai cho máy tìm kiếm ĐÚNG những gì màn hình đang hiện — xem jsonLd() ở đầu tệp. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd(sp, dg)) }} />
       {thanhTim(true)}
@@ -524,7 +524,7 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
           <button type="button" className="ksv-btn" onClick={keo(doan ? "tra-doan" : "tra-ngay")}>{doan ? "Gửi yêu cầu" : "Chọn ngày"}</button></span></nav>
       <div className="ksv-two" id="tra-tq">
         <div className="ksv-panel" style={{ padding: 20 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}><h2 style={{ margin: 0, fontSize: 26 }}>{sp.ten}</h2>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}><h1 style={{ margin: 0, fontSize: 26 }}>{sp.ten}</h1>
             <span className="tra-tag">{sp.loai_ten}</span>{sp.wellness && <span className="tra-tag ok">Wellness &amp; retreat</span>}{sp.chua_co_lich && <span className="tra-tag">Lịch khởi hành đang cập nhật</span>}{sp.gio_chot && <span className="tra-tag hot">Giờ chót</span>}</div>
           <span className="tra-ma">{sp.ma}</span>
           {nhanhTour.length > 0 && <dl className="tra-facts">{nhanhTour.map(([n, v]) => <div key={n}><dt>{n}</dt><dd>{v}</dd></div>)}</dl>}
@@ -647,7 +647,7 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
           {sp.link_web && <> <a className="ksv-link" href={sp.link_web} target="_blank" rel="noopener noreferrer">Đối chiếu trang gốc ↗</a></>}</small>}
         {!sp.web_cap_nhat && sp.link_web && <small className="ksv-muted"><a className="ksv-link" href={sp.link_web} target="_blank" rel="noopener noreferrer">Đối chiếu trang gốc ↗</a></small>}
       </section>
-    </div>;
+    </main>;
   }
 
   // ═══════════════════════════════════ 1–2 · TÌM + DANH SÁCH ═══════════════════════════════════
@@ -655,7 +655,7 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
   // KS-19l (Chủ tịch chọn phương án C 06/11/2026): lối vào «Tour đoàn theo yêu cầu» nằm ngay dưới «Tour ghép» trong bộ lọc
   // Loại tour. Điện thoại giấu bộ lọc sau nút «Bộ lọc», nên ở đó lối vào hiện thêm một ô ngay đầu danh sách.
   const moDoan = () => { setMoLoc(false); setSp(null); setBuoc("doan"); len(); };
-  return <div className="ksv tra">{css}{thanhTim()}
+  return <main className="ksv tra">{css}{thanhTim()}
     {coWell && <button type="button" className="tra-well" onClick={() => setLoc({ ...LOC0, well: true })}>
       <span><b>Wellness &amp; Retreat</b><small>Nghỉ dưỡng, thiền, yoga, spa — trong nước và nước ngoài</small></span><em>Xem các tour wellness →</em></button>}
     {loi && <div className="ksv-loi">{loi}</div>}
@@ -723,7 +723,7 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
         {ds && !kq.length && <section className="ksv-panel"><span>Không có tour khớp. Thử bỏ bớt bộ lọc, đổi khoảng ngày, hoặc gửi yêu cầu thiết kế tour riêng.</span></section>}
       </div>
     </div>
-  </div>;
+  </main>;
 }
 
 const CSS = `
@@ -840,6 +840,22 @@ const CSS = `
 .tra-csbody p{margin:0;white-space:pre-line;line-height:1.65}
 @media (max-width:640px){.tra-dbody{padding:14px}.tra-csbody{padding:4px 14px 14px}.tra-dnoi{padding-left:10px}}
 .tra-inc.no{border-top-color:#8a3b2e}
+/* ══ TR-15 · BA CHỖ ĐO ĐƯỢC TRÊN BẢN CHẠY THẬT 14-11-2026 ═══════════════════════════════
+   (1) NÚT VÀO ĐƯỜNG ĐẶT TOUR GẦN NHƯ VÔ HÌNH. Đo trên 95/95 thẻ tour: chữ #23252C trên nền
+       #14538D, tương phản 1,93:1 — WCAG đòi 4,5:1. Toàn trang có đúng 95 chỗ không đạt tương
+       phản, và cả 95 đều là chính cái nút này.
+       Vì sao: TR-7 đổi nút thẻ tour từ <button> sang <a> (để có link thật cho máy tìm kiếm),
+       mà luật ép chữ trắng chỉ viết cho «button.ksv-btn». Hỏi trình duyệt luật nào đang thắng
+       thì ra ba luật cùng trúng: «a {color:var(--navy)}», «#vtd-access a {color:inherit}» và
+       «.ksv-btn {color:#fff}» — luật giữa có ID nên thắng, nút thừa hưởng màu chữ của trang.
+       Trang khách sạn KHÔNG dính: đã soát, nó vẫn dùng <button>.
+   (2) iPHONE TỰ PHÓNG TO KHI KHÁCH BẤM VÀO Ô NHẬP. Safari phóng trang khi ô nhập có cỡ chữ
+       dưới 16px. Đo ở 375px: 5/5 ô nhập của trang tour đều dưới 16px.
+   (3) Ô TÍCH 18x18px. WCAG 2.2 (2.5.8) đòi vùng bấm tối thiểu 24x24px. */
+.tra a.ksv-btn,#vtd-access .tra a.ksv-btn{color:#fff;-webkit-text-fill-color:#fff;min-height:44px}
+.tra a.ksv-btn.line,#vtd-access .tra a.ksv-btn.line{color:var(--ksv-ink);-webkit-text-fill-color:var(--ksv-ink)}
+.tra input[type=checkbox],.tra input[type=radio]{width:24px;height:24px;flex:none}
+@media (max-width:640px){.tra input,.tra select,.tra textarea{font-size:16px}}
 @media (max-width:640px){.tra-sbar{grid-template-columns:1fr}.tra-sbar .ksv-btn-tim{grid-column:auto}.tra-k4{grid-template-columns:1fr 1fr}.tra-ht{font-size:18px}}
 
 /* ── TR-7 · 13/11/2026 — THẺ TOUR TRÊN ĐIỆN THOẠI (Chủ tịch duyệt bản xem thử 13/11) ─────────
