@@ -10,7 +10,8 @@ CSS = (GOC / "web/app/globals.css").read_text(encoding="utf-8")
 
 def _khoi_r5_13() -> str:
     i = CSS.index("R5-13 · BÀN KINH DOANH TRÊN ĐIỆN THOẠI")
-    return CSS[i:]
+    j = CSS.find("R5-19 · KHUNG BÀN CHUNG", i)          # R5-19 viết khối riêng ngay sau
+    return CSS[i:j if j > 0 else None]
 
 
 def test_chi_sua_duoi_600px():

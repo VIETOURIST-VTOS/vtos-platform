@@ -36,14 +36,15 @@ const TAB: { ma: string; ten: string; tieu_de?: string; the: The[] }[] = [
     { ten: "Lịch xe trống", mo_ta: "Phối hợp đội xe để bán tour", toi: "/lich-xe-trong" },
     { ten: "Chính sách bán", mo_ta: "Chiết khấu, giá trẻ em, khuyến mãi · hoa hồng đối tác/CTV · điểm Rewards", toi: "/chinh-sach-ban" },
     { ten: "Dịch vụ lẻ", mo_ta: "Visa, vé, phòng, xe, gửi khách hưởng hoa hồng", toi: "/non-package" },
-    { ten: "Khách sạn & vé máy bay OTA", mo_ta: "Màn liên kết OTA trong phân hệ", toi: "/khach-san-ota" }] },
+    { ten: "Khách sạn & vé máy bay OTA", mo_ta: "Màn liên kết OTA trong phân hệ", toi: "/khach-san-ota" },
+    { ten: "Đơn phòng OTA", mo_ta: "Theo dõi đơn khách sạn OTA", toi: "/don-khach-san-ota" },
+    { ten: "Đối soát OTA", mo_ta: "Đối soát đơn OTA với nhà cung cấp", toi: "/doi-soat-ota" }] },
   { ma: "khach", ten: "Khách & booking", tieu_de: "Khách & booking", the: [
     { ten: "Khách hàng & nguồn khách", mo_ta: "Hồ sơ, lead, kênh và đối chiếu chuyển đổi", toi: "/leads?tab=leads" },
     { ten: "Hộp thư đa kênh", mo_ta: "Hội thoại và khách chờ sale", toi: "/inbox" },
     { ten: "Yêu cầu đặt dịch vụ", mo_ta: "Gửi Điều hành, theo dõi người nhận và hạn xử lý", toi: "/requests?mang=le" },
     { ten: "Booking & bảo lưu", mo_ta: "Cọc, thu tiền, giữ chỗ, hủy và bảo lưu", toi: "/bookings?mang=le" },
-    { ten: "Yêu cầu từ cổng khách", mo_ta: "Phản hồi yêu cầu khách gửi từ VTD", toi: "/yeu-cau-khach" },
-    { ten: "Đơn phòng OTA", mo_ta: "Theo dõi đơn khách sạn OTA", toi: "/don-khach-san-ota" }] },
+    { ten: "Yêu cầu từ cổng khách", mo_ta: "Phản hồi yêu cầu khách gửi từ VTD", toi: "/yeu-cau-khach" }] },
   { ma: "cs", ten: "Chăm sóc", tieu_de: "Chăm sóc khách hàng", the: [
     { ten: "Chăm sóc sau tour", mo_ta: "Kết quả liên hệ, quá hạn, khách quay lại", toi: "/cham-soc" },
     { ten: "Phản hồi & khiếu nại", mo_ta: "Hồ sơ khiếu nại hiện có", toi: "/khieu-nai" },
@@ -52,12 +53,12 @@ const TAB: { ma: string; ten: string; tieu_de?: string; the: The[] }[] = [
     { ten: "Góp ý riêng lãnh đạo", mo_ta: "Chỉ hiển thị theo quyền đã được cấp", toi: "/gop-y-lanh-dao" }] },
   { ma: "doi", ten: "Đội ngũ", tieu_de: "Đội ngũ kinh doanh", the: [
     { ten: "Cơ cấu tổ chức", mo_ta: "Chi nhánh → phòng → team → người; có ngày hiệu lực", toi: "/to-chuc-kd" },
-    { ten: "Người bán hàng", mo_ta: "Danh mục và phạm vi người bán", toi: "/nguoi-ban-hang" }] },
+    { ten: "Người bán hàng", mo_ta: "Danh mục và phạm vi người bán", toi: "/nguoi-ban-hang" },
+    { ten: "Báo cáo công việc", mo_ta: "Báo cáo ngày / tuần của người trong phòng", toi: "/reports" }] },
   { ma: "ct", ten: "Chỉ tiêu & báo cáo", tieu_de: "Chỉ tiêu & báo cáo", the: [
-    { ten: "Chỉ tiêu kinh doanh", mo_ta: "Doanh thu theo phạm vi và kỳ, giao chỉ tiêu", noi: "doanh-thu" },
+    { ten: "Chỉ tiêu theo người & nhóm", mo_ta: "Xem từng booking tính chỉ tiêu, giao chỉ tiêu", noi: "doanh-thu" },
     { ten: "Báo cáo bán hàng", mo_ta: "Bán tour, nhắc thu, hủy chỗ, kinh doanh, tour lẻ", toi: "/sales-reports?mang=le" },
-    { ten: "Báo cáo ngày / tuần / tháng", mo_ta: "Bảng chỉ tiêu phòng và bản chụp kỳ trước", noi: "bang" },
-    { ten: "Đối soát OTA", mo_ta: "Màn đối soát hiện có trong menu", toi: "/doi-soat-ota" }] },
+    { ten: "Báo cáo ngày / tuần / tháng", mo_ta: "Bảng chỉ tiêu phòng và bản chụp kỳ trước", noi: "bang" }] },
 ];
 
 /** Màn được mở TRONG khung: mọi thẻ ở trên, cộng hồ sơ chuyến/booking/khách bấm từ bên trong chúng. */
@@ -171,7 +172,7 @@ export default function BanGdKdLe() {
       <button type="button" className="g5-lui" onClick={() => { setMo(null); setKhung(null); }}>‹ {t.tieu_de || "Tổng quan"}</button>
       <b>{mo.ten}</b>
     </div>}
-    {mo && khung && <KhungNhung key={khung} toi={khung} ten={mo.ten} cuaBan={laKd} ngoai={ngoaiKhung} anDauBan />}
+    {mo && khung && <KhungNhung key={khung} toi={khung} ten={mo.ten} cuaBan={laKd} ngoai={ngoaiKhung} anDauBan khungBan />}
     {mo && !khung && mo.noi === "doanh-thu" && <DoanhThuChiTieuKd anNhip />}
     {mo && !khung && mo.noi === "bang" && <TrangPhanHe khoa="kdle" khongThanh />}
 

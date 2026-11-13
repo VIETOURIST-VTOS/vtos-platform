@@ -75,6 +75,27 @@ def co_quyen_noi_dung(db: Session, u: User, r: DailyReport) -> bool:
     return r.user_id == u.id or trong(pham_vi_noi_dung(db, u), phong_cua_user(db, r.user_id))
 
 
+# R5-19 · TRƯỞNG NHÓM ĐỌC BÁO CÁO NGÀY CỦA NGƯỜI TRONG NHÓM MÌNH (Chủ tịch 14/11/2026: «có»).
+# Phạm vi nhóm là phạm vi bàn Trưởng nhóm (`ban_kd_vai.pham_vi`: cơ cấu tổ chức KD nếu đã khai, chưa
+# khai thì người cùng ô nhóm bán hàng) — không khai lại. CHỈ ĐỌC: «đã xem / trả bổ sung / giao hỗ trợ»
+# vẫn là việc của người xem xét phòng (TP, GĐ KD) theo `co_quyen_noi_dung`.
+VAI_DOC_THEO_NHOM = ("tn_kd",)
+
+
+def nhom_doc_duoc(db: Session, u: User) -> set[int]:
+    """Mã người trong nhóm mà người này ĐỌC được báo cáo ngày. Tập rỗng = không có phạm vi nhóm."""
+    if u.role not in VAI_DOC_THEO_NHOM:
+        return set()
+    from app.services import ban_kd_vai as KV
+    ky = f"{O.gio_vn().date():%Y-%m}"
+    return set(KV.pham_vi(db, u, ky).get("user_ids") or []) | {u.id}
+
+
+def doc_duoc(db: Session, u: User, r: DailyReport) -> bool:
+    """Đọc nội dung (và tệp) một báo cáo: người nộp, người xem xét của phòng, hoặc Trưởng nhóm của người nộp."""
+    return co_quyen_noi_dung(db, u, r) or r.user_id in nhom_doc_duoc(db, u)
+
+
 def trang_thai_xem(r: DailyReport | None) -> str:
     if r is None:
         return ""
@@ -281,10 +302,11 @@ def _noi_dung(db: Session, r: DailyReport, nap: tuple[dict, dict] | None = None)
 def tong_hop(db: Session, u: User, d: date, phong: str = "", now: datetime | None = None) -> dict:
     now = now or O.gio_vn()
     pv_tt, pv_nd = pham_vi_trang_thai(db, u), pham_vi_noi_dung(db, u)
-    if pv_tt is not None and not pv_tt:
+    nhom = nhom_doc_duoc(db, u) if (pv_tt is not None and not pv_tt) else set()
+    if pv_tt is not None and not pv_tt and not nhom:
         raise PermissionError("Bạn chưa được giao xem báo cáo ngày của phòng nào")
     tat_ca = O.nhan_vien_phai_nop(db)          # KS-BC: một lần, dùng lại cho danh sách người giao việc
-    emps = [e for e in tat_ca if trong(pv_tt, e.department)]
+    emps = [e for e in tat_ca if (e.user_id in nhom if nhom else trong(pv_tt, e.department))]
     cac_phong = sorted({e.department for e in emps}, key=lambda m: ten_phong(m))
     if phong:
         emps = [e for e in emps if e.department == phong]
@@ -301,12 +323,13 @@ def tong_hop(db: Session, u: User, d: date, phong: str = "", now: datetime | Non
         tt = O.trang_thai_ngay(db, e, e.user_id, d, now, nghi_san=nghi_san, bc_san=bc, han_san=han_san)
         dem[tt["ma"]] = dem.get(tt["ma"], 0) + 1
         r = bc.get(e.user_id)
-        doc = r is not None and (r.user_id == u.id or trong(pv_nd, e.department))
+        xet = trong(pv_nd, e.department)        # được xem xét (TP, GĐ…); Trưởng nhóm chỉ đọc
+        doc = r is not None and (r.user_id == u.id or xet or e.user_id in nhom)
         xem = trang_thai_xem(r)
         tu_minh = e.user_id == u.id
         if tt["ma"] == "qua_han":
             xl["qua_han"] += 1
-        if r is not None and doc and not tu_minh and xem in xl:
+        if r is not None and doc and xet and not tu_minh and xem in xl:
             xl[xem] += 1
         dong.append({
             "user_id": e.user_id, "code": e.code, "ten": e.full_name, "phong": e.department, "phong_ten": ten_phong(e.department),
@@ -317,7 +340,7 @@ def tong_hop(db: Session, u: User, d: date, phong: str = "", now: datetime | Non
             "xem": xem, "xem_ten": TEN_XEM.get(xem, ""), "bo_sung_ly_do": r.bo_sung_ly_do if r else "",
             "diem_robot": r.robot_score if r else None, "ghi_chu_robot": r.robot_note if r else "",
             "diem_tp": r.manager_score if r else None, "nguoi_xem": r.reviewed_by if r else "",
-            "doc_duoc": doc, "xem_xet_duoc": bool(r is not None and doc and not tu_minh and xem != "da_xem"),
+            "doc_duoc": doc, "xem_xet_duoc": bool(r is not None and doc and xet and not tu_minh and xem != "da_xem"),
             "tu_minh": tu_minh,
             "noi_dung": _noi_dung(db, r, nap) if doc else None,
         })
@@ -333,7 +356,7 @@ def tong_hop(db: Session, u: User, d: date, phong: str = "", now: datetime | Non
     return {
         "ngay": d.isoformat(), "as_of": now.isoformat(timespec="minutes"), "mui_gio": "Asia/Ho_Chi_Minh",
         "han": O.han_chu(db, d),
-        "pham_vi": "toan_cty" if pv_tt is None else "phong",
+        "pham_vi": "toan_cty" if pv_tt is None else "nhom" if nhom else "phong",
         "chi_trang_thai": pv_nd is not None and pv_tt is None,
         "cac_phong": [{"ma": m, "ten": ten_phong(m), "doc_noi_dung": trong(pv_nd, m)} for m in cac_phong],
         "phong": phong, "xu_ly": xl, "dem": dem, "phai_nop": phai, "da_nop": da_nop,

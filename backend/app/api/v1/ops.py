@@ -127,7 +127,8 @@ def list_reports(period: str | None = None, mine: bool = False, u: User = Depend
     # BC-2: người quản lý chỉ đọc NỘI DUNG báo cáo của phòng thuộc phạm vi (bao_cao_phong.PHONG);
     # Chủ tịch, TGĐ, Ban Kiểm soát cả công ty. Trước đây mọi vai quản lý đọc được cả công ty.
     if not mine and u.role in MANAGERS:
-        rows = [r for r in rows if XEM.co_quyen_noi_dung(db, u, r)]
+        nhom = XEM.nhom_doc_duoc(db, u)          # R5-19: Trưởng nhóm đọc báo cáo người trong nhóm
+        rows = [r for r in rows if r.user_id in nhom or XEM.co_quyen_noi_dung(db, u, r)]
     return [report_out(r, users) for r in rows]
 
 
@@ -311,7 +312,7 @@ def _bao_cao_duoc_xem(db: Session, u: User, rid: int) -> DailyReport:
     r = db.get(DailyReport, rid)
     if r is None:
         raise HTTPException(404, "Không có báo cáo")
-    if r.user_id != u.id and not XEM.co_quyen_noi_dung(db, u, r):   # BC-2: theo phạm vi phòng
+    if r.user_id != u.id and not (XEM.co_quyen_noi_dung(db, u, r) or r.user_id in XEM.nhom_doc_duoc(db, u)):   # BC-2 phòng; R5-19 nhóm
         raise HTTPException(403, "Chỉ người nộp và người xem xét của phòng ấy xem được tệp của báo cáo này")
     return r
 

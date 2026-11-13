@@ -22,7 +22,7 @@ const TAB: Tab[] = [
     { ten: "Cơ cấu tổ chức", mo_ta: "Người trong nhóm", toi: "/to-chuc-kd" },
     { ten: "Báo cáo công việc", mo_ta: "Báo cáo ngày / tuần của nhóm", toi: "/reports" }] },
   { ma: "bc", ten: "Báo cáo", tieu_de: "Báo cáo", the: [
-    { ten: "Doanh thu & chỉ tiêu", mo_ta: "Của nhóm và từng người", noi: "doanh-thu" },
+    { ten: "Chỉ tiêu theo người & nhóm", mo_ta: "Của nhóm và từng người, từng booking tính chỉ tiêu", noi: "doanh-thu" },
     { ten: "Báo cáo bán hàng", mo_ta: "Bán tour, nhắc thu, hủy chỗ", toi: "/sales-reports?mang=le" },
     { ten: "Phiếu lương của tôi", mo_ta: "Lương, thưởng, hoa hồng", toi: "/phieu-luong" }] },
 ];

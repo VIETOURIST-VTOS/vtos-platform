@@ -30,8 +30,12 @@ function Inbox() {
       <div className="kpi"><b>{st.counts?.ai_da_tra_loi || 0}</b><span>AI đã trả lời thay</span></div>
       <div className="kpi"><b>{st.facebook ? "✓" : "✗"} / {st.zalo ? "✓" : "✗"} / {st.ai ? "✓" : "✗"}</b><span>Facebook / Zalo / Claude AI</span></div>
     </div>
-    {!st.facebook && <Gate ok={false}>Chưa nối Page: CNTT dán FB_PAGE_ACCESS_TOKEN, FB_PAGE_ID, FB_APP_SECRET vào Render; trên Meta for Developers → Messenger → Webhooks đặt Callback URL <code>https://vtos-api.onrender.com{st.fb_webhook_url || "/api/v1/facebook/webhook"}</code>, Verify token = FB_VERIFY_TOKEN, đăng ký sự kiện messages, messaging_postbacks.</Gate>}
-    {!st.ai && <Gate ok={false}>Chưa có ANTHROPIC_API_KEY trên Render – AI trả lời thay bằng câu mẫu (vẫn xin tên/SĐT và báo tư vấn viên); có khóa thì AI tư vấn theo tour, giá, chỗ còn trong VTOS.</Gate>}
+    {/* R5-19: hướng dẫn cấu hình chỉ cho CNTT; người bán thấy một dòng trạng thái. */}
+    {role === "cntt" ? <>
+      {!st.facebook && <Gate ok={false}>Chưa nối Page: CNTT dán FB_PAGE_ACCESS_TOKEN, FB_PAGE_ID, FB_APP_SECRET vào Render; trên Meta for Developers → Messenger → Webhooks đặt Callback URL <code>https://vtos-api.onrender.com{st.fb_webhook_url || "/api/v1/facebook/webhook"}</code>, Verify token = FB_VERIFY_TOKEN, đăng ký sự kiện messages, messaging_postbacks.</Gate>}
+      {!st.ai && <Gate ok={false}>Chưa có ANTHROPIC_API_KEY trên Render – AI trả lời thay bằng câu mẫu (vẫn xin tên/SĐT và báo tư vấn viên); có khóa thì AI tư vấn theo tour, giá, chỗ còn trong VTOS.</Gate>}
+    </> : (!st.facebook || !st.zalo) && st.facebook !== undefined
+      ? <p className="muted">Kênh {[!st.facebook && "Facebook", !st.zalo && "Zalo"].filter(Boolean).join(" / ")} chưa nối — đang chờ CNTT.</p> : null}
     <div className="grid" style={{ gridTemplateColumns: "minmax(280px, 1fr) 2fr" }}>
       <div className="panel">
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>

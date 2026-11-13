@@ -11,10 +11,31 @@ import { useState } from "react";
  *    đổi nhóm tại chỗ, không mở bàn lồng trong bàn).
  *  · đường dẫn thuộc `cuaBan` → mở NGAY TRONG KHUNG.
  *  · còn lại (trang chủ, phân hệ khác của CRM) → không đi đâu cả; lối ra duy nhất là thanh đầu. */
-export default function KhungNhung({ toi, ten, mo, cuaBan, ngoai, anDauBan }: {
+/** R5-19 · gắn nhãn cột (đầu bảng) lên từng ô để điện thoại xếp mỗi dòng thành một thẻ. Chỉ thêm thuộc
+ *  tính `data-nhan` và lớp `kb-the` — không di chuyển nút nào của trang con. */
+function ganNhanCot(doc: Document) {
+  doc.querySelectorAll("main table").forEach((t) => {
+    const ths = Array.from(t.querySelectorAll(":scope > thead > tr:first-child > th"));
+    if (ths.length < 3) return;
+    const nhan = ths.map((h) => (h.textContent || "").trim());
+    t.classList.add("kb-the");
+    t.querySelectorAll(":scope > tbody > tr").forEach((tr) => {
+      let i = 0;
+      Array.from(tr.children).forEach((td) => {
+        const n = nhan[i] || "";
+        if (n && !td.hasAttribute("colspan") && td.getAttribute("data-nhan") !== n) td.setAttribute("data-nhan", n);
+        i += Number(td.getAttribute("colspan") || 1);
+      });
+    });
+  });
+}
+
+export default function KhungNhung({ toi, ten, mo, cuaBan, ngoai, anDauBan, khungBan }: {
   toi: string; ten: string; mo?: string; cuaBan: (href: string) => boolean; ngoai?: (href: string) => boolean;
   /** VH-43: giấu thanh đầu `.mh01-ban` của bàn nhúng — bàn ngoài đã có một thanh, hai thanh là lặp. */
   anDauBan?: boolean;
+  /** R5-19: khung bàn chung (nền trắng sáng, điểm nhấn navy — CSS `html.vtos-khung-ban` ở globals.css). */
+  khungBan?: boolean;
 }) {
   const [cao, setCao] = useState(640);
   const src = toi + (mo ? (toi.includes("?") ? "&" : "?") + `mo=${mo}` : "");
@@ -34,6 +55,18 @@ export default function KhungNhung({ toi, ten, mo, cuaBan, ngoai, anDauBan }: {
           + ".thanh-viec a.tv:not(.chinh),.thanh-viec .tv-nhan{display:none!important}.thanh-viec:not(:has(a.tv.chinh)){display:none!important}";
         if (anDauBan) st.textContent += ".mh01-ban{display:none!important}";
         doc.head.appendChild(st);
+        if (khungBan) {
+          doc.documentElement.classList.add("vtos-khung-ban");
+          // Bấm tiêu đề màn: mở / thu ghi chú kỹ thuật đầu màn (dòng «ⓘ»).
+          doc.addEventListener("click", (e) => {
+            const h = (e.target as HTMLElement | null)?.closest?.("main h1");
+            if (h) doc.documentElement.classList.toggle("kb-mo-ghi");
+          });
+          let hen = 0;
+          const gan = () => { cancelAnimationFrame(hen); hen = requestAnimationFrame(() => ganNhanCot(doc)); };
+          gan();
+          new MutationObserver(gan).observe(b, { childList: true, subtree: true });
+        }
         doc.addEventListener("click", (e) => {
           const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
           if (!a) return;

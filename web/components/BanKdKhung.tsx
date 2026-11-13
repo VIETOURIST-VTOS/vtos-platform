@@ -397,7 +397,7 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
       const x = t.the.find((c) => c.toi && c.toi.split("?")[0] === toi.split("?")[0]);
       if (x) { setTab(t.ma); setMo(x); setKhung(toi); window.scrollTo({ top: 0 }); return; }
     }
-    if (toi.startsWith("/fit")) { setMo({ ten: "Doanh thu & chỉ tiêu", mo_ta: "", noi: "doanh-thu" }); setKhung(null); return; }
+    if (toi.startsWith("/fit")) { setMo({ ten: "Chỉ tiêu theo người & nhóm", mo_ta: "", noi: "doanh-thu" }); setKhung(null); return; }
     setMo({ ten: "Chi tiết", mo_ta: "" }); setKhung(toi); window.scrollTo({ top: 0 });
   };
   const ngoaiKhung = (h: string) => { if (h.startsWith("/fit")) { moTab(tabs[0].ma); return true; } return false; };
@@ -429,7 +429,7 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
       <button type="button" className="g5-lui" onClick={() => { setMo(null); setKhung(null); }}>‹ {t.tieu_de || t.ten}</button>
       <b>{mo.ten}</b>
     </div>}
-    {mo && khung && <KhungNhung key={khung} toi={khung} ten={mo.ten} cuaBan={laKd} ngoai={ngoaiKhung} anDauBan />}
+    {mo && khung && <KhungNhung key={khung} toi={khung} ten={mo.ten} cuaBan={laKd} ngoai={ngoaiKhung} anDauBan khungBan />}
     {mo && !khung && mo.noi === "doanh-thu" && <DoanhThuChiTieuKd anNhip />}
     {mo && !khung && mo.noi === "bang" && <TrangPhanHe khoa="kdle" khongThanh />}
 

@@ -13,6 +13,13 @@ import { Tag, errMsg, MangTag } from "@/components/ui";
 const CT_TOI_DA = 300;
 const PCT_KEYS = new Set(["margin", "pct_moc", "rate"]);
 const DATE_KEYS = new Set(["created_at", "cancelled_at", "deadline", "start_date", "end_date"]);
+/** R5-19 · nhãn ô tổng (máy chủ trả khoá tiếng Anh). Khoá chưa có tên thì in nguyên khoá. */
+const NHAN_TONG: Record<string, string> = {
+  bookings: "Booking", pax: "Khách", revenue: "Doanh thu", paid: "Đã thu", due: "Còn phải thu",
+  cancelled: "Đã huỷ", overdue: "Quá hạn", charge: "Phí huỷ", retained: "Giữ lại",
+  revenue_target: "Chỉ tiêu doanh thu", commission_est: "Hoa hồng dự tính", tours: "Chuyến",
+  cost: "Chi phí", profit: "Lãi gộp",
+};
 function cell(k: string, v: any) {
   if (v === null || v === undefined) return "";
   if (typeof v === "boolean") return v ? "✓" : "";
@@ -51,7 +58,7 @@ function SalesReports() {
         {P.includes("month") && <label>Tháng<input type="month" value={month} onChange={(e) => setMonth(e.target.value)} /></label>}
         {P.length === 0 && <p className="muted">Báo cáo tính đến thời điểm hiện tại.</p>}
         <button className="act teal" onClick={run} disabled={busy}>{busy ? "Đang chạy…" : "Chạy báo cáo"}</button> <button className="act grey" onClick={xlsx}>Xuất Excel</button>
-        {rep && <div className="kpis" style={{ marginTop: 8 }}>{Object.entries(T).map(([k, v]: any) => <div className="kpi" key={k}><b>{typeof v === "number" ? vnd(v) : String(v)}</b><span>{k}</span></div>)}</div>}
+        {rep && <div className="kpis" style={{ marginTop: 8 }}>{Object.entries(T).map(([k, v]: any) => <div className="kpi" key={k}><b>{typeof v === "number" ? vnd(v) : String(v)}</b><span>{NHAN_TONG[k] || k}</span></div>)}</div>}
         {rep?.note && <p className="muted">{rep.note}</p>}
       </div>
     </div>

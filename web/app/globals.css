@@ -1869,3 +1869,34 @@ main .xu-ly-ban .xu-ly-dau .act{margin:0}
   .nh-khoi .bd-duong-nhanx>span{overflow:visible;font-size:calc(10/14*1rem)}
   .nh-khoi .nh-cum{width:100%}
 }
+
+/* ══ R5-19 · KHUNG BÀN CHUNG cho màn mở bằng thẻ trong bàn Kinh doanh (Chủ tịch 14/11/2026: «chung navy
+   trắng sáng»). KhungNhung gắn lớp `vtos-khung-ban` lên trang con — mở cùng màn ấy từ menu thì như cũ.
+   Nền trắng sáng, điểm nhấn navy: tiêu đề là thẻ trắng có vạch navy; ghi chú kỹ thuật đầu màn thu vào
+   một dòng «ⓘ», bấm tiêu đề mới mở; đầu bảng xanh rất nhạt, chữ navy thường (bỏ chữ hoa và phông máy chữ). */
+html.vtos-khung-ban main h1{background:var(--vtos-card);color:var(--vtos-navy);border:1px solid var(--vtos-line);
+  border-left:5px solid var(--vtos-sky);border-radius:12px;padding:12px 16px;margin:0 0 12px;
+  font-size:calc(17/14*1rem);line-height:1.3}
+html.vtos-khung-ban main h1:has(+ p.muted){cursor:pointer}
+html.vtos-khung-ban main h1:has(+ p.muted)::after{content:"ⓘ  Ghi chú cách đọc màn — bấm để xem";display:block;
+  margin-top:4px;font-size:calc(11.5/14*1rem);font-weight:500;color:var(--vtos-text-mute);font-family:inherit}
+html.vtos-khung-ban.kb-mo-ghi main h1:has(+ p.muted)::after{content:"ⓘ  Thu gọn ghi chú"}
+html.vtos-khung-ban:not(.kb-mo-ghi) main h1 + p.muted,
+html.vtos-khung-ban:not(.kb-mo-ghi) main h1 + p.muted + p.muted{display:none}
+html.vtos-khung-ban th{background:var(--vtos-info-bg);color:var(--vtos-navy);text-transform:none;letter-spacing:0;
+  font-family:inherit;font-weight:700;border-bottom:2px solid var(--vtos-sky)}
+html.vtos-khung-ban th.num{font-family:inherit}
+html.vtos-khung-ban .kpi{border-left:4px solid var(--vtos-sky)}
+html.vtos-khung-ban [aria-pressed="true"]{border-color:var(--vtos-sky)}
+/* Điện thoại: mỗi dòng bảng một thẻ (khuôn R5-13); nhãn cột lấy từ đầu bảng (KhungNhung gắn `data-nhan`). */
+@media (max-width:600px){
+  html.vtos-khung-ban table.kb-the{min-width:0}
+  html.vtos-khung-ban table.kb-the thead{display:none}
+  html.vtos-khung-ban table.kb-the tbody{display:grid;gap:8px}
+  html.vtos-khung-ban table.kb-the tr{display:grid;gap:4px;background:var(--vtos-card);border:1px solid var(--vtos-line);
+    border-left:4px solid var(--vtos-sky);border-radius:10px;padding:8px 10px}
+  html.vtos-khung-ban table.kb-the td{display:flex;justify-content:space-between;gap:10px;padding:0;border:0;min-width:0;text-align:right}
+  html.vtos-khung-ban table.kb-the td[data-nhan]::before{content:attr(data-nhan);color:var(--vtos-text-mute);
+    font-size:calc(11.5/14*1rem);text-align:left;flex:0 0 auto;max-width:45%}
+  html.vtos-khung-ban table.kb-the td[colspan]{display:block;text-align:left}
+}
