@@ -663,6 +663,21 @@ def _so_ngay(s: str) -> int | None:
     return int(m.group(1) or m.group(2)) if m else None
 
 
+def _so_dem(s: str) -> int | None:
+    """Số ĐÊM đọc từ một cái tên. «5N4Đ» → 4; «5 Ngày 4 Đêm» → 4; «3 Ngày» → None.
+
+    TR-12 (13/11/2026) · VÌ SAO PHẢI ĐẾM CẢ ĐÊM, không chỉ ngày. Với tour trong nước, **3N2Đ và
+    3N3Đ là hai sản phẩm khác hẳn nhau**: bản 3 đêm có thêm một đêm xe giường nằm, nên giờ khởi
+    hành, giá và cả lịch trình đều khác. TR-11 chỉ chặn theo số NGÀY, nên hai bản ấy vẫn ghép
+    được vào nhau. ĐO ĐƯỢC ngay hôm sau, trên dữ liệu thật: sản phẩm `DL001` («ĐÀ LẠT MỘNG MƠ»,
+    **3N2Đ**, 9 chuyến đang mở bán) có ứng viên hạng NHẤT là trang «Đà Lạt **3 Ngày 3 Đêm**».
+    Thêm chặn đêm thì ứng viên ấy bị gạt, và trang 3N2Đ đúng nổi lên.
+    """
+    k = _khong_dau(s)
+    m = re.search(r"\d{1,2}\s*n\s*(\d{1,2})\s*[dđ]", k) or re.search(r"\d{1,2}\s*ngay\s*(\d{1,2})\s*dem", k)
+    return int(m.group(1)) if m else None
+
+
 def so_ngay_sp(p: Product) -> int | None:
     """Số ngày của một sản phẩm crm, đọc theo thứ tự tin cậy: cột `days` → tên → `length_text`.
 
@@ -676,9 +691,20 @@ def so_ngay_sp(p: Product) -> int | None:
             or _so_ngay(getattr(p, "length_text", "") or ""))
 
 
-def _hop_ngay(nw: int | None, np_: int | None) -> bool:
-    """Hai bên có thể ghép với nhau về ĐỘ DÀI không? Chỉ bên nào ĐỌC ĐƯỢC mới bị xét."""
-    return not (nw and np_) or nw == np_
+def so_dem_sp(p: Product) -> int | None:
+    """Số đêm của một sản phẩm crm. Cùng lối đọc phòng thủ như `so_ngay_sp` — xem giải thích ở đó."""
+    return (getattr(p, "nights", None) or _so_dem(getattr(p, "name", "") or "")
+            or _so_dem(getattr(p, "length_text", "") or ""))
+
+
+def _hop_ngay(nw: int | None, np_: int | None, dw: int | None = None, dp: int | None = None) -> bool:
+    """Hai bên có thể ghép với nhau về ĐỘ DÀI không? Chỉ bên nào ĐỌC ĐƯỢC mới bị xét.
+
+    TR-12: xét CẢ ngày lẫn đêm. «3N2Đ» và «3N3Đ» cùng 3 ngày nhưng khác hẳn nhau — xem `_so_dem`.
+    Bên nào không đọc được số đêm thì không bị xét theo đêm, đúng như luật đã có với số ngày:
+    rất nhiều tên chỉ ghi «3 Ngày», siết theo thứ không đọc được là giết hết gợi ý đúng.
+    """
+    return (not (nw and np_) or nw == np_) and (not (dw and dp) or dw == dp)
 
 
 def _diem_khop(tw: set[str], tp: set[str]) -> float:
@@ -711,11 +737,11 @@ def goi_y_ghep(web: list[dict], sps: list[Product]) -> list[dict]:
     """
     ra = []
     for w in web:
-        tw, nw = _tu(w["ten"]), _so_ngay(w["ten"])
+        tw, nw, dw = _tu(w["ten"]), _so_ngay(w["ten"]), _so_dem(w["ten"])
         tot = None
         for p in sps:
-            np_ = so_ngay_sp(p)
-            if not _hop_ngay(nw, np_):
+            np_, dp = so_ngay_sp(p), so_dem_sp(p)
+            if not _hop_ngay(nw, np_, dw, dp):
                 continue                       # lệch độ dài: không phải ứng viên, dù tên giống hệt
             diem = _diem_khop(tw, _tu(p.name))
             if not diem:
@@ -757,23 +783,25 @@ def goi_y_web(web: list[dict], sps: list[Product], da_ghep: set[str] | None = No
     for p in sps:
         if (p.link_web or "").strip():
             continue
-        tp, np_ = _tu(p.name or ""), so_ngay_sp(p)
+        tp, np_, dp = _tu(p.name or ""), so_ngay_sp(p), so_dem_sp(p)
         tp = tp | _tu(p.diem_den or "")        # tên crm hay ngắn; điểm đến bù đúng chỗ thiếu
         cand = []
         for w in web:
             if w["url"] in da:
                 continue                       # trang đang thuộc về sản phẩm khác — không bày
-            nw = _so_ngay(w["ten"])
-            if not _hop_ngay(nw, np_):
+            nw, dw = _so_ngay(w["ten"]), _so_dem(w["ten"])
+            if not _hop_ngay(nw, np_, dw, dp):
                 continue
             diem = _diem_khop(_tu(w["ten"]), tp)
             if nw and np_:
                 diem += 0.15
+            if dw and dp:
+                diem += 0.10                   # khớp cả đêm: chắc hơn nữa (TR-12)
             if diem >= NGUONG_UNG_VIEN:
                 cand.append({"url": w["url"], "ten": w["ten"], "anh": w.get("anh") or "",
-                             "so_ngay": nw, "diem": round(diem, 2)})
+                             "so_ngay": nw, "so_dem": dw, "diem": round(diem, 2)})
         cand.sort(key=lambda x: -x["diem"])
-        ra.append({"pid": p.id, "ma": p.code, "ten": p.name, "so_ngay": np_,
+        ra.append({"pid": p.id, "ma": p.code, "ten": p.name, "so_ngay": np_, "so_dem": dp,
                    "ung_vien": cand[:so],
                    # «chắc» = điểm cao VÀ bỏ xa ứng viên nhì. Một ứng viên 0.9 đứng cạnh một ứng
                    # viên 0.88 thì KHÔNG chắc — đó là hai biến thể của cùng một tuyến, và chọn
@@ -1609,7 +1637,8 @@ def gui_yeu_cau_doan(db: Session, tk: TaiKhoanNgoai, d: dict, now: datetime | No
 
 THIEU_ND = {"anh": "Thiếu ảnh", "lich": "Chưa có lịch theo ngày", "bao_gom": "Thiếu giá bao gồm", "tre_em": "Thiếu giá trẻ em",
             "gia_ao": "Còn số tiền chưa điền trên web",
-            "lech_ngay": "Lịch trên web LỆCH số ngày với tour"}
+            "lech_ngay": "Lịch trên web LỆCH số ngày với tour",
+            "ngay_vench": "Cột số ngày không khớp TÊN sản phẩm"}
 
 
 def thieu_noi_dung(p: Product, chuyen: list[tuple[Tour, int]], co_ct_chuyen: bool = False,
@@ -1656,6 +1685,25 @@ def thieu_noi_dung(p: Product, chuyen: list[tuple[Tour, int]], co_ct_chuyen: boo
     nw = len(nd.get("lich_trinh") or [])
     if nw and (np_ := so_ngay_sp(p)) and nw != np_:
         ra.append("lech_ngay")
+    # TR-12 (13/11/2026) · HAI CHỖ SỬA SAU MỘT NGÀY CHẠY THẬT CỦA TR-11.
+    #
+    # (a) BÁO OAN TOUR MỘT NGÀY. `NCT` («TOUR NAM CÁT TIÊN 1 NGÀY», 5 chuyến đang mở bán) bị ghi
+    #     «Chưa có lịch theo ngày» suốt — nhưng một tour MỘT ngày thì không có «Ngày 1 / Ngày 2»
+    #     nào để tách; chương trình của nó tự nhiên là một khối. Nó có 1.942 ký tự nội dung mà
+    #     vẫn bị đếm vào danh sách thiếu. Một hàng rào kêu oan vài lần là một hàng rào người ta
+    #     thôi đọc, nên bỏ cảnh báo «lich» khi tour dài đúng 1 ngày VÀ đã có chữ để đọc.
+    if "lich" in ra and so_ngay_sp(p) == 1 and (
+            (nd.get("gioi_thieu") or "").strip() or (tm["chuong_trinh"] or "").strip()):
+        ra.remove("lich")
+    # (b) CỘT `days` CHỌI VỚI CHÍNH TÊN SẢN PHẨM — một lỗi DỮ LIỆU, không phải lỗi ghép.
+    #     Đo 13/11/2026: `JP006` tên ghi «6N5D» mà cột `days` ghi 5; `MICEDL3N3D` tên ghi «3N3D»
+    #     mà cột ghi 4. Cả hai bị TR-11 gắn nhãn «lệch số ngày» và trông y như ghép sai — suýt
+    #     nữa bị gỡ link, mà link của chúng ĐÚNG. Phải gọi đúng tên bệnh thì mới chữa đúng chỗ:
+    #     ở đây phải sửa cột `days` của sản phẩm, không phải đi ghép lại trang web.
+    ten_ngay = _so_ngay(getattr(p, "name", "") or "")
+    cot_ngay = getattr(p, "days", None)
+    if ten_ngay and cot_ngay and ten_ngay != cot_ngay:
+        ra.append("ngay_vench")
     return ra
 
 
