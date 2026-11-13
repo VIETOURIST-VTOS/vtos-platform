@@ -124,10 +124,8 @@ def test_truong_nhom_doc_bao_cao_cua_nhom_minh(db):
     ten = {d["ten"]: d for d in th["dong"]}
     assert "NV.KD1" in ten and "NV.KD2" not in ten
     assert ten["NV.KD1"]["doc_duoc"] and ten["NV.KD1"]["noi_dung"] is not None
-    assert ten["NV.KD1"]["xem_xet_duoc"] is False          # chỉ đọc
     assert X.doc_duoc(db, tn, ra) and not X.doc_duoc(db, tn, rb)
-    with pytest.raises(PermissionError):
-        X.xem_xet(db, tn, ra, "da_xem")
+    # R5-20: Trưởng nhóm nay xem xét được người trong nhóm (test_r5_20_gia_von_tn).
 
 
 def test_vai_khac_khong_co_pham_vi_nhom_van_bi_chan(db):

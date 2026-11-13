@@ -13,7 +13,11 @@ VIEW_ROLES = ("chutich", "tgd", "ptgd_doan", "ptgd_mkt", "gd_kd", "tp_kd", "tn_k
 
 @router.get("/sales-reports")
 def list_reports(u: User = Depends(current_user)):
-    return [{"key": k, **v} for k, v in SR.REPORTS.items()]
+    ds = [{"key": k, **v} for k, v in SR.REPORTS.items()]
+    if u.role in VAI_AN_GIA_VON:        # R5-20: mô tả không hứa cột người bán không được thấy
+        for x in ds:
+            x["desc"] = x.get("desc", "").replace("chi phí quyết toán, lợi nhuận, ", "")
+    return ds
 
 
 def _scope(db, u: User, rep: dict) -> None:
@@ -25,6 +29,24 @@ def _scope(db, u: User, rep: dict) -> None:
     names = set(db.execute(select(User.full_name).where(User.id.in_(vis))).scalars())
     rep["summary"] = [r for r in rep["summary"] if r.get("sale", u.full_name) in names]
     rep["detail"] = [r for r in rep.get("detail", []) if r.get("sale", u.full_name) in names]
+
+
+# R5-20 · NGƯỜI BÁN KHÔNG THẤY GIÁ VỐN (Chủ tịch quyết 25/9/2026 «Phòng kinh doanh lẻ gỡ hết, không liên
+# quan giá vốn»; 14/11/2026 «1 ok»). Máy chủ cắt cột chi phí / lợi nhuận / biên trước khi trả — cả bản xem
+# lẫn bản Excel — chứ không trả rồi giấu ở giao diện.
+VAI_AN_GIA_VON = ("nv_kd", "tn_kd", "tp_kd")
+KHOA_GIA_VON = ("cost", "profit", "margin")
+
+
+def _an_gia_von(u: User, rep: dict) -> None:
+    if u.role not in VAI_AN_GIA_VON:
+        return
+    cols = rep.get("columns") or {}
+    for k in ("summary", "detail"):
+        if k in cols:
+            cols[k] = [c for c in cols[k] if c[0] not in KHOA_GIA_VON]
+        rep[k] = [{x: v for x, v in r.items() if x not in KHOA_GIA_VON} for r in rep.get(k) or []]
+    rep["total"] = {x: v for x, v in (rep.get("total") or {}).items() if x not in KHOA_GIA_VON}
 
 
 def _params(from_: str | None, to: str | None, month: str | None, mang: str) -> dict:
@@ -40,6 +62,7 @@ def _run(db, key: str, u: User, p: dict) -> dict:
     except ValueError as ex:
         raise HTTPException(422, str(ex))
     _scope(db, u, rep)
+    _an_gia_von(u, rep)
     return rep
 
 
