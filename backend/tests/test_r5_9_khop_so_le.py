@@ -74,7 +74,8 @@ def test_man_chu_tich_xep_hang_le_doc_co_so_chi_tieu():
     for tep in ("BanGdKdLe", "BanKdKhung"):
         t = (GOC / f"web/components/{tep}.tsx").read_text(encoding="utf-8")
         # R5-12: dòng đối chiếu màn Chủ tịch / TGĐ nay nằm trong khối chung `KhoiNhipDoanhThu` (BanKdKhung).
-        assert "no_cu" in t and ("màn Chủ tịch / TGĐ" in t or "<KhoiNhipDoanhThu" in t)
+        # R5-14: phải thu (có `no_cu`) của bàn GĐ nay là khối chung `KhoiPhaiThu` trong BanKdKhung, gọi qua `HangTien`.
+        assert ("no_cu" in t or "<HangTien" in t) and ("màn Chủ tịch / TGĐ" in t or "<HangTien" in t)
 
 
 def test_r5_10_tong_khop_ham_man_chu_tich():

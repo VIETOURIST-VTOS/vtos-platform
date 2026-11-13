@@ -1,5 +1,5 @@
 "use client";
-import BanKdKhung, { BangThucBan, KhoiNhipDoanhThu, KhoiPhaiThu, OSo, giaTriDt, so, tien, type Tab } from "@/components/BanKdKhung";
+import BanKdKhung, { BangThucBan, HangTien, OSo, so, type Tab } from "@/components/BanKdKhung";
 
 /** R5-7 · BÀN LÀM VIỆC CHUYÊN VIÊN KINH DOANH — Chủ tịch duyệt bản xem trước 13/11/2026.
  *  CHỈ SỐ CỦA CHÍNH MÌNH (Chủ tịch: «chỉ của mình») — máy chủ không trả dòng của người khác.
@@ -33,18 +33,18 @@ export default function BanNvKd() {
   return <BanKdKhung ten="Bàn làm việc Chuyên viên Kinh doanh" tabs={TAB} phamVi={() => "Số của riêng tôi"}
     tongQuan={({ d, dt, moToi }) => {
       const th = d?.the || {};
-      const dtoi = giaTriDt(th.doanh_thu_toi);
       return <>
-        <p className="g5-nhom">CỦA TÔI · THÁNG NÀY</p>
-        <div className="g5-dai5">
-          <OSo nhan="Doanh thu của tôi" v={d ? dtoi.v : undefined} phu={dtoi.phu} lk="Chi tiết" bam={() => moToi("/fit")} />
+        {/* R5-14: bỏ ô «Doanh thu của tôi» và «Khách còn nợ» (trùng khối Doanh thu – Chỉ tiêu và Phải thu). */}
+        <p className="g5-nhom">VIỆC CẦN XỬ LÝ</p>
+        <div className="g5-dai3">
           <OSo nhan="Lead mới chưa liên hệ" nong v={d ? so(th.lead_moi?.so) : undefined} phu="Được giao cho tôi" lk="Khách của tôi" bam={() => moToi("/leads?tab=leads")} />
-          <OSo nhan="Booking tháng này" v={d ? so(th.booking_moi?.so) : undefined} phu={d ? `${so(th.booking_moi?.chua_coc)} chưa cọc` : ""} lk="Booking" bam={() => moToi("/bookings?mang=le")} />
-          <OSo nhan="Khách còn nợ" nong v={d ? (th.phai_thu?.so == null ? null : tien(th.phai_thu.so)) : undefined} chua="—" phu={d ? `${so(th.phai_thu?.so_booking || 0)} booking · nhắc trước ngày đi` : ""} lk="Nhắc thu" bam={() => moToi("/bookings?mang=le")} />
           <OSo nhan="Chăm sóc quá hạn" nong v={d ? so(th.cham_soc_qua_han?.so) : undefined} phu={d ? `${so(th.cham_soc_qua_han?.toi_han)} phiếu tới hạn` : ""} lk="Chăm sóc" bam={() => moToi("/cham-soc")} />
+          <OSo nhan="Booking tháng này" v={d ? so(th.booking_moi?.so) : undefined} phu={d ? `${so(th.booking_moi?.chua_coc)} chưa cọc` : ""} lk="Booking" bam={() => moToi("/bookings?mang=le")} />
         </div>
-        <KhoiNhipDoanhThu duong="/ban-kd-le/vai/nhip" coToi />
-        <div>
+        <BangThucBan ds={d?.thuc_ban} moToi={moToi} />
+        <p className="g5-nhom">TIỀN · THÁNG NÀY</p>
+        <HangTien duong="/ban-kd-le/vai/nhip" coToi pt={d?.phai_thu} moToi={moToi} />
+        <div className="g5-hai">
           <section className="g5-khoi" aria-label="Việc hôm nay">
             <div className="g5-dau"><h2>Việc hôm nay</h2><span>Cũng hiện ở nút Công việc</span></div>
             {!d ? <p className="g5-nho">Đang đọc số…</p> : (d.viec || []).length === 0 ? <p className="g5-nho">Không có việc tồn.</p> :
@@ -52,10 +52,6 @@ export default function BanNvKd() {
                 <li key={v.ma}><span><b>{v.tieu_de}</b><small>{v.mo_ta}</small></span>
                   <button type="button" className="g5-cua" onClick={() => moToi(v.toi)}>Mở →</button></li>))}</ul>}
           </section>
-        </div>
-        <BangThucBan ds={d?.thuc_ban} moToi={moToi} />
-        <div className="g5-hai">
-          <KhoiPhaiThu pt={d?.phai_thu} moToi={moToi} />
           <section className="g5-khoi" aria-label="Lương, đề xuất và báo cáo">
             <div className="g5-dau"><h2>Lương, đề xuất &amp; báo cáo</h2><span>Mở ngay trong bàn</span></div>
             <ul className="g5-ds">

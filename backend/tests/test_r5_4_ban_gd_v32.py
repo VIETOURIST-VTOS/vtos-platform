@@ -27,9 +27,13 @@ def test_sau_tab_v32_va_mo_trong_ban():
 
 
 def test_bang_chuyen_du_cot_va_gon():
-    for chu in ("Hòa vốn", "Bán đủ khách", "còn thiếu", "Chi tiết →", 'className="vach"', "slice(0, 6)", "Xem thêm",
-                "datViecBan(", "HOẠT ĐỘNG TOUR LẺ", "<KhoiNhipDoanhThu", "Phải thu khách hàng"):
+    # R5-14 (14/11/2026): bảng chuyến và phải thu của bàn GĐ nay là khối CHUNG trong BanKdKhung — kiểm ở đó.
+    for chu in ("datViecBan(", "HOẠT ĐỘNG TOUR LẺ", "<BangThucBan", "<HangTien"):
         assert chu in BAN, chu
+    KHUNG = (GOC / "web/components/BanKdKhung.tsx").read_text(encoding="utf-8")
+    for chu in ("hòa vốn", "bán đủ", "thiếu", "Chi tiết →", 'className="kh-bar"', "slice(0, 6)", "Xem thêm",
+                "Phải thu khách"):
+        assert chu in KHUNG, chu
 
 
 def test_chip_gd_kd_tro_fit():
