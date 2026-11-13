@@ -329,12 +329,17 @@ function NoiDungCong({ p, ten }: { p: any; ten: Record<string, string> }) {
     : "Ghép link web, hoặc nhập «NGÀY 1:… NGÀY 2:…» vào ô Chương trình của sản phẩm.");
   if (th.includes("bao_gom")) goiY.push("Nhập mục «Giá tour bao gồm» trên web hoặc ô Dịch vụ của sản phẩm.");
   if (th.includes("tre_em")) goiY.push("Nhập giá trẻ em ở chuyến đang mở bán (Điều hành).");
+  // TR-12: cảnh báo này trông GIỐNG «lệch số ngày» nhưng chữa ở chỗ KHÁC HẲN — và nói nhầm chỗ
+  // thì người ta đi gỡ một cái link đúng. Nên lời hướng dẫn phải chỉ thẳng vào cột dữ liệu.
+  if (th.includes("ngay_vench")) goiY.push(
+    `Tên sản phẩm ghi một đằng, cột số ngày ghi một nẻo (cột đang là ${p.so_ngay ?? "?"}). `
+    + "Đây là lỗi DỮ LIỆU của sản phẩm, KHÔNG phải ghép sai link — sửa số ngày ở hồ sơ sản phẩm, đừng gỡ link.");
   // TR-11: cảnh báo này KHÁC HẲN mấy cái trên. Mấy cái trên nói «còn thiếu»; cái này nói «đang
   // SAI» — khách đọc lịch trình, bảng giá và «bao gồm» của một tour khác độ dài. Nên nó nói ra
   // ĐỦ HAI CON SỐ: thiếu số thì người đọc phải tự đi tìm, và phần lớn sẽ không đi.
   if (th.includes("lech_ngay")) goiY.push(
     `Tour ${p.so_ngay ?? "?"} ngày nhưng trang web đã ghép có ${p.web?.so_ngay ?? "?"} ngày lịch trình. `
     + "Ghép lại đúng trang (nút «Sửa link»), hoặc gỡ link nếu web chưa có bài đúng độ dài.");
-  return <>{th.map((k) => <Tag key={k} cls={k === "lech_ngay" ? "bad" : "warn"}>{ten[k] || k}</Tag>)}
+  return <>{th.map((k) => <Tag key={k} cls={k === "lech_ngay" || k === "ngay_vench" ? "bad" : "warn"}>{ten[k] || k}</Tag>)}
     <div className="muted" style={{ fontSize: 12 }}>{goiY.join(" ")}</div></>;
 }
