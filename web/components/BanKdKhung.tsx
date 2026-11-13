@@ -21,6 +21,17 @@ export type The = { ten: string; mo_ta: string; toi?: string; noi?: "doanh-thu" 
 export type Tab = { ma: string; ten: string; tieu_de?: string; the: The[] };
 export type Ctx = { d: any; dt: any; moToi: (toi: string) => void };
 
+const BIEU_TAB: Record<string, string> = { ban: "🛒", khach: "👥", bk: "🧾", cs: "♡", doi: "⬢", ct: "📊", bc: "📊", luong: "💼" };
+/** Biểu tượng thẻ theo đường dẫn màn — chỉ để nhận diện nhanh, không mang nghĩa nghiệp vụ. */
+function bieuThe(x: The): string {
+  const t = (x.toi || x.noi || "").split("?")[0];
+  const B: [string, string][] = [["/ban-tour-le", "▦"], ["/tours", "🗓"], ["/bao-gia", "✎"], ["/bang-gia", "₫"], ["/non-package", "✈"],
+    ["/leads", "◎"], ["/inbox", "✉"], ["/requests", "⇄"], ["/bookings", "▤"], ["/cham-soc", "♡"], ["/khieu-nai", "⚑"],
+    ["/danh-gia", "★"], ["/to-chuc-kd", "⬢"], ["/reports", "✍"], ["/sales-reports", "📈"], ["/phieu-luong", "💼"],
+    ["/cham-cong", "🗒"], ["/de-nghi-mua", "🛍"], ["doanh-thu", "📊"], ["bang", "▥"]];
+  return (B.find(([k]) => t === k || t.startsWith(k)) || ["", "◆"])[1];
+}
+
 export const so = (x: any) => (typeof x === "number" ? x.toLocaleString("vi-VN") : x);
 export const tien = (v: number) => v >= 1e9 ? (v / 1e9).toLocaleString("vi-VN", { maximumFractionDigits: 2 }) + " tỷ"
   : v >= 1e6 ? Math.round(v / 1e6).toLocaleString("vi-VN") + " tr" : vnd(v) + " đ";
@@ -78,26 +89,88 @@ export function BieuDo12({ dt, ten }: { dt: any; ten: string }) {
   </section>;
 }
 
-/** Bảng Đội ngũ: xếp hạng theo doanh thu tháng (Trưởng phòng: cả phòng · Trưởng nhóm: nhóm mình). */
-export function BangDoiNgu({ ds, coNhom }: { ds: any[]; coNhom?: boolean }) {
-  return <section className="g5-khoi" aria-label="Đội ngũ">
-    <div className="g5-dau"><h2>Đội ngũ · xếp hạng tháng</h2><span>Giá trị booking · chỉ tiêu mặc định: Chuyên viên 500 tr, Trưởng nhóm và Trưởng phòng 1 tỷ (giao riêng thì theo số giao)</span></div>
+/** R5-11 · 14/11/2026 (Chủ tịch duyệt bản xem trước): Đội ngũ và Theo nhóm CAO BẰNG NHAU, khung Đội ngũ có
+ *  thanh kéo trượt (dọc + ngang, đầu bảng đứng yên); mã nhóm thành ô navy, mỗi nhóm có thanh tiến độ. Dùng chung
+ *  cho bàn TP và bàn GĐ KD — CSS đi kèm khối (`.dn-*`) để bàn GĐ (khung CSS riêng) cũng hiện đúng. */
+export function BangDoiNgu({ ds, coNhom, don }: { ds: any[]; coNhom?: boolean; don?: boolean }) {
+  return <section className={"g5-khoi dn-khoi" + (don ? " dn-don" : "")} aria-label="Đội ngũ">
+    {/* Không dùng dấu backtick trong khối style dưới đây (bài học MKT-6/7). */}
+    <style>{`
+.dn-hai{display:grid;grid-template-columns:1.55fr 1fr;gap:14px;align-items:stretch}
+.dn-khoi{display:flex;flex-direction:column;height:520px}
+.dn-khoi .g5-dau{flex:none}
+.dn-cuon{flex:1;min-height:0;overflow:auto;border-radius:10px;scrollbar-width:thin;scrollbar-color:#5b9be6 #e8f0fc}
+.dn-cuon::-webkit-scrollbar{width:8px;height:8px}.dn-cuon::-webkit-scrollbar-track{background:#e8f0fc;border-radius:99px}
+.dn-cuon::-webkit-scrollbar-thumb{background:linear-gradient(#5b9be6,#2f6fc0);border-radius:99px}
+.dn-bang{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;min-width:640px}
+.dn-bang th{position:sticky;top:0;z-index:1;background:linear-gradient(120deg,#2f6fc0,#1f4f97);color:#fff;font-weight:600;font-size:12px;text-align:left;padding:10px 12px;white-space:nowrap}
+.dn-bang th:first-child{border-radius:10px 0 0 10px}.dn-bang th:last-child{border-radius:0 10px 10px 0}
+.dn-bang td{padding:10px 12px;border-bottom:1px solid #eef2f8;vertical-align:middle}
+.dn-bang tbody tr:hover td{background:#f6f9fe}
+.dn-bang b{color:#1d3a68}
+.dn-hang{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;font-size:12px;font-weight:800;background:#e8f0fc;color:#1f4f97}
+.dn-hang.v1{background:linear-gradient(120deg,#ffd24a,#f0a500);color:#3a2a00}
+.dn-toi{margin-left:6px;font-size:11px;font-weight:700;color:#fff;background:#2f6fc0;border-radius:999px;padding:1px 7px}
+.dn-nhom{display:inline-block;font-size:11.5px;font-weight:800;color:#1f4f97;background:#e8f0fc;border:1px solid #c9dbf5;border-radius:999px;padding:2px 9px;white-space:nowrap}
+.dn-mo{font-size:12px;color:#8b9ab0}
+.dn-tr{display:inline-block;width:56px;height:7px;border-radius:99px;background:#eef2f8;overflow:hidden;vertical-align:middle;margin-right:6px}
+.dn-tr i{display:block;height:100%;background:linear-gradient(90deg,#2f6fc0,#5b9be6)}
+.dn-lcb{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px;background:#fdeceb;color:#b3281f;white-space:nowrap}
+.dn-lcb.dat{background:#e8f5ef;color:#1c6f50}
+.dn-ds{list-style:none;margin:0;padding:0 4px 0 0;display:grid;gap:8px}
+.dn-ds li{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid #eef2f8;border-left:4px solid #2f6fc0;border-radius:12px;background:linear-gradient(90deg,#f6f9fe,#fff 60%)}
+.dn-ds li:hover{border-color:#c9dbf5;border-left-color:#1f4f97;box-shadow:0 4px 14px rgba(31,79,151,.1)}
+.dn-ma{display:grid;place-items:center;min-width:46px;height:34px;padding:0 8px;border-radius:10px;font-weight:800;font-size:13px;color:#fff;background:linear-gradient(120deg,#2f6fc0,#1f4f97)}
+.dn-ma.xam{background:linear-gradient(120deg,#9aa9bf,#7d8ca3);font-size:11px}
+.dn-g{min-width:0}.dn-g b{display:block;font-size:13.5px;color:#1d3a68}.dn-g small{display:block;font-size:12px;color:#8b9ab0}
+.dn-thanh{display:block;height:6px;border-radius:99px;background:#eef2f8;overflow:hidden;margin-top:6px}
+.dn-thanh i{display:block;height:100%;background:linear-gradient(90deg,#2f6fc0,#5b9be6)}
+.dn-pt{font-weight:800;color:#1f4f97;font-size:14px}
+.dn-khoi.dn-don{height:auto;max-height:520px}
+@media(max-width:1000px){.dn-hai{grid-template-columns:1fr}.dn-khoi{height:auto;max-height:560px}}
+`}</style>
+
+    <div className="g5-dau"><h2>Đội ngũ · xếp hạng tháng</h2><span>Giá trị booking · chỉ tiêu mặc định: Chuyên viên 500 tr, Trưởng nhóm và Trưởng phòng 1 tỷ · kéo để xem cả {ds.length} người</span></div>
     {ds.length === 0 ? <p className="g5-nho">Chưa có người nào trong phạm vi.</p> :
-      <div className="g5-cuon"><table className="g5-bang">
-        <thead><tr><th>#</th><th>Người</th>{coNhom && <th>Đơn vị</th>}<th>Doanh thu</th><th>Chỉ tiêu</th><th>Đạt</th><th>Mốc lương cơ bản</th><th>Booking</th></tr></thead>
+      <div className="dn-cuon"><table className="dn-bang">
+        <thead><tr><th>#</th><th>Người</th>{coNhom && <th>Nhóm</th>}<th>Doanh thu</th><th>Chỉ tiêu</th><th>Đạt</th><th>Mốc lương cơ bản</th><th>Booking</th></tr></thead>
         <tbody>{ds.map((x, i) => (
           <tr key={x.user_id}>
-            <td><span className={"g5-hang" + (i === 0 && x.tien > 0 ? " v1" : "")}>{i + 1}</span></td>
-            <td><b className="ma">{x.ho_ten}</b>{x.la_toi && <span className="g5-toi">tôi</span>}</td>
-            {coNhom && <td>{x.don_vi || "—"}</td>}
+            <td><span className={"dn-hang" + (i === 0 && x.tien > 0 ? " v1" : "")}>{i + 1}</span></td>
+            <td><b>{x.ho_ten}</b>{x.la_toi && <span className="dn-toi">tôi</span>}</td>
+            {coNhom && <td>{x.don_vi ? <span className="dn-nhom">{x.don_vi}</span> : "—"}</td>}
             <td>{tien(x.tien)}</td>
-            <td>{x.chi_tieu == null ? <span className="ngay">chưa giao</span> : tien(x.chi_tieu)}</td>
-            <td>{x.ty_le == null ? "—" : <><span className="g5-tr"><i style={{ width: Math.min(100, x.ty_le * 100) + "%" }} /></span>{pct(x.ty_le)}</>}</td>
-            <td>{x.moc_lcb == null ? "—" : <span className={"g5-lcb" + (x.dat_lcb ? " dat" : "")}>{x.dat_lcb ? "Đạt" : "Chưa"} {tien(x.moc_lcb)}</span>}</td>
+            <td>{x.chi_tieu == null ? <span className="dn-mo">chưa giao</span> : tien(x.chi_tieu)}</td>
+            <td>{x.ty_le == null ? "—" : <><span className="dn-tr"><i style={{ width: Math.min(100, x.ty_le * 100) + "%" }} /></span>{pct(x.ty_le)}</>}</td>
+            <td>{x.moc_lcb == null ? "—" : <span className={"dn-lcb" + (x.dat_lcb ? " dat" : "")}>{x.dat_lcb ? "Đạt" : "Chưa"} {tien(x.moc_lcb)}</span>}</td>
             <td>{x.so_booking}</td>
           </tr>))}</tbody>
       </table></div>}
   </section>;
+}
+
+export function KhoiTheoNhom({ ds, dang }: { ds: any[] | undefined; dang?: boolean }) {
+  return <section className="g5-khoi dn-khoi" aria-label="Theo nhóm">
+    <div className="g5-dau"><h2>Theo nhóm</h2><span>Doanh thu / chỉ tiêu tháng</span></div>
+    {dang ? <p className="g5-nho">Đang đọc số…</p> : !ds || ds.length === 0 ? <p className="g5-nho">Chưa có nhóm nào trong phạm vi.</p> :
+      <div className="dn-cuon"><ul className="dn-ds">{ds.map((g: any) => {
+        const chua = g.ma === "Chưa có nhóm";
+        return <li key={String(g.don_vi_id)}>
+          <span className={"dn-ma" + (chua || String(g.ma).length > 5 ? " xam" : "")}>{chua ? "—" : g.ma}</span>
+          <span className="dn-g"><b>{chua ? g.ten : (String(g.ten).startsWith("Nhóm") ? g.ten : "Nhóm " + g.ten)}</b>
+            <small>{so(g.so_nguoi)} người · {tien(g.tien)} / {g.chi_tieu == null ? "chưa giao" : tien(g.chi_tieu)}</small>
+            <span className="dn-thanh"><i style={{ width: Math.min(100, (g.ty_le || 0) * 100) + "%" }} /></span></span>
+          <span className="dn-pt">{g.ty_le == null ? "—" : pct(g.ty_le)}</span>
+        </li>; })}</ul></div>}
+  </section>;
+}
+
+/** Hai khối đứng cạnh nhau, cùng chiều cao. */
+export function DoiNguVaNhom({ doi, nhom, dang }: { doi: any[]; nhom: any[] | undefined; dang?: boolean }) {
+  return <div className="dn-hai">
+    <BangDoiNgu ds={doi} coNhom />
+    <KhoiTheoNhom ds={nhom} dang={dang} />
+  </div>;
 }
 
 /** Phải thu khách — booking lẻ của người trong phạm vi, theo bảy mốc hạn (cùng khối bàn GĐ). */
@@ -222,11 +295,13 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
     {mo && !khung && mo.noi === "bang" && <TrangPhanHe khoa="kdle" khongThanh />}
 
     {!mo && tab !== tabs[0].ma && <>
-      <div className="g5-muc"><h2>{t.tieu_de || t.ten}</h2><p>Bấm là mở ngay trong bàn</p></div>
+      {/* R5-11: đầu tab là dải navy sáng; mỗi thẻ có vạch navy bên trái và ô biểu tượng. */}
+      <div className="g5-muc2"><span className="bi" aria-hidden="true">{BIEU_TAB[t.ma] || "◆"}</span><div><b>{t.tieu_de || t.ten}</b><small>Bấm là mở ngay trong bàn</small></div></div>
       <div className="g5-luoi">
         {t.the.map((x) => (
           <button key={x.ten} type="button" className="g5-the-lk" onClick={() => moThe(x)}>
-            <span><b>{x.ten}</b><small>{x.mo_ta}</small></span><i aria-hidden="true">↗</i>
+            <span className="bi" aria-hidden="true">{bieuThe(x)}</span>
+            <span className="g"><b>{x.ten}</b><small>{x.mo_ta}</small></span><i aria-hidden="true">↗</i>
           </button>))}
       </div>
     </>}
@@ -266,6 +341,14 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
 .g5-the-lk b{display:block;font-size:14.5px;color:var(--g5-dam)}
 .g5-the-lk small{display:block;font-size:12.5px;color:var(--g5-chu2);margin-top:3px}
 .g5-the-lk i{font-style:normal;flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:#fff;background:linear-gradient(120deg,var(--g5-ns-a),var(--g5-ns-b))}
+.g5-the-lk{position:relative;overflow:hidden;justify-content:flex-start;border-radius:14px;transition:border-color .15s,box-shadow .15s,transform .15s}
+.g5-the-lk:hover{transform:translateY(-1px)}
+.g5-the-lk .bi{flex:none;display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--g5-ns-nhat);color:var(--g5-ns-b);font-size:18px}
+.g5-the-lk .g{flex:1;min-width:0}
+.g5-the-lk i{margin-left:auto}
+.g5-muc2{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:14px;color:#fff;background:linear-gradient(120deg,var(--g5-ns-a),var(--g5-ns-b));box-shadow:0 6px 18px rgba(31,79,151,.25)}
+.g5-muc2 .bi{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.18);font-size:18px}
+.g5-muc2 b{display:block;font-size:17px}.g5-muc2 small{display:block;font-size:12.5px;opacity:.85}
 .g5-nhom{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;letter-spacing:.12em;color:var(--g5-ns-b);margin:2px 0 -6px}
 .g5-nhom::before{content:"";width:4px;height:14px;border-radius:3px;background:linear-gradient(var(--g5-ns-a),var(--g5-ns-b))}
 .g5-dai5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}

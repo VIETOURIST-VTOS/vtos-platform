@@ -145,6 +145,76 @@ def pham_vi(db: Session, u: User, ky: str) -> dict:
             "nhom": (u.sales_group or "") if vai == "tn" else ""}
 
 
+def _dong(db: Session, bang_ct: dict, uid: int, o: dict, nguoi: dict, nguoi_xem: int) -> dict:
+    """Một dòng bảng Đội ngũ (dùng chung bàn TP và bàn GĐ KD — R5-11)."""
+    usr = db.get(User, uid)
+    ct = _chi_tieu_nguoi(bang_ct, uid, db)
+    tien = float(o.get("tien", 0.0))
+    moc = moc_luong_co_ban(db, uid)
+    return {"user_id": uid, "ho_ten": usr.full_name if usr else str(uid),
+            "don_vi": nguoi.get("don_vi") or o.get("don_vi", "") or (usr.sales_group if usr else ""),
+            "vai": nguoi.get("vai", ""), "vai_dang_nhap": usr.role if usr else "",
+            "tien": tien, "so_booking": o.get("so_booking", 0),
+            "chi_tieu": ct, "ty_le": (tien / ct) if ct else None, "la_toi": uid == nguoi_xem,
+            "moc_lcb": moc, "dat_lcb": (tien >= moc) if moc else None}
+
+
+def _gom_theo_nhom_ban_hang(doi_ngu: list[dict]) -> list[dict]:
+    """R5-8: «Theo nhóm» gom theo ô nhóm bán hàng; chỉ tiêu nhóm = cộng chỉ tiêu cá nhân (R5-10)."""
+    g: dict[str, dict] = {}
+    for x in doi_ngu:
+        k = x["don_vi"] or "Chưa có nhóm"
+        o = g.setdefault(k, {"don_vi_id": k, "ten": k, "ma": k, "tien": 0.0, "so_nguoi": 0,
+                             "chi_tieu": None, "ty_le": None})
+        o["tien"] += x["tien"]; o["so_nguoi"] += 1
+        if x["chi_tieu"]:
+            o["chi_tieu"] = (o["chi_tieu"] or 0.0) + x["chi_tieu"]
+    for o in g.values():
+        o["ty_le"] = (o["tien"] / o["chi_tieu"]) if o["chi_tieu"] else None
+    return sorted(g.values(), key=lambda x: (x["ma"] == "Chưa có nhóm", x["ma"]))
+
+
+def doi_ngu_ca_phong(db: Session, nguoi_xem: int = 0, hom_nay: date | None = None) -> dict:
+    """R5-11 (Chủ tịch duyệt 14/11/2026: «bổ sung 2 khung này vào bàn làm việc của GĐ KD»): Đội ngũ + Theo nhóm
+    của CẢ phòng Lẻ cho bàn GĐ KD. Cơ cấu đã khai → mọi người trong cây «le», nhóm = đơn vị lá; chưa khai →
+    đọc ô nhóm bán hàng (NHOM_LE, gồm Chuyên viên, Trưởng nhóm, Trưởng phòng). Cùng cách tính với bàn TP."""
+    d = hom_nay or date.today()
+    ky = f"{d:%Y-%m}"
+    cuoi = _cuoi(ky)
+    bang_ct = CT.tra_cuu(db, ky)
+    dv_all = [x for x in db.execute(select(DonViKD).where(DonViKD.mang == LUONG)).scalars() if x.dang_hieu_luc(d)]
+    pv = [x.id for x in dv_all]
+    nguoi = TC.nguoi_trong(db, pv, cuoi) if pv else []
+    if nguoi:
+        kq = DT.thang(db, ky, LUONG, pv)
+        ban = {o["user_id"]: o for o in kq["theo_nguoi"]}
+        ten = {n["user_id"]: n for n in nguoi}
+        doi = [_dong(db, bang_ct, uid, ban.get(uid, {}), ten[uid], nguoi_xem) for uid in sorted(ten)]
+        doi.sort(key=lambda x: -x["tien"])
+        co_con = {x.cha_id for x in dv_all if x.cha_id}
+        dvt = {x["don_vi_id"]: x for x in kq["theo_don_vi"]}
+        nhom = []
+        for c in sorted((x for x in dv_all if x.id not in co_con), key=lambda x: x.ma):
+            ct = _chi_tieu_don_vi(bang_ct, c.id)
+            tien = float(dvt.get(c.id, {}).get("tien", 0.0))
+            so_ng = len(TC.nguoi_trong(db, [c.id], d))
+            if ct is None:
+                cts = [x["chi_tieu"] for x in doi if x["chi_tieu"] and x["don_vi"] == c.ten]
+                ct = float(sum(cts)) if cts else None
+            nhom.append({"don_vi_id": c.id, "ten": c.ten, "ma": c.ma, "tien": tien, "so_nguoi": so_ng,
+                         "chi_tieu": ct, "ty_le": (tien / ct) if ct else None})
+        return {"nguon": "co_cau", "doi_ngu": doi, "theo_nhom": nhom}
+    q = select(User).where(User.role.in_(VAI_NGUOI_BAN + ("tp_kd",)), User.active == True,  # noqa: E712
+                           func.coalesce(User.sales_group, "").in_(NHOM_LE))
+    uids = sorted({x.id for x in db.execute(q).scalars()})
+    kq = DT.thang(db, ky, LUONG, None)
+    ban = {o["user_id"]: o for o in kq["theo_nguoi"] if o["user_id"] in uids}
+    doi = [_dong(db, bang_ct, uid, ban.get(uid, {}), {}, nguoi_xem) for uid in uids]
+    doi.sort(key=lambda x: -x["tien"])
+    return {"nguon": "nhom_ban_hang", "doi_ngu": doi, "theo_nhom": _gom_theo_nhom_ban_hang(doi)}
+
+
+
 def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
     d = hom_nay or date.today()
     ky = f"{d:%Y-%m}"
@@ -176,18 +246,7 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
             dt_pv = GD.doi_chieu_chu_tich(db, d)["thang"]
         ten = {n["user_id"]: n for n in TC.nguoi_trong(db, p["don_vi_ids"], _cuoi(ky))} if p["don_vi_ids"] else {}
         for uid in uids:
-            o = ban.get(uid, {})
-            nguoi = ten.get(uid) or {}
-            usr = db.get(User, uid)
-            ct = _chi_tieu_nguoi(bang_ct, uid, db)
-            tien = float(o.get("tien", 0.0))
-            moc = moc_luong_co_ban(db, uid)
-            doi_ngu.append({"user_id": uid, "ho_ten": usr.full_name if usr else str(uid),
-                            "don_vi": nguoi.get("don_vi") or o.get("don_vi", "") or (usr.sales_group if usr else ""),
-                            "vai": nguoi.get("vai", ""), "vai_dang_nhap": usr.role if usr else "",
-                            "tien": tien, "so_booking": o.get("so_booking", 0),
-                            "chi_tieu": ct, "ty_le": (tien / ct) if ct else None, "la_toi": uid == u.id,
-                            "moc_lcb": moc, "dat_lcb": (tien >= moc) if moc else None})
+            doi_ngu.append(_dong(db, bang_ct, uid, ban.get(uid, {}), ten.get(uid) or {}, u.id))
         doi_ngu.sort(key=lambda x: -x["tien"])
         if ct_pv is None:
             # R5-10: đơn vị chưa được giao chỉ tiêu → chỉ tiêu nhóm / phòng = cộng chỉ tiêu cá nhân của người trong
@@ -206,17 +265,7 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
                                   "chi_tieu": ct, "ty_le": (tien / ct) if ct else None})
         elif vai == "tp" and p["nguon"] == "nhom_ban_hang":
             # R5-8: «Theo nhóm» gom theo ô nhóm bán hàng; chỉ tiêu nhóm chưa giao được (chưa có đơn vị).
-            g: dict[str, dict] = {}
-            for x in doi_ngu:
-                k = x["don_vi"] or "Chưa có nhóm"
-                o = g.setdefault(k, {"don_vi_id": k, "ten": k, "ma": k, "tien": 0.0, "so_nguoi": 0,
-                                     "chi_tieu": None, "ty_le": None})
-                o["tien"] += x["tien"]; o["so_nguoi"] += 1
-                if x["chi_tieu"]:
-                    o["chi_tieu"] = (o["chi_tieu"] or 0.0) + x["chi_tieu"]      # R5-10: cộng chỉ tiêu cá nhân
-            for o in g.values():
-                o["ty_le"] = (o["tien"] / o["chi_tieu"]) if o["chi_tieu"] else None
-            theo_nhom = sorted(g.values(), key=lambda x: (x["ma"] == "Chưa có nhóm", x["ma"]))
+            theo_nhom = _gom_theo_nhom_ban_hang(doi_ngu)
 
     # ── Booking, lead, chăm sóc của phạm vi ────────────────────────────────────────────────────
     dau_thang = datetime.combine(d.replace(day=1), time.min)

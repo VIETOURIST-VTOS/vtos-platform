@@ -61,6 +61,12 @@ def doi_chieu_chu_tich(db: Session, d: date) -> dict:
         return {"thang": None, "chuyen_thang": None, "co_so": ""}
 
 
+def _doi_ngu_phong(db: Session, d: date) -> dict:
+    from app.services import ban_kd_vai as V          # nhập muộn: ban_kd_vai đã nhập module này
+    kq = V.doi_ngu_ca_phong(db, 0, d)
+    return {"doi_ngu": kq["doi_ngu"], "theo_nhom": kq["theo_nhom"], "nguon_doi_ngu": kq["nguon"]}
+
+
 def tong_quan(db: Session, hom_nay: date | None = None) -> dict:
     d = hom_nay or date.today()
     ky = f"{d:%Y-%m}"
@@ -151,6 +157,8 @@ def tong_quan(db: Session, hom_nay: date | None = None) -> dict:
     return {"ngay": d.isoformat(), "the": the, "viec": viec, "hoat_dong": hoat_dong,
             "san_sang": san_sang, "thuc_ban": thuc_ban(db, rows), "phai_thu": phai_thu_le(db, d),
             "doi_chieu": doi_chieu,
+            # R5-11: Đội ngũ + Theo nhóm của cả phòng Lẻ — cùng hàm, cùng cách tính với bàn Trưởng phòng.
+            **_doi_ngu_phong(db, d),
             "doanh_thu_pham_vi": "ca_khoi_kd" if not don_vi else "co_cau"}
 
 

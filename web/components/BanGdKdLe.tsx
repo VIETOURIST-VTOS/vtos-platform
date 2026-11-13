@@ -8,6 +8,7 @@ import { useHomNay } from "@/components/DauManHinh01";
 import NutLich90, { VAI_NUT_LICH_90 } from "@/components/NutLich90";
 import { api, vnd, fmtD } from "@/lib/api";
 import { errMsg } from "@/components/ui";
+import { DoiNguVaNhom } from "@/components/BanKdKhung";
 
 /** R5-4 · BÀN LÀM VIỆC GIÁM ĐỐC KINH DOANH LẺ THEO MẪU v32 — Chủ tịch 13/11/2026 05:49:
  *  «giao diện bàn làm việc của GĐKD chưa giống theo mẫu đề xuất» (vietourist-vtd-v32-demo
@@ -260,6 +261,9 @@ export default function BanGdKdLe() {
           {pt?.no_cu?.tong != null && <p className="g5-nho g5-nocu">+ Nợ cũ cần đối soát: <b>{tien(pt.no_cu.tong)}</b> · {so(pt.no_cu.so_booking)} booking — {pt.no_cu.ghi}. Cộng hai phần = số phải thu tour lẻ đầy đủ.</p>}
         </section>
       </div>
+
+      {/* R5-11 · Chủ tịch duyệt 14/11/2026: Đội ngũ + Theo nhóm của cả phòng Lẻ — cùng khối, cùng cách tính bàn TP. */}
+      <DoiNguVaNhom doi={d?.doi_ngu || []} nhom={d?.theo_nhom} dang={!d} />
 
       <section className="g5-khoi" aria-label="Chuyến cần thúc bán">
         <div className="g5-dau"><div><h2>Chuyến cần thúc bán</h2>
