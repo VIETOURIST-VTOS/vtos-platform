@@ -466,6 +466,151 @@ def can_lam_moi(p: Product, now: datetime | None = None) -> bool:
         return True
 
 
+# ── TR-6 (13/11/2026) · SỨC KHOẺ CỦA ĐƯỜNG ĐỌC WEB CŨ ─────────────────────────────────────────
+# Chủ tịch chốt 12/11/2026: nội dung tour TIẾP TỤC đọc từ vietourist.com.vn. Quyết định ấy mang
+# theo một rủi ro không tự lộ ra: `lam_moi()` nuốt mọi lỗi để cổng vẫn chạy bằng bản cũ —
+#
+#     except Exception as ex:   # web chính chậm / đổi cấu trúc: cổng vẫn chạy bằng bản cũ
+#
+# — đúng và nên thế, NHƯNG hệ quả là ngày web cũ đổi bố cục HTML, bộ bóc tách chết ÂM THẦM. Khách
+# vẫn thấy trang, chỉ là thấy bản chụp của nhiều tuần trước, và không ai biết. Lỗi có được ghi
+# vào `noi_dung_web["loi"]`, nhưng trước đợt này KHÔNG MÀN HÌNH NÀO ĐỌC CỘT ẤY.
+#
+# Hàm này là chỗ đọc. CHỈ ĐỌC, không gọi mạng, không sửa một dòng nào — nên gọi bao nhiêu lần
+# cũng được và không bao giờ làm hỏng cái nó đang đo.
+#
+# KHÔNG TỰ ĐẶT NGƯỠNG «BAO LÂU LÀ CŨ». Nó lấy đúng `WEB_CU_GIO` mà `can_lam_moi()` đang dùng, rồi
+# nhân đôi: quá HAI kỳ làm mới mà vẫn chưa đọc lại nghĩa là việc làm mới không chạy, chứ không
+# phải mới tới hạn. Viết lại một con số thứ hai ở đây là tạo ra hai định nghĩa «cũ», và hai bản
+# thì sớm muộn lệch — bài học KN-1 chép lại ở `ho_so_hdv.py`.
+
+def suc_khoe_doc_web(db: Session, now: datetime | None = None) -> dict:
+    """Đường đọc nội dung từ vietourist.com.vn còn sống không, và tour nào đang thiếu ảnh.
+
+    Trả về SỐ ĐẾM và DANH SÁCH MÃ TOUR, không trả nội dung — đây là cửa cho người vận hành nhìn
+    một cái biết đường đọc còn chạy không, không phải cửa đọc dữ liệu tour.
+    """
+    now = now or datetime.now()
+    han_cu = timedelta(hours=WEB_CU_GIO * 2)
+
+    sps = _sp_hien(db)
+    chua_ghep, chua_doc, hong, qua_han, khong_anh = [], [], [], [], []
+    cu_nhat: str | None = None
+
+    for p in sps:
+        nd = p.noi_dung_web or {}
+
+        if not (p.link_web or "").strip():
+            chua_ghep.append(p.code)
+            continue                                  # chưa ghép link thì không có gì để đo tiếp
+
+        if not nd:
+            chua_doc.append(p.code)
+            continue                                  # đã ghép nhưng chưa đọc lần nào
+
+        if (nd.get("loi") or "").strip():
+            hong.append({"ma": p.code, "ten": p.name, "loi": str(nd.get("loi"))[:200],
+                         "thu_luc": nd.get("thu_luc") or None})
+
+        moc = nd.get("cap_nhat_luc")
+        if moc:
+            if cu_nhat is None or moc < cu_nhat:
+                cu_nhat = moc
+            try:
+                if now - datetime.fromisoformat(moc) > han_cu:
+                    qua_han.append({"ma": p.code, "ten": p.name, "cap_nhat_luc": moc})
+            except ValueError:
+                # Mốc không đọc được là một kiểu hỏng riêng, KHÔNG phải «quá hạn». Gộp vào quá
+                # hạn là nói sai nguyên nhân cho người đi sửa.
+                hong.append({"ma": p.code, "ten": p.name, "loi": f"mốc thời gian không đọc được: {moc}",
+                             "thu_luc": nd.get("thu_luc") or None})
+
+        # THIẾU ẢNH đo ở đây, cùng một lượt duyệt. Trên trang bán tour, thẻ không ảnh gần như
+        # không bán được — và nguồn ảnh là web cũ, nên nó thuộc đúng phép đo này.
+        if not (nd.get("anh") or []):
+            khong_anh.append({"ma": p.code, "ten": p.name})
+
+    da_doc = len(sps) - len(chua_ghep) - len(chua_doc)
+    return {
+        "tong_san_pham": len(sps),
+        "chua_ghep_link": {"so": len(chua_ghep), "ma": chua_ghep[:50]},
+        "chua_doc_lan_nao": {"so": len(chua_doc), "ma": chua_doc[:50]},
+        "da_doc": da_doc,
+        "doc_hong": {"so": len(hong), "ds": hong[:50]},
+        "qua_han_lam_moi": {"so": len(qua_han), "ds": qua_han[:50], "nguong_gio": WEB_CU_GIO * 2},
+        "khong_co_anh": {"so": len(khong_anh), "ds": khong_anh[:50]},
+        # RỖNG khác 0: chưa sản phẩm nào đọc được thì KHÔNG có bản cũ nhất, chứ không phải bản cũ
+        # nhất là hôm nay. Màn hình đọc `null` phải in «chưa có», không in một ngày.
+        "ban_cu_nhat": cu_nhat,
+        "do_luc": now.isoformat(timespec="minutes"),
+    }
+
+
+# ── TR-6 (13/11/2026) · ĐÁNH GIÁ HIỆN TRÊN TRANG BÁN TOUR ────────────────────────────────────
+# Sổ đánh giá đã có từ đợt 25/9/2026 (`DanhGiaSauTour`), nhưng chưa bao giờ hiện ra cổng khách.
+# Đây là cửa đọc ấy. BỐN LUẬT, không luật nào được bỏ:
+#
+#  (1) CHỈ ĐIỂM KHÁCH TỰ CHẤM. `nguon == "khach"`. Điểm nhân viên ghi hộ không lên trang bán
+#      hàng — lý do đã viết trong `models/danh_gia.py`: người gọi lại khách chấm thấp chính là
+#      người bị chấm.
+#  (2) CHỈ NHẬN XÉT ĐƯỢC PHÉP ĐĂNG Ở ĐÚNG CHỖ NÀY. Hỏi `dong_y.cong_khai_duoc(r, "trang_tour")`,
+#      không tự dựng lại mệnh đề. Đánh giá thu trước 13/11/2026 mang phạm vi cũ («hồ sơ hướng
+#      dẫn viên tại VTOS») nên KHÔNG lọt qua — đúng như đã hứa với khách.
+#  (3) KHÔNG KÈM TÊN VÀ THÔNG TIN LIÊN HỆ. Chính câu hỏi đã hứa thế. Hàm này không trả về tên,
+#      điện thoại, email, mã đơn hay mã chuyến — không có gì lần ngược ra được một người.
+#  (4) ĐIỂM TRUNG BÌNH CŨNG CHỈ CỘNG TỪ NHỮNG DÒNG ẤY. Cộng cả dòng chưa được phép đăng rồi bảo
+#      «đây chỉ là con số, không phải lời khách» là lách; con số ấy vẫn sinh ra từ dòng khách
+#      chưa cho phép dùng ở đây.
+#
+# RỖNG LÀ RỖNG, KHÔNG PHẢI 0 SAO. Chưa có đánh giá nào thì `diem_tb` là None và màn hình phải in
+# «chưa có đánh giá», không in «0/5» — một tour mới mở mà hiện 0 sao thì thà đừng hiện gì.
+
+def danh_gia_cong_khai(db: Session, pid: int, trang: int = 1, moi_trang: int = 10) -> dict:
+    """Đánh giá của khách cho một tour, phần được phép hiện công khai trên trang bán tour."""
+    from app.models.danh_gia import DanhGiaSauTour, DongYCongKhai
+    from app.services import dong_y as DY
+
+    p = db.get(Product, pid)
+    if p is None or p.status != "active":
+        raise LoiTour("Không tìm thấy tour")
+
+    # MỌI chuyến của sản phẩm, kể cả đã đi xong — đánh giá chỉ sinh ra SAU chuyến đi, nên không
+    # dùng được `_chuyen()` (hàm ấy chỉ lấy chuyến đang mở bán).
+    dk = [Tour.product_id == p.id]
+    if (p.code or "").strip():
+        dk.append(Tour.product_code == p.code)
+    tids = [t.id for t in db.execute(select(Tour).where(or_(*dk))).scalars()]
+    if not tids:
+        return {"diem_tb": None, "so_danh_gia": 0, "nhan_xet": [], "tong_nhan_xet": 0, "trang": 1}
+
+    cap = db.execute(
+        select(DanhGiaSauTour, DongYCongKhai)
+        .join(DongYCongKhai, DongYCongKhai.danh_gia_id == DanhGiaSauTour.id)
+        .where(DanhGiaSauTour.tour_id.in_(tids),
+               DanhGiaSauTour.doi_tuong == "tour",
+               DanhGiaSauTour.nguon == "khach")
+        .order_by(DanhGiaSauTour.tao_luc.desc())).all()
+
+    duoc = [(dg, r) for dg, r in cap if DY.cong_khai_duoc(r, "trang_tour")]
+
+    diem = [dg.diem for dg, _ in duoc if dg.diem is not None]      # bỏ qua ô khách không chấm
+    co_chu = [dg for dg, _ in duoc if (dg.nhan_xet or "").strip()]
+
+    t = max(1, int(trang or 1))
+    dau = (t - 1) * moi_trang
+    return {
+        "diem_tb": round(sum(diem) / len(diem), 1) if diem else None,
+        "so_danh_gia": len(diem),
+        "tong_nhan_xet": len(co_chu),
+        "trang": t,
+        "moi_trang": moi_trang,
+        # Chỉ hai thứ: lời khách và tháng. Không tên, không liên hệ, không mã đơn, không mã chuyến.
+        "nhan_xet": [{"diem": dg.diem, "noi_dung": dg.nhan_xet.strip(),
+                      "thang": dg.tao_luc.strftime("%m/%Y") if dg.tao_luc else None}
+                     for dg in co_chu[dau:dau + moi_trang]],
+    }
+
+
 _XANH = ("du lich xanh", "chua lanh", "retreat", "wellness", "yoga")      # + «thiền» (có dấu — «thiên» không tính)
 
 
@@ -624,7 +769,22 @@ def _chuyen_out(t: Tour, con: int, so_khach: int, hom_nay: date) -> dict:
             "gio_chot": (t.start_date - hom_nay).days <= K.GIO_CHOT_NGAY}
 
 
-def the_san_pham(p: Product, chuyen: list[tuple[Tour, int]], so_khach: int, hom_nay: date, chung: bool) -> dict:
+def _anh_tai(db: Session, pids: list[int]) -> dict[int, list[str]]:
+    """TR-8: đường ảnh phòng sản phẩm đã tải lên, MỘT lượt truy vấn cho cả danh sách.
+    Nhập trong hàm vì `anh_tour` nhập ngược lại tệp này (ma trận quyền dùng chung)."""
+    try:
+        from app.services import anh_tour as AT
+        return AT.duong_cong(db, pids)
+    except Exception:
+        return {}                      # thiếu bảng (bản cũ chưa chuyển hệ) thì cổng vẫn chạy bằng ảnh web
+
+
+def the_san_pham(p: Product, chuyen: list[tuple[Tour, int]], so_khach: int, hom_nay: date, chung: bool,
+                 anh_tai: list[str] | None = None) -> dict:
+    """TR-8 (13/11/2026): `anh_tai` là ảnh phòng sản phẩm TẢI LÊN VTOS. Chủ tịch chốt cùng ngày:
+    ảnh tải lên ĐỨNG TRƯỚC, ảnh đọc từ vietourist.com.vn nối sau — không xoá ảnh web nào, nên vá
+    được tour nào hay tour ấy mà không phải chờ đủ bộ. Tham số chứ không tự truy vấn: hàm này
+    chạy trong vòng lặp 85 sản phẩm, để nó tự hỏi cơ sở dữ liệu là 85 lượt truy vấn."""
     ds = [_chuyen_out(t, con, so_khach, hom_nay) for t, con in chuyen]
     du = [c for c in ds if c["du_cho"]]
     re_nhat = min(du, key=lambda c: c["gia"]) if du else None
@@ -638,7 +798,7 @@ def the_san_pham(p: Product, chuyen: list[tuple[Tour, int]], so_khach: int, hom_
             "gia_tre_em": re_nhat["gia_tre_em"] if re_nhat else None,
             "so_chuyen": len(ds), "khoi_hanh_gan": [c["khoi_hanh"] for c in du[:4]],
             "khuyen_mai": any(c["gia_goc"] for c in du), "gio_chot": any(c["gio_chot"] for c in du),
-            "it_cho": any(c["it_cho"] for c in du), "anh": list(nd.get("anh") or [])[:8], "noi_bat": list(p.noi_bat or [])[:5],
+            "it_cho": any(c["it_cho"] for c in du), "anh": (list(anh_tai or []) + list(nd.get("anh") or []))[:8], "noi_bat": list(p.noi_bat or [])[:5],
             "mo_thanh_toan": mo_thanh_toan(None, p, chung), "co_noi_dung": bool(nd.get("lich_trinh") or p.program),
             # TR-3: tour ghép đã ghép web nhưng chưa có chuyến mở bán → vẫn hiện, khách gửi yêu cầu giữ chỗ
             "chua_co_lich": loai(p) == "ghep" and not ds,
@@ -662,6 +822,7 @@ def tim(db: Session, tab: str = "", q: str = "", noi: str = "", tu: date | None 
     sps = _sp_hien(db)
     ch = _chuyen(db, sps, hom_nay)
     chung = tt_chung(db)
+    anh_tai = _anh_tai(db, [p.id for p in sps])     # TR-8: MỘT lượt truy vấn cho cả danh sách
     k0 = _khong_dau(q.strip())
     the, noi_ds = [], set()
     for p in sps:
@@ -684,7 +845,7 @@ def tim(db: Session, tab: str = "", q: str = "", noi: str = "", tu: date | None 
             ds = [(t, c) for t, c in ds if (not tu or t.start_date >= tu) and (not den or t.start_date <= den)]
             if loai(p) == "ghep" and not ds:
                 continue
-        the.append(the_san_pham(p, ds, nl + te, hom_nay, chung))
+        the.append(the_san_pham(p, ds, nl + te, hom_nay, chung, anh_tai.get(p.id)))
     the.sort(key=lambda o: (o["gia_tu"] is None, min(o["khoi_hanh_gan"] or ["9999"]), o["ten"]))
     return {"san_pham": the, "tong": len(the), "noi_khoi_hanh": sorted(noi_ds), "nguoi_lon": nl, "tre_em": te,
             "phuong_tien": PHUONG_TIEN_TOUR, "loai": LOAI_TOUR, "co_wellness": any(o["wellness"] for o in the),
@@ -748,6 +909,49 @@ def tach_muc(van_ban: str) -> dict:
             "quy_dinh": "\n".join(muc["qd"]).strip()[:4000]}
 
 
+# ── TR-7b (13/11/2026) · SỐ GIỮ CHỖ KHÔNG ĐƯỢC LỌT RA MÀN KHÁCH ─────────────────────────────
+# KS-71 mục G4 đo được trên bản chạy thật: trang chi tiết in «Chi phí phụ thu phòng đơn:
+# 00.000 VNĐ/khách». Đó là số giữ chỗ của người soạn bài trên vietourist.com.vn, chưa ai điền.
+#
+# VÌ SAO PHẢI CHẶN Ở ĐÂY CHỨ KHÔNG ĐỢI SỬA BÊN WEB CŨ. Nội dung đọc về từ web cũ (Chủ tịch
+# chốt mục 12 của KS-71), nên mọi lỗi soạn bài bên ấy chảy thẳng ra màn khách. Một con số giả
+# nằm cạnh giá thật làm hỏng lòng tin vào CẢ trang — khách không biết số nào mới là thật.
+#
+# LUẬT: dòng nào mang số tiền toàn số 0 («00.000», «000.000») hoặc còn chỗ trống chưa điền
+# («X.XXX», «____») thì KHÔNG hiện cho khách, VÀ sản phẩm bị đánh dấu thiếu nội dung để phòng
+# sản phẩm thấy mà đi sửa bên web cũ. Giấu đi mà không ai biết thì sáu tháng sau vẫn còn đó.
+#
+# KHÔNG tự đoán số đúng và KHÔNG tự điền — ranh giới Chủ tịch chốt 09/9/2026: Claude viết cấu
+# trúc, người của anh nhập số.
+# CÁCH VIẾT ĐẦU TIÊN CỦA EM SAI, VÀ SAI KIỂU NGUY HIỂM — ghi lại để không ai viết lại như thế.
+# Em bắt thẳng mẫu «0{1,3}.000». Nó khớp luôn phần đuôi của «1.000.000», tức một tour giá đúng
+# một triệu sẽ bị GIẤU khỏi màn khách. Bộ lọc dựng để chống số giả mà lại xoá số thật thì tệ
+# hơn là không lọc. Phép thử bắt được trước khi đẩy.
+#
+# Cách đúng: tách từng SỐ TIỀN trọn vẹn rồi hỏi «mọi chữ số của nó có phải đều là 0 không».
+_TIEN = re.compile(r"(?<![\d.,])\d{1,3}(?:[.,]\d{3})+(?![\d.,])")
+_CHO_TRONG = re.compile(r"(?<![0-9A-Za-zÀ-ỹ])[Xx]{1,3}[.,][Xx]{3}(?![0-9A-Za-zÀ-ỹ])|_{3,}")
+
+
+def co_so_ao(s: str) -> bool:
+    """Dòng này có số tiền giữ chỗ chưa ai điền không?"""
+    s = s or ""
+    if _CHO_TRONG.search(s):
+        return True
+    return any(set(m.group().replace(".", "").replace(",", "")) == {"0"} for m in _TIEN.finditer(s))
+
+
+def _loc_so_ao(dong: list[str]) -> tuple[list[str], int]:
+    """Trả (các dòng SẠCH, số dòng đã bỏ). Giữ nguyên thứ tự."""
+    sach = [d for d in dong if not co_so_ao(d)]
+    return sach, len(dong) - len(sach)
+
+
+def _quy_dinh_sach(s: str) -> tuple[str, int]:
+    sach, bo = _loc_so_ao((s or "").split("\n"))
+    return "\n".join(sach).strip(), bo
+
+
 def lich_trinh(db: Session, p: Product, tour_id: int | None = None) -> dict:
     """Ưu tiên: chương trình của chuyến → lịch trình đọc từ web → chương trình sản phẩm có mốc ngày → nguyên văn."""
     from app.models.chuong_trinh import ChuongTrinhNgay
@@ -781,14 +985,20 @@ def chi_tiet(db: Session, pid: int, nguoi_lon: int = 2, tre_em: int = 0, hom_nay
     if loai(p) == "ghep" and not ds and not p.link_web:
         raise LoiTour("Tour này hiện chưa có ngày khởi hành mở bán — xem tour khác hoặc gửi yêu cầu", 404)
     chung = tt_chung(db)
-    the = the_san_pham(p, ds, nl + te, hom_nay, chung)
+    anh_tai = _anh_tai(db, [p.id]).get(p.id) or []
+    the = the_san_pham(p, ds, nl + te, hom_nay, chung, anh_tai)
     nd = p.noi_dung_web or {}
     tm = tach_muc(p.program or "")                                      # P1-01: web trống thì lấy mục tách từ chương trình
     chuyen = [_chuyen_out(t, con, nl + te, hom_nay) for t, con in ds]
+    # TR-7b: lọc số giữ chỗ TRƯỚC khi trả cho khách. `bo_so_ao` đếm số dòng đã bỏ — cửa
+    # `/tour-online` của nhân viên đọc con số ấy để biết sản phẩm nào còn số giả trên web cũ.
+    bao, bo1 = _loc_so_ao(list(nd.get("bao_gom") or tm["bao_gom"]))
+    khong, bo2 = _loc_so_ao(list(nd.get("khong_bao_gom") or tm["khong_bao_gom"]))
+    qd, bo3 = _quy_dinh_sach(nd.get("quy_dinh") or tm["quy_dinh"])
     return {**the, "chuyen": chuyen, "lich_trinh": lich_trinh(db, p, chuyen[0]["tour_id"] if chuyen else None),
-            "anh": list(nd.get("anh") or []), "bao_gom": list(nd.get("bao_gom") or tm["bao_gom"]),
-            "khong_bao_gom": list(nd.get("khong_bao_gom") or tm["khong_bao_gom"]),
-            "quy_dinh": nd.get("quy_dinh") or tm["quy_dinh"], "bang_gia_web": list(nd.get("bang_gia") or []),
+            "anh": anh_tai + list(nd.get("anh") or []), "bao_gom": bao,
+            "khong_bao_gom": khong, "bo_so_ao": bo1 + bo2 + bo3,
+            "quy_dinh": qd, "bang_gia_web": list(nd.get("bang_gia") or []),
             "khoi_hanh_text": nd.get("khoi_hanh_text") or "", "link_web": p.link_web or "",
             "web_cap_nhat": nd.get("cap_nhat_luc"), "dich_vu": p.services or "",
             "coc_pt": float(p.deposit_pct or R.get_param(db, "coc_mac_dinh_pct")), "dong_so_truoc": int(p.days_to_close or 0),
@@ -1298,17 +1508,20 @@ def gui_yeu_cau_doan(db: Session, tk: TaiKhoanNgoai, d: dict, now: datetime | No
 
 # ══ 5 · VTOS — màn «Tour trên cổng khách» ═════════════════════════════════════════════════════════════════════════
 
-THIEU_ND = {"anh": "Thiếu ảnh", "lich": "Chưa có lịch theo ngày", "bao_gom": "Thiếu giá bao gồm", "tre_em": "Thiếu giá trẻ em"}
+THIEU_ND = {"anh": "Thiếu ảnh", "lich": "Chưa có lịch theo ngày", "bao_gom": "Thiếu giá bao gồm", "tre_em": "Thiếu giá trẻ em",
+            "gia_ao": "Còn số tiền chưa điền trên web"}
 
 
-def thieu_noi_dung(p: Product, chuyen: list[tuple[Tour, int]], co_ct_chuyen: bool = False) -> list[str]:
+def thieu_noi_dung(p: Product, chuyen: list[tuple[Tour, int]], co_ct_chuyen: bool = False,
+                   co_anh_tai: bool = False) -> list[str]:
     """P1-01 (Chủ tịch duyệt 09/11/2026): khách đang thấy gì trên kh.vietourist.vn cho sản phẩm này — thiếu mục nào.
     Cùng nguồn với chi_tiet(): ảnh web; lịch theo ngày (chương trình chuyến → web → chương trình sản phẩm đã tách mục);
     bao gồm (web → mục tách từ chương trình → «dịch vụ»); giá trẻ em ở MỌI chuyến đang mở bán. Chỉ báo, không chặn."""
     nd = p.noi_dung_web or {}
     tm = tach_muc(p.program or "")
     ra = []
-    if not nd.get("anh"):
+    # TR-8: tour đã có ảnh phòng sản phẩm tải lên thì KHÔNG còn thiếu ảnh, dù web cũ vẫn trống.
+    if not (nd.get("anh") or co_anh_tai):
         ra.append("anh")
     if not (co_ct_chuyen or nd.get("lich_trinh") or tach_ngay(tm["chuong_trinh"])):
         ra.append("lich")
@@ -1316,10 +1529,16 @@ def thieu_noi_dung(p: Product, chuyen: list[tuple[Tour, int]], co_ct_chuyen: boo
         ra.append("bao_gom")
     if any(not t.price_chd for t, _con in chuyen):
         ra.append("tre_em")
+    # TR-7b: màn khách đã LỌC các dòng mang số giữ chỗ; chỗ này là để người của anh biết mà đi
+    # sửa bên vietourist.com.vn. Lọc mà không báo thì lỗi nằm im mãi.
+    if any(co_so_ao(d) for d in list(nd.get("bao_gom") or tm["bao_gom"])
+           + list(nd.get("khong_bao_gom") or tm["khong_bao_gom"])
+           + (nd.get("quy_dinh") or tm["quy_dinh"] or "").split("\n")):
+        ra.append("gia_ao")
     return ra
 
 
-def _sp_vtos(db: Session, p: Product, so_chuyen: int, thieu: list[str] | None = None) -> dict:
+def _sp_vtos(db: Session, p: Product, so_chuyen: int, thieu: list[str] | None = None, so_anh_tai: int = 0) -> dict:
     nd = p.noi_dung_web or {}
     return {"id": p.id, "ma": p.code, "ten": p.name, "tour_type": p.tour_type, "loai": loai(p), "nuoc_ngoai": la_nuoc_ngoai(p),
             "diem_den": p.diem_den or "", "diem_den_suy": diem_den(p), "noi_bat": p.noi_bat or [], "wellness": bool(p.wellness),
@@ -1328,6 +1547,7 @@ def _sp_vtos(db: Session, p: Product, so_chuyen: int, thieu: list[str] | None = 
             "web": {"cap_nhat_luc": nd.get("cap_nhat_luc"), "loi": nd.get("loi") or "", "so_anh": len(nd.get("anh") or []),
                     "so_ngay": len(nd.get("lich_trinh") or []), "so_bao_gom": len(nd.get("bao_gom") or []), "ten": nd.get("ten") or "",
                     "anh_dau": (nd.get("anh") or [None])[0]},
+            "so_anh_tai": so_anh_tai,                                 # TR-8: ảnh phòng sản phẩm đã tải lên VTOS
             "co_chuong_trinh": bool((p.program or "").strip()), "thieu": thieu or []}
 
 
@@ -1338,8 +1558,10 @@ def ds_vtos(db: Session, u: User) -> dict:
     from app.models.chuong_trinh import ChuongTrinhNgay                  # P1-01: chuyến nào đã có chương trình riêng
     tids = [t.id for v in ch.values() for t, _ in v]
     co_ct = set(db.execute(select(ChuongTrinhNgay.tour_id).where(ChuongTrinhNgay.tour_id.in_(tids or [0]))).scalars()) if tids else set()
+    anh_sp = _anh_tai(db, [p.id for p in sps])                           # TR-8: ảnh phòng sản phẩm đã tải
     return {"san_pham": [_sp_vtos(db, p, len(ch.get(p.id, [])),
-                                  thieu_noi_dung(p, ch.get(p.id, []), any(t.id in co_ct for t, _ in ch.get(p.id, [])))) for p in sps],
+                                  thieu_noi_dung(p, ch.get(p.id, []), any(t.id in co_ct for t, _ in ch.get(p.id, [])),
+                                                   bool(anh_sp.get(p.id))), len(anh_sp.get(p.id) or [])) for p in sps],
             "thieu_nd": THIEU_ND, "tt_chung": tt_chung(db),
             "phuong_tien": PHUONG_TIEN_TOUR, "ma_tran": {k: list(v) for k, v in MA_TRAN.items()},
             "duoc": {"sua": _co(u, VAI_SUA_CONG), "ghep": _co(u, VAI_GHEP), "tt_chung": _co(u, VAI_TT_CHUNG),
@@ -1484,6 +1706,67 @@ def bat_tt_sp(db: Session, u: User, pid: int, bat: bool) -> Product:
     R.audit(db, u.username, u.role, "tour_tt_mo" if bat else "tour_tt_dong", f"product:{p.code}")
     db.commit(); db.refresh(p)
     return p
+
+
+# ── TR-6b (13/11/2026) · BẬT / ĐÓNG HÀNG LOẠT ────────────────────────────────────────────────
+# VÌ SAO CÓ HÀM NÀY — ghi ra vì nó là bài học đắt, không phải một tiện ích cho tiện tay.
+#
+# 13/11/2026, Chủ tịch yêu cầu mở thanh toán cho cả 380 sản phẩm. Không có cửa hàng loạt, nên
+# cách duy nhất là gọi `bat_tt_sp` 380 lần. ĐO ĐƯỢC, hai lần, trên máy chủ thật:
+#
+#   · 5 luồng song song  → máy chủ 502 sau ~30 giây, VTOS mất API ~5 phút (02:11–02:16).
+#   · 1 luồng, nghỉ 400ms → máy chủ VẪN 502 sau ~90 giây, mất API lần nữa (02:21–02:25).
+#
+# Tức đây KHÔNG phải chuyện đi nhanh hay đi chậm. Mỗi lượt `bat_tt_sp` là một yêu cầu HTTP, một
+# `db.commit()` và một dòng nhật ký kiểm toán; máy Render 512MB không nuốt nổi vài trăm lượt như
+# thế liên tiếp, dù giãn cỡ nào. Hơn trăm người dùng VTOS bị văng cả hai lần.
+#
+# Hàm này đổi vài trăm lượt ấy thành MỘT: một truy vấn, một vòng gán, MỘT `commit`, MỘT dòng nhật
+# ký mang theo số lượng và bộ lọc.
+#
+# BA ĐIỀU ÉP:
+#  (1) QUYỀN CAO HƠN CỬA MỘT SẢN PHẨM. `bat_tt_sp` cho `VAI_GHEP` (TP Điều hành, TP/GĐ Kinh
+#      doanh) — mở một tour là việc thường ngày của họ. Mở CẢ KHO một phát thì khác hẳn về mức:
+#      nó là quyết định kinh doanh, nên đòi `VAI_TT_CHUNG` (Chủ tịch / TGĐ), đúng bằng công tắc
+#      chung. Dùng lại `VAI_GHEP` ở đây là lặng lẽ nâng quyền của ba vai kia.
+#  (2) MỘT DÒNG NHẬT KÝ, CÓ SỐ VÀ CÓ BỘ LỌC. Một thao tác đổi 300 dòng mà không nói nó đổi những
+#      gì thì sáu tháng sau không ai dựng lại được chuyện đã xảy ra.
+#  (3) TRẢ VỀ SỐ ĐO ĐƯỢC, KHÔNG TRẢ «đã xong». `da_doi` đếm đúng số dòng THỰC SỰ đổi trạng thái —
+#      sản phẩm vốn đã mở thì không tính. Gọi lại lần hai phải ra `da_doi = 0`, và đó là cách
+#      người bấm biết lần đầu đã ăn.
+
+LOC_HANG_LOAT = {
+    "tat_ca": "Tất cả sản phẩm đang hoạt động",
+    "co_chuyen": "Chỉ sản phẩm có chuyến đang mở bán",
+}
+
+
+def bat_tt_hang_loat(db: Session, u: User, bat: bool, loc: str = "co_chuyen",
+                     hom_nay: date | None = None) -> dict:
+    """Mở / đóng thanh toán trực tuyến cho NHIỀU sản phẩm trong MỘT giao dịch."""
+    _quyen(u, VAI_TT_CHUNG, "Chỉ Chủ tịch / TGĐ mở / đóng thanh toán hàng loạt")
+    if loc not in LOC_HANG_LOAT:
+        raise LoiTour(f"Bộ lọc không hợp lệ — chỉ nhận: {', '.join(LOC_HANG_LOAT)}")
+
+    hom_nay = hom_nay or _hom_nay()
+    sps = _sp_hien(db)
+    if loc == "co_chuyen":
+        ch = _chuyen(db, sps, hom_nay)
+        sps = [p for p in sps if ch.get(p.id)]
+
+    bat = bool(bat)
+    doi = [p for p in sps if bool(p.mo_thanh_toan) is not bat]
+    for p in doi:
+        p.mo_thanh_toan = bat
+
+    R.audit(db, u.username, u.role,
+            "tour_tt_hang_loat_mo" if bat else "tour_tt_hang_loat_dong",
+            f"tour-online:{loc}",
+            after={"bo_loc": loc, "so_xet": len(sps), "so_doi": len(doi),
+                   "ma": [p.code for p in doi][:200]})
+    db.commit()                                   # MỘT lần, cho cả lô
+    return {"bo_loc": loc, "bo_loc_ten": LOC_HANG_LOAT[loc], "bat": bat,
+            "so_xet": len(sps), "da_doi": len(doi)}
 
 
 def bat_tt_chung(db: Session, u: User, bat: bool, now: datetime | None = None) -> bool:

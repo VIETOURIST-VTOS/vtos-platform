@@ -1127,41 +1127,24 @@ def anh_noi_bo(db: Session, u: User, aid: int):
 from app.models.nha_hang import AnhNhaHang, NHOM_ANH, CAN_CU_ANH, TRANG_THAI_ANH  # noqa: E402
 
 VAI_DUYET_ANH = ("tp_dh",) + TOAN_QUYEN
-ANH_TOI_DA_MB = 10
+# TR-8 (13/11/2026): lõi xử lý ảnh chuyển sang `anh_chung.py` để cổng tour dùng CHUNG, không chép
+# lại 100 dòng. Các tên dưới đây giữ nguyên để mọi chỗ đang gọi `NH.KIEU_ANH`, `NH.CANH_HIEN`…
+# không phải sửa. Hành vi không đổi một dòng nào — cùng 1600/480, cùng WEBP, cùng xoá EXIF.
+from app.services import anh_chung as AC  # noqa: E402
+
+ANH_TOI_DA_MB = AC.TOI_DA_MB
 ANH_TOI_DA_SO = 60
-KIEU_ANH = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
-CANH_HIEN, CANH_NHO = 1600, 480
+KIEU_ANH = AC.KIEU_ANH
+CANH_HIEN, CANH_NHO = AC.CANH_HIEN, AC.CANH_NHO
 # Đổi các trường này trên ảnh ĐÃ DUYỆT → ảnh về «Chờ duyệt» (thôi hiện) cho tới khi TP ĐH duyệt lại:
 # chúng là chữ / căn cứ ra trước khách. Đổi nhóm, thứ tự, ảnh bìa thì không.
 TRUONG_ANH_DUYET_LAI = ("chu_thich", "mo_ta_thay_the", "credit", "can_cu", "can_cu_ghi_chu")
 
 
 def _lam_nhe(data: bytes) -> tuple[bytes | None, bytes | None, int, int]:
-    """Bản hiển thị (≤1600px) và ảnh nhỏ (≤480px), WEBP, xoay theo EXIF rồi BỎ EXIF (vị trí GPS…).
-    Không có thư viện ảnh / ảnh lỗi → (None, None, 0, 0): giữ bản gốc, cổng dùng bản gốc."""
-    try:
-        from io import BytesIO
-        from PIL import Image, ImageOps
-    except Exception:
-        return None, None, 0, 0
-    try:
-        im = Image.open(BytesIO(data))
-        if (im.format or "").upper() == "JPEG":
-            im.draft("RGB", (CANH_HIEN * 2, CANH_HIEN * 2))        # giải mã thu nhỏ: đỡ bộ nhớ máy chủ 512 MB
-        im = ImageOps.exif_transpose(im)
-        if im.mode not in ("RGB", "RGBA"):
-            im = im.convert("RGBA" if "A" in im.getbands() else "RGB")
-        rong, cao = im.size
-        ra = []
-        for canh, q in ((CANH_HIEN, 82), (CANH_NHO, 76)):
-            b = im.copy()
-            b.thumbnail((canh, canh))
-            o = BytesIO()
-            b.save(o, "WEBP", quality=q, method=4)
-            ra.append(o.getvalue())
-        return ra[0], ra[1], rong, cao
-    except Exception:
-        return None, None, 0, 0
+    """Bản hiển thị (≤1600px) + ảnh nhỏ (≤480px), WEBP, xoay theo EXIF rồi BỎ EXIF.
+    TR-8: phần việc thật nằm ở `anh_chung.lam_nhe` — dùng chung với cổng tour."""
+    return AC.lam_nhe(data)
 
 
 def _anh_cua(db: Session, nid: int) -> list[AnhNhaHang]:
@@ -1205,11 +1188,7 @@ def _kiem_can_cu(can_cu: str, nhom: str) -> None:
 
 
 def _co_pil() -> bool:
-    try:
-        import PIL  # noqa: F401
-        return True
-    except ImportError:
-        return False
+    return AC.co_pil()
 
 
 def _kiem_tep_anh(ten_tep: str, data: bytes) -> str:

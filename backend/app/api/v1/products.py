@@ -210,6 +210,41 @@ def tro_tt_chung(data: _TrBatIn, u: User = Depends(require_roles(*TRO.VAI_TT_CHU
     return {"message": "Đã mở thanh toán trực tuyến tour (chung)" if b else "Đã đóng thanh toán trực tuyến tour (chung)"}
 
 
+class _TrBatLoIn(_TrBatIn):
+    loc: str = "co_chuyen"
+
+
+@router.post("/tour-online/thanh-toan-hang-loat")
+def tro_tt_lo(data: _TrBatLoIn, u: User = Depends(require_roles(*TRO.VAI_TT_CHUNG)), db: Session = Depends(get_db)):
+    """Mở / đóng thanh toán cho NHIỀU sản phẩm trong MỘT lượt gọi, MỘT giao dịch.
+
+    Bấm từng sản phẩm thì mỗi lượt là một yêu cầu HTTP + một commit + một dòng nhật ký. Đo được
+    13/11/2026: vài trăm lượt như thế làm máy chủ 512MB trả 502 và VTOS mất API — hai lần, cả khi
+    đi một luồng có giãn nhịp. Cửa này gộp chúng lại làm một.
+
+    Quyền `VAI_TT_CHUNG` (Chủ tịch / TGĐ), CAO HƠN cửa một sản phẩm — lý do ở `tour_online.py`.
+    """
+    r = _tro(TRO.bat_tt_hang_loat, db, u, data.bat, data.loc)
+    lam = "Đã mở" if r["bat"] else "Đã đóng"
+    return {**r, "message": f"{lam} thanh toán trực tuyến cho {r['da_doi']}/{r['so_xet']} sản phẩm "
+                            f"({r['bo_loc_ten'].lower()})"}
+
+
+@router.get("/tour-online/suc-khoe-doc-web")
+def tro_suc_khoe(u: User = Depends(require_roles(*TRO.VAI_GHEP)), db: Session = Depends(get_db)):
+    """Đường đọc nội dung từ vietourist.com.vn còn sống không, và tour nào đang thiếu ảnh.
+
+    CỬA ĐỌC, cùng vai với cửa ghép link — ai ghép link thì người ấy phải thấy link mình ghép còn
+    đọc được không. Không gọi ra mạng, không sửa gì: nó chỉ đọc lại thứ `lam_moi()` đã ghi sẵn
+    vào `noi_dung_web` sau mỗi lần thử.
+
+    VÌ SAO CẦN. `lam_moi()` nuốt mọi lỗi để cổng khách vẫn chạy bằng bản cũ — đúng, nhưng nghĩa
+    là ngày web cũ đổi bố cục HTML thì bộ bóc tách chết âm thầm: khách vẫn thấy trang, chỉ là bản
+    chụp của nhiều tuần trước. Lỗi vẫn được ghi, chỉ là trước đợt này không màn hình nào đọc.
+    """
+    return TRO.suc_khoe_doc_web(db)
+
+
 @router.get("/tour-online/don")
 def tro_don(chi_vat: bool = False, u: User = Depends(require_roles(*TRO.VAI_XEM_DON)), db: Session = Depends(get_db)):
     return {"don": _tro(TRO.ds_don, db, u, chi_vat)}
@@ -219,3 +254,94 @@ def tro_don(chi_vat: bool = False, u: User = Depends(require_roles(*TRO.VAI_XEM_
 def tro_vat(did: int, u: User = Depends(require_roles(*TRO.VAI_VAT)), db: Session = Depends(get_db)):
     d = _tro(TRO.xuat_vat, db, u, did)
     return {"message": f"Đã đánh dấu xuất hóa đơn GTGT cho {d.ma}"}
+
+
+# ══ TR-8 (13/11/2026) · ALBUM ẢNH TOUR ══════════════════════════════════════════════════════
+# Cửa để phòng sản phẩm TỰ ĐƯA ẢNH LÊN. Đo 13/11: 13 trong 85 tour trên cổng không có một tấm
+# ảnh nào, và 22 trong 33 tour đang có chuyến mở bán thiếu ảnh — vì nội dung đọc từ web cũ mà
+# bên ấy trống. Chỗ này không sửa được bằng mã, chỉ sửa được bằng một cửa nhập (ranh giới Chủ
+# tịch chốt 09/9/2026: Claude viết cửa, người của anh đưa dữ liệu vào).
+#
+# Gửi TỪNG TỆP một, không gửi cả lô: giao diện báo được tiến độ từng tấm và thử lại đúng tấm
+# hỏng, thay vì cả lô 20 ảnh đổ vì một tệp lỗi. Mỗi tấm cũng là một lượt nhẹ cho máy 512MB.
+from fastapi import File, Form, Response, UploadFile     # noqa: E402
+
+from app.services import anh_tour as ANHT                # noqa: E402
+
+
+def _anht(f, *a, **k):
+    try:
+        return f(*a, **k)
+    except ANHT.LoiTour as ex:
+        raise HTTPException(ex.status, str(ex))
+
+
+@router.get("/tour-online/{pid}/album")
+def tro_album(pid: int, u: User = Depends(require_roles(*ANHT.VAI_XEM)), db: Session = Depends(get_db)):
+    return _anht(ANHT.album, db, u, pid)
+
+
+@router.post("/tour-online/{pid}/anh", status_code=201)
+async def tro_anh_tai(pid: int, tep: UploadFile = File(...), nhom: str = Form(...), can_cu: str = Form("chua_xac_minh"),
+                      chu_thich: str = Form(""), mo_ta_thay_the: str = Form(""), credit: str = Form(""),
+                      can_cu_ghi_chu: str = Form(""),
+                      u: User = Depends(require_roles(*ANHT.VAI_ANH)), db: Session = Depends(get_db)):
+    data = await tep.read()
+    x, moi = _anht(ANHT.tai_anh, db, u, pid, tep.filename or "anh.jpg", data,
+                   {"nhom": nhom, "can_cu": can_cu, "chu_thich": chu_thich,
+                    "mo_ta_thay_the": mo_ta_thay_the, "credit": credit, "can_cu_ghi_chu": can_cu_ghi_chu})
+    return {"id": x.id, "moi": moi,
+            "message": "Đã tải ảnh lên" if moi else "Ảnh này đã có trong album — không tạo bản trùng"}
+
+
+class _AnhSuaIn(_BM):
+    nhom: str | None = None
+    chu_thich: str | None = None
+    mo_ta_thay_the: str | None = None
+    credit: str | None = None
+    can_cu: str | None = None
+    can_cu_ghi_chu: str | None = None
+
+
+@router.put("/tour-online/anh/{aid}")
+def tro_anh_sua(aid: int, data: _AnhSuaIn, u: User = Depends(require_roles(*ANHT.VAI_ANH)),
+                db: Session = Depends(get_db)):
+    _anht(ANHT.sua, db, u, aid, data.model_dump())
+    return {"message": "Đã lưu"}
+
+
+class _AnhAnIn(_BM):
+    an: bool = True
+
+
+@router.post("/tour-online/anh/{aid}/an")
+def tro_anh_an(aid: int, data: _AnhAnIn, u: User = Depends(require_roles(*ANHT.VAI_ANH)),
+               db: Session = Depends(get_db)):
+    x = _anht(ANHT.an, db, u, aid, data.an)
+    return {"message": "Đã gỡ ảnh khỏi cổng khách" if x.trang_thai == "an" else "Đã cho ảnh hiện lại"}
+
+
+@router.delete("/tour-online/anh/{aid}")
+def tro_anh_xoa(aid: int, u: User = Depends(require_roles(*ANHT.VAI_ANH)), db: Session = Depends(get_db)):
+    _anht(ANHT.xoa, db, u, aid)
+    return {"message": "Đã xoá ảnh khỏi album"}
+
+
+class _AnhXepIn(_BM):
+    ids: list[int]
+
+
+@router.post("/tour-online/{pid}/anh/xep")
+def tro_anh_xep(pid: int, data: _AnhXepIn, u: User = Depends(require_roles(*ANHT.VAI_ANH)),
+                db: Session = Depends(get_db)):
+    _anht(ANHT.xep, db, u, pid, data.ids)
+    return {"message": "Đã xếp lại thứ tự ảnh"}
+
+
+@router.get("/tour-online/anh/{aid}/{co}")
+def tro_anh_tep(aid: int, co: str, u: User = Depends(require_roles(*ANHT.VAI_XEM)),
+                db: Session = Depends(get_db)):
+    """Người trong nhà xem được cả ảnh đang ẩn (để còn bật lại) và bản gốc."""
+    data, a = _anht(ANHT.tep, db, u, aid, co)
+    return Response(content=data, media_type=a.kieu_noi_dung or "image/jpeg",
+                    headers={"Cache-Control": "private, max-age=600"})

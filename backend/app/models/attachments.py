@@ -63,6 +63,11 @@ DOI_TUONG_DAY_DU = {
     "am_thuc":       ("Ảnh ẩm thực (web VTD)", "mkt", "10_Marketing", True),
     # KS-13 (30/10/2026): ảnh khách sạn hợp tác trên cổng khách — nội dung đối ngoại, Điều hành tải.
     "khach_san_vtd": ("Ảnh khách sạn (web VTD)", "dieu_hanh", "10_Marketing", True),
+    # TR-8 (13/11/2026): ảnh TOUR trên cổng khách kh.vietourist.vn. Đo 13/11: 13 trong 85 tour không
+    # có một tấm ảnh nào vì nội dung đọc từ vietourist.com.vn, mà bên ấy thiếu. Đây là cửa để phòng
+    # sản phẩm vá chỗ thiếu. Xếp vào Marketing vì ảnh bán hàng là nội dung đối ngoại, dù cả Điều hành
+    # và Kinh doanh cũng tải được (ma trận ở app/services/anh_tour.py).
+    "anh_tour":      ("Ảnh tour (cổng khách)", "mkt", "10_Marketing", True),
     "don_dich_vu":   ("Đơn đặt dịch vụ", "dieu_hanh", "05_Tour", True),
     "tour":          ("Tour", "dieu_hanh", "05_Tour", True),
     # Đ-11 (13/9/2026) – CHỨNG TỪ GẮN VÀO TỪNG DÒNG CHI, không phải vào cả chuyến.

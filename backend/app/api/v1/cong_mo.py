@@ -18,15 +18,33 @@ CUA_SO_GIAY, TOI_DA_TRONG_CUA_SO = 600, 240
 _LUOT: dict = defaultdict(list)
 
 
+# TR-8 (13/11/2026) · ẢNH ĐẾM Ở NGĂN RIÊNG — và đây là một cái bẫy suýt làm sập cổng.
+#
+# Trần 240 lượt / 10 phút dựng để chặn người cào giá, và nó đúng khi mỗi lần xem trang là vài
+# lượt gọi. Nhưng album ảnh tour làm MỖI THẺ TOUR thành một lượt tải ảnh: một trang 85 tour là
+# 85 lượt. Ba lần mở trang là khách thật bị chặn 429 — tự mình khoá cổng của mình.
+#
+# Cách cổng nhà hàng đã giải (am_thuc.py, 28/10/2026): ảnh đếm ở MỘT NGĂN RIÊNG với trần rộng
+# hơn hẳn. Lượt tải ảnh rẻ (đọc kho, có Cache-Control một ngày) và không lộ giá, nên nới nó
+# không nới chỗ cần canh. Trần cho trang giữ nguyên 240.
+_LUOT_ANH: dict = defaultdict(list)
+TOI_DA_ANH = 900            # 85 thẻ × vài lần mở trang, vẫn chật hơn nhiều so với một máy đi cào
+
+
 def _phanh(req: Request) -> None:
     ip = (req.headers.get("x-forwarded-for", "").split(",")[0].strip() or (req.client.host if req.client else "")) or "?"
+    la_anh = "/anh/" in req.url.path
+    luot, tran = (_LUOT_ANH, TOI_DA_ANH) if la_anh else (_LUOT, TOI_DA_TRONG_CUA_SO)
     bay_gio = time.time()
-    v = [t for t in _LUOT[ip] if bay_gio - t < CUA_SO_GIAY]
-    if len(v) >= TOI_DA_TRONG_CUA_SO:
-        _LUOT[ip] = v
+    v = [t for t in luot[ip] if bay_gio - t < CUA_SO_GIAY]
+    if len(v) >= tran:
+        luot[ip] = v
         raise HTTPException(429, "Quá nhiều lượt xem từ địa chỉ này — đợi ít phút rồi thử lại")
     v.append(bay_gio)
-    _LUOT[ip] = v
+    luot[ip] = v
+    if len(luot) > 5000:                       # dọn địa chỉ đã nguội, kẻo từ điển phình mãi
+        for k in [k for k, x in luot.items() if not x or bay_gio - x[-1] > CUA_SO_GIAY]:
+            luot.pop(k, None)
 
 
 router = APIRouter(prefix="/api/v1/cong/mo", tags=["cong-mo"], dependencies=[Depends(_phanh)])
@@ -145,6 +163,18 @@ def tr_mot(pid: int, background: BackgroundTasks, nguoi_lon: int = 2, tre_em: in
     return _tr(TR.chi_tiet, db, pid, nguoi_lon, tre_em)
 
 
+@router.get("/tour-online/san-pham/{pid:int}/danh-gia")
+def tr_danh_gia(pid: int, trang: int = 1, db: Session = Depends(get_db)):
+    """Đánh giá khách tự chấm cho một tour — phần được phép hiện công khai.
+
+    KHÔNG trả tên, điện thoại, email, mã đơn hay mã chuyến: câu hỏi xin đồng ý đã hứa với khách
+    là «không kèm tên và thông tin liên hệ». Điều kiện «được hiện hay không» hỏi đúng một chỗ,
+    `dong_y.cong_khai_duoc(r, "trang_tour")` — không dựng lại mệnh đề ở đây.
+    """
+    from app.services import tour_online as TR
+    return _tr(TR.danh_gia_cong_khai, db, pid, trang)
+
+
 @router.get("/tour-online/san-pham/{pid:int}/lich-trinh/{tour_id:int}")
 def tr_lich(pid: int, tour_id: int, db: Session = Depends(get_db)):
     from app.services import tour_online as TR
@@ -181,3 +211,21 @@ def ttd_hoa_don(ma: str, db: Session = Depends(get_db)):
     pdf = _ttd(TTD.tai_hoa_don, db, ma)
     return Response(pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="HoaDon-{ma.upper()}.pdf"'})
+
+# ══ TR-8 (13/11/2026) · ẢNH TOUR DO PHÒNG SẢN PHẨM TẢI LÊN ══════════════════════════════════
+# Cửa ĐỌC duy nhất của album ảnh tour ra ngoài internet, và nó tự canh ba điều:
+#   · chỉ ảnh đang hiện (`trang_thai == "da_duyet"`) — gỡ một tấm là nó biến khỏi cổng ngay;
+#   · KHÔNG BAO GIỜ bản gốc — bản gốc mang EXIF (toạ độ GPS người chụp) và tên tệp nội bộ;
+#   · đếm ở ngăn phanh riêng cho ảnh (xem `_phanh` ở đầu tệp).
+@router.get("/tour-online/anh/{aid}/{co}")
+def mo_anh_tour(aid: int, co: str, db: Session = Depends(get_db)):
+    from app.services import anh_tour as ANHT
+    if co not in ("nho", "hien"):
+        raise HTTPException(404, "Không có ảnh này")
+    from fastapi.responses import Response
+    try:
+        data, a = ANHT.tep(db, None, aid, co)
+    except ANHT.LoiTour as ex:
+        raise HTTPException(404, str(ex))
+    return Response(content=data, media_type=a.kieu_noi_dung or "image/webp",
+                    headers={"Cache-Control": "public, max-age=86400"})

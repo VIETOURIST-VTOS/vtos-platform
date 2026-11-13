@@ -158,10 +158,20 @@ def test_a3_cau_hoi_duoc_chep_NGUYEN_VAN_vao_ban_ghi():
     """Một bản ghi đồng ý mà không nói được «đồng ý với điều gì» thì nó không chứng minh gì cả."""
     db = _db()
     r = _ban_ghi(db, ID["dg0"])
-    assert r.cau_hoi == DY.CAU_HOI
+    # TR-6 · 13/11/2026 — CÂU HỎI ĐỔI, LUẬT KHÔNG ĐỔI. Chủ tịch duyệt đưa đánh giá lên trang bán
+    # tour `kh.vietourist.vn`, tức ra ngoài internet — rộng hơn «hồ sơ hướng dẫn viên tại VTOS»
+    # mà câu cũ đã hỏi. Theo đúng luật ghi trong `ho_so_hdv.py` («phải hỏi lại khách bằng một câu
+    # mới, không phải đổi một dòng cấu hình»), từ nay hỏi `CAU_HOI_2` và ghi `PHAM_VI_2`.
+    #
+    # PHÉP THỬ NÀY KHÔNG BỊ NỚI: nó vẫn canh đúng ba điều cũ — bản ghi chép NGUYÊN VĂN câu đã
+    # hỏi, câu ấy hứa không kèm tên, và câu ấy nói ĐÍCH DANH chỗ sẽ đăng. Nay có hai chỗ nên
+    # canh cả hai. Còn luật «bản ghi CŨ giữ phạm vi cũ, không được nâng» do
+    # `test_tr6_pham_vi_dong_y.py` canh riêng.
+    assert r.cau_hoi == DY.CAU_HOI_2
     assert "không kèm tên" in r.cau_hoi
     assert "hồ sơ hướng dẫn viên" in r.cau_hoi
-    assert r.pham_vi == "ho_so_hdv_cong_khai"
+    assert "kh.vietourist.vn" in r.cau_hoi
+    assert r.pham_vi == "ho_so_hdv_va_trang_tour"
     db.close()
 
 
@@ -459,7 +469,11 @@ def test_f3_hang_doi_noi_ro_rong_khong_phai_la_khong_ai_khen():
     """Rỗng ở đây là đúng, không phải hỏng — và màn hình phải nói ra điều ấy."""
     kq = client.get("/api/v1/cong-bo/hang-doi", headers=_h("chutich")).json()
     assert "luu_y" in kq and "trước đợt này" in kq["luu_y"]
-    assert kq["cau_hoi"] == DY.CAU_HOI
+    # TR-6 · 13/11/2026 — `cau_hoi` là câu ĐANG hỏi khách hôm nay, để người duyệt biết mình đang
+    # duyệt lời đồng ý cho điều gì. Câu cũ vẫn trả về ở `cau_hoi_cu`, và mỗi bản ghi vẫn mang
+    # nguyên văn câu đã hỏi chính nó.
+    assert kq["cau_hoi"] == DY.CAU_HOI_2
+    assert kq["cau_hoi_cu"] == DY.CAU_HOI
 
 
 def test_f4_nhan_nguoi_viet_KHONG_in_ten_tuyen_khi_chua_co_truong_tuyen():
