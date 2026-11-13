@@ -43,8 +43,10 @@ export function giaTriDt(o: any): { v: any; phu: string } {
   if (!o) return { v: undefined, phu: "" };
   if (o.so == null) return { v: null, phu: o.ly_do || "chưa đo" };
   const ct = o.chi_tieu;
+  // R5-10 (Chủ tịch 14/11/2026): kèm mốc nhận lương cơ bản (200 tr HCM) — chỉ hiện, không đổi cách tính lương.
+  const lcb = o.moc_lcb ? ` · mốc lương cơ bản ${tien(o.moc_lcb)}: ${o.dat_lcb ? "đã đạt" : "chưa đạt"}` : "";
   return { v: <>{tien(o.so)} <small>/ {ct == null ? "chưa giao" : tien(ct)}</small></>,
-           phu: ct ? `Đạt ${pct(o.so / ct)} chỉ tiêu tháng` : "Chỉ tiêu tháng chưa giao" };
+           phu: (ct ? `Đạt ${pct(o.so / ct)} chỉ tiêu tháng` : "Chỉ tiêu tháng chưa giao") + lcb };
 }
 
 /** Biểu đồ 12 tháng doanh thu – chỉ tiêu của phạm vi bàn. */
@@ -79,10 +81,10 @@ export function BieuDo12({ dt, ten }: { dt: any; ten: string }) {
 /** Bảng Đội ngũ: xếp hạng theo doanh thu tháng (Trưởng phòng: cả phòng · Trưởng nhóm: nhóm mình). */
 export function BangDoiNgu({ ds, coNhom }: { ds: any[]; coNhom?: boolean }) {
   return <section className="g5-khoi" aria-label="Đội ngũ">
-    <div className="g5-dau"><h2>Đội ngũ · xếp hạng tháng</h2><span>Theo doanh thu tính chỉ tiêu</span></div>
+    <div className="g5-dau"><h2>Đội ngũ · xếp hạng tháng</h2><span>Giá trị booking · chỉ tiêu mặc định: Chuyên viên 500 tr, Trưởng nhóm và Trưởng phòng 1 tỷ (giao riêng thì theo số giao)</span></div>
     {ds.length === 0 ? <p className="g5-nho">Chưa có người nào trong phạm vi.</p> :
       <div className="g5-cuon"><table className="g5-bang">
-        <thead><tr><th>#</th><th>Người</th>{coNhom && <th>Đơn vị</th>}<th>Doanh thu</th><th>Chỉ tiêu</th><th>Đạt</th><th>Booking</th></tr></thead>
+        <thead><tr><th>#</th><th>Người</th>{coNhom && <th>Đơn vị</th>}<th>Doanh thu</th><th>Chỉ tiêu</th><th>Đạt</th><th>Mốc lương cơ bản</th><th>Booking</th></tr></thead>
         <tbody>{ds.map((x, i) => (
           <tr key={x.user_id}>
             <td><span className={"g5-hang" + (i === 0 && x.tien > 0 ? " v1" : "")}>{i + 1}</span></td>
@@ -91,6 +93,7 @@ export function BangDoiNgu({ ds, coNhom }: { ds: any[]; coNhom?: boolean }) {
             <td>{tien(x.tien)}</td>
             <td>{x.chi_tieu == null ? <span className="ngay">chưa giao</span> : tien(x.chi_tieu)}</td>
             <td>{x.ty_le == null ? "—" : <><span className="g5-tr"><i style={{ width: Math.min(100, x.ty_le * 100) + "%" }} /></span>{pct(x.ty_le)}</>}</td>
+            <td>{x.moc_lcb == null ? "—" : <span className={"g5-lcb" + (x.dat_lcb ? " dat" : "")}>{x.dat_lcb ? "Đạt" : "Chưa"} {tien(x.moc_lcb)}</span>}</td>
             <td>{x.so_booking}</td>
           </tr>))}</tbody>
       </table></div>}
@@ -111,6 +114,7 @@ export function KhoiPhaiThu({ pt, moToi }: { pt: any; moToi: (t: string) => void
       <p className="g5-nho">Tổng <b>{tien(pt.tong)}</b> · <b>{so(pt.so_booking)}</b> booking còn nợ. Hạn = ngày khởi hành.</p>
       <button type="button" className="g5-cua" onClick={() => moToi("/bookings?mang=le")}>Xem booking còn nợ →</button>
     </>}
+    {pt?.no_cu?.tong != null && <p className="g5-nho g5-nocu">+ Nợ cũ cần đối soát: <b>{tien(pt.no_cu.tong)}</b> · {so(pt.no_cu.so_booking)} booking — {pt.no_cu.ghi}.</p>}
   </section>;
 }
 
@@ -232,6 +236,9 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
       {d?.canh_bao && <div className="g5-khoi g5-canh"><p>{d.canh_bao}</p></div>}
       {/* R5-8: phạm vi đang đọc theo ô nhóm bán hàng (chưa khai cơ cấu) — chỉ là ghi chú, không phải cảnh báo. */}
       {d?.ghi_pham_vi && <p className="g5-ghi">{d.ghi_pham_vi}</p>}
+      {/* R5-9: số Lẻ trên màn Chủ tịch để đối chiếu — doanh thu chuyến, khác cơ sở ô doanh thu (giá trị booking). */}
+      {d?.vai === "tp" && <p className="g5-ghi">Doanh thu phòng = doanh thu chuyến Lẻ, cùng số và cùng cách tính với màn Chủ tịch / TGĐ. Bảng Đội ngũ tính giá trị booking từng người{d?.the?.doanh_thu?.tong_booking != null ? ` (cộng ${tien(d.the.doanh_thu.tong_booking)})` : ""} nên cộng lại không bằng tổng phòng.</p>}
+      {d?.vai === "tn" && d?.doi_chieu?.thang != null && <p className="g5-ghi">Doanh thu nhóm tính theo giá trị booking (màn Chủ tịch chưa có số theo nhóm). Doanh thu chuyến Lẻ cả phòng tháng này: {tien(d.doi_chieu.thang)} · {so(d.doi_chieu.chuyen_thang)} chuyến — như màn Chủ tịch / TGĐ.</p>}
       {tongQuan({ d, dt, moToi })}
     </>}
 
@@ -286,6 +293,9 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
 .g5-dau h2::before{content:"";flex:none;width:4px;height:18px;border-radius:3px;background:linear-gradient(var(--g5-ns-a),var(--g5-ns-b))}
 .g5-dau span{font-size:12px;color:var(--g5-chu3)}
 .g5-nho{font-size:12.5px;color:var(--g5-chu2);margin:10px 0 0;line-height:1.6}
+.g5-nocu{border-top:1px dashed var(--g5-line);padding-top:8px;color:#8d6200}
+.g5-lcb{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px;background:#fdeceb;color:#b3281f;white-space:nowrap}
+.g5-lcb.dat{background:#e8f5ef;color:#1c6f50}
 .g5-loi{color:var(--vtos-danger);margin:0}
 .g5-cuon{overflow-x:auto}
 .g5-bang{width:100%;border-collapse:separate;border-spacing:0;margin-top:6px;font-size:13px;min-width:600px}

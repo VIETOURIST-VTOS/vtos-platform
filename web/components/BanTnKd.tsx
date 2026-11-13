@@ -38,7 +38,7 @@ export default function BanTnKd() {
         <p className="g5-nhom">KẾT QUẢ NHÓM · THÁNG NÀY</p>
         <div className="g5-dai5">
           <OSo nhan="Doanh thu nhóm" v={d ? dn.v : undefined} phu={dn.phu} lk="Chi tiết" bam={() => moToi("/fit")} />
-          <OSo nhan="Doanh thu của tôi" v={d ? dtoi.v : undefined} phu={d ? "Trưởng nhóm vẫn đi bán" : ""} lk="Của tôi" bam={() => moToi("/fit")} />
+          <OSo nhan="Doanh thu của tôi" v={d ? dtoi.v : undefined} phu={d ? dtoi.phu : ""} lk="Của tôi" bam={() => moToi("/fit")} />
           <OSo nhan="Booking nhóm" v={d ? so(th.booking_moi?.so) : undefined} phu={d ? `Tháng này · ${so(th.booking_moi?.chua_coc)} chưa cọc` : ""} lk="Booking" bam={() => moToi("/bookings?mang=le")} />
           <OSo nhan="Lead mới chưa liên hệ" nong v={d ? so(th.lead_moi?.so) : undefined} phu="Của người trong nhóm" lk="Lead" bam={() => moToi("/leads?tab=leads")} />
           <OSo nhan="Chăm sóc quá hạn" nong v={d ? so(th.cham_soc_qua_han?.so) : undefined} phu="Của người trong nhóm" lk="Chăm sóc" bam={() => moToi("/cham-soc")} />

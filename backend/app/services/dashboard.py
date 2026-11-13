@@ -383,7 +383,7 @@ def build(db: Session, u: User) -> dict:
     # mở trang chủ ra không thấy gì về phần việc của mình – đúng cách tính lương của họ cũng không thấy.
     if role in ("gd_kd", "tp_kd", "tn_kd", "nv_kd", "ptgd_doan", "chutich", "tgd"):
         moc = R.get_param(db, "moc_chi_tieu_hcm")
-        le: dict[int, float] = {}; doan: dict[int, float] = {}; doan_tours = 0
+        doan: dict[int, float] = {}; doan_tours = 0
         for t, s in zip(tours_m, sett):                  # dùng lại `sett` đã tính, không gọi quyết toán lần hai
             if R.is_doan(t):
                 doan_tours += 1
@@ -394,10 +394,20 @@ def build(db: Session, u: User) -> dict:
                     # để con số trên trang chủ và con số trả lương không nói khác nhau.
                     doan[b.sales_id] = doan.get(b.sales_id, 0.0) + s["profit"] * ((b.amount or 0) / rev if rev else 0)
                 continue
-            for b in t.bookings:
-                if b.counts_for_target: le[b.sales_id] = le.get(b.sales_id, 0) + (b.amount or 0) - (b.discount or 0)
         users = {x.id: x.full_name for x in db.execute(select(User)).scalars()}
-        sec["kd_le"] = sorted([{"sales": users.get(i, i), "revenue": v, "pct": v / moc if moc else 0} for i, v in le.items()], key=lambda r: -(r["revenue"] or 0))
+        # R5-9 · 13/11/2026 (Chủ tịch: «giữ 2 cơ sở, nối cho khớp»): xếp hạng NV Lẻ đọc CÙNG cơ sở chỉ tiêu
+        # mà bàn TP / Trưởng nhóm / Chuyên viên và tab doanh thu /fit đang đọc — giá trị booking, kỳ theo
+        # ngày tour kết thúc (`doanh_thu_kd.thang`, anh Tuấn chốt 19/9/2026). Trước đây bảng này chỉ cộng
+        # chuyến Kế toán đã xác nhận trong tháng, nên đầu tháng bảng TRỐNG trong khi bàn TP đã có số.
+        # Doanh thu PHÒNG (khối `doanh_thu_phong` ngay trên) vẫn là doanh thu chuyến — cơ sở thứ hai, có ghi rõ.
+        from app.services import doanh_thu_kd as DT
+        try:
+            nguoi_le = DT.thang(db, f"{today:%Y-%m}", "le", None)["theo_nguoi"]
+        except Exception:  # noqa: BLE001 — một khối hỏng không làm sập trang chủ
+            nguoi_le = []
+        sec["kd_le"] = [{"sales": o["nguoi_ban"] or users.get(o["user_id"], o["user_id"]), "revenue": o["tien"],
+                         "pct": o["tien"] / moc if moc else 0} for o in nguoi_le]
+        sec["kd_le_co_so"] = "Giá trị booking chưa huỷ, kỳ theo ngày tour kết thúc — cơ sở tính chỉ tiêu, khớp bàn TP KD lẻ."
         sec["kd_doan"] = {"so_chuyen": doan_tours,
                           "rows": sorted([{"sales": users.get(i, i), "profit_share": v} for i, v in doan.items()], key=lambda r: -r["profit_share"])}
         from app.services import xu_huong as _XH

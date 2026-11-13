@@ -33,7 +33,7 @@ export default function BanNvKd() {
   return <BanKdKhung ten="Bàn làm việc Chuyên viên Kinh doanh" tabs={TAB} phamVi={() => "Số của riêng tôi"}
     tongQuan={({ d, dt, moToi }) => {
       const th = d?.the || {};
-      const dtoi = giaTriDt(th.doanh_thu);
+      const dtoi = giaTriDt(th.doanh_thu_toi);
       return <>
         <p className="g5-nhom">CỦA TÔI · THÁNG NÀY</p>
         <div className="g5-dai5">

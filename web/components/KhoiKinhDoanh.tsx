@@ -92,13 +92,16 @@ export function KhoiKinhDoanhLe({ ds, bieu_do, dt }: { ds?: any[] | null; bieu_d
       <Dau ten="Kinh doanh Lẻ" phu="doanh thu tính chỉ tiêu tháng" />
       <DoanhThuPhong p={dt?.le} ky={dt?.ky} nam={dt?.nam} />
       {co.length === 0
-        ? <p className="muted">Chưa có chuyến nào quyết toán trong tháng.</p>
+        ? <p className="muted">Chưa có booking tour lẻ nào tính chỉ tiêu trong tháng.</p>
         : <>
             {bieu_do}
             {doc && <p className="muted v14-ghi">{doc}</p>}
           </>}
       <p className="muted v14-ghi">
-        Phòng Lẻ hưởng theo <b>mốc doanh thu</b> chuyến đã quyết toán.{" "}
+        {/* R5-9 · 13/11/2026: xếp hạng đọc cơ sở chỉ tiêu (giá trị booking, kỳ theo ngày tour kết thúc) — khớp
+            bàn TP / Trưởng nhóm / Chuyên viên KD lẻ. Dòng doanh thu phòng ở trên là doanh thu chuyến (cơ sở khác). */}
+        Xếp hạng theo <b>giá trị booking</b> (cơ sở tính chỉ tiêu, kỳ theo ngày tour kết thúc) — cùng số với bàn
+        Trưởng phòng KD lẻ. Doanh thu phòng ở trên là <b>doanh thu chuyến</b>, cơ sở khác nên hai số không bằng nhau.{" "}
         <Link className="the-cua" href="/sales-reports?mang=le">Danh sách đầy đủ →</Link>
       </p>
     </section>
