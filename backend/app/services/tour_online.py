@@ -979,18 +979,134 @@ def tim(db: Session, tab: str = "", q: str = "", noi: str = "", tu: date | None 
             "mo_thanh_toan_chung": chung}
 
 
+_GIO_RE = re.compile(r"\b\d{1,2}\s*[hg]\s*\d{0,2}\b", re.IGNORECASE)
+
+
+def _cat_tieu_de(phan: str) -> tuple[str, str]:
+    """Dòng mốc ngày dài quá thì cắt làm tiêu đề + thân, thay vì bỏ cả ngày.
+
+    TR-14, đo trên bản chạy thật: rất nhiều bài web gói NGUYÊN một ngày vào MỘT dòng —
+    «NGÀY 1: TP.HỒ CHÍ MINH - HÒN CÒ RESORT - TANYOLI MÔNG CỔ (Ăn trưa,tối) 07h15: Xe và hướng
+    dẫn viên đón Quý khách…» dài hơn 1.000 ký tự. Luật cũ «dòng mốc phải ngắn dưới 300» loại
+    thẳng những dòng ấy, nên CẢ tour mất lịch trình và trang tour đổ ra một khối chữ liền.
+    Cắt theo đúng thứ tự chữ tự nói ra: hết cụm bữa ăn → mốc giờ đầu tiên → hết câu đầu.
+    """
+    p = _sach(phan)
+    for m in _NGOAC.finditer(p):      # «(Ăn trưa,tối)» là dấu hết tiêu đề đáng tin nhất, xét trước
+        if doc_bua(m.group(0)):
+            return p[:m.end()].strip(), p[m.end():].strip()
+    if len(p) <= 220:
+        return p, ""
+    g = _GIO_RE.search(p, 20)                         # «07h15:» mở đầu phần thân
+    if g and g.start() <= 240:
+        return p[:g.start()].strip(" -–—:·|"), p[g.start():].strip()
+    c = p.find(". ", 40)
+    if 0 < c <= 240:
+        return p[:c + 1].strip(), p[c + 2:].strip()
+    return p[:200].strip(), p[200:].strip()
+
+
 def tach_ngay(van_ban: str) -> list[dict]:
     """Chương trình sản phẩm (văn bản tự do) → từng ngày, CHỈ khi có mốc «Ngày 1..N» liên tiếp."""
     dong = (van_ban or "").replace("\r", "").split("\n")
     ra: list[dict] = []
     for d in dong:
         m = _NGAY_RE.match(_KHONG_RONG.sub("", d))
-        if m and len(d) < 300:
-            ra.append({"ngay": int(m.group(1)), "tieu_de": _sach(m.group(2))[:200], "noi_dung": "", "anh": []})
+        if m:
+            td, than = _cat_tieu_de(m.group(2))
+            ra.append({"ngay": int(m.group(1)), "tieu_de": td[:200], "noi_dung": than[:4000], "anh": []})
         elif ra:
             ra[-1]["noi_dung"] = (ra[-1]["noi_dung"] + ("\n" if ra[-1]["noi_dung"] else "") + d.strip()).strip()[:4000]
     if not ra or [x["ngay"] for x in ra] != list(range(1, len(ra) + 1)):
         return []
+    return ra
+
+
+# ══ TR-14 · BỮA ĂN VÀ NƠI NGHỈ CỦA TỪNG NGÀY ════════════════════════════════════════════════
+# Đo trên bản chạy thật 14/11/2026, 174 sản phẩm đang bán: 40 tour tách được ngày (146 ngày),
+# và trong 146 ngày ấy có ĐÚNG 0 ngày ghi bữa ăn, ĐÚNG 0 ngày ghi nơi nghỉ. Giao diện TR-13 vẽ
+# sẵn dải «Đêm N · nơi nghỉ» và các thẻ «Ăn trưa / Ăn tối» — không cái nào hiện được, vì hai
+# cửa dưới đây trả về rỗng cứng:
+#       {**x, "bua": [], "khach_san": ""}
+# Mà chữ thì CÓ, nằm ngay trên tiêu đề ngày đọc từ web:
+#       «TP.HCM - PHAN THIẾT - NOVELA RESORT (Ăn Sáng + Trưa)»
+#       «ĐÀ NẴNG CHÀO ĐÓN QUÝ KHÁCH ( Ăn Tối)»
+#       «TP. HỒ CHÍ MINH – KDL RỪNG MADAGUI – BẢO LỘC (Trưa, tối)»   ← không có chữ «Ăn»
+#       «NGÀY 1: TP.HỒ CHÍ MINH - HÒN CÒ RESORT - TANYOLI MÔNG CỔ (Ăn trưa,tối)»
+# Sáu cách viết khác nhau trong cùng một kho dữ liệu, nên đọc bằng luật chứ không bằng so chuỗi.
+_BUA_TU = (("sang", "sáng"), ("trua", "trưa"), ("toi", "tối"))
+_NGOAC = re.compile(r"\(([^()]{1,60})\)")
+
+
+def doc_bua(tieu_de: str) -> list[str]:
+    """«(Ăn Sáng + Trưa)» → ['sáng','trưa']. Chỉ nhận cụm ngoặc CHỈ chứa tên bữa.
+
+    Ép «chỉ chứa tên bữa» là có lý do: tiêu đề còn những cụm ngoặc khác —
+    «(Tango Your Life)», «(tự túc)» — nhận bừa là bịa ra bữa ăn không có trong chương trình,
+    và khách đọc xong sẽ đòi đúng bữa ấy.
+    """
+    for m in _NGOAC.finditer(tieu_de or ""):
+        kd = _khong_dau(m.group(1))
+        co = [vi for kd_tu, vi in _BUA_TU if re.search(rf"\b{kd_tu}\b", kd)]
+        if not co:
+            continue
+        con = re.sub(r"\ban\b|\bsang\b|\btrua\b|\btoi\b|[\s,+&/\-–—.]", "", kd)
+        if con:                       # còn chữ lạ → không phải cụm bữa ăn
+            continue
+        return co
+    return []
+
+
+def bo_cum_bua(tieu_de: str) -> str:
+    """Bỏ cụm bữa ăn khỏi tiêu đề: bữa đã thành thẻ riêng, để lại là in hai lần."""
+    ra = tieu_de or ""
+    for m in _NGOAC.finditer(tieu_de or ""):
+        kd = _khong_dau(m.group(1))
+        if any(re.search(rf"\b{k}\b", kd) for k, _ in _BUA_TU) and not re.sub(
+                r"\ban\b|\bsang\b|\btrua\b|\btoi\b|[\s,+&/\-–—.]", "", kd):
+            ra = ra.replace(m.group(0), "")
+    return _sach(ra).strip(" -–—:·|")
+
+
+_KS_TU = re.compile(r"\b(resort|hotel|khach\s*san)\b")
+_NHAN_PHONG = re.compile(r"nh[aậ]n\s+ph[oòó]ng[^.;\n]{0,80}", re.IGNORECASE)
+
+
+def doc_khach_san(tieu_de: str, noi_dung: str = "") -> str:
+    """Nơi nghỉ của ngày — CHỈ lấy khi chữ tự nói ra, không suy.
+
+    Hai nguồn, theo thứ tự tin cậy:
+      1. một đoạn của tiêu đề có chứa «resort / hotel / khách sạn» — «TP.HCM - PHAN THIẾT -
+         NOVELA RESORT» cho «NOVELA RESORT»;
+      2. câu «nhận phòng …» trong thân ngày, và cũng chỉ khi câu ấy có một trong ba chữ trên.
+    Không có thì trả rỗng, và giao diện ghi «Đang cập nhật». «Đang cập nhật» là sự thật;
+    đoán tên khách sạn rồi in lên trang bán hàng thì không.
+    """
+    for doan in re.split(r"\s[-–—]\s|\s*[|·]\s*", bo_cum_bua(tieu_de or "")):
+        d = _sach(doan)
+        if d and _KS_TU.search(_khong_dau(d)) and 3 <= len(d) <= 80:
+            return d
+    for m in _NHAN_PHONG.finditer(noi_dung or ""):
+        cau = _sach(m.group(0))
+        if _KS_TU.search(_khong_dau(cau)):
+            # cắt phần đứng trước «nhận phòng» ra, giữ lại tên
+            ten = re.sub(r"^nh[aậ]n\s+ph[oòó]ng\s*(t[aạ]i|[ởo])?\s*", "", cau, flags=re.IGNORECASE)
+            ten = _sach(ten).strip(" .,;:")
+            if 3 <= len(ten) <= 80:
+                return ten
+    return ""
+
+
+def ngay_day_du(ds: list[dict], ngay_cuoi_khong_nghi: bool = True) -> list[dict]:
+    """Đắp bữa ăn và nơi nghỉ vào từng ngày đọc từ web / từ chương trình sản phẩm."""
+    ra = []
+    for i, x in enumerate(ds):
+        td = str(x.get("tieu_de") or "")
+        nd = str(x.get("noi_dung") or "")
+        cuoi = ngay_cuoi_khong_nghi and i == len(ds) - 1
+        ra.append({**x, "tieu_de": bo_cum_bua(td) or td,
+                   "bua": doc_bua(td),
+                   "khach_san": "" if cuoi else doc_khach_san(td, nd)})
     return ra
 
 
@@ -1091,13 +1207,19 @@ def lich_trinh(db: Session, p: Product, tour_id: int | None = None) -> dict:
                                                 "khach_san": n.khach_san, "anh": []} for n in ngay], "van_ban": ""}
     web = (p.noi_dung_web or {}).get("lich_trinh") or []
     if web:
-        return {"nguon": "web", "ngay": [{**x, "bua": [], "khach_san": ""} for x in web], "van_ban": ""}
+        return {"nguon": "web", "ngay": ngay_day_du(web), "van_ban": ""}
     ct = tach_muc(p.program or "")["chuong_trinh"]                     # P1-01: bỏ phần bao gồm / quy định lẫn vào
     tn = tach_ngay(ct)
     if tn:
-        return {"nguon": "san_pham", "ngay": [{**x, "bua": [], "khach_san": ""} for x in tn], "van_ban": ""}
+        return {"nguon": "san_pham", "ngay": ngay_day_du(tn), "van_ban": ""}
     gt = ((p.noi_dung_web or {}).get("gioi_thieu") or "").strip()   # TR-1c: bài giới thiệu trên web trước văn bản sản phẩm
     if gt:
+        # TR-14: rất nhiều bài trên web gói CẢ chương trình từng ngày vào phần giới thiệu — HC001
+        # («BIỂN CÀ NÁ - HÒN CÒ RESORT») là một: bài có đủ «NGÀY 1:» và «NGÀY 2:» mà trang tour
+        # vẫn đổ ra một khối chữ liền, vì chỗ này chưa bao giờ thử tách. Thử tách trước đã.
+        tg = tach_ngay(gt)
+        if tg:
+            return {"nguon": "web_gioi_thieu_ngay", "ngay": ngay_day_du(tg), "van_ban": ""}
         return {"nguon": "web_gioi_thieu", "ngay": [], "van_ban": gt[:8000]}
     return {"nguon": "van_ban", "ngay": [], "van_ban": ct[:8000]}
 
