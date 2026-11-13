@@ -179,6 +179,14 @@ def tro_web(u: User = Depends(require_roles(*(TRO.VAI_SUA_CONG + TRO.VAI_GHEP)))
     return {"web": _tro(TRO.ds_web, db, u)}
 
 
+# TR-11 · CHIỀU NGƯỢC của cửa trên. Cửa `/web` đi từ tour web sang sản phẩm; cửa này đi từ SẢN
+# PHẨM CHƯA GHÉP sang các trang web hợp nhất — thứ người đi ghép thật sự cần, vì việc của họ là
+# «22 tour này thiếu ảnh, trang nào của nó?» chứ không phải «596 trang này thuộc về ai».
+@router.get("/tour-online/goi-y-link")
+def tro_goi_y(u: User = Depends(require_roles(*(TRO.VAI_SUA_CONG + TRO.VAI_GHEP))), db: Session = Depends(get_db)):
+    return _tro(TRO.ds_goi_y_nguoc, db, u)
+
+
 @router.put("/tour-online/{pid}/cong")
 def tro_sua(pid: int, data: _TrCongIn, u: User = Depends(require_roles(*TRO.VAI_SUA_CONG)), db: Session = Depends(get_db)):
     p = _tro(TRO.sua_cong, db, u, pid, data.model_dump(exclude_none=True))

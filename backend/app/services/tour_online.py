@@ -663,24 +663,123 @@ def _so_ngay(s: str) -> int | None:
     return int(m.group(1) or m.group(2)) if m else None
 
 
+def so_ngay_sp(p: Product) -> int | None:
+    """Số ngày của một sản phẩm crm, đọc theo thứ tự tin cậy: cột `days` → tên → `length_text`.
+
+    Đọc bằng `getattr` có mặc định, KHÔNG phải vì sản phẩm thật thiếu cột — mà vì hàm này được
+    gọi từ `thieu_noi_dung`, nơi các vòng khác đã dựng sẵn phép thử bằng bản ghi RÚT GỌN chỉ mang
+    đúng mấy trường chúng cần (`test_p1_01_5`). Thêm một trường bắt buộc vào đường ấy là bắt vòng
+    khác sửa phép thử của họ cho vừa ý vòng này — và một phép thử bị sửa để hết đỏ là một phép
+    thử yếu đi. Thiếu trường thì trả `None`, và `None` nghĩa là «không biết», tức không cảnh báo.
+    """
+    return (getattr(p, "days", None) or _so_ngay(getattr(p, "name", "") or "")
+            or _so_ngay(getattr(p, "length_text", "") or ""))
+
+
+def _hop_ngay(nw: int | None, np_: int | None) -> bool:
+    """Hai bên có thể ghép với nhau về ĐỘ DÀI không? Chỉ bên nào ĐỌC ĐƯỢC mới bị xét."""
+    return not (nw and np_) or nw == np_
+
+
+def _diem_khop(tw: set[str], tp: set[str]) -> float:
+    """0..1. Trộn BAO PHỦ (bao nhiêu phần tên web nằm trong tên sản phẩm) với Jaccard.
+
+    Chỉ Jaccard thì thiên vị hai tên dài bằng nhau; tên trên web luôn dài hơn vì mang thêm
+    «Tour Du Lịch», mùa, năm. Bao phủ gỡ đúng chỗ đó, Jaccard giữ cho nó không nhận bừa một tên
+    web quá ngắn. 0.6/0.4 là tỉ lệ đo trên 596 tour web × 380 sản phẩm ngày 13/11/2026.
+    """
+    if not tw or not tp:
+        return 0.0
+    g = len(tw & tp)
+    return 0.6 * (g / len(tw)) + 0.4 * (g / len(tw | tp))
+
+
 def goi_y_ghep(web: list[dict], sps: list[Product]) -> list[dict]:
-    """Gợi ý sản phẩm crm cho từng tour web (giống tên + cùng số ngày). Chỉ GỢI Ý — người xác nhận mới ghép."""
+    """Gợi ý sản phẩm crm cho từng tour web. Chỉ GỢI Ý — người xác nhận mới ghép.
+
+    TR-11 (13/11/2026) · SỐ NGÀY NAY LÀ ĐIỀU KIỆN LOẠI, KHÔNG PHẢI CỘNG ĐIỂM — và đây là chỗ
+    sửa quan trọng nhất của vòng này, vì bản cũ gợi ý SAI đúng vào ca điểm cao nhất.
+    ĐO ĐƯỢC ngày 13/11/2026 trên dữ liệu thật: web cũ có **20 tour Singapore – Malaysia**. Với
+    `SM001` («HÀ NỘI - SINGAPORE - MALAYSIA 5N4D»), bản cũ chấm **1.00 — điểm tuyệt đối** cho
+    trang «Singapore - Malaysia 4 NGÀY 3 ĐÊM Khởi Hành Từ Hà Nội», trong khi bản đúng
+    «5 Ngày 4 Đêm KH Từ Hà Nội» nằm ngay cạnh. Lý do: hai tên có cùng bộ từ (`_tu` đã lọc bỏ
+    «5n4d»), nên khác biệt DUY NHẤT giữa đúng và sai là số ngày — mà số ngày chỉ được cộng 0.15.
+    Một khoản thưởng nhỏ không bao giờ thắng nổi một tên khớp hơn nửa từ.
+    Hậu quả nếu ghép theo gợi ý ấy KHÔNG phải là xấu mặt: khách đặt tour 5 ngày rồi đọc lịch
+    trình, bảng giá và «bao gồm» của tour 4 ngày — một lời hứa sai với người đã trả tiền.
+    Nên: đọc được số ngày ở CẢ HAI bên mà lệch nhau thì LOẠI HẲN, không chấm điểm.
+    """
     ra = []
     for w in web:
         tw, nw = _tu(w["ten"]), _so_ngay(w["ten"])
         tot = None
         for p in sps:
-            tp = _tu(p.name)
-            if not tw or not tp:
+            np_ = so_ngay_sp(p)
+            if not _hop_ngay(nw, np_):
+                continue                       # lệch độ dài: không phải ứng viên, dù tên giống hệt
+            diem = _diem_khop(tw, _tu(p.name))
+            if not diem:
                 continue
-            diem = len(tw & tp) / len(tw | tp)
-            np_ = p.days or _so_ngay(p.name or "") or _so_ngay(p.length_text or "")
-            if nw and np_ and nw == np_:
-                diem += 0.15
+            if nw and np_:
+                diem += 0.15                   # cùng độ dài ĐỌC ĐƯỢC ở cả hai bên: chắc hơn hẳn
             if tot is None or diem > tot[0]:
                 tot = (diem, p)
         g = {"pid": tot[1].id, "ma": tot[1].code, "ten": tot[1].name, "diem": round(tot[0], 2)} if tot and tot[0] >= 0.25 else None
         ra.append({**w, "goi_y": g})
+    return ra
+
+
+# Dưới ngưỡng này thì không đưa ra làm ứng viên — bày một gợi ý tồi tốn thì giờ người xem hơn là
+# không bày gì. 0.45 là mức đo được: dưới nó, các cặp trên dữ liệu thật đều là trùng điểm đến chứ
+# không phải trùng tour (ví dụ mọi tour Đà Lạt khớp nhau ở đúng chữ «đà lạt»).
+NGUONG_UNG_VIEN = 0.45
+SO_UNG_VIEN = 3
+
+
+def goi_y_web(web: list[dict], sps: list[Product], da_ghep: set[str] | None = None,
+              so: int = SO_UNG_VIEN) -> list[dict]:
+    """CHIỀU NGƯỢC LẠI: mỗi SẢN PHẨM chưa ghép → vài trang web hợp nhất, để người ghép bấm chọn.
+
+    VÌ SAO PHẢI CÓ CHIỀU NÀY. `goi_y_ghep` đi từ WEB sang SẢN PHẨM: với mỗi tour web nó chọn một
+    sản phẩm khớp nhất. Một sản phẩm không phải «khớp nhất» của tour web nào thì không có gợi ý
+    nào trỏ tới nó — người của Điều hành thấy nó nằm trong mục «Chưa ghép web» nhưng phải TỰ DÒ
+    trong 596 trang để tìm trang của nó. Đo ngày 13/11/2026: **22 sản phẩm có chuyến đang mở bán
+    mà chưa ghép link**, nên cổng khách hiện chúng KHÔNG CÓ MỘT TẤM ẢNH NÀO — không phải vì
+    thiếu ảnh, mà vì chưa có chỗ nào để đọc ảnh về.
+
+    Trả về mỗi sản phẩm kèm tối đa `so` ứng viên đã xếp hạng. KHÔNG tự ghép: ghép là việc của
+    người, vì trên dữ liệu thật chỉ khoảng một phần tư số sản phẩm có ứng viên đủ chắc, phần còn
+    lại tên trên crm và trên web đặt khác hẳn nhau («ĐÀ LẠT MỘNG MƠ» ↔ «Đà Lạt 3 Ngày 2 Đêm:
+    Thành Phố Ngàn Hoa») và chỉ người làm tour mới biết trang nào là trang nào.
+    """
+    da = set(da_ghep or ())
+    ra = []
+    for p in sps:
+        if (p.link_web or "").strip():
+            continue
+        tp, np_ = _tu(p.name or ""), so_ngay_sp(p)
+        tp = tp | _tu(p.diem_den or "")        # tên crm hay ngắn; điểm đến bù đúng chỗ thiếu
+        cand = []
+        for w in web:
+            if w["url"] in da:
+                continue                       # trang đang thuộc về sản phẩm khác — không bày
+            nw = _so_ngay(w["ten"])
+            if not _hop_ngay(nw, np_):
+                continue
+            diem = _diem_khop(_tu(w["ten"]), tp)
+            if nw and np_:
+                diem += 0.15
+            if diem >= NGUONG_UNG_VIEN:
+                cand.append({"url": w["url"], "ten": w["ten"], "anh": w.get("anh") or "",
+                             "so_ngay": nw, "diem": round(diem, 2)})
+        cand.sort(key=lambda x: -x["diem"])
+        ra.append({"pid": p.id, "ma": p.code, "ten": p.name, "so_ngay": np_,
+                   "ung_vien": cand[:so],
+                   # «chắc» = điểm cao VÀ bỏ xa ứng viên nhì. Một ứng viên 0.9 đứng cạnh một ứng
+                   # viên 0.88 thì KHÔNG chắc — đó là hai biến thể của cùng một tuyến, và chọn
+                   # bừa một trong hai là đúng cái sai mà vòng này sinh ra để chặn.
+                   "chac": bool(cand) and cand[0]["diem"] >= 0.80
+                           and (len(cand) == 1 or cand[0]["diem"] - cand[1]["diem"] >= 0.15)})
     return ra
 
 
@@ -1509,7 +1608,8 @@ def gui_yeu_cau_doan(db: Session, tk: TaiKhoanNgoai, d: dict, now: datetime | No
 # ══ 5 · VTOS — màn «Tour trên cổng khách» ═════════════════════════════════════════════════════════════════════════
 
 THIEU_ND = {"anh": "Thiếu ảnh", "lich": "Chưa có lịch theo ngày", "bao_gom": "Thiếu giá bao gồm", "tre_em": "Thiếu giá trẻ em",
-            "gia_ao": "Còn số tiền chưa điền trên web"}
+            "gia_ao": "Còn số tiền chưa điền trên web",
+            "lech_ngay": "Lịch trên web LỆCH số ngày với tour"}
 
 
 def thieu_noi_dung(p: Product, chuyen: list[tuple[Tour, int]], co_ct_chuyen: bool = False,
@@ -1535,6 +1635,27 @@ def thieu_noi_dung(p: Product, chuyen: list[tuple[Tour, int]], co_ct_chuyen: boo
            + list(nd.get("khong_bao_gom") or tm["khong_bao_gom"])
            + (nd.get("quy_dinh") or tm["quy_dinh"] or "").split("\n")):
         ra.append("gia_ao")
+    # TR-11 (13/11/2026) · GHÉP NHẦM ĐỘ DÀI — chỗ hỏng mà màn hình CŨ KHÔNG THỂ THẤY.
+    #
+    # Tất cả các phép kiểm trên đây hỏi «có hay không có». Không phép nào hỏi «có ĐÚNG không».
+    # Nên một sản phẩm ghép vào trang web của một tour KHÁC ĐỘ DÀI vẫn được chấm «Đủ nội dung»,
+    # và không ai biết, kể cả người đang nhìn thẳng vào dòng ấy.
+    #
+    # ĐO NGÀY 13/11/2026, trên 120 sản phẩm đã ghép link (88 sản phẩm đọc được số ngày cả hai
+    # bên): **7 sản phẩm lệch**. Hai trong số đó ĐANG MỞ BÁN, nên khách đang đọc nhầm ngay lúc đo:
+    #   · TL001 — cổng ghi «2 NGÀY 1 ĐÊM», 2 chuyến mở, nội dung đọc từ trang La Ngâu **3N2Đ**.
+    #     (Web cũ chỉ có đúng một trang La Ngâu và nó là 3N2Đ — tour này không có trang đúng để
+    #     ghép, nên lối ra là gỡ link rồi tải ảnh thẳng vào album.)
+    #   · JP0013 — cổng ghi 6N5Đ, 3 chuyến mở, trang đã ghép có ĐÚNG 5 ngày lịch trình.
+    #     Màn hình hôm ấy ghi dòng JP0013 là «Đủ nội dung».
+    #
+    # Chỉ báo khi ĐỌC ĐƯỢC số ngày ở cả hai bên — suy đoán thêm ở đây là đẻ ra báo động giả, mà
+    # một hàng rào kêu oan vài lần là một hàng rào người ta thôi đọc.
+    # Chỉ hỏi số ngày của sản phẩm KHI web đã đọc được lịch — không có lịch thì cảnh báo «lich»
+    # ở trên đã lo, và tính thêm ở đây là làm việc thừa trên mỗi dòng của 380 sản phẩm.
+    nw = len(nd.get("lich_trinh") or [])
+    if nw and (np_ := so_ngay_sp(p)) and nw != np_:
+        ra.append("lech_ngay")
     return ra
 
 
@@ -1544,6 +1665,9 @@ def _sp_vtos(db: Session, p: Product, so_chuyen: int, thieu: list[str] | None = 
             "diem_den": p.diem_den or "", "diem_den_suy": diem_den(p), "noi_bat": p.noi_bat or [], "wellness": bool(p.wellness),
             "phuong_tien_ds": p.phuong_tien_ds or [], "phuong_tien_suy": phuong_tien(p), "transport": p.transport or "",
             "mo_thanh_toan": bool(p.mo_thanh_toan), "link_web": p.link_web or "", "so_chuyen": so_chuyen,
+            # TR-11: để màn hình nói ĐƯỢC «6 ngày ↔ web 5 ngày» chứ không chỉ gắn một cái nhãn đỏ.
+            # Một cảnh báo không kèm hai con số thì người đọc phải tự đi tìm, và phần lớn sẽ không đi.
+            "so_ngay": so_ngay_sp(p),
             "web": {"cap_nhat_luc": nd.get("cap_nhat_luc"), "loi": nd.get("loi") or "", "so_anh": len(nd.get("anh") or []),
                     "so_ngay": len(nd.get("lich_trinh") or []), "so_bao_gom": len(nd.get("bao_gom") or []), "ten": nd.get("ten") or "",
                     "anh_dau": (nd.get("anh") or [None])[0]},
@@ -1673,6 +1797,28 @@ def ds_web(db: Session, u: User) -> list[dict]:
     if loi and not ra:
         raise LoiTour("Không đọc được danh sách tour trên web: " + "; ".join(loi), 502)
     return ra
+
+
+def ds_goi_y_nguoc(db: Session, u: User) -> dict:
+    """TR-11 · Danh sách việc cho người ghép: mỗi sản phẩm CHƯA GHÉP kèm vài trang web hợp nhất.
+
+    Xếp sản phẩm ĐANG MỞ BÁN lên trước, vì đó là những tour khách đang nhìn thấy trống ảnh ngay
+    lúc này — 22 sản phẩm như thế, đo ngày 13/11/2026.
+    Lỗi đọc web KHÔNG làm cửa này hỏng: trả kèm `loi` để màn hình nói ra, còn phần đọc được vẫn
+    dùng được. Đọc được một nửa mà biết mình đọc một nửa thì vẫn hơn hẳn không có gì.
+    """
+    _quyen(u, VAI_SUA_CONG + VAI_GHEP)
+    web, loi = doc_ds_web()
+    sps = _sp_hien(db)
+    da = {p.link_web for p in sps if p.link_web}
+    ra = goi_y_web(web, sps, da)
+    ch = _chuyen(db, sps, _hom_nay())
+    for o in ra:
+        o["so_chuyen"] = len(ch.get(o["pid"], []))
+    ra.sort(key=lambda o: (-o["so_chuyen"], not o["chac"], o["ma"]))
+    return {"san_pham": ra, "so_web": len(web), "loi": loi,
+            "nguong": NGUONG_UNG_VIEN, "so_chua_ghep": len(ra),
+            "so_chua_ghep_dang_ban": sum(1 for o in ra if o["so_chuyen"])}
 
 
 def ghep(db: Session, u: User, pid: int, url: str) -> Product:
