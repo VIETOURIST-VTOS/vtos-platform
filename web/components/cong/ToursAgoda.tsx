@@ -854,6 +854,19 @@ const CSS = `
    (3) Ô TÍCH 18x18px. WCAG 2.2 (2.5.8) đòi vùng bấm tối thiểu 24x24px. */
 .tra a.ksv-btn,#vtd-access .tra a.ksv-btn{color:#fff;-webkit-text-fill-color:#fff;min-height:44px}
 .tra a.ksv-btn.line,#vtd-access .tra a.ksv-btn.line{color:var(--ksv-ink);-webkit-text-fill-color:var(--ksv-ink)}
+/* TR-15b · LUẬT TR-15 KHÔNG ĂN, VÀ SAI ĐÚNG CÁI BẪY VỪA GỠ Ở NÚT.
+   Nghiệm thu TR-15 trên bản chạy thật: nút đặt tour lên 7,92:1 (đạt), h1 và main có, nhưng
+   ô tích TRONG BỘ LỌC VẪN 18x18px. Hỏi lại trình duyệt, bốn luật trúng ô ấy, hai luật đặt
+   kích thước:
+       .ksv-chk input, #vtd-access .ksv .ksv-chk input  {width:18px}   (1,2,1)  ← thắng
+       .tra input[type=checkbox]                        {width:24px}   (0,2,1)
+   Luật cũ viết thành DANH SÁCH hai phép chọn, và phép chọn thứ hai có ID. Đã kiểm trên trang
+   chạy: #vtd-access CÓ THẬT và là tổ tiên của gốc trang tour, nên nhánh có ID mới là nhánh
+   trúng — điểm (1,2,1), đè luật (0,2,1) của TR-15.
+   Đúng cái bẫy TR-15 vừa gỡ ở nút <a>, mà sang ô tích lại quên kiểm: tưởng «.tra» là đủ,
+   tưởng chứ không đo. Nay nâng lên có ID; .ksv và .tra là CÙNG một thẻ gốc nên viết dính
+   «.ksv.tra» được điểm (1,3,1), ăn chắc chứ không hoà rồi trông vào thứ tự dòng. */
+#vtd-access .ksv.tra input[type=checkbox],#vtd-access .ksv.tra input[type=radio],
 .tra input[type=checkbox],.tra input[type=radio]{width:24px;height:24px;flex:none}
 @media (max-width:640px){.tra input,.tra select,.tra textarea{font-size:16px}}
 @media (max-width:640px){.tra-sbar{grid-template-columns:1fr}.tra-sbar .ksv-btn-tim{grid-column:auto}.tra-k4{grid-template-columns:1fr 1fr}.tra-ht{font-size:18px}}
