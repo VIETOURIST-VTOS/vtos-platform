@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 const d = (n?: number | null) => (n || n === 0 ? Math.round(n).toLocaleString("vi-VN") + " đ" : "—");
 const ngay = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "—");
@@ -19,6 +20,7 @@ const MAU: Record<string, string> = { cho_duyet: "warn", hieu_luc: "ok", tu_choi
 const TRONG = { loai: "xe", ten: "", pham_vi: "ca_hai", khu_vuc: "", gia: "", tu_cho: "", tu_diem: "", den_diem: "", hang_ve: "pho_thong", gia_tre_em: "", gia_em_be: "", tu_ngay: "", den_ngay: "", ghi_chu: "" };
 
 function Trang() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { toast } = useShell();
   const [tab, setTab] = useState<"tk" | "dg" | "le">("tk");
   const [le, setLe] = useState<any>(null); const [fLe, setFLe] = useState({ ngay: "", ten: "" });
@@ -44,7 +46,7 @@ function Trang() {
     toast("Đã lưu — chờ TP Điều hành duyệt"); setF(null);
   });
 
-  return (<>
+  return (<>{hop}
     <h1>Tour đoàn khách tự thiết kế</h1>
     <p className="muted">Khách thiết kế tại kh.vietourist.vn/tours → «Tự thiết kế tour đoàn». Tạm tính = giá vốn ÷ (1 − {Math.round((x.bien_tam_tinh || 0.1) * 100)}%).
       Khách sạn, nhà hàng lấy từ gói giá / thực đơn đã duyệt; xe trong nước lấy bảng giá xe theo tuyến (xe 45 chỗ, cột xe nhà), lệch tuyến thì đơn giá ngày xe nhà × số ngày; HDV trong nước lấy bảng thù lao HDV theo tuyến (ngày lễ Tết ×2 theo thẻ «Ngày lễ Tết»). Dịch vụ khác, xe / HDV nước ngoài và vé máy bay lấy từ đơn giá đoàn dưới đây. Mục chưa có giá = Sales báo giá.
@@ -142,7 +144,7 @@ function Trang() {
             {dg.duoc.nhap && <button className="act grey" onClick={() => setF({ ...TRONG, ...r, khu_vuc: r.khu_vuc || "", gia: String(r.gia ?? ""), tu_cho: r.tu_cho ?? "", gia_tre_em: r.gia_tre_em ?? "", gia_em_be: r.gia_em_be ?? "" })}>Sửa</button>}
             {dg.duoc.duyet && r.trang_thai === "cho_duyet" && <>
               <button className="act teal" disabled={busy} onClick={() => lam(() => api(`/tour-doan/don-gia/${r.id}/duyet`, { method: "POST", json: { dong_y: true } }))}>Duyệt</button>
-              <button className="act grey" disabled={busy} onClick={() => { const l = window.prompt("Lý do từ chối"); if (l) lam(() => api(`/tour-doan/don-gia/${r.id}/duyet`, { method: "POST", json: { dong_y: false, ly_do: l } })); }}>Từ chối</button></>}
+              <button className="act grey" disabled={busy} onClick={async () => { const l = await nhap("Lý do từ chối"); if (l) lam(() => api(`/tour-doan/don-gia/${r.id}/duyet`, { method: "POST", json: { dong_y: false, ly_do: l } })); }}>Từ chối</button></>}
             {dg.duoc.duyet && r.trang_thai === "hieu_luc" && <button className="act grey" disabled={busy} onClick={() => lam(() => api(`/tour-doan/don-gia/${r.id}/ngung`, { method: "POST" }))}>Ngừng</button>}
           </td></tr>)}
           {!dg.don_gia.length && <tr><td colSpan={8} className="muted">Chưa có đơn giá — mọi dịch vụ ngoài khách sạn / nhà hàng sẽ hiện «Sales báo giá».</td></tr>}</tbody></table></div>

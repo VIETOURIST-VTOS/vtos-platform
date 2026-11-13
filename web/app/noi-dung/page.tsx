@@ -10,6 +10,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import DinhKem from "@/components/DinhKem";
+import { useHoi } from "@/components/HopHoi";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const RONG = { title: "", loai: "bai_dang", campaign_id: "", kenh: [] as string[], ngay_du_kien: today(),
@@ -17,6 +18,7 @@ const RONG = { title: "", loai: "bai_dang", campaign_id: "", kenh: [] as string[
 const MAU: Record<string, string> = { nhap: "grey", cho_duyet: "warn", cho_ky_2: "red", da_duyet: "ok", da_dang: "ok", go: "grey" };
 
 function NoiDung() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   const soanDuoc = ["nv_mkt", "ptgd_mkt", "cntt"].includes(role);
@@ -44,7 +46,7 @@ function NoiDung() {
     .then((r) => { if (r) { setF({ ...RONG }); setHien(false); } });
   const canKy2 = f.co_cam_ket || f.co_so_lieu_tc;
 
-  return (<>
+  return (<>{hop}
     <h1>Nội dung & thương hiệu</h1>
     <p className="muted">Đây là <b>sổ duyệt</b>: nội dung nào đã đăng, ai duyệt, đăng ở đâu, và trong đó có cam kết gì với khách không.
       Nội dung có <b>cam kết với khách</b> hoặc có <b>số liệu tài chính</b> cần <b>chữ ký thứ hai</b> của Ban TGĐ hoặc Pháp chế —
@@ -112,12 +114,12 @@ function NoiDung() {
           {n.status === "nhap" && soanDuoc && <button className="act" onClick={() => post(`/noi-dung/${n.id}/chuyen-trang-thai`, { status: "cho_duyet" })}>Trình duyệt</button>}
           {(n.status === "cho_duyet" || n.status === "cho_ky_2") && duyetDuoc &&
             <button className="act" onClick={() => post(`/noi-dung/${n.id}/duyet`)}>Ký duyệt</button>}
-          {n.status === "da_duyet" && <button className="act" onClick={() => {
-            const l = prompt("Đường dẫn bài đã đăng (bắt buộc):");
+          {n.status === "da_duyet" && <button className="act" onClick={async () => {
+            const l = await nhap("Đường dẫn bài đã đăng (bắt buộc):");
             if (l && l.trim()) post(`/noi-dung/${n.id}/chuyen-trang-thai`, { status: "da_dang", link_dang: l.trim() });
           }}>Đánh dấu đã đăng</button>}
-          {(n.status === "da_dang" || n.status === "da_duyet") && <button className="act grey" onClick={() => {
-            const l = prompt("Lý do gỡ nội dung:");
+          {(n.status === "da_dang" || n.status === "da_duyet") && <button className="act grey" onClick={async () => {
+            const l = await nhap("Lý do gỡ nội dung:");
             if (l && l.trim()) post(`/noi-dung/${n.id}/chuyen-trang-thai`, { status: "go", ly_do_go: l.trim() });
           }}>Gỡ / hết hiệu lực</button>}
         </td></tr>,

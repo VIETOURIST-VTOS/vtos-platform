@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, getUser } from "@/lib/api";
+import { useHoi } from "@/components/HopHoi";
 
 /** 5.9.2 Đề nghị mua và 5.9.3 Cấp phát tài sản (Chủ tịch chốt 08/10/2026).
  *
@@ -16,6 +17,7 @@ const tien = (n: number | null | undefined) =>
   n === null || n === undefined ? "—" : n.toLocaleString("vi-VN");
 
 export function DeNghiMua() {
+  const { xacNhan, nhap, hop } = useHoi();   // TR-10: hỏi lại trên trang, không dùng hộp thoại trình duyệt
   const u = getUser();
   const [rows, setRows] = useState<any[]>([]);
   const [meta, setMeta] = useState<any>(null);
@@ -49,22 +51,23 @@ export function DeNghiMua() {
   }
 
   async function duyet(r: any, dong_y: boolean) {
-    const ghi_chu = dong_y ? "" : (window.prompt("Không duyệt vì sao? (bắt buộc)") || "");
+    const ghi_chu = dong_y ? "" : (await nhap("Không duyệt vì sao? (bắt buộc)") || "");
     if (!dong_y && !ghi_chu.trim()) { setLoi("Không duyệt thì phải ghi lý do."); return; }
     try { await api(`/de-nghi-mua/${r.id}/duyet`, { method: "POST", json: { dong_y, ghi_chu } }); nap(); }
     catch (e: any) { setLoi(String(e?.message || e)); }
   }
 
   async function ghiChi(r: any) {
-    const s = window.prompt(`Số tiền đã chi cho ${r.ma}?`, String(r.uoc_tinh ?? ""));
+    const s = await nhap(`Số tiền đã chi cho ${r.ma}?`, String(r.uoc_tinh ?? ""));
     if (!s) return;
-    const ct = window.prompt("Số chứng từ (để trống cũng được):") || "";
+    const ct = await nhap("Số chứng từ (để trống cũng được):") || "";
     try { await api(`/de-nghi-mua/${r.id}/da-chi`, { method: "POST", json: { so_tien: Number(s), chung_tu_ref: ct } }); nap(); }
     catch (e: any) { setLoi(String(e?.message || e)); }
   }
 
   return (
     <section>
+      {hop}
       <h1>Đề nghị mua</h1>
       <p className="muted">
         Mọi phòng gửi được ở đây. Đề nghị đi <b>TGĐ / Chủ tịch duyệt</b> rồi <b>Kế toán ghi đã chi</b> —
@@ -130,6 +133,7 @@ export function DeNghiMua() {
 }
 
 export function CapPhatTaiSan() {
+  const { xacNhan, nhap, hop } = useHoi();   // TR-10: hỏi lại trên trang, không dùng hộp thoại trình duyệt
   const u = getUser();
   const [rows, setRows] = useState<any[]>([]);
   const [meta, setMeta] = useState<any>(null);
@@ -161,9 +165,9 @@ export function CapPhatTaiSan() {
   }
 
   async function tra(r: any) {
-    const tt = window.prompt(`Trả "${r.ten_tai_san}" trong tình trạng nào? (bắt buộc)`) || "";
+    const tt = await nhap(`Trả "${r.ten_tai_san}" trong tình trạng nào? (bắt buộc)`) || "";
     if (!tt.trim()) { setLoi("Phải ghi tình trạng món đồ khi trả."); return; }
-    const hong = window.confirm("Món này MẤT hoặc HỎNG? (Hủy = trả bình thường)");
+    const hong = await xacNhan("Món này MẤT hoặc HỎNG? (Hủy = trả bình thường)");
     const ngay = new Date().toISOString().slice(0, 10);
     try { await api(`/cap-phat/${r.id}/tra`, { method: "POST", json: { tra_ngay: ngay, tinh_trang: tt, mat_hong: hong } }); nap(); }
     catch (e: any) { setLoi(String(e?.message || e)); }
@@ -171,6 +175,7 @@ export function CapPhatTaiSan() {
 
   return (
     <section>
+      {hop}
       <h2>Cấp phát tài sản</h2>
       <p className="muted">
         Sổ này trả lời đúng <b>một câu</b>: món nào đang ở tay ai — câu HCNS phải hỏi mỗi lần có người

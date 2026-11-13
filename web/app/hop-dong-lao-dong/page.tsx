@@ -4,6 +4,7 @@ import Shell, { useShell } from "@/components/Shell";
 import DinhKem from "@/components/DinhKem";
 import { api, vnd, fmtD, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Hợp đồng lao động — V5 của lệnh giao việc 08/9/2026.
  *
@@ -17,6 +18,7 @@ import { Tag, errMsg } from "@/components/ui";
  *  Hợp đồng lao động thuộc nhóm hồ sơ 06_Nhan_su: dữ liệu cá nhân, phân quyền riêng theo Nghị định
  *  13/2023 — chỉ HCNS, Ban TGĐ, Chủ tịch và Ban Kiểm soát đọc được tệp. */
 function HopDong() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [meta, setMeta] = useState<any>(null);
   const [ds, setDs] = useState<any[]>([]);
@@ -114,7 +116,7 @@ function HopDong() {
   /** NGỪNG, không phải XOÁ. Máy chủ đặt `active = false` và giữ lại dòng: một người phụ thuộc đã từng
    *  được giảm trừ là căn cứ quyết toán thuế của những kỳ trước, xoá đi là xoá mất căn cứ ấy. */
   const ngungNpt = async (d: any) => {
-    if (!window.confirm(`Ngừng giảm trừ cho ${d.full_name}? Dòng cũ vẫn giữ để tra lại.`)) return;
+    if (!await xacNhan(`Ngừng giảm trừ cho ${d.full_name}? Dòng cũ vẫn giữ để tra lại.`)) return;
     try { await api(`/dependents/${d.id}`, { method: "DELETE" }); toast("Đã ngừng"); moHoSo(chon); }
     catch (e) { toast(errMsg(e), true); }
   };
@@ -135,10 +137,10 @@ function HopDong() {
   };
 
   const chamDut = async (c: any) => {
-    const on = window.prompt(`Chấm dứt hợp đồng ${c.code}. Ngày chấm dứt (YYYY-MM-DD):`,
+    const on = await nhap(`Chấm dứt hợp đồng ${c.code}. Ngày chấm dứt (YYYY-MM-DD):`,
                              new Date().toISOString().slice(0, 10));
     if (!on) return;
-    const reason = window.prompt("Lý do chấm dứt (ghi lại để sau này đối chiếu hồ sơ BHXH):") || "";
+    const reason = await nhap("Lý do chấm dứt (ghi lại để sau này đối chiếu hồ sơ BHXH):") || "";
     try { await api(`/labor-contracts/${c.id}/terminate`, { method: "POST", json: { on, reason } });
           toast("Đã ghi chấm dứt."); await load(); }
     catch (e) { toast(errMsg(e), true); }
@@ -147,7 +149,7 @@ function HopDong() {
   const coHd = new Set(ds.filter((c) => c.status !== "cham_dut").map((c) => c.employee_id));
   const thieu = emps.filter((e: any) => e.active && e.contract_type === "hdld" && !coHd.has(e.id));
 
-  return (<>
+  return (<>{hop}
     <h1>Hợp đồng lao động</h1>
     <p className="muted">Bản scan là chính — HCNS tải lên mỗi khi có hợp đồng mới hoặc phụ lục. Màn hình
       chỉ giữ những trường hệ thống phải biết để <b>cảnh báo hết hạn</b> và để tính lương; phần còn lại

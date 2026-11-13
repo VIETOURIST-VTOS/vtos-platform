@@ -8,6 +8,7 @@ import MatKhauCongKhai from "@/components/MatKhauCongKhai";
 import HoSoNhanVien from "@/components/HoSoNhanVien";
 import SuaTaiKhoan from "@/components/SuaTaiKhoan";
 import CapNgoaiLe from "@/components/CapNgoaiLe";
+import { useHoi } from "@/components/HopHoi";
 /** Tài khoản & phân quyền (đặc tả 07/9/2026, phần B).
  *
  *  Màn hình này CÔNG BỐ ma trận quyền chứ không sửa nó: ma trận nằm trong mã nguồn, có phép thử tự động
@@ -49,6 +50,7 @@ const ACT_TEN: Record<string, string> = {
 };
 
 function AccessPage() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   const canWrite = ["cntt", "hcns", "chutich", "tgd"].includes(role);
@@ -123,10 +125,10 @@ function AccessPage() {
     } catch (e) { toast(errMsg(e), true); return false; }
   };
 
-  const doiVaiTro = (r: any, moi: string) => {
+  const doiVaiTro = async (r: any, moi: string) => {
     if (moi === r.role) return;
     const nhay = (acc?.vai_tro_nhay_cam || []).includes(moi);
-    const ly_do = window.prompt(
+    const ly_do = await nhap(
       `Đổi vai trò ${r.full_name} thành ${acc.roles[moi]}.` +
       (nhay ? "\n\nĐây là vai trò nhìn được toàn bộ tiền và sổ sách – chỉ Chủ tịch hoặc TGĐ đổi được." : "") +
       "\n\nLý do (bắt buộc):", "");
@@ -135,11 +137,11 @@ function AccessPage() {
   };
 
   const taoTaiKhoan = async () => {
-    const ho_ten = window.prompt("Họ tên đầy đủ:", ""); if (!ho_ten?.trim()) return;
-    const ma_nv = window.prompt("Mã nhân viên (cũng là mật khẩu tạm):", ""); if (!ma_nv?.trim()) return;
-    const role = window.prompt("Mã vai trò (ví dụ ketoan, nv_kd, hcns):", "ketoan"); if (!role?.trim()) return;
-    const department = window.prompt("Phòng (ví dụ ketoan, kd_le, dieu_hanh):", "ketoan") || "";
-    const ngoai = window.confirm("Người này NGOÀI biên chế (thuê ngoài, không có trong bảng lương)?\n\nOK = ngoài biên chế · Cancel = trong biên chế");
+    const ho_ten = await nhap("Họ tên đầy đủ:", ""); if (!ho_ten?.trim()) return;
+    const ma_nv = await nhap("Mã nhân viên (cũng là mật khẩu tạm):", ""); if (!ma_nv?.trim()) return;
+    const role = await nhap("Mã vai trò (ví dụ ketoan, nv_kd, hcns):", "ketoan"); if (!role?.trim()) return;
+    const department = await nhap("Phòng (ví dụ ketoan, kd_le, dieu_hanh):", "ketoan") || "";
+    const ngoai = await xacNhan("Người này NGOÀI biên chế (thuê ngoài, không có trong bảng lương)?\n\nOK = ngoài biên chế · Cancel = trong biên chế");
     try {
       const r = await api<any>("/access/accounts", { method: "POST", json: {
         ho_ten: ho_ten.trim(), ma_nv: ma_nv.trim(), role: role.trim(),
@@ -186,7 +188,7 @@ function AccessPage() {
     return r.active;
   });
 
-  return <>
+  return <>{hop}
     <h1>Tài khoản & phân quyền</h1>
     <p className="muted">Ma trận quyền nằm trong mã nguồn và có phép thử tự động canh; màn hình này công bố lại,
       không sửa. Sửa được ở đây: vai trò, khóa/mở, pháp nhân chủ quản và ngoại lệ có thời hạn.</p>
@@ -330,7 +332,7 @@ function AccessPage() {
             {canDatLaiMK && <button className="act grey" style={{ margin: 0 }}
               title="Máy sinh mật khẩu tạm, hiện đúng một lần; người dùng phải đổi ở lần đăng nhập kế tiếp"
               onClick={async () => {
-                if (!confirm(`Sinh mật khẩu tạm cho ${r.full_name} (${r.username})?\n\n`
+                if (!await xacNhan(`Sinh mật khẩu tạm cho ${r.full_name} (${r.username})?\n\n`
                            + `Mật khẩu hiện ra ĐÚNG MỘT LẦN để anh chép gửi cho họ — không tra lại `
                            + `được. Người này buộc phải đổi ngay ở lần đăng nhập kế tiếp.`)) return;
                 try {
@@ -437,7 +439,7 @@ function AccessPage() {
           <span className="muted">{suy.dem.da_co} tài khoản đã có</span>
           {canWrite && suy.dem.suy_duoc > 0 && <button className="act" style={{ margin: 0 }} disabled={dangSuy}
             onClick={async () => {
-              if (!confirm(`Gán pháp nhân cho ${suy.dem.suy_duoc} tài khoản theo bảng dưới?`)) return;
+              if (!await xacNhan(`Gán pháp nhân cho ${suy.dem.suy_duoc} tài khoản theo bảng dưới?`)) return;
               setDangSuy(true);
               try {
                 const r = await api<any>("/access/phap-nhan/suy-tu-ho-so", { method: "POST", json: {} });
@@ -497,7 +499,7 @@ function AccessPage() {
               <td>{v}</td>
               <td>{co ? co.username : <Tag cls="warn">chưa có</Tag>}</td>
               <td>{!co && canWrite && <button className="act" style={{ margin: 0 }} onClick={async () => {
-                if (!confirm(`Tạo tài khoản đăng nhập cho ${v}? Mật khẩu chỉ hiện một lần.`)) return;
+                if (!await xacNhan(`Tạo tài khoản đăng nhập cho ${v}? Mật khẩu chỉ hiện một lần.`)) return;
                 try {
                   const r = await api<any>("/access/accounts/robot", { method: "POST", json: { role: k } });
                   setMkRobot(r); loadAcc(); loadGaps();

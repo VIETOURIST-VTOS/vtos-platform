@@ -25,6 +25,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 type Soat = {
   tong_tai_khoan: number;
@@ -35,6 +36,7 @@ type Soat = {
 };
 
 export default function MatKhauCongKhai({ canWrite }: { canWrite?: boolean }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const [s, setS] = useState<Soat | null>(null);
   const [chay, setChay] = useState(false);
   const [loi, setLoi] = useState("");
@@ -50,7 +52,7 @@ export default function MatKhauCongKhai({ canWrite }: { canWrite?: boolean }) {
 
   async function batCo() {
     if (!s) return;
-    if (!confirm(
+    if (!await xacNhan(
       `Buộc ${s.chua_tung_dang_nhap} tài khoản chưa từng đăng nhập phải đổi mật khẩu ở lần đăng nhập đầu tiên?\n\n` +
       `• Không tài khoản nào bị khoá\n` +
       `• Không mật khẩu nào bị đặt hộ — mỗi người tự đặt mật khẩu mới\n` +
@@ -82,7 +84,7 @@ export default function MatKhauCongKhai({ canWrite }: { canWrite?: boolean }) {
   }
 
   return (
-    <div className="card" style={{ marginBottom: 12, borderLeft: "3px solid var(--vtos-danger)" }}>
+    <div className="card" style={{ marginBottom: 12, borderLeft: "3px solid var(--vtos-danger)" }}>{hop}
       <b style={{ color: "var(--vtos-danger)" }}>
         {s.chua_tung_dang_nhap} tài khoản chưa từng đăng nhập — mật khẩu còn nguyên như lúc gieo
       </b>

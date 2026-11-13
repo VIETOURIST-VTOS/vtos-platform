@@ -19,6 +19,7 @@
 import { useEffect, useState } from "react";
 import { api, getUser, vnd } from "@/lib/api";
 import { errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 type Dong = {
   khoa_ten: string;
@@ -57,6 +58,7 @@ const NHAN_CACH_KHOP: Record<string, string> = {
 };
 
 export default function KhoCuNguoiBan({ onXong }: { onXong?: () => void }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const user = getUser();
   const [mo, setMo] = useState(false);
   const [b, setB] = useState<Bang | null>(null);
@@ -93,7 +95,7 @@ export default function KhoCuNguoiBan({ onXong }: { onXong?: () => void }) {
 
   async function chuyenPhieu() {
     if (!gl?.doi_duoc.length) return;
-    if (!confirm(
+    if (!await xacNhan(
       `Chuyển ${gl.doi_duoc.length} phiếu đặt (${vnd(gl.tien_ve_nguoi_that) + " đ"}) về đúng người bán?\n\n` +
       `Chỉ đổi chủ phiếu — không nạp lại lô, không đụng dòng khách hay dòng chi.\n` +
       `Việc này ghi vào nhật ký mang tên ${user!.username}.`
@@ -114,7 +116,7 @@ export default function KhoCuNguoiBan({ onXong }: { onXong?: () => void }) {
   const ds = (b?.dong || []).filter((d) => !chiCanGan || (!d.user_id && d.cach_khop !== "nguoi_gan"));
 
   return (
-    <div className="card" style={{ marginBottom: 12, borderLeft: "3px solid #1d4ed8" }}>
+    <div className="card" style={{ marginBottom: 12, borderLeft: "3px solid #1d4ed8" }}>{hop}
       <button className="link" onClick={() => setMo(!mo)} style={{ fontWeight: 600 }}>
         {mo ? "▾" : "▸"} Gán người bán cho kho quyết toán cũ T1–T6/2026
       </button>

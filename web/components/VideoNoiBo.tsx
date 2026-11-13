@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 type Gan = { id: number; ten: string };
 const MB = 1024 * 1024;
@@ -44,6 +45,7 @@ async function guiTho(path: string, init: RequestInit) {
 
 export default function VideoNoiBo({ goc, oid, toast, loaiPhong = [], mon = [], thucDon = [], onDoi }:
   { goc: "/khach-san-vtd" | "/nha-hang"; oid: number; toast: (m: string, l?: boolean) => void; loaiPhong?: Gan[]; mon?: Gan[]; thucDon?: Gan[]; onDoi?: () => void }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const [x, setX] = useState<any>(null);
   const [f, setF] = useState<File | null>(null);
   const [doc, setDoc] = useState<{ thoi_luong: number; phat_duoc: boolean; anh: Blob | null } | null>(null);
@@ -92,7 +94,7 @@ export default function VideoNoiBo({ goc, oid, toast, loaiPhong = [], mon = [], 
     finally { setBusy(false); setTien(null); }
   };
   const viec = async (id: number, v: string) => {
-    if (v === "xoa" && !window.confirm("Xóa video này khỏi danh sách?")) return;
+    if (v === "xoa" && !await xacNhan("Xóa video này khỏi danh sách?")) return;
     setBusy(true);
     try { const r = await api<any>(`${goc}/video/${id}/${v}`, { method: "POST" }); toast(r.message); load(); onDoi?.(); }
     catch (e) { toast(errMsg(e), true); } finally { setBusy(false); }
@@ -104,7 +106,7 @@ export default function VideoNoiBo({ goc, oid, toast, loaiPhong = [], mon = [], 
   };
   const duoc = (v: any) => x.duoc_quan || (x.duoc_nhap && v.tai_boi === x.toi);
 
-  return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+  return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{hop}
     <div className="panel" style={{ margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ fontSize: 13 }}><b>Mức chuẩn:</b> {x.chuan.map((c: any) => <span key={c.loai} style={{ marginRight: 10 }}>{c.co ? "✓" : "○"} {c.ten.split(" (")[0].split(" —")[0]}</span>)}
         {x.du_chuan ? <Tag cls="ok">Đủ chuẩn</Tag> : <span className="muted">— chỉ nhắc, 1 video thực tế là đủ để bắt đầu</span>}</div>

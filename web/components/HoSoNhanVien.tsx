@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** HS-2 · Hồ sơ nhân viên — bấm vào số hồ sơ trên bảng Tài khoản thì mở ra cái này.
  *
@@ -77,6 +78,7 @@ function oGiaTri(v: any) {
 
 export default function HoSoNhanVien({ uid, hoTen, onClose }:
   { uid: number; hoTen: string; onClose: () => void }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const [d, setD] = useState<any>(null);
   const [loi, setLoi] = useState("");
   // GIÁ TRỊ ĐÃ HIỆN chỉ sống trong bộ nhớ của lần mở này: đóng hồ sơ là mất, mở lại là một lượt
@@ -88,7 +90,7 @@ export default function HoSoNhanVien({ uid, hoTen, onClose }:
   async function xinHien(truong: string, ten: string) {
     // MỤC ĐÍCH DO NGƯỜI GÕ, không có danh sách chọn sẵn. Một ô chọn "làm hợp đồng / khai BHXH /
     // khác" thì ai cũng bấm cái đầu tiên, và cột mục đích trong nhật ký thành một cột vô nghĩa.
-    const md = prompt(`Xem giá trị thật của «${ten}» để làm gì?\n\n`
+    const md = await nhap(`Xem giá trị thật của «${ten}» để làm gì?\n\n`
       + `Lượt xem này vào nhật ký hồ sơ mang tên bạn, kèm câu bạn ghi ở đây.`);
     if (md === null) return;
     setDangHien(truong);
@@ -110,7 +112,7 @@ export default function HoSoNhanVien({ uid, hoTen, onClose }:
       .catch((e) => setLoi(errMsg(e)));
   }, [uid]);
 
-  return <div style={{ border: "1px solid var(--line, #2a3b55)", borderRadius: 8, padding: 14, marginTop: 14 }}>
+  return <div style={{ border: "1px solid var(--line, #2a3b55)", borderRadius: 8, padding: 14, marginTop: 14 }}>{hop}
     <div className="row" style={{ gap: 10, alignItems: "baseline", marginBottom: 10 }}>
       <h3 style={{ margin: 0 }}>Hồ sơ nhân viên — {hoTen}</h3>
       {d && <span className="muted" style={{ fontSize: 12 }}>

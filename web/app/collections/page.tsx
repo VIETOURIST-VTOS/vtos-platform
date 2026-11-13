@@ -4,6 +4,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import DinhKem from "@/components/DinhKem";
+import { useHoi } from "@/components/HopHoi";
 
 const ST: Record<string, [string, string]> = {
   da_khop: ["Đã khớp", "ok"], cho_ke_toan: ["Chờ Kế toán", "warn"], chua_khop: ["Chưa khớp", ""], bo_qua: ["Bỏ qua", ""],
@@ -29,6 +30,7 @@ const VAI_SO_QUY = VAI_LAP_PHIEU_THU;
 const CHIEU_QUY: [string, string][] = [["thu", "Phiếu thu quỹ"], ["chi", "Phiếu chi quỹ"]];
 
 function Collections() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const isKT = ["ketoan", "cntt"].includes(user?.role || "");
   const [sum, setSum] = useState<any>(null);
@@ -70,7 +72,7 @@ function Collections() {
     } catch (x) { toast(errMsg(x), true); }
   };
   const huyDong = async (tid: number, pid: number) => {
-    const ly = prompt("Lý do huỷ dòng phân bổ này? (bắt buộc – dòng huỷ vẫn nằm lại trong sổ)");
+    const ly = await nhap("Lý do huỷ dòng phân bổ này? (bắt buộc – dòng huỷ vẫn nằm lại trong sổ)");
     if (!ly) return;
     try {
       const r = await api(`/bank-transactions/phan-bo/${pid}/huy`, { method: "POST", json: { ly_do: ly } });
@@ -132,7 +134,7 @@ function Collections() {
     setDangLap(false);
   };
   const dueRows = (sum?.bookings || []).filter((b: any) => b.due > 0);
-  return (<>
+  return (<>{hop}
     <h1>Thu tiền – robot R1 (SePay) &amp; phiếu thu</h1>
     <p className="muted">Robot chỉ tự sinh phiếu thu khi khớp <b>tuyệt đối</b> mã booking + số tiền còn phải thu. Mọi trường hợp khác treo chờ Kế toán quyết định. Giao dịch ngân hàng là bản ghi bất biến.</p>
     <div className="kpis">
@@ -170,7 +172,7 @@ function Collections() {
             <option value="">– chọn booking –</option>{(sum?.bookings || []).map((b: any) => <option key={b.booking_id} value={b.booking_id}>{b.code} · {b.customer_name} · còn {vnd(b.due)}</option>)}</select>
           <input placeholder="Ghi chú (cọc đợt 1…)" value={assign[t.id]?.note || ""} onChange={(e) => setAssign({ ...assign, [t.id]: { booking_id: assign[t.id]?.booking_id ?? (t.booking_id || ""), note: e.target.value } })} />
           <button className="act teal" style={{ margin: 0 }} disabled={!(assign[t.id]?.booking_id ?? t.booking_id)} onClick={() => post(`/bank-transactions/${t.id}/assign`, { booking_id: Number(assign[t.id]?.booking_id ?? t.booking_id), note: assign[t.id]?.note || "" })}>Gán &amp; lập phiếu thu</button>
-          <button className="act grey" style={{ margin: 0 }} onClick={() => { const n = prompt("Lý do bỏ qua giao dịch này?"); if (n !== null) post(`/bank-transactions/${t.id}/ignore`, { note: n }); }}>Bỏ qua</button>
+          <button className="act grey" style={{ margin: 0 }} onClick={async () => { const n = await nhap("Lý do bỏ qua giao dịch này?"); if (n !== null) post(`/bank-transactions/${t.id}/ignore`, { note: n }); }}>Bỏ qua</button>
         </div>}
         {t.transfer_type === "in" && <button className="act grey" style={{ margin: 0, fontSize: 12 }}
           onClick={() => moPhanBo(t.id)}>{pbMo === t.id ? "Ẩn phân bổ" : "Chia cho nhiều booking"}</button>}</td>}</tr>)

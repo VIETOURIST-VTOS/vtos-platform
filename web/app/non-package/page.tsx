@@ -4,10 +4,12 @@ import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, pct, fmtD, fmtDT, getToken, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 const PMT: Record<string, [string, string]> = { UNPAID: ["Chưa cọc", "red"], DEPO: ["Đặt cọc", "warn"], PAID: ["Đã thanh toán", "ok"], CANCEL: ["Đã hủy", ""] };
 
 function NonPackage() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   const [data, setData] = useState<any>({ kinds: {}, rows: [], summary: { by_type: [], total: {} } });
@@ -46,12 +48,12 @@ function NonPackage() {
     if (!canCost) { delete d.cost_amount; delete d.supplier_name; }
     try { await api(`/non-package/${edit.id}`, { method: "PUT", json: d }); toast("Đã lưu dịch vụ"); setEdit(null); load(); } catch (x) { toast(errMsg(x), true); }
   };
-  const cancel = async (r: any) => { const reason = prompt(`Lý do hủy ${r.tour_code} – ${r.customer_name}?`); if (!reason) return; const ch = prompt(`Phí hủy giữ lại (đ), đã thu ${vnd(r.paid)} – để 0 nếu không thu phí:`, "0"); if (ch === null) return;
+  const cancel = async (r: any) => { const reason = await nhap(`Lý do hủy ${r.tour_code} – ${r.customer_name}?`); if (!reason) return; const ch = await nhap(`Phí hủy giữ lại (đ), đã thu ${vnd(r.paid)} – để 0 nếu không thu phí:`, "0"); if (ch === null) return;
     try { const x = await api(`/bookings/${r.id}/cancel`, { method: "POST", json: { reason, charge: soTien(ch), retain: true } }); toast(x.message); load(); } catch (e) { toast(errMsg(e), true); } };
   const printIt = async (r: any) => { try { const res = await fetch(`/api/v1/non-package/${r.id}/print`, { headers: { Authorization: `Bearer ${getToken() || ""}` } }); const html = await res.text(); const w = window.open("", "_blank"); if (w) { w.document.write(html); w.document.close(); } } catch { toast("Không in được", true); } };
-  const closeMonth = async () => { const m = prompt("Chốt dịch vụ lẻ tháng (YYYY-MM, phải là tháng đã kết thúc):", month); if (!m) return; try { const r = await api("/non-package/close-month", { method: "POST", json: { month: m } }); toast(r.message); load(); } catch (e) { toast(errMsg(e), true); } };
+  const closeMonth = async () => { const m = await nhap("Chốt dịch vụ lẻ tháng (YYYY-MM, phải là tháng đã kết thúc):", month); if (!m) return; try { const r = await api("/non-package/close-month", { method: "POST", json: { month: m } }); toast(r.message); load(); } catch (e) { toast(errMsg(e), true); } };
   const K = data.kinds || {}; const S = data.summary || {}; const T = S.total || {};
-  return (<>
+  return (<>{hop}
     <h1>Dịch vụ lẻ – Non-package</h1>
     <p className="muted">Bán visa, vé máy bay, khách sạn, xe, nhà hàng, land, HDV không gắn tour trọn gói – như màn hình Non-package của Vietrip: mỗi dịch vụ có mã KLEddmmyy, thu tiền theo mã booking (SePay/tiền mặt), in phiếu, hủy có phí → bảo lưu; Kế toán chốt tháng để ghi doanh thu – giá vốn.</p>
     <div className="kpis">

@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Ngoại lệ cần xử lý (Kiểm soát & Chính sách).
  *
@@ -24,6 +25,7 @@ type Row = {
 };
 
 function NgoaiLePage() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   const laLanhDao = ["chutich", "tgd"].includes(role);
@@ -67,7 +69,7 @@ function NgoaiLePage() {
   };
 
   return (
-    <main>
+    <main>{hop}
       <h1>Ngoại lệ cần xử lý</h1>
       <p className="muted" style={{ marginTop: -6 }}>
         Mỗi dòng dưới đây là một lần quy tắc bị bẻ. Khác cảnh báo nghiệp vụ ở chỗ nó không tự tắt: chỉ đóng
@@ -192,8 +194,8 @@ function NgoaiLePage() {
               {r.trang_thai !== "dong" &&
                 <button className="act grey" onClick={() => moForm(r)}>{mo === r.ma ? "Thu gọn" : "Ghi giải trình"}</button>}
               {r.trang_thai === "dong" && laLanhDao &&
-                <button className="act orange" onClick={() => {
-                  const ly = window.prompt("Mở lại ngoại lệ này vì lý do gì?") || "";
+                <button className="act orange" onClick={async () => {
+                  const ly = await nhap("Mở lại ngoại lệ này vì lý do gì?") || "";
                   if (ly.trim()) goi("mo-lai", { ma: r.ma, ly_do: ly });
                 }}>Mở lại</button>}
               {r.nguoi_nhan && r.trang_thai !== "dong" &&

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useShell } from "@/components/Shell";
 import { api, vnd, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Chi phí kỳ đội xe — KHỐI DÙNG CHUNG, không phải mã mới.
  *
@@ -21,6 +22,7 @@ import { Tag, errMsg } from "@/components/ui";
  *  đợi và bảng lợi nhuận đọc cùng nguồn với sổ chi phí kỳ; ghi xong mà bàn chưa đổi thì giám đốc
  *  tưởng mình ghi trượt và ghi lần thứ hai. */
 export default function ChiPhiKyPanel({ ky, onDoiSo }: { ky: string; onDoiSo?: () => void }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [cp, setCp] = useState<any>(null);
   const [xe, setXe] = useState<any[]>([]);
@@ -47,7 +49,7 @@ export default function ChiPhiKyPanel({ ky, onDoiSo }: { ky: string; onDoiSo?: (
   };
 
   const go = async (id: number) => {
-    const ly_do = window.prompt("Gỡ khoản này khỏi kỳ vì lý do gì?\n\n" +
+    const ly_do = await nhap("Gỡ khoản này khỏi kỳ vì lý do gì?\n\n" +
       "Một khoản chi phí biến mất khỏi báo cáo mà không ai biết vì sao là cách nhanh nhất làm cho lãi " +
       "lỗ tháng không đối chiếu được với tháng trước.");
     if (!ly_do || !ly_do.trim()) return;
@@ -59,7 +61,7 @@ export default function ChiPhiKyPanel({ ky, onDoiSo }: { ky: string; onDoiSo?: (
 
   const nhomCua = (ma: string) => (cp?.nhom || []).find((n: any) => n.ma === ma);
 
-  return (<>
+  return (<>{hop}
     {canGhi && <div className="panel">
       <h2>Ghi chi phí kỳ {ky}</h2>
       <p className="muted">Khoản không gắn vào chuyến nào: bảo hiểm, đăng kiểm, lương tài xế, wifi,

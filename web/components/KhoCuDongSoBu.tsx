@@ -30,6 +30,7 @@
 import { useState } from "react";
 import { api, getUser } from "@/lib/api";
 import { errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 const DUOC_XEM = ["chutich", "tgd", "cntt", "tp_dh"];
 
@@ -52,6 +53,7 @@ type Go = {
 const tien = (n: number) => (n || 0).toLocaleString("vi-VN") + " đ";
 
 export default function KhoCuDongSoBu({ onXong }: { onXong?: () => void }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const user = getUser();
   const [mo, setMo] = useState(false);
   const [moiLo, setMoiLo] = useState(50);
@@ -74,7 +76,7 @@ export default function KhoCuDongSoBu({ onXong }: { onXong?: () => void }) {
   }
 
   async function dong() {
-    if (!confirm(
+    if (!await xacNhan(
       `ĐÓNG SỐ BÙ cho kho quyết toán cũ?\n\n` +
       `• Chạy theo lô ${moiLo} chuyến, gọi tiếp cho tới hết.\n` +
       `• Mốc kỳ lấy theo NGÀY KẾT THÚC của từng chuyến — tiền rơi vào tháng nó phát sinh,\n` +
@@ -107,7 +109,7 @@ export default function KhoCuDongSoBu({ onXong }: { onXong?: () => void }) {
   }
 
   async function go() {
-    if (!confirm(
+    if (!await xacNhan(
       `GỠ phần CỬA NÀY đã đóng số?\n\n` +
       `• Trả chuyến về "kết thúc", xoá doanh thu / giá vốn / mốc kỳ do cửa bù ghi.\n` +
       `• KHÔNG đụng chuyến Điều hành đã đóng số THẬT — cửa gỡ nhận ra bằng mốc kỳ và giữ lại.\n` +
@@ -136,7 +138,7 @@ export default function KhoCuDongSoBu({ onXong }: { onXong?: () => void }) {
   }
 
   return (
-    <div className="card" style={{ marginBottom: 12, borderLeft: "3px solid #0369a1" }}>
+    <div className="card" style={{ marginBottom: 12, borderLeft: "3px solid #0369a1" }}>{hop}
       <button className="link" onClick={() => setMo(!mo)} style={{ fontWeight: 600 }}>
         {mo ? "▾" : "▸"} Kho quyết toán cũ — đóng số bù (Chủ tịch ký thay)
       </button>

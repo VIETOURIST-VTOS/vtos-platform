@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 type Cat = { stages: Record<string, string>; lifecycle: Record<string, string>; results: Record<string, string>;
   doc_status: Record<string, string>; markets: any[] };
@@ -22,6 +23,7 @@ const DOC_TAG: Record<string, string> = { ACCEPTED: "ok", WAIVED: "ok", NOT_APPL
   NEEDS_REPLACEMENT: "red", WAIVER_REQUESTED: "warn", UPLOADED: "warn", UNDER_REVIEW: "warn" };
 
 function Visa() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [cat, setCat] = useState<Cat | null>(null);
   const [tong, setTong] = useState<any>(null);
@@ -71,7 +73,7 @@ function Visa() {
   const stage = ct?.case?.current_stage;
   const at = (s: string) => stage === s && ct?.case?.lifecycle_status === "ACTIVE";
 
-  return (<>
+  return (<>{hop}
     {/* Màn hình này KHÔNG có tiêu đề cho tới 29/9/2026 — mọi màn hình khác của bốn phòng đều có một
         <h1>, riêng đây mở ra là vào thẳng đoạn giải thích, và thứ đập vào mắt đầu tiên lại là ô cảnh
         báo thiếu tệp bên dưới. Người dùng không có chỗ nào để biết mình đang đứng ở phân hệ nào. */}
@@ -187,24 +189,24 @@ function Visa() {
           onClick={() => act("gửi kiểm tra", `/visa/ho-so/${ct.case.id}/gui-kiem-tra`)}>Gửi kiểm tra</button>}
         {at("kiem_tra") && <button className="act" disabled={!!busy}
           onClick={() => act("xác nhận kiểm tra đạt", `/visa/ho-so/${ct.case.id}/kiem-tra-dat`)}>Kiểm tra đạt</button>}
-        {at("khai_ho_so") && <button className="act" disabled={!!busy} onClick={() => {
-          const ma = prompt("Mã tham chiếu hồ sơ do LSQ/ĐSQ cấp:"); if (!ma) return;
+        {at("khai_ho_so") && <button className="act" disabled={!!busy} onClick={async () => {
+          const ma = await nhap("Mã tham chiếu hồ sơ do LSQ/ĐSQ cấp:"); if (!ma) return;
           act("ghi nhận đã khai hồ sơ", `/visa/ho-so/${ct.case.id}/khai-ho-so`, { reference_code: ma });
         }}>Đã khai hồ sơ chính thức</button>}
-        {at("lich_hen") && <button className="act" disabled={!!busy} onClick={() => {
-          const luc = prompt("Thời gian hẹn (YYYY-MM-DD HH:MM):"); if (!luc) return;
+        {at("lich_hen") && <button className="act" disabled={!!busy} onClick={async () => {
+          const luc = await nhap("Thời gian hẹn (YYYY-MM-DD HH:MM):"); if (!luc) return;
           act("ghi lịch hẹn", `/visa/ho-so/${ct.case.id}/lich-hen`,
-              { starts_at: luc.replace(" ", "T"), location: prompt("Địa điểm:") || "" });
+              { starts_at: luc.replace(" ", "T"), location: await nhap("Địa điểm:") || "" });
         }}>Ghi lịch hẹn</button>}
-        {at("ban_giao") && <button className="act" disabled={!!busy} onClick={() => {
-          if (!confirm("Xác nhận đã trả giấy tờ/kết quả cho khách?")) return;
+        {at("ban_giao") && <button className="act" disabled={!!busy} onClick={async () => {
+          if (!await xacNhan("Xác nhận đã trả giấy tờ/kết quả cho khách?")) return;
           act("ghi bàn giao", `/visa/ho-so/${ct.case.id}/ban-giao`,
               { direction: "TRA_KHACH", item_type: "ho_chieu", to_party: ct.applicant.ten, confirmed: true });
         }}>Đã trả khách</button>}
         {at("dong_ho_so") || ct.case.result_status !== "NOT_AVAILABLE" ? <button className="act orange" disabled={!!busy}
           onClick={() => act("đóng hồ sơ", `/visa/ho-so/${ct.case.id}/dong-ho-so`)}>Đóng hồ sơ</button> : null}{" "}
-        {ct.case.lifecycle_status === "ACTIVE" && <button className="act grey" disabled={!!busy} onClick={() => {
-          const ly = prompt("Lý do tạm dừng:"); if (!ly) return;
+        {ct.case.lifecycle_status === "ACTIVE" && <button className="act grey" disabled={!!busy} onClick={async () => {
+          const ly = await nhap("Lý do tạm dừng:"); if (!ly) return;
           act("tạm dừng", `/visa/ho-so/${ct.case.id}/tam-dung`, { reason: ly });
         }}>Tạm dừng</button>}{" "}
         {ct.case.lifecycle_status === "ON_HOLD" && <button className="act" disabled={!!busy}
@@ -265,8 +267,8 @@ function Visa() {
             <button className="act" disabled={!!busy}
               onClick={() => act("chấp nhận tài liệu", `/visa/ho-so/${ct.case.id}/tai-lieu/${t.id}/kiem-tra`,
                                  { decision: "ACCEPTED" })}>Chấp nhận</button>{" "}
-            <button className="act orange" disabled={!!busy} onClick={() => {
-              const ly = prompt("Lý do yêu cầu nộp lại (khách sẽ đọc):"); if (!ly) return;
+            <button className="act orange" disabled={!!busy} onClick={async () => {
+              const ly = await nhap("Lý do yêu cầu nộp lại (khách sẽ đọc):"); if (!ly) return;
               act("yêu cầu nộp lại", `/visa/ho-so/${ct.case.id}/tai-lieu/${t.id}/kiem-tra`,
                   { decision: "NEEDS_REPLACEMENT", reason: ly });
             }}>Nộp lại</button></>}</td></tr>)}</tbody></table>
@@ -279,10 +281,10 @@ function Visa() {
               : w.quyet_dinh === "APPROVED" ? <Tag cls="ok">đã duyệt – {w.nguoi_quyet}</Tag>
               : <Tag cls="red">từ chối – {w.nguoi_quyet}</Tag>}</td>
             <td>{w.quyet_dinh === "PENDING" && canWrite && <>
-              <button className="act" disabled={!!busy} onClick={() => act("duyệt miễn nộp",
-                `/visa/ho-so/${ct.case.id}/ngoai-le/${w.id}/quyet-dinh`, { approve: true, note: prompt("Ghi chú:") || "" })}>Duyệt</button>{" "}
-              <button className="act orange" disabled={!!busy} onClick={() => {
-                const ly = prompt("Lý do từ chối:"); if (!ly) return;
+              <button className="act" disabled={!!busy} onClick={async () => act("duyệt miễn nộp",
+                `/visa/ho-so/${ct.case.id}/ngoai-le/${w.id}/quyet-dinh`, { approve: true, note: await nhap("Ghi chú:") || "" })}>Duyệt</button>{" "}
+              <button className="act orange" disabled={!!busy} onClick={async () => {
+                const ly = await nhap("Lý do từ chối:"); if (!ly) return;
                 act("từ chối miễn nộp", `/visa/ho-so/${ct.case.id}/ngoai-le/${w.id}/quyet-dinh`, { approve: false, note: ly });
               }}>Từ chối</button></>}</td></tr>)}</tbody></table></>}
 
@@ -295,9 +297,9 @@ function Visa() {
           <td>{a.trang_thai === "SCHEDULED" && canWrite && <>
             <button className="act" disabled={!!busy} onClick={() => act("ghi có mặt",
               `/visa/ho-so/${ct.case.id}/lich-hen/${a.id}/sinh-trac-hoc`, { attended: true })}>Đã đến / lấy vân tay</button>{" "}
-            <button className="act grey" disabled={!!busy} onClick={() => {
-              const luc = prompt("Lịch mới (YYYY-MM-DD HH:MM):"); if (!luc) return;
-              const ly = prompt("Lý do đổi lịch (bắt buộc):"); if (!ly) return;
+            <button className="act grey" disabled={!!busy} onClick={async () => {
+              const luc = await nhap("Lịch mới (YYYY-MM-DD HH:MM):"); if (!luc) return;
+              const ly = await nhap("Lý do đổi lịch (bắt buộc):"); if (!ly) return;
               act("đổi lịch", `/visa/ho-so/${ct.case.id}/lich-hen/${a.id}/doi-lich`,
                   { starts_at: luc.replace(" ", "T"), reason: ly });
             }}>Đổi lịch</button></>}</td></tr>)}</tbody></table>
@@ -308,8 +310,8 @@ function Visa() {
         <h4>Ghi nhận kết quả</h4>
         <button className="act" disabled={!!busy} onClick={() => act("ghi kết quả được cấp",
           `/visa/ho-so/${ct.case.id}/ket-qua`, { outcome: "GRANTED", received_on: new Date().toISOString().slice(0, 10) })}>Được cấp</button>{" "}
-        <button className="act orange" disabled={!!busy} onClick={() => {
-          const ly = prompt("Lý do từ chối theo thông báo của LSQ/ĐSQ:"); if (!ly) return;
+        <button className="act orange" disabled={!!busy} onClick={async () => {
+          const ly = await nhap("Lý do từ chối theo thông báo của LSQ/ĐSQ:"); if (!ly) return;
           act("ghi kết quả từ chối", `/visa/ho-so/${ct.case.id}/ket-qua`,
               { outcome: "REFUSED", received_on: new Date().toISOString().slice(0, 10), refusal_reason: ly });
         }}>Bị từ chối</button>

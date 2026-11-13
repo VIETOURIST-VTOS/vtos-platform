@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, getUser } from "@/lib/api";
+import { useHoi } from "@/components/HopHoi";
 
 /** 4.4.2 Chương trình của từng chuyến — tab «Chương trình» trên trang chi tiết chuyến.
  *
@@ -13,6 +14,7 @@ import { api, getUser } from "@/lib/api";
 const T = (b: boolean) => (b ? "✓" : "—");
 
 export default function ChuongTrinhChuyen({ tourId }: { tourId: number }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const u = getUser();
   const [d, setD] = useState<any>(null);
   const [dx, setDx] = useState<any>(null);
@@ -46,7 +48,7 @@ export default function ChuongTrinhChuyen({ tourId }: { tourId: number }) {
 
   async function luu(ngayThu: number, o: any) {
     const ly_do = d?.da_khoi_hanh
-      ? (window.prompt("Chuyến đã khởi hành — sửa chương trình thì phải ghi lý do:") || "")
+      ? (await nhap("Chuyến đã khởi hành — sửa chương trình thì phải ghi lý do:") || "")
       : "";
     if (d?.da_khoi_hanh && !ly_do.trim()) { setLoi("Chuyến đã khởi hành, phải ghi lý do."); return; }
     try { await api(`/chuong-trinh/${tourId}/ngay/${ngayThu}`, { method: "PUT", json: { ...o, ly_do } }); nap(); }
@@ -61,7 +63,7 @@ export default function ChuongTrinhChuyen({ tourId }: { tourId: number }) {
   if (!d) return (<section><p className="muted">Đang nạp…</p>{loi && <p className="loi">{loi}</p>}</section>);
 
   return (
-    <section>
+    <section>{hop}
       <h2>Chương trình chuyến {d.ma_chuyen}</h2>
       <p className="muted">
         Chương trình <b>của riêng chuyến này</b>, không phải của sản phẩm. Nó được <b>chép một lần</b> rồi

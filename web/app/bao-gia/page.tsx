@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** V6 – Báo giá. MỘT màn hình cho cả lẻ và đoàn, lọc bằng ?mang=.
  *
@@ -35,6 +36,7 @@ const vnd = (n: number | null | undefined) => (n || 0).toLocaleString("vi-VN") +
 const pct = (n: number | null) => (n === null || n === undefined ? "–" : (n * 100).toFixed(1) + "%");
 
 function BaoGia() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [mang, setMang] = useState("kd_le");
   const [ds, setDs] = useState<BG[]>([]);
@@ -151,7 +153,7 @@ function BaoGia() {
       const nhac = c.du_co_so
         ? `Biên ${pct(c.bien)} dưới ngưỡng ${pct(c.nguong)}.`
         : `Chưa đủ cơ sở tính biên: ${c.dong_thieu_gia_von.length} dòng chưa có giá vốn.`;
-      const ly_do = prompt(`${nhac}\n\nGửi vẫn được, nhưng phải giải trình (ít nhất ` +
+      const ly_do = await nhap(`${nhac}\n\nGửi vẫn được, nhưng phải giải trình (ít nhất ` +
                            `${meta?.dai_giai_trinh || 30} ký tự):\nvì sao chấp nhận · khoản nào làm ` +
                            `mỏng biên · bù bằng gì`);
       if (!ly_do || !ly_do.trim()) return;
@@ -173,7 +175,7 @@ function BaoGia() {
   // hợp đồng lấy từ BẢN BÁO GIÁ ĐÃ GỬI, nên chỗ bấm phải là chỗ nhìn thấy bản đã gửi. Đặt ở màn hình
   // kia thì người lập phải nhớ mã báo giá, và nhớ nhầm thì hợp đồng mang giá trị của một bản khác.
   const lapHopDong = async (b: BG) => {
-    const so = window.prompt(`Lập hợp đồng cho báo giá ${b.ma} – khách ${b.khach_ten}.\n` +
+    const so = await nhap(`Lập hợp đồng cho báo giá ${b.ma} – khách ${b.khach_ten}.\n` +
                              "Số hợp đồng (để trống thì hệ thống tự sinh):") ?? null;
     if (so === null) return;               // bấm Huỷ – khác với để trống rồi bấm Đồng ý
     setDang(true);
@@ -195,7 +197,7 @@ function BaoGia() {
   };
 
   return (
-    <div className="wrap">
+    <div className="wrap">{hop}
       <h1>Báo giá {mang === "kd_doan" ? "đoàn" : "lẻ"}</h1>
       <p className="muted">
         Cổng biên đứng ở bước <b>gửi khách</b>, vì cam kết xảy ra ở đó chứ không phải lúc lập dự toán.

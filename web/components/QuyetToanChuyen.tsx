@@ -38,6 +38,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, vnd, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 type Lech = { muc: string; o: string; noi: string };
 type Ky = { buoc: string; nguoi: string; luc: string | null };
@@ -88,6 +89,7 @@ function OMay({ nhan, gt, duoi }: { nhan: string; gt: React.ReactNode; duoi?: st
 export default function QuyetToanChuyen({ tripId, toast }: {
   tripId: number; toast?: (m: string, loi?: boolean) => void;
 }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const [d, setD] = useState<To | null>(null);
   const [loi, setLoi] = useState("");
   const [giay, setGiay] = useState<string>("");          // tổng km VIẾT TAY trên tờ giấy
@@ -131,7 +133,7 @@ export default function QuyetToanChuyen({ tripId, toast }: {
   });
 
   return (
-    <div className="panel">
+    <div className="panel">{hop}
       <h2>Quyết toán chuyến · Mẫu 2 {d.ma_phieu && <span className="muted">#{d.ma_phieu}</span>}{" "}
         <Tag cls={d.qt_trang_thai === "da_duyet" ? "ok" : d.qt_trang_thai === "tra_lai" ? "red" : "warn"}>
           {d.qt_ten_trang_thai}</Tag></h2>
@@ -263,8 +265,8 @@ export default function QuyetToanChuyen({ tripId, toast }: {
               onClick={() => goi(`/fleet/quyet-toan-chuyen/${tripId}/ky`, { buoc: b }, "POST",
                 `Đã ký bước ${TEN_BUOC[b] || b}`)}>Ký bước {TEN_BUOC[b] || b}</button>
           ))}
-          <button className="act grey" disabled={dang} style={{ margin: 0 }} onClick={() => {
-            const ly = window.prompt("Trả lại để sửa – ghi rõ phải sửa cái gì:");
+          <button className="act grey" disabled={dang} style={{ margin: 0 }} onClick={async () => {
+            const ly = await nhap("Trả lại để sửa – ghi rõ phải sửa cái gì:");
             if (ly && ly.trim()) goi(`/fleet/quyet-toan-chuyen/${tripId}/tra-lai`, { ly_do: ly },
               "POST", "Đã trả lại để sửa");
           }}>Trả lại để sửa</button>
