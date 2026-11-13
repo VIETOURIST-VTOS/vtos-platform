@@ -27,6 +27,9 @@ import Shell, { useShell, VAI_BAN_KD_LE } from "@/components/Shell";
 import TrangPhanHe from "@/components/TrangPhanHe";
 import DoanhThuChiTieuKd from "@/components/DoanhThuChiTieuKd";
 import BanGdKdLe from "@/components/BanGdKdLe";
+import BanTpKd from "@/components/BanTpKd";
+import BanTnKd from "@/components/BanTnKd";
+import BanNvKd from "@/components/BanNvKd";
 import { usePhamViBaoCao } from "@/components/BangChiTieuPhong";
 
 function KinhDoanhLe() {
@@ -66,8 +69,8 @@ function KinhDoanhLe() {
 
 /** R5-4 · 13/11/2026 (Chủ tịch): Giám đốc Kinh doanh vào /fit là gặp BÀN LÀM VIỆC CỦA MÌNH theo mẫu
  *  v32 (`BanGdKdLe`), không thanh dọc — như bàn GĐ đội xe; Chủ tịch, TGĐ bấm «Kinh doanh lẻ» cũng gặp bàn ấy.
- *  TP, trưởng nhóm, NV vẫn gặp trang hai tab ở
- *  trên. Vai đọc từ phiên đã lưu SAU khi gắn trang (đọc lúc dựng sẵn là lệch giữa máy chủ và trình duyệt);
+ *  R5-7: TP, trưởng nhóm, NV gặp bàn riêng của mình (BanTpKd / BanTnKd / BanNvKd); trang hai tab ở trên
+ *  còn cho `?xem=`. Vai đọc từ phiên đã lưu SAU khi gắn trang (đọc lúc dựng sẵn là lệch giữa máy chủ và trình duyệt);
  *  `?xem=` (mục lục, doanh thu) vẫn mở trang hai tab cho mọi vai. */
 function vaiDaLuu(): string {
   try { return JSON.parse(localStorage.getItem("vtos_user") || "{}").role || ""; } catch { return ""; }
@@ -80,6 +83,11 @@ export default function Page() {
   if (vai === null) return <Shell><div className="panel muted">Đang tải…</div></Shell>;
   // R5-4: GĐ KD cùng Chủ tịch, TGĐ (và hai vai đọc nền) — đúng danh sách vai của bàn — gặp bàn ở /fit.
   if (VAI_BAN_KD_LE.includes(vai) && !coXem) return <Shell khongThanhBen><BanGdKdLe /></Shell>;
+  // R5-7 (Chủ tịch duyệt 13/11/2026): Trưởng phòng, Trưởng nhóm, Chuyên viên — mỗi vai một bàn riêng ở /fit.
+  // `?xem=` vẫn mở trang hai tab (đích của thẻ «Doanh thu & chỉ tiêu» và /kinh-doanh-le cũ).
+  if (vai === "tp_kd" && !coXem) return <Shell khongThanhBen><BanTpKd /></Shell>;
+  if (vai === "tn_kd" && !coXem) return <Shell khongThanhBen><BanTnKd /></Shell>;
+  if (vai === "nv_kd" && !coXem) return <Shell khongThanhBen><BanNvKd /></Shell>;
   return <Shell><Suspense fallback={<div className="panel muted">Đang tải…</div>}>
     <KinhDoanhLe />
   </Suspense></Shell>;
