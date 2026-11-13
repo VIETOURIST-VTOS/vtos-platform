@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** IR – Pháp chế (Đợt D1, 08/10/2026).
  *
@@ -39,6 +40,7 @@ const QH_RONG = { ho_so: "", nguoi_duoc_cap: "", to_chuc: "", ly_do: "", ho_so_c
 const MAU_Q: Record<string, string> = { dang_hieu_luc: "ok", khong_co_han: "red", het_han: "grey", da_thu_hoi: "navy" };
 
 function IrPhapCheScreen() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   const [tab, setTab] = useState<"cong_bo" | "van_ban" | "viec" | "chu_ky" | "ndt">("cong_bo");
@@ -91,7 +93,7 @@ function IrPhapCheScreen() {
     catch (x) { toast(errMsg(x), true); }
   };
 
-  return (<>
+  return (<>{hop}
     <h1>IR – Pháp chế</h1>
     <p className="muted">Hai việc: <b>văn bản có phiên bản</b> và <b>nghĩa vụ công bố thông tin</b>. VTD niêm yết UPCoM
       nên công bố là nghĩa vụ có chế tài, không phải việc nội bộ. Trạng thái công bố do quy tắc xác định tính ra
@@ -242,7 +244,7 @@ function IrPhapCheScreen() {
           <td className="muted">{x.y_kien}</td>
           <td>{x.trang_thai === "cho" && ghiDuoc && <>
             <button className="act teal" onClick={() => goi(`/ir-phap-che/xac-nhan/${x.id}/tra-loi`, { dong_y: true }).then(async () => setXn(await api(`/ir-phap-che/ban-ghi/${x.ban_ghi_id}/xac-nhan`)))}>Xác nhận</button>
-            <button className="act grey" onClick={() => { const y = prompt("Lý do từ chối xác nhận:") || ""; if (y.trim()) goi(`/ir-phap-che/xac-nhan/${x.id}/tra-loi`, { dong_y: false, y_kien: y }).then(async () => setXn(await api(`/ir-phap-che/ban-ghi/${x.ban_ghi_id}/xac-nhan`))); }}>Từ chối</button>
+            <button className="act grey" onClick={async () => { const y = await nhap("Lý do từ chối xác nhận:") || ""; if (y.trim()) goi(`/ir-phap-che/xac-nhan/${x.id}/tra-loi`, { dong_y: false, y_kien: y }).then(async () => setXn(await api(`/ir-phap-che/ban-ghi/${x.ban_ghi_id}/xac-nhan`))); }}>Từ chối</button>
           </>}</td></tr>)}</tbody></table>}
       {ghiDuoc && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
         <input placeholder="Chỉ mục (Doanh thu quý 3…)" style={{ width: 240 }} value={fXn.chi_muc} onChange={(e) => setFXn({ ...fXn, chi_muc: e.target.value })} />

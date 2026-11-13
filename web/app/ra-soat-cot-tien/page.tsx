@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Rà soát cột tiền (K1, K2) – bàn làm việc của Kế toán, KHÔNG nằm trong màn hình Kiểm soát.
  *
@@ -33,6 +34,7 @@ const LOC: [string, string][] = [
 ];
 
 function RaSoatCotTien() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [loc, setLoc] = useState("chua_ro");
   const [d, setD] = useState<any>(null);
@@ -59,7 +61,7 @@ function RaSoatCotTien() {
     if (truong === "quyet_k2" && gia_tri === "giu") {
       // Quyết GIỮ một cột tiền đang mặc định 0 là quyết rằng "chưa có số" sẽ tiếp tục bị ghi thành 0.
       // Đó là một quyết định phải giải trình được, nên bắt buộc có lý do.
-      const ly_do = prompt("Giữ nguyên nghĩa là chấp nhận “chưa có số” bị ghi thành 0 ở cột này.\nLý do:");
+      const ly_do = await nhap("Giữ nguyên nghĩa là chấp nhận “chưa có số” bị ghi thành 0 ở cột này.\nLý do:");
       if (!ly_do || !ly_do.trim()) return;
       ghi_chu = ly_do.trim();
     }
@@ -76,7 +78,7 @@ function RaSoatCotTien() {
   const ntcRows: any[] = ntc?.rows || [];
 
   return (
-    <div className="wrap">
+    <div className="wrap">{hop}
       <h1>Rà soát cột tiền</h1>
       <p className="muted">
         Cột nào trong cơ sở dữ liệu là tiền, và cột tiền nào đang ghi <b>0</b> thay cho

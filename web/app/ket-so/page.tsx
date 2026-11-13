@@ -5,6 +5,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import DinhKem from "@/components/DinhKem";
+import { useHoi } from "@/components/HopHoi";
 
 /** Kết sổ một kỳ – đường vào cho phần đã có ở app/services/ket_so.py.
  *
@@ -26,6 +27,7 @@ const KY_MAC_DINH = () => {
 };
 
 function KetSo() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [ky, setKy] = useState(KY_MAC_DINH());
   const [tt, setTt] = useState<any>(null);
@@ -111,7 +113,7 @@ function KetSo() {
   };
 
   const khoaKy = async () => {
-    const note = prompt(`Khóa sổ kỳ ${ky}. Sau khi khóa, không ghi thêm bút toán nào vào kỳ này được nữa.\nGhi chú:`);
+    const note = await nhap(`Khóa sổ kỳ ${ky}. Sau khi khóa, không ghi thêm bút toán nào vào kỳ này được nữa.\nGhi chú:`);
     if (note === null) return;
     setDang(true);
     try {
@@ -125,7 +127,7 @@ function KetSo() {
     setPl({ ...pl, [id]: { ...(pl[id] || {}), [k]: v } });
 
   return (
-    <div className="wrap">
+    <div className="wrap">{hop}
       <h1>Kết sổ kỳ</h1>
       <div className="row">
         <label>Kỳ</label>
@@ -507,6 +509,7 @@ function MucDoChan() {
  *      phân quyền và do người có quyền ấy làm. Ở đây nó chỉ phải ĐẾM ĐƯỢC và GỌI ĐƯỢC TÊN.
  */
 function TachNhiem() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [d, setD] = useState<any>(null);
   const [tk, setTk] = useState<any>(null);
@@ -543,7 +546,7 @@ function TachNhiem() {
     const noi = dangChan && muc_do !== "canh_bao_va_chan";
     let can_cu = "";
     if (noi) {
-      can_cu = prompt(
+      can_cu = await nhap(
         `Hạ mức cặp "${c.ma_cap}" từ "chặn" xuống "${d?.muc_do?.[muc_do] || muc_do}".\n` +
         `Phải ghi CĂN CỨ, và phải có chữ ký Chủ tịch hoặc TGĐ.\nCăn cứ:`) || "";
       if (!can_cu.trim()) { toast("Chưa ghi căn cứ — không gửi."); return; }
@@ -568,7 +571,7 @@ function TachNhiem() {
   const chuaDat = d?.chua_dat_muc || [];
 
   return (
-    <>
+    <>{hop}
       <h3 style={{ marginTop: 28 }}>Sổ tách bạch trách nhiệm</h3>
       <p className="muted">
         Một người không được đi cả hai bước của một cặp đã ký. So theo NGƯỜI (mã nhân viên), không

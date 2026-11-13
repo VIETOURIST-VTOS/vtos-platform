@@ -8,6 +8,7 @@ import { Tag, errMsg } from "@/components/ui";
 // So nay KHONG phai so tai san thu hai: nguyen gia va khau hao van o the TSCD ngay tren. No tra
 // loi dung MOT cau — mon nao dang o tay ai — va do la cau HCNS phai hoi moi lan co nguoi nghi viec.
 import { CapPhatTaiSan } from "@/components/DeNghiMuaCapPhat";
+import { useHoi } from "@/components/HopHoi";
 
 /** Tài sản cố định & chi phí trả trước — V5 của lệnh 08/9/2026.
  *
@@ -21,6 +22,7 @@ const TABS: [string, string][] = [["ts", "Tài sản cố định"], ["kh", "Kh�
                                   ["tt", "Chi phí trả trước"], ["pb", "Phân bổ kỳ"]];
 
 function TaiSan() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [tab, setTab] = useState("ts");
   const [ky, setKy] = useState(new Date().toISOString().slice(0, 7));
@@ -68,7 +70,7 @@ function TaiSan() {
   const ghiSo = async (loai: "kh" | "pb") => {
     const url = loai === "kh" ? `/fixed-assets/depreciation/${ky}/post` : `/prepaid/allocation/${ky}/post`;
     const ten = loai === "kh" ? "khấu hao" : "phân bổ chi phí trả trước";
-    if (!window.confirm(`Ghi sổ ${ten} kỳ ${ky}?\n\nĐối chiếu bảng bên dưới trước khi bấm — bút toán ` +
+    if (!await xacNhan(`Ghi sổ ${ten} kỳ ${ky}?\n\nĐối chiếu bảng bên dưới trước khi bấm — bút toán ` +
                         "ghi nhầm kỳ phải đảo bằng tay ở cả hai kỳ.")) return;
     try { const r = await api<any>(url, { method: "POST" }); toast(r.message || "Đã ghi sổ."); await load(); }
     catch (e) { toast(errMsg(e), true); }
@@ -147,7 +149,7 @@ function TaiSan() {
       </>}
     </div>);
 
-  return (<>
+  return (<>{hop}
     <h1>Tài sản &amp; mua sắm</h1>
     <p className="muted">Khấu hao là khoản chênh lớn nhất giữa lãi theo đoàn và lãi trên sổ —
       <b> 3,46 tỷ trong sáu tháng đầu 2026</b>. Chừng nào danh sách tài sản còn rỗng thì khấu hao kỳ ra

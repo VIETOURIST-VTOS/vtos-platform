@@ -10,10 +10,12 @@ import { useEffect, useState } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 const H1 = { from: "2026-01-01", to: "2026-06-30" };
 
 function BankAccounts() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [rows, setRows] = useState<any[]>([]);
   const [map, setMap] = useState<any>(null);
@@ -53,9 +55,9 @@ function BankAccounts() {
   const doPreview = () => run("xem trước",
     () => api(`/bank-accounts/phan-loai/xem-truoc?since=${range.from}&upto=${range.to}`), setPreview);
 
-  const doApply = () => {
+  const doApply = async () => {
     const n = preview?.matched || 0;
-    if (!confirm(`Ghi vào sổ: đổi mã tài khoản của ${n.toLocaleString("vi")} dòng từ 1121/1122 sang tiểu khoản từng ngân hàng.\n\n` +
+    if (!await xacNhan(`Ghi vào sổ: đổi mã tài khoản của ${n.toLocaleString("vi")} dòng từ 1121/1122 sang tiểu khoản từng ngân hàng.\n\n` +
       `Không đổi số tiền, ngày, số chứng từ. Hệ thống tự kiểm chứng số dư TK 112 trước và sau phải y nguyên – lệch một đồng là hoàn tác toàn bộ.\n\n` +
       `Có nhật ký kiểm toán và có thể huỷ gán từng ngân hàng. Tiếp tục?`)) return;
     run("ghi vào sổ", () => api(`/bank-accounts/phan-loai/thuc-hien?since=${range.from}&upto=${range.to}`, { method: "POST" }),
@@ -89,7 +91,7 @@ function BankAccounts() {
     }), () => setSua(null));
   };
 
-  return (<>
+  return (<>{hop}
     <p className="muted">MISA theo dõi tiền gửi theo <b>từng tài khoản ngân hàng</b>; sổ nạp sang VTOS lại ghi cột đối tượng trên TK 112
       là người nộp/nhận tiền nên không tách được. Nạp báo cáo <b>“Sổ tiền gửi ngân hàng”</b> của MISA (in theo từng tài khoản ngân hàng)
       để hệ thống biết chính xác chứng từ nào thuộc ngân hàng nào – không phải đoán theo số chứng từ.</p>

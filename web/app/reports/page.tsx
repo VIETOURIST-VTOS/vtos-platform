@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtD, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 const MANAGERS = ["tp_dh", "gd_kd", "tp_kd", "tn_kd", "ptgd_doan", "ptgd_mkt", "tgd", "chutich", "hcns", "cntt", "bks"];
 // BC-2: người xem xét của từng phòng trong bảng phòng (TP Hướng dẫn, GĐ đội xe, Kế toán) cũng mở tab
@@ -334,6 +335,7 @@ function TongHop() {
 }
 
 function Reports() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   const isMgr = MANAGERS.includes(role);
@@ -353,7 +355,7 @@ function Reports() {
   useEffect(() => { load(); }, [load]);
   const post = async (path: string, json?: any) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || "Xong"); load(); return r; } catch (x) { toast(errMsg(x), true); } };
 
-  return (<>
+  return (<>{hop}
     <h1>Báo cáo công việc (Điều 12) &amp; ca trực page</h1>
     <p className="muted">Mọi nhân viên văn phòng (trừ HDV, tài xế, Ban TGĐ) nộp báo cáo 5 phần <b>trước 0 giờ ngày kế tiếp</b> mỗi ngày làm việc (Thứ Hai – Thứ Bảy); nghỉ cả ngày đã duyệt thì không phải nộp. Robot chấm điểm nháp, trưởng phòng chấm chính thức; thiếu 1 ngày → nhắc nhở, 2 ngày liên tiếp → chuyển HCNS. Xếp loại tháng A/B/C/D là cảnh báo sớm, căn cứ đánh giá 3 tháng.</p>
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -380,7 +382,7 @@ function Reports() {
       </div><button className="act" disabled={!fs.employee_id} onClick={() => post("/page-shifts", { ...fs, employee_id: Number(fs.employee_id) })}>Phân ca</button></div>}
       <div className="panel wrap"><table><thead><tr><th>Ngày</th><th>Ca</th><th>Nhân viên</th><th>Lượt sót &gt;5 phút</th><th>Chế tài</th><th>Ghi chú robot</th><th>NV phản hồi</th><th></th></tr></thead>
         <tbody>{shifts.length ? shifts.map((s) => <tr key={s.id}><td>{fmtD(s.shift_date)}</td><td>{s.slot}</td><td>{s.employee}</td><td>{s.scanned_at ? s.missed : <span className="muted">chưa quét</span>}</td><td>{s.penalty ? <Tag cls="red">−{vnd(s.penalty)}</Tag> : s.scanned_at ? <Tag cls="ok">0</Tag> : ""}{s.kicked && <Tag cls="red">loại ca</Tag>}</td><td className="muted">{s.missed_note}</td><td className="muted">{s.responded}</td>
-          <td>{["cntt", "gd_kd"].includes(role) && <button className="act grey" style={{ margin: 0 }} onClick={() => { const n = prompt("Số lượt sót > 5 phút:", String(s.missed)); if (n !== null) post(`/page-shifts/${s.id}/scan`, { missed: Number(n), note: prompt("Ghi chú:") || "" }); }}>Quét</button>}{s.employee_id && <button className="act grey" style={{ margin: "0 0 0 4px" }} onClick={() => { const t = prompt("Phản hồi (trong 3 ngày):"); if (t) post(`/page-shifts/${s.id}/respond`, { text: t }); }}>Phản hồi</button>}</td></tr>) : <tr><td colSpan={8} className="muted">Chưa có ca trong tháng.</td></tr>}</tbody></table></div>
+          <td>{["cntt", "gd_kd"].includes(role) && <button className="act grey" style={{ margin: 0 }} onClick={async () => { const n = await nhap("Số lượt sót > 5 phút:", String(s.missed)); if (n !== null) post(`/page-shifts/${s.id}/scan`, { missed: Number(n), note: await nhap("Ghi chú:") || "" }); }}>Quét</button>}{s.employee_id && <button className="act grey" style={{ margin: "0 0 0 4px" }} onClick={async () => { const t = await nhap("Phản hồi (trong 3 ngày):"); if (t) post(`/page-shifts/${s.id}/respond`, { text: t }); }}>Phản hồi</button>}</td></tr>) : <tr><td colSpan={8} className="muted">Chưa có ca trong tháng.</td></tr>}</tbody></table></div>
       <p className="muted">Cổng 11: 1–3 lượt −100.000/lượt; 4–5 lượt −200.000/lượt; ≥6 lượt loại khỏi ca tháng sau và điều chỉnh chỉ tiêu. Chỉ trừ vào hoa hồng (đã nối vào bảng lương).</p>
     </>}
   </>);

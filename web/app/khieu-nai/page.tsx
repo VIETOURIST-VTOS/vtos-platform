@@ -9,12 +9,14 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import DinhKem from "@/components/DinhKem";
+import { useHoi } from "@/components/HopHoi";
 
 const RONG = { source: "dien_thoai", customer_name: "", customer_phone: "", booking_id: "", nhom: "chat_luong",
                level: 1, noi_dung: "", de_nghi_khach: "", handler: "", nguon_tao: "nguoi", ai_ghi_chu: "" };
 const MAU: Record<string, string> = { moi: "warn", dang_xu_ly: "warn", cho_khach: "grey", da_dong: "ok", tai_mo: "red" };
 
 function KhieuNai() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { toast } = useShell();
   const [meta, setMeta] = useState<any>({ kn_nguon: {}, kn_nhom: {}, kn_muc: {}, kn_trang_thai: {}, kn_nguyen_nhan: {}, kn_huong: {}, kn_nhom_can_booking: [] });
   const [ds, setDs] = useState<any[]>([]);
@@ -64,7 +66,7 @@ function KhieuNai() {
   const doiHuong = (k: string) => setD({ ...d, huong_xu_ly: d.huong_xu_ly.includes(k) ? d.huong_xu_ly.filter((x: string) => x !== k) : [...d.huong_xu_ly, k] });
   const canChungTu = d.huong_xu_ly.some((h: string) => h === "hoan_mot_phan" || h === "hoan_toan_bo");
 
-  return (<>
+  return (<>{hop}
     <h1>Phản hồi & khiếu nại</h1>
     <p className="muted">Hồ sơ khiếu nại của <b>khách hàng</b> — khác với <b>Sự vụ</b> (kỷ luật nội bộ nhân viên). Màn hình này
       <b> không có ô nhập số tiền bồi thường</b>: chỉ ghi đề nghị của khách bằng nguyên văn, còn số tiền công ty thực trả
@@ -157,7 +159,7 @@ function KhieuNai() {
             <button className="act" onClick={() => post(`/khieu-nai/${c.id}/phan-hoi`)}>Đã phản hồi khách</button>}
           {c.chuyen_duoc?.map((s: string) => <button key={s} className="act grey" style={{ marginRight: 6 }}
             onClick={() => s === "tai_mo"
-              ? (() => { const l = prompt("Lý do tái mở hồ sơ:"); if (l && l.trim()) post(`/khieu-nai/${c.id}/tai-mo`, { ly_do: l.trim() }); })()
+              ? (async () => { const l = await nhap("Lý do tái mở hồ sơ:"); if (l && l.trim()) post(`/khieu-nai/${c.id}/tai-mo`, { ly_do: l.trim() }); })()
               : post(`/khieu-nai/${c.id}/chuyen-trang-thai`, { status: s })}>→ {meta.kn_trang_thai[s]}</button>)}
 
           {c.status !== "da_dong" && <div className="panel" style={{ marginTop: 8 }}>

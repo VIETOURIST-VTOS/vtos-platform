@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Danh mục pháp nhân và đối chiếu công ty chủ quản của hồ sơ (Ý kiến thẩm định 06/9/2026 – Đợt 2 mục 2).
  *  Màn hình này cố ý KHÔNG có nút "gán tất cả về công ty mẹ": rỗng nghĩa là chưa xác định, và gán sai
@@ -10,6 +11,7 @@ import { Tag, errMsg } from "@/components/ui";
 const KINDS: [string, string][] = [["tour", "Chuyến tour"], ["booking", "Booking"], ["receipt", "Phiếu thu"], ["chi", "Đề nghị chi"], ["chung_tu", "Chứng từ ghi sổ"]];
 
 function Companies() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   const canWrite = ["cntt", "ketoan", "tgd", "chutich", "tp_dh", "ptgd_doan"].includes(role);
@@ -47,7 +49,7 @@ function Companies() {
   const gan = () => { if (!co) return toast("Chọn pháp nhân trước", true); post(`/companies/scope/${kind}/assign`, { ids: sel, company_id: Number(co) }); };
   const toggle = (id: number) => setSel((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
 
-  return (<>
+  return (<>{hop}
     <h1>Pháp nhân &amp; công ty chủ quản của hồ sơ</h1>
     <p className="muted">Ô trống nghĩa là <b>chưa xác định</b>, không phải công ty mẹ. Hồ sơ chưa xác định nằm ở danh sách đối chiếu bên dưới cho tới khi người có thẩm quyền chỉ định – mọi lần gán đều vào nhật ký nghiệp vụ.</p>
 
@@ -86,9 +88,9 @@ function Companies() {
         <label>Khởi hành đến<input type="date" value={lo.den_ngay} onChange={(e) => setLo({ ...lo, den_ngay: e.target.value })} /></label>
         <label><input type="checkbox" checked={lo.chi_chua_gan} onChange={(e) => setLo({ ...lo, chi_chua_gan: e.target.checked })} /> Chỉ tour chưa xác định</label>
       </div>
-      <button className="act orange" disabled={!lo.company_id} onClick={() => {
+      <button className="act orange" disabled={!lo.company_id} onClick={async () => {
         const c = cos.find((x) => x.id === Number(lo.company_id));
-        if (confirm(`Gán ${c?.name} cho toàn bộ tour thỏa tiêu chí đang chọn? Tiêu chí và số hồ sơ sẽ được ghi vào nhật ký.`))
+        if (await xacNhan(`Gán ${c?.name} cho toàn bộ tour thỏa tiêu chí đang chọn? Tiêu chí và số hồ sơ sẽ được ghi vào nhật ký.`))
           post("/companies/scope/tour/assign-filter", { ...lo, company_id: Number(lo.company_id), tu_ngay: lo.tu_ngay || null, den_ngay: lo.den_ngay || null });
       }}>Gán theo tiêu chí</button>
       <p className="muted">Dùng khi phải xử lý hàng nghìn tour cũ. Tiêu chí đã nêu được lưu vào nhật ký để sau này truy lại được căn cứ vì sao một tour thuộc pháp nhân này chứ không phải pháp nhân kia.</p></div>}
@@ -114,9 +116,9 @@ function Companies() {
           {kind === "chi" && <label>Nhóm chi<input placeholder="hanh_chinh, marketing…" value={lo2.nhom} onChange={(e) => setLo2({ ...lo2, nhom: e.target.value })} /></label>}
           <label><input type="checkbox" checked={lo2.khong_co_tour} onChange={(e) => setLo2({ ...lo2, khong_co_tour: e.target.checked })} /> Chỉ hồ sơ không gắn tour</label>
         </div>
-        <button className="act orange" disabled={!lo2.company_id} onClick={() => {
+        <button className="act orange" disabled={!lo2.company_id} onClick={async () => {
           const c = cos.find((x) => x.id === Number(lo2.company_id));
-          if (confirm(`Gán ${c?.name} cho toàn bộ hồ sơ thỏa tiêu chí đang chọn? Tiêu chí và số hồ sơ sẽ được ghi vào nhật ký.`))
+          if (await xacNhan(`Gán ${c?.name} cho toàn bộ hồ sơ thỏa tiêu chí đang chọn? Tiêu chí và số hồ sơ sẽ được ghi vào nhật ký.`))
             post(`/companies/scope/${kind}/assign-batch`, { ...lo2, company_id: Number(lo2.company_id) });
         }}>Gán theo lô</button>
         <p className="muted">Hồ sơ gắn tour đã đi theo tour ở bước &quot;suy từ hồ sơ cha&quot;. Phần còn lại là chi hành chính, chi marketing và chứng từ nạp từ MISA – Kế toán nhìn kỳ và nguồn chứng từ là biết thuộc sổ của pháp nhân nào.</p>

@@ -5,6 +5,7 @@ import Shell, { useShell } from "@/components/Shell";
 import DinhKem from "@/components/DinhKem";
 import { api, vnd, fmtD, fmtDT, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Phòng Hướng dẫn – màn hình của người điều phối, khi toàn bộ HDV là cộng tác viên.
  *
@@ -17,6 +18,7 @@ const TABS: [string, string][] = [["viec", "Việc cần làm"], ["hdv", "Đội
   ["yeucau", "Yêu cầu HDV"], ["baocao", "Báo cáo sau tour"], ["tien", "Tiền HDV"], ["dexuat", "Đề xuất"]];
 
 function HuongDan() {
+  const { xacNhan, nhap, hop } = useHoi();   // TR-10: hỏi lại trên trang, không dùng hộp thoại trình duyệt
   const { user, toast } = useShell();
   // Đợt HD-14 đọc hai tham số đường dẫn: `?tab=ho-so` mở tab hồ sơ, `?hdv=<id>` mở thẳng hồ sơ một
   // người. Đường dẫn mang số hiệu người là CỐ Ý — nó gửi cho nhau được. Trang này vì thế PHẢI bọc
@@ -129,7 +131,7 @@ function HuongDan() {
   };
 
   const huyYeuCau = async (y: any) => {
-    const ly_do = window.prompt("Huỷ yêu cầu này vì lý do gì?", "");
+    const ly_do = await nhap("Huỷ yêu cầu này vì lý do gì?", "");
     if (ly_do === null) return;
     try { const r = await api<any>(`/guide-assignments/yeu-cau/${y.id}/huy`,
             { method: "POST", json: { phien_ban: y.phien_ban, ly_do } });
@@ -140,7 +142,7 @@ function HuongDan() {
   const kiemBaoCao = async (aid: number, pb: number | null, xac_nhan: boolean) => {
     let y_kien = "";
     if (!xac_nhan) {
-      const v = window.prompt("Trả lại báo cáo — thiếu gì?\n\nBắt buộc ghi: không ghi thì người nộp phải đoán.", "");
+      const v = await nhap("Trả lại báo cáo — thiếu gì?\n\nBắt buộc ghi: không ghi thì người nộp phải đoán.", "");
       if (v === null) return;
       y_kien = v;
     }
@@ -156,7 +158,7 @@ function HuongDan() {
   };
 
   const congBoMotCap = async () => {
-    if (!window.confirm("Công bố: mọi đề xuất phòng HDV chỉ qua MỘT cấp — Chủ tịch hoặc TGĐ ký là "
+    if (!await xacNhan("Công bố: mọi đề xuất phòng HDV chỉ qua MỘT cấp — Chủ tịch hoặc TGĐ ký là "
       + "xong, ở mọi mức tiền. Chữ ký sẽ ghi tên anh/chị. Loại đã có đường đi thì giữ nguyên.")) return;
     try { const r = await api<any>("/guide-assignments/de-xuat/cau-hinh/khai-mot-cap",
             { method: "POST", json: {} });
@@ -184,7 +186,7 @@ function HuongDan() {
   };
 
   const dongLoiChao = async (id: number) => {
-    const ly_do = window.prompt("Đóng lời chào này vì lý do gì?\n\n" +
+    const ly_do = await nhap("Đóng lời chào này vì lý do gì?\n\n" +
       "Ghi nhận là LỜI CHÀO HẾT HIỆU LỰC, không phải hướng dẫn viên vi phạm.", "quá hạn trả lời");
     if (ly_do === null) return;
     try { const d = await api<any>(`/huong-dan/chao-chuyen/${id}/dong`, { method: "POST", json: { ly_do } });
@@ -194,6 +196,7 @@ function HuongDan() {
 
   if (!tq) return <p className="muted">Đang tải…</p>;
   return (<>
+    {hop}
     <h1>Phòng Hướng dẫn</h1>
     <p className="muted">Toàn bộ hướng dẫn viên là <b>cộng tác viên</b>. Vì vậy màn hình này <b>chào chuyến</b> chứ
       không phân công: công ty chào tuyến, ngày và đơn giá; hướng dẫn viên nhận hoặc từ chối. Hạn 24 giờ là

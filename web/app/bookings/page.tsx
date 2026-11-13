@@ -6,11 +6,13 @@ import DinhKem from "@/components/DinhKem";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtD, fmtDT, soTien } from "@/lib/api";
 import { Tag, Gate, errMsg, MangTag } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 const PMT: Record<string, [string, string]> = { UNPAID: ["Chưa cọc", "red"], DEPO: ["Đã cọc", "warn"], PAID: ["Đủ tiền", "ok"], CANCEL: ["Đã hủy", ""] };
 const RT_ST: Record<string, [string, string]> = { hieu_luc: ["Còn hiệu lực", "ok"], tat_toan: ["Đã tất toán", ""], huy: ["Đã hủy", "red"] };
 
 function Bookings() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   const mang = useSearchParams().get("mang") || "";
@@ -34,18 +36,18 @@ function Bookings() {
   const run = async (path: string, json: any, ok?: string) => { try { const r = await api(path, { method: "POST", json }); toast(r.message || ok || "Xong"); load(); return true; } catch (e) { toast(errMsg(e), true); return false; } };
   // Gia hạn đòi HẠN MỚI và LÝ DO – máy chủ từ chối nếu thiếu một trong hai, vì một chỗ được giữ thêm
   // là một chỗ không bán cho khách khác. Hạn mới cũng không được muộn hơn deadline hủy chỗ của tour.
-  const giaHan = (b: any) => {
-    const g = window.prompt(`Gia hạn giữ chỗ ${b.code} (${b.pax} chỗ) đến lúc nào?\nNhập theo dạng 2026-09-20 17:00${b.cancel_deadline ? `\nKhông được muộn hơn deadline hủy chỗ ${fmtDT(b.cancel_deadline)}` : ""}`,
+  const giaHan = async (b: any) => {
+    const g = await nhap(`Gia hạn giữ chỗ ${b.code} (${b.pax} chỗ) đến lúc nào?\nNhập theo dạng 2026-09-20 17:00${b.cancel_deadline ? `\nKhông được muộn hơn deadline hủy chỗ ${fmtDT(b.cancel_deadline)}` : ""}`,
       (b.giu_cho_den || "").slice(0, 16).replace("T", " "));
     if (!g) return;
-    const ly_do = (window.prompt("Lý do gia hạn (bắt buộc – một chỗ giữ thêm là một chỗ không bán được):") || "").trim();
+    const ly_do = (await nhap("Lý do gia hạn (bắt buộc – một chỗ giữ thêm là một chỗ không bán được):") || "").trim();
     if (!ly_do) { toast("Phải ghi lý do gia hạn.", true); return; }
     run(`/bookings/${b.id}/giu-cho/gia-han`, { den: g.trim().replace(" ", "T"), ly_do });
   };
   // Khôi phục = xin lại chỗ đã trả về tour. Máy chủ kiểm tour còn chỗ trước khi cho; hết chỗ thì báo
   // đỏ chứ không im lặng cho qua – cho qua ở đây là bán trùng ghế.
-  const khoiPhuc = (b: any) => {
-    const note = (window.prompt(`Khôi phục giữ chỗ ${b.code} – ${b.pax} chỗ. Lý do:`, "Khách báo đã chuyển tiền") || "").trim();
+  const khoiPhuc = async (b: any) => {
+    const note = (await nhap(`Khôi phục giữ chỗ ${b.code} – ${b.pax} chỗ. Lý do:`, "Khách báo đã chuyển tiền") || "").trim();
     if (!note) return;
     run(`/bookings/${b.id}/giu-cho/khoi-phuc`, { note });
   };
@@ -63,7 +65,7 @@ function Bookings() {
     if (await run(`/retentions/${apply.id}/apply`, { booking_id: Number(d.booking_id), amount: d.amount ? Number(d.amount) : null })) setApply(null);
   };
   const s = ret.summary || {};
-  return (<>
+  return (<>{hop}
     <h1>Booking & tiền bảo lưu</h1>
     <MangTag mang={mang} />
     <p className="muted">Theo vận hành Vietrip: % cọc theo sản phẩm → trạng thái Chưa cọc / Đã cọc / Đủ tiền; deadline hủy chỗ = khởi hành − số ngày đóng tour (17:00); robot R4 khóa booking khi đóng tour hoặc thu đủ, nhắc cọc quá hạn; Điều hành hủy booking (một cửa) → phí hủy giữ lại, phần còn lại bảo lưu hoặc hoàn tiền. <Link href="/requests">Tạo yêu cầu / booking mới →</Link></p>
@@ -95,7 +97,7 @@ function Bookings() {
           <td>{b.sales_name}</td>
           <td style={{ whiteSpace: "nowrap" }}>
             {!b.cancelled && !b.locked && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setEdit(b)}>sửa khách</button>}{" "}
-            {!b.cancelled && b.locked && canUnlock && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => { const r = prompt(`Lý do mở khóa ${b.code}?`); if (r) run(`/bookings/${b.id}/unlock`, { note: r }); }}>mở khóa</button>}{" "}
+            {!b.cancelled && b.locked && canUnlock && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={async () => { const r = await nhap(`Lý do mở khóa ${b.code}?`); if (r) run(`/bookings/${b.id}/unlock`, { note: r }); }}>mở khóa</button>}{" "}
             {!b.cancelled && isDH && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => setCancel(b)}>hủy</button>}{" "}
             {/* VPM-7 · cửa giữ chỗ. Trước 11/9/2026 phân hệ này có đủ robot, đủ nhật ký, đủ cửa ở máy chủ
                 mà màn hình KHÔNG có nút nào – tức là luật chỉ sống trong mã, còn Điều hành thì không dùng
@@ -142,8 +144,8 @@ function Bookings() {
           <td className="muted" style={{ maxWidth: 260 }}>{r.note}{r.resolve_note && <div>→ {r.resolve_note}</div>}</td><td>{fmtD(r.expires_on)}</td><td><Tag cls={c}>{l}</Tag>{r.refund_request_id && r.status === "hieu_luc" && <div className="muted">đang hoàn</div>}</td><td>{r.created_by}</td>
           <td style={{ whiteSpace: "nowrap" }}>{r.status === "hieu_luc" && <>
             {canRt && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => openApply(r)}>dùng cho booking</button>}{" "}
-            {!r.refund_request_id && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => { const n = prompt(`Đề xuất hoàn ${vnd(r.remaining)} đ cho ${r.customer_name} – ghi chú:`); if (n !== null) run(`/retentions/${r.id}/refund`, { note: n }); }}>đề xuất hoàn tiền</button>}{" "}
-            {canRtCancel && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={() => { const n = prompt(`Lý do hủy bảo lưu ${r.code} (số còn lại ghi thu nhập khác)?`); if (n) run(`/retentions/${r.id}/cancel`, { note: n }); }}>hủy bảo lưu</button>}</>}</td>
+            {!r.refund_request_id && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={async () => { const n = await nhap(`Đề xuất hoàn ${vnd(r.remaining)} đ cho ${r.customer_name} – ghi chú:`); if (n !== null) run(`/retentions/${r.id}/refund`, { note: n }); }}>đề xuất hoàn tiền</button>}{" "}
+            {canRtCancel && <button className="act grey" style={{ padding: "2px 6px", margin: 0 }} onClick={async () => { const n = await nhap(`Lý do hủy bảo lưu ${r.code} (số còn lại ghi thu nhập khác)?`); if (n) run(`/retentions/${r.id}/cancel`, { note: n }); }}>hủy bảo lưu</button>}</>}</td>
         </tr>; }) : <tr><td colSpan={10} className="muted">Không có khoản bảo lưu.</td></tr>}</tbody></table>
     </div>
 

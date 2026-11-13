@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, getToken, taiTep } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** AT-2a · ALBUM ẢNH NHÀ HÀNG (Chủ tịch + Điều hành chốt 29/10/2026).
  *  Chỉ ảnh của chính nhà hàng · 10 MB/ảnh · 60 ảnh/nhà hàng · máy tạo ảnh nhẹ, giữ bản gốc · 5 nhóm ảnh.
@@ -56,6 +57,7 @@ function guiMot(path: string, fd: FormData, tienDo: (p: number) => void): Promis
 }
 
 export default function AlbumNhaHang({ nid, toast, onDoi }: { nid: number; toast: (m: string, loi?: boolean) => void; onDoi?: () => void }) {
+  const { xacNhan, nhap: nhapHoi, hop } = useHoi();
   const [a, setA] = useState<any>(null);
   const [loNhom, setLoNhom] = useState("khong_gian");
   const [lo, setLo] = useState({ can_cu: "nha_hang", can_cu_ghi_chu: "", credit: "" });
@@ -124,7 +126,7 @@ export default function AlbumNhaHang({ nid, toast, onDoi }: { nid: number; toast
     goi(`/nha-hang/${nid}/album/thu-tu`, { ids });
   };
 
-  return (<div className="panel" style={{ marginTop: 14 }}>
+  return (<div className="panel" style={{ marginTop: 14 }}>{hop}
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between" }}>
       <div><h3 style={{ margin: 0 }}>Không gian &amp; hương vị</h3>
         <div className="muted">Chọn ảnh bìa, sắp xếp và hoàn thiện từng ảnh. <b>{a.tong}</b> ảnh / {a.toi_da}</div></div>
@@ -228,7 +230,7 @@ export default function AlbumNhaHang({ nid, toast, onDoi }: { nid: number; toast
             {!chon.la_bia && chon.trang_thai !== "an" && <button className="act grey" disabled={busy} onClick={() => goi(`/nha-hang/album/${chon.id}/bia`, {})}>Đặt làm ảnh bìa</button>}
             <button className="act grey" disabled={busy} onClick={() => goi(`/nha-hang/album/${chon.id}/an`, { an: chon.trang_thai !== "an" })}>{chon.trang_thai === "an" ? "Bỏ ẩn" : "Ẩn ảnh"}</button>
             <button className="act grey" disabled={busy} onClick={() => tepThay.current?.click()}>Thay ảnh</button>
-            {(chon.tai_boi === a.toi || a.duoc_duyet) && <button className="act grey" disabled={busy} onClick={() => { if (window.confirm("Xóa ảnh này khỏi album?")) goi(`/nha-hang/album/${chon.id}/xoa`, {}, () => setChon(null)); }}>Xóa ảnh</button>}
+            {(chon.tai_boi === a.toi || a.duoc_duyet) && <button className="act grey" disabled={busy} onClick={async () => { if (await xacNhan("Xóa ảnh này khỏi album?")) goi(`/nha-hang/album/${chon.id}/xoa`, {}, () => setChon(null)); }}>Xóa ảnh</button>}
             <input ref={tepThay} type="file" accept=".jpg,.jpeg,.png,.webp" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) thay(f); }} />
             <button className="act grey" onClick={() => taiTep(chon.goc.replace(/^\/api\/v1/, ""), chon.ten_tep || `anh_${chon.id}.jpg`).catch((e) => toast(errMsg(e), true))}>Tải bản gốc</button>
           </div>}

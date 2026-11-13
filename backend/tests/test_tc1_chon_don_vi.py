@@ -105,10 +105,22 @@ def test_q3_moi_lan_goi_may_chu_deu_di_qua_hai_hang_so_duong_dan():
 # ------------------------------------------------------------------ Q4
 
 def test_q4_hoi_truoc_khi_doi_chu_khong_hoi_sau():
-    """Thứ tự ở đây là toàn bộ giá trị của ràng buộc: hỏi SAU khi đã đổi thì việc đã mất rồi."""
+    """Thứ tự ở đây là toàn bộ giá trị của ràng buộc: hỏi SAU khi đã đổi thì việc đã mất rồi.
+
+    TR-10 · 13/11/2026 — CỬA HỎI ĐỔI CÁCH VIẾT, KHÔNG ĐỔI VIỆC. Trước đây cửa hỏi là
+    `window.confirm`; nay là `await xacNhan(...)` vẽ ngay trên trang. Lý do đổi: hộp thoại của
+    trình duyệt KHOÁ CẢ TRANG, và ngày 13/11 phòng Điều hành không ghép được link cho 22 tour vì
+    trình duyệt trả «prompt() is not supported». `web/hang-rao/khong-hop-thoai-trinh-duyet.js` nay
+    CẤM HẲN `confirm(` trên giao diện.
+
+    Điều phép thử này canh thì KHÔNG đổi một chữ: phải HỎI, phải hỏi TRƯỚC khi đổi phạm vi, và
+    trả lời «không» thì dừng hẳn. Nên nó nhận CẢ HAI cách viết — để lần sau tên hàm có đổi nữa
+    thì phép thử vẫn nói về cái nó sinh ra để nói, chứ không đỏ vì một cái tên.
+    """
     ma = _doc(NUT)
-    assert "chuaLuu" in ma and "confirm(" in ma, "thiếu cửa hỏi khi còn dữ liệu chưa lưu"
-    i_hoi = ma.index("confirm(")
+    m_hoi = re.search(r"xacNhan\(|(?:window\.)?confirm\(", ma)
+    assert "chuaLuu" in ma and m_hoi, "thiếu cửa hỏi khi còn dữ liệu chưa lưu"
+    i_hoi = m_hoi.start()
     i_dat = ma.index("datDangXem(")
     assert i_hoi < i_dat, (
         "cửa hỏi nằm SAU lệnh đổi phạm vi – phải hỏi trước, vì hỏi sau thì phần đang gõ dở đã mất")

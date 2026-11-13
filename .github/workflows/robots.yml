@@ -36,6 +36,16 @@ on:
       job:
         description: "vietrip | sepay | ngay | tuan | thang | vietrip_products"
         default: "vietrip"
+
+# QUYỀN CHỈ-ĐỌC — TR-10, 13/11/2026.
+#
+# Tệp này gọi API của hệ thống bằng `secrets.ROBOT_TOKEN` của RIÊNG nó, chứ không dùng
+# `GITHUB_TOKEN` để ghi gì vào kho. Nên token của Actions ở đây chỉ cần đủ để `checkout`.
+# Đáng làm nhất ở đúng tệp này: nó là tệp duy nhất mang `ROBOT_TOKEN` — chiếc khoá đã từng
+# lọt ra một lần (đã xoay 13/11/2026) — nên quyền quanh nó càng hẹp càng tốt.
+permissions:
+  contents: read
+
 jobs:
   run:
     runs-on: ubuntu-latest

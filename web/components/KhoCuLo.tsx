@@ -22,6 +22,7 @@
 import { useState } from "react";
 import { api, getUser } from "@/lib/api";
 import { errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 type Xem = {
   nguon: string;
@@ -36,6 +37,7 @@ type Xem = {
 const DUOC_XEM = ["chutich", "tgd", "cntt", "tp_dh"];
 
 export default function KhoCuLo({ onXong }: { onXong?: () => void }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const user = getUser();
   const [mo, setMo] = useState(false);
   const [xem, setXem] = useState<Xem | null>(null);
@@ -57,7 +59,7 @@ export default function KhoCuLo({ onXong }: { onXong?: () => void }) {
   async function go() {
     if (!xem) return;
     const n = xem.xoa_duoc.length;
-    if (!confirm(
+    if (!await xacNhan(
       `GỠ CẢ LÔ kho quyết toán cũ T1–T6/2026?\n\n` +
       `• Gỡ ${xem.tong_dong} dòng quyết toán mang nhãn "${xem.nguon}"\n` +
       `• Xoá ${n} chuyến do lô này tạo ra\n` +
@@ -74,7 +76,7 @@ export default function KhoCuLo({ onXong }: { onXong?: () => void }) {
   }
 
   return (
-    <div className="card" style={{ marginBottom: 12, borderLeft: "3px solid #b45309" }}>
+    <div className="card" style={{ marginBottom: 12, borderLeft: "3px solid #b45309" }}>{hop}
       <button className="link" onClick={() => setMo(!mo)} style={{ fontWeight: 600 }}>
         {mo ? "▾" : "▸"} Kho quyết toán cũ T1–T6/2026 — nạp và gỡ cả lô
       </button>

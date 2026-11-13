@@ -4,6 +4,7 @@ import DinhKem from "@/components/DinhKem";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtD, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 const SRC: Record<string, string> = { thu_tien: "Thu tiền (R1)", hoa_don: "Hóa đơn", quyet_toan: "Quyết toán tour", thu_cong: "Kế toán lập", dao: "Bút toán đảo", de_nghi_chi: "Đề nghị chi (R3)", lenh_chi: "Lệnh chi", luong: "Bảng lương (R6)", ket_chuyen: "Kết chuyển 911" };
 const EST: Record<string, [string, string]> = { nhap: ["Nháp", "warn"], da_ghi_so: ["Đã ghi sổ", "ok"], huy: ["Hủy", "red"] };
@@ -25,6 +26,7 @@ const MLST: Record<string, [string, string]> = {
 };
 
 function MoLaiPanel({ toast, isKTT, isKy }: { toast: (m: string, e?: boolean) => void; isKTT: boolean; isKy: boolean }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const [ds, setDs] = useState<any[]>([]);
   const [ky, setKy] = useState("");
   const [lyDo, setLyDo] = useState("");
@@ -37,7 +39,7 @@ function MoLaiPanel({ toast, isKTT, isKy }: { toast: (m: string, e?: boolean) =>
   const mo = ds.filter((d) => d.trang_thai === "da_ky");
   const cho = ds.filter((d) => d.trang_thai === "cho_ky");
 
-  return (<div className="panel" style={{ marginTop: 12 }}>
+  return (<div className="panel" style={{ marginTop: 12 }}>{hop}
     <h3 style={{ margin: "0 0 4px" }}>Mở lại kỳ đã khóa</h3>
     <p className="muted">Kế toán trưởng trình, Chủ tịch HĐQT ký — hai người, không phải một. Lý do
       bắt buộc tối thiểu 30 ký tự và hiện cho người ký đọc trước khi ký. Kỳ đã chốt theo bản kiểm
@@ -65,7 +67,7 @@ function MoLaiPanel({ toast, isKTT, isKy }: { toast: (m: string, e?: boolean) =>
           <td>{d.ky_boi ? <>{d.ky_vai} {d.ky_boi}<br /><span className="muted">{fmtDT(d.ky_luc)}</span></> : <span className="muted">—</span>}</td>
           {isKy && <td>{d.trang_thai === "cho_ky" && <>
             <button className="act orange" style={{ margin: 0 }} onClick={() => post(`/periods/mo-lai/${d.id}/ky`)}>Ký mở lại kỳ</button>
-            <button className="act grey" style={{ margin: "0 0 0 6px" }} onClick={() => { const n = prompt("Lý do từ chối — người trình cần biết sửa gì để trình lại:"); if (n) post(`/periods/mo-lai/${d.id}/tu-choi`, { ly_do: n }); }}>Từ chối</button>
+            <button className="act grey" style={{ margin: "0 0 0 6px" }} onClick={async () => { const n = await nhap("Lý do từ chối — người trình cần biết sửa gì để trình lại:"); if (n) post(`/periods/mo-lai/${d.id}/tu-choi`, { ly_do: n }); }}>Từ chối</button>
           </>}</td>}
         </tr>)}</tbody></table></div>}
     {cho.length > 0 && !isKy && <p className="muted">{cho.length} đề nghị đang chờ Chủ tịch HĐQT ký.</p>}
@@ -83,6 +85,7 @@ const BSKT_ST: Record<string, string> = {
 };
 
 function BoSoKiemToanPanel({ toast, isKT, isKy, onKetQua }: { toast: (m: string, e?: boolean) => void; isKT: boolean; isKy: boolean; onKetQua: (r: any) => void }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const [rows, setRows] = useState<any[]>([]);
   const [dangDung, setDangDung] = useState<any>(null);
   const [busy, setBusy] = useState("");
@@ -114,7 +117,7 @@ function BoSoKiemToanPanel({ toast, isKT, isKy, onKetQua }: { toast: (m: string,
     setBusy("");
   };
 
-  return <div className="panel"><h3>7. BCTC kiểm toán / soát xét — bộ số đã ký</h3>
+  return <div className="panel">{hop}<h3>7. BCTC kiểm toán / soát xét — bộ số đã ký</h3>
     <p className="muted">Bộ số của bản BCTC đã kiểm toán hoặc soát xét — KHÁC số MISA thô, đó chính là lý do có cửa này. Chốt sổ chỉ chạy được trên một bộ số <b>đã có chữ ký Chủ tịch HĐQT</b>. Nguồn “Điều chỉnh kiểm toán” trên Chứng từ ghi sổ.</p>
     <button className="act grey" onClick={() => dl("/misa/bo-so-kiem-toan/mau.xlsx", "Mau_bo_so_BCTC_kiem_toan.xlsx")}>Tải mẫu Excel</button>
     <span className="muted"> TK · Tên · Mã đối tượng · Tên đối tượng · Dư Nợ/Có đầu kỳ · Dư Nợ/Có cuối kỳ</span>
@@ -139,7 +142,7 @@ function BoSoKiemToanPanel({ toast, isKT, isKy, onKetQua }: { toast: (m: string,
         <td className="muted">{d.tai_len_boi}<br />{fmtDT(d.tai_len_luc)}</td>
         <td>{d.trang_thai === "cho_ky" && isKy ? <>
           <button className="act orange" style={{ margin: 0 }} disabled={!!busy} onClick={() => bam(`/misa/bo-so-kiem-toan/${d.id}/ky`)}>Ký</button>
-          <button className="act grey" style={{ margin: "0 0 0 6px" }} disabled={!!busy} onClick={() => { const n = prompt("Lý do từ chối — người tải lên cần biết sửa gì để tải lại:"); if (n) bam(`/misa/bo-so-kiem-toan/${d.id}/tu-choi`, { ly_do: n }); }}>Từ chối</button>
+          <button className="act grey" style={{ margin: "0 0 0 6px" }} disabled={!!busy} onClick={async () => { const n = await nhap("Lý do từ chối — người tải lên cần biết sửa gì để tải lại:"); if (n) bam(`/misa/bo-so-kiem-toan/${d.id}/tu-choi`, { ly_do: n }); }}>Từ chối</button>
         </> : d.ky_boi ? <span className="muted">{d.ky_boi}<br />{fmtDT(d.ky_luc)}</span> : <span className="muted">—</span>}</td>
       </tr>)}</tbody></table></>}
 
@@ -228,6 +231,7 @@ function BanDaLapPanel({ toast, isKT, isKy, since, upto, onXem }: {
   toast: (m: string, e?: boolean) => void; isKT: boolean; isKy: boolean;
   since: string; upto: string; onXem: (d: any) => void;
 }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const [rows, setRows] = useState<any[]>([]);
   const [busy, setBusy] = useState("");
   const [k, setK] = useState({ ky: "", nguoi_dai_dien: "", ghi_chu: "" });
@@ -255,7 +259,7 @@ function BanDaLapPanel({ toast, isKT, isKy, since, upto, onXem }: {
   };
 
   const daKy = rows.find((d) => d.trang_thai === "da_ky");
-  return <div className="panel"><h3>Bản báo cáo đã lập</h3>
+  return <div className="panel">{hop}<h3>Bản báo cáo đã lập</h3>
     <p className="muted">Bảng số bên dưới <b>tính lại từ sổ mỗi lần mở</b>, nên con số của một kỳ đã qua đổi theo sổ: một bút toán đề ngày cũ là báo cáo kỳ ấy khác đi. Một BẢN ĐÃ LẬP là lát cắt của sổ tại ngày lập, đóng băng từng chỉ tiêu, có chữ ký — và đó mới là con số đã phát hành. <b>Lập</b> là tính; <b>Ký</b> là chịu trách nhiệm; hai việc, hai nút.</p>
 
     {isKT && <><hr /><b>Lập một bản cho khoảng ngày đang chọn ({fmtD(since)} – {fmtD(upto)})</b>
@@ -280,7 +284,7 @@ function BanDaLapPanel({ toast, isKT, isKy, since, upto, onXem }: {
           {d.trang_thai === "nhap" && isKT && <button className="act" style={{ margin: "0 0 0 6px" }} disabled={!!busy} onClick={() => bam(`/reports/ban-da-lap/${d.id}/trinh`)}>Trình</button>}
           {d.trang_thai === "cho_ky" && isKy && <>
             <button className="act orange" style={{ margin: "0 0 0 6px" }} disabled={!!busy} onClick={() => bam(`/reports/ban-da-lap/${d.id}/ky`)}>Ký</button>
-            <button className="act grey" style={{ margin: "0 0 0 6px" }} disabled={!!busy} onClick={() => { const n = prompt("Lý do từ chối — người lập cần biết sửa gì để lập lại:"); if (n) bam(`/reports/ban-da-lap/${d.id}/tu-choi`, { ly_do: n }); }}>Từ chối</button>
+            <button className="act grey" style={{ margin: "0 0 0 6px" }} disabled={!!busy} onClick={async () => { const n = await nhap("Lý do từ chối — người lập cần biết sửa gì để lập lại:"); if (n) bam(`/reports/ban-da-lap/${d.id}/tu-choi`, { ly_do: n }); }}>Từ chối</button>
           </>}
         </td>
       </tr>)}</tbody></table></>}
@@ -654,6 +658,7 @@ function SoKeToanPanel({ toast }: { toast: (m: string, e?: boolean) => void }) {
 }
 
 function Accounting() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const isKT = user?.role === "ketoan";
   // Đợt E6 13/10/2026 — hai vai KHÁC `isKT`: người TRÌNH đề nghị mở lại kỳ và người KÝ.
@@ -707,7 +712,7 @@ function Accounting() {
   const num = (v: string) => Number(String(v).replace(/[^\d.-]/g, "")) || 0;
   const td = lines.reduce((a, l) => a + num(l.debit), 0), tc = lines.reduce((a, l) => a + num(l.credit), 0);
 
-  return (<>
+  return (<>{hop}
     <h1>Kế toán TT99/2025 – robot R2 ghi sổ tự động</h1>
     <p className="muted">Bút toán sinh tự động khi Kế toán xác nhận phiếu thu (Nợ 111/112 – Có 131), phát hành hóa đơn (Nợ 131 – Có 511, 3331), xác nhận quyết toán tour (Nợ 154 – Có 331; Nợ 632 – Có 154). Chứng từ đã ghi sổ không sửa – chỉ lập bút toán đảo. Kỳ đã khóa không ghi sổ.</p>
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -749,7 +754,7 @@ function Accounting() {
           <tr key={e.id} style={{ cursor: "pointer" }} onClick={() => setOpen(open === e.id ? null : e.id)}><td><b>{e.code}</b></td><td>{fmtD(e.entry_date)}</td><td>{e.description}</td><td className="muted">{SRC[e.source_type] || SRC2[e.source_type] || e.source_type}<div>{e.source_ref}</div></td><td style={{ textAlign: "right" }}>{vnd(e.amount)}</td>
             <td><Tag cls={EST[e.status]?.[1]}>{EST[e.status]?.[0]}</Tag>{e.reversed_by_id && <Tag cls="red">đã đảo</Tag>}</td><td className="muted">{e.posted_by || e.created_by}</td>
             <td onClick={(ev) => ev.stopPropagation()}>{isKT && e.status === "nhap" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/journal/${e.id}/post`)}>Ghi sổ</button>}
-              {isKT && e.status === "da_ghi_so" && !e.reversed_by_id && <button className="act grey" style={{ margin: 0 }} onClick={() => { const r = prompt("Lý do đảo bút toán?"); if (r) post(`/journal/${e.id}/reverse`, { reason: r }); }}>Đảo</button>}</td></tr>
+              {isKT && e.status === "da_ghi_so" && !e.reversed_by_id && <button className="act grey" style={{ margin: 0 }} onClick={async () => { const r = await nhap("Lý do đảo bút toán?"); if (r) post(`/journal/${e.id}/reverse`, { reason: r }); }}>Đảo</button>}</td></tr>
           {open === e.id && <tr key={e.id + "l"}><td colSpan={8}><table style={{ margin: "4px 0 8px 24px", width: "auto" }}><tbody>{e.lines.map((l: any) => <tr key={l.id}><td className="mono">{l.account}</td><td>{accounts.find((a) => a.code === l.account)?.name}</td><td style={{ textAlign: "right" }}>{l.debit ? "Nợ " + vnd(l.debit) : ""}</td><td style={{ textAlign: "right" }}>{l.credit ? "Có " + vnd(l.credit) : ""}</td><td className="muted">{l.partner_code && <code>{l.partner_code}</code>} {l.partner} {l.project_code && <Tag cls="grey">{l.project_code}</Tag>} {l.note}</td></tr>)}</tbody></table>
             {/* Chứng từ gốc của bút toán. Quyết định "nhập là dùng luôn" (08/9/2026) đã bỏ khâu trưởng
                 phòng duyệt từng dòng; tờ chứng từ đính ở đây là thứ còn lại để hậu kiểm truy ngược một
@@ -788,7 +793,7 @@ function Accounting() {
               post(`/invoices/${i.id}/issue`, { ma_viec: mv }).finally(() => setDangGui((m) => ({ ...m, [i.id]: false })));
             }}>{dangGui[i.id] ? "Đang gửi…" : "Phát hành"}</button>}{i.status === "dang_phat_hanh" && <>
             <button className="act orange" style={{ margin: 0 }} onClick={() => post(`/invoices/${i.id}/do-lai`)}>Dò lại nhà cung cấp</button>
-            <div className="muted" style={{ fontSize: 11.5 }}>gửi lúc {fmtDT(i.issue_sent_at)} · chưa biết kết quả</div></>}{i.status !== "huy" && <button className="act grey" style={{ margin: "0 0 0 4px" }} onClick={() => { const r = prompt("Lý do hủy hóa đơn?"); if (r) post(`/invoices/${i.id}/cancel`, { reason: r }); }}>Hủy</button>}
+            <div className="muted" style={{ fontSize: 11.5 }}>gửi lúc {fmtDT(i.issue_sent_at)} · chưa biết kết quả</div></>}{i.status !== "huy" && <button className="act grey" style={{ margin: "0 0 0 4px" }} onClick={async () => { const r = await nhap("Lý do hủy hóa đơn?"); if (r) post(`/invoices/${i.id}/cancel`, { reason: r }); }}>Hủy</button>}
             {" "}<button className="act grey" style={{ margin: "0 0 0 4px" }} title="Tệp hóa đơn (PDF/XML) và chứng từ kèm" onClick={() => setTepHD(i.no || `nhap-${i.id}`)}>Tệp</button></td>}</tr>) : <tr><td colSpan={10} className="muted">Chưa có hóa đơn.</td></tr>}</tbody></table></div>
       {tepHD && <DinhKem doiTuong="hoa_don" doiTuongId={tepHD} loai="hoa_don" tieuDe={`Tệp của hóa đơn ${tepHD}`}
         goi={"Bản PDF và XML hóa đơn điện tử, biên bản điều chỉnh/hủy nếu có. Nhóm 03_Thue, giữ 10 năm " +
@@ -840,7 +845,7 @@ function Accounting() {
 
     {tab === "periods" && <div className="panel wrap"><table><thead><tr><th>Kỳ</th><th>Trạng thái</th><th>Khóa bởi</th><th>Lúc</th><th>Ghi chú</th>{isKT && <th></th>}</tr></thead>
       <tbody>{periods.map((p) => <tr key={p.period}><td><b>{p.period}</b></td><td>{p.locked ? <Tag cls="navy">Đã khóa</Tag> : <Tag cls="ok">Mở</Tag>}</td><td>{p.locked_by}</td><td>{fmtDT(p.locked_at)}</td><td className="muted">{p.note}</td>
-        {isKT && <td>{!p.locked && <button className="act orange" style={{ margin: 0 }} onClick={() => { const n = prompt(`Khóa kỳ ${p.period}? Ghi chú:`); if (n !== null) post(`/periods/${p.period}/lock`, { note: n }); }}>Khóa kỳ</button>}</td>}</tr>)}</tbody></table></div>}
+        {isKT && <td>{!p.locked && <button className="act orange" style={{ margin: 0 }} onClick={async () => { const n = await nhap(`Khóa kỳ ${p.period}? Ghi chú:`); if (n !== null) post(`/periods/${p.period}/lock`, { note: n }); }}>Khóa kỳ</button>}</td>}</tr>)}</tbody></table></div>}
     {tab === "periods" && <MoLaiPanel toast={toast} isKTT={isKTT} isKy={isKy} />}
   </>);
 }

@@ -9,6 +9,7 @@ import { Tag, Gate, errMsg, KyO } from "@/components/ui";
 import DinhKem from "@/components/DinhKem";
 import QuyetToanForm from "@/components/QuyetToanForm";
 import ChuongTrinhChuyen from "@/components/ChuongTrinhChuyen";
+import { useHoi } from "@/components/HopHoi";
 
 // Đ-1 (12/9/2026) · tab "lop3" là CỬA còn thiếu của cả phân hệ quyết toán lớp 3.
 //
@@ -410,6 +411,7 @@ const DONG_TIEN: [string, string][] = [["", "VND (tiền đồng)"], ["USD", "US
   ["CNY", "CNY – Nhân dân tệ"], ["AUD", "AUD – Đô la Úc"], ["GBP", "GBP – Bảng Anh"], ["CAD", "CAD – Đô la Canada"],
   ["TWD", "TWD – Đô la Đài Loan"], ["HKD", "HKD – Đô la Hồng Kông"], ["KHAC", "khác – gõ mã 3 chữ"]];
 function Settlement({ t, note, NoteBox, run, load, toast }: any) {
+  const { xacNhan, nhap, hop } = useHoi();
   const se = t.settlement_edit || {}; const sm = se.summary || {}; const checks: any[] = se.checks || []; const st: Record<string, string> = se.service_types || {};
   const [edit, setEdit] = useState<any>(null);
   const [showCancelled, setShowCancelled] = useState(false);
@@ -427,7 +429,7 @@ function Settlement({ t, note, NoteBox, run, load, toast }: any) {
     if (body.tien_te === "KHAC") body.tien_te = (edit.tien_te_khac || "").trim().toUpperCase();
     try { await api(edit.id ? `${base}/lines/${edit.id}` : `${base}/lines`, { method: edit.id ? "PUT" : "POST", json: body }); toast(edit.id ? "Đã sửa dòng" : "Đã thêm dòng"); setEdit(null); load(); } catch (x) { toast(errMsg(x), true); }
   };
-  const cancel = async (l: any) => { const r = prompt(`Lý do hủy dòng ${l.line_no} – ${l.description}?`); if (!r) return; try { await api(`${base}/lines/${l.id}/cancel`, { method: "POST", json: { note: r } }); toast("Đã hủy dòng"); load(); } catch (x) { toast(errMsg(x), true); } };
+  const cancel = async (l: any) => { const r = await nhap(`Lý do hủy dòng ${l.line_no} – ${l.description}?`); if (!r) return; try { await api(`${base}/lines/${l.id}/cancel`, { method: "POST", json: { note: r } }); toast("Đã hủy dòng"); load(); } catch (x) { toast(errMsg(x), true); } };
   const upload = (l: any) => {
     const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*,application/pdf";
     inp.onchange = async () => { const f = inp.files?.[0]; if (!f) return; if (f.size > 1_500_000) { toast("Tệp quá 1,5 MB – hãy chụp/nén nhỏ hơn", true); return; }
@@ -441,7 +443,7 @@ function Settlement({ t, note, NoteBox, run, load, toast }: any) {
   const matchPaid = async () => { try { const r = await api(`${base}/match-paid`, { method: "POST" }); setKhopKq(r); toast(r.message); load(); } catch (x) { toast(errMsg(x), true); } };
   const viewDoc = async (l: any) => { try { const r = await fetch(`/api/v1${base}/lines/${l.id}/doc`, { headers: { Authorization: `Bearer ${getToken() || ""}` } }); if (!r.ok) throw new Error("Không tải được chứng từ"); const u = URL.createObjectURL(await r.blob()); window.open(u, "_blank"); } catch (x: any) { toast(x.message || String(x), true); } };
   const F = (k: string, label: string, type = "text", extra: any = {}) => <div><label>{label}</label><input type={type} value={edit[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} {...extra} /></div>;
-  return (<div className="panel wrap">
+  return (<div className="panel wrap">{hop}
     <h2>Quyết toán chi phí thực tế sau tour <Tag cls="navy">V.{String(sm.version || 1).padStart(2, "0")}</Tag> · {sm.lines || 0} dòng · thực chi <b>{vnd(sm.actual)}</b> · đã thanh toán {vnd(sm.paid)} · còn phải trả <b>{vnd(sm.remaining)}</b></h2>
     <div className="kpis">
       <div className="kpi"><b>{vnd(sm.revenue)}</b><span>Tổng thu (booking)</span></div>

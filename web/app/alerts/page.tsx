@@ -4,6 +4,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import { ROLES } from "@/lib/meta";
+import { useHoi } from "@/components/HopHoi";
 
 // KS-4 · 11/9/2026. Đo trên hệ thống thật: 1.703 cảnh báo đang mở, 1.310 đỏ. Màn hình cũ đổ cả bảng
 // ra một danh sách phẳng và cho mọi người một nút "Đóng" duy nhất, bấm là xong, không hỏi gì.
@@ -23,6 +24,7 @@ const LOC: [string, string][] = [
 ];
 
 function Alerts() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [rows, setRows] = useState<any[]>([]);
   const [tong, setTong] = useState(0);
@@ -47,17 +49,17 @@ function Alerts() {
     try { await api(path, { method: "POST", json }); load(); }
     catch (x) { toast(errMsg(x), true); }
   };
-  const dong = (a: any, boQua: boolean) => {
+  const dong = async (a: any, boQua: boolean) => {
     const hoi = boQua
       ? "Bỏ qua vì sao? (dữ liệu lịch sử, chuyến đã huỷ… – ít nhất 10 ký tự)"
       : "Đóng dựa vào đâu? (số chứng từ, mã bản ghi, hoặc lý do – ít nhất 10 ký tự)";
-    const bc = (window.prompt(hoi) || "").trim();
+    const bc = (await nhap(hoi) || "").trim();
     if (!bc) return;
     if (bc.length < 10) { toast("Bằng chứng phải ít nhất 10 ký tự.", true); return; }
     goi(`/alerts/${a.id}/resolve`, { bang_chung: bc, bo_qua: boQua });
   };
 
-  return (<>
+  return (<>{hop}
     <h1>Cảnh báo nghiệp vụ</h1>
     <p className="muted">
       {tong} cảnh báo{trangThai && ` ở trạng thái đang lọc`}

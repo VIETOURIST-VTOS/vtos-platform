@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Quy ước hạch toán – bảng quy ước máy đọc được, thay cho một tệp Excel và trí nhớ của kế toán.
  *
@@ -18,6 +19,7 @@ const TABS: [string, string][] = [
 ];
 
 function HachToanPage() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const vai = user?.role || "";
   const laKeToan = ["chutich", "tgd", "ketoan"].includes(vai);
@@ -85,7 +87,7 @@ function HachToanPage() {
   };
 
   const boQua = async (ma: string) => {
-    const gt = window.prompt(`Cho qua đơn ${ma} mà KHÔNG bổ sung giá vốn.\nGhi rõ vì sao (ít nhất 20 ký tự) – lý do này vào nhật ký bất biến:`);
+    const gt = await nhap(`Cho qua đơn ${ma} mà KHÔNG bổ sung giá vốn.\nGhi rõ vì sao (ít nhất 20 ký tự) – lý do này vào nhật ký bất biến:`);
     if (!gt) return;
     await goi("thieu-gia-von/bo-qua", { ma_don: ma, giai_trinh: gt });
   };
@@ -95,7 +97,7 @@ function HachToanPage() {
   const choKy = (d?.quy_tac || []).filter((r: any) => r.status === "pending");
 
   return (
-    <main>
+    <main>{hop}
       <h1>Quy ước hạch toán</h1>
       <p className="muted" style={{ marginTop: -6 }}>
         Máy chạy quy ước, người sửa quy ước – <b>không sửa từng bút toán</b>. Mỗi dòng dưới đây nói

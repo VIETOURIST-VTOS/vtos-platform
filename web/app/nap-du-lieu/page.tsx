@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Nạp dữ liệu vào VTOS – một cửa cho người nhập tay, cho tệp tải lên, và cho tác vụ AI.
  *
@@ -18,6 +19,7 @@ function theoPhong(ds: any[]) {
 }
 
 function NapDuLieu() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [bo, setBo] = useState<any>(null);
   const [loai, setLoai] = useState("");
@@ -174,7 +176,7 @@ function NapDuLieu() {
   const napCaLo = async () => {
     const can = lo.filter((x) => x.trang_thai === "da_doc" && seNap(x));
     if (!can.length) return;
-    if (!confirm(`Nạp ${can.length} tệp vào hệ thống?\n\n`
+    if (!await xacNhan(`Nạp ${can.length} tệp vào hệ thống?\n\n`
       + `Tổng ${can.reduce((s, x) => s + soSeNap(x), 0)} dòng sẽ ghi.\n`
       + `Mỗi tệp vào nhật ký thành một dòng riêng mang đúng tên tệp của nó.`)) return;
     setDang(true);
@@ -239,7 +241,7 @@ function NapDuLieu() {
   const thieuBatBuoc = (chon?.cot || []).filter((c: any) => c.bat_buoc && !(oNhap[c.key] || "").trim());
 
   if (!bo) return <p className="muted">Đang tải…</p>;
-  return (<>
+  return (<>{hop}
     <h1>Nạp dữ liệu vào VTOS</h1>
     <p className="muted">Gõ tay từng dòng, tải tệp nhiều dòng và tác vụ AI đọc ảnh đi qua <b>cùng một cửa</b>: cùng bộ kiểm tra,
       cùng khóa chống trùng, cùng nhật ký. Nếu mỗi đường một kiểu kiểm tra thì cái chặt nhất trở nên vô

@@ -6,6 +6,7 @@ import { Tag, errMsg } from "@/components/ui";
 import { AnhNoiBo } from "@/components/nha-hang/AlbumNhaHang";
 import VideoNoiBo from "@/components/VideoNoiBo";   // KS-16f
 import DanhGiaKsNoiBo from "@/components/khach-san-vtd/DanhGiaKsNoiBo";
+import { useHoi } from "@/components/HopHoi";
 
 /** KS-13 · KHÁCH SẠN HỢP TÁC (CỔNG KHÁCH) — Chủ tịch duyệt bản demo 30/10/2026.
  *  NV / TP Điều hành nhập khách sạn, ảnh, loại phòng, gói giá và mùa giá (chỉ GIÁ BÁN, đã gồm 8% VAT — KS-19 / P0-03).
@@ -221,6 +222,7 @@ function HoSo({ x, kid, toast, onDong, onMoi, onDoi }: { x: any; kid: number | "
 }
 
 function Album({ h, x, toast, onDoi }: { h: any; x: any; toast: (m: string, l?: boolean) => void; onDoi: () => void }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const [teps, setTeps] = useState<File[]>([]);
   const [nhom, setNhom] = useState("");
   const [lp, setLp] = useState("");
@@ -252,7 +254,7 @@ function Album({ h, x, toast, onDoi }: { h: any; x: any; toast: (m: string, l?: 
       chu_thich: sua.chu_thich, mo_ta_thay_the: sua.mo_ta_thay_the });
     setSua(null);
   };
-  return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+  return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{hop}
     {x.duoc_nhap && <div className="panel" style={{ margin: 0 }}>
       <div className="grid">
         <label>Ảnh (JPG / PNG / WEBP, chọn nhiều)<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => setTeps(Array.from(e.target.files || []))} /></label>
@@ -284,7 +286,7 @@ function Album({ h, x, toast, onDoi }: { h: any; x: any; toast: (m: string, l?: 
           {a.trang_thai === "da_duyet" && !a.la_bia && <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/anh/${a.id}`, { la_bia: true })}>Đặt bìa</button>}
           {a.trang_thai !== "an" ? <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/anh/${a.id}/an`, { bat: true })}>Ẩn</button>
             : <button className="act grey" disabled={busy} onClick={() => goi(`/khach-san-vtd/anh/${a.id}/an`, { bat: false })}>Bỏ ẩn</button>}
-          {(a.tai_boi === x.toi || x.duoc_duyet) && <button className="act grey" disabled={busy} onClick={() => { if (window.confirm("Xóa ảnh này khỏi album?")) goi(`/khach-san-vtd/anh/${a.id}/xoa`, {}); }}>Xóa</button>}</div>}
+          {(a.tai_boi === x.toi || x.duoc_duyet) && <button className="act grey" disabled={busy} onClick={async () => { if (await xacNhan("Xóa ảnh này khỏi album?")) goi(`/khach-san-vtd/anh/${a.id}/xoa`, {}); }}>Xóa</button>}</div>}
       </div>)}
       {h.album?.nhac && <p className="muted" style={{ gridColumn: "1 / -1", margin: 0, color: h.album.thieu ? "#d99a2b" : undefined }}>
         {h.album.nhac} — khuyến nghị {h.album.chuan}–{h.album.toi_da} ảnh / khách sạn{h.album.thieu ? " (chỉ nhắc, vẫn bật hiện được)" : ""}.</p>}

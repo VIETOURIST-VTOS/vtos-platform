@@ -67,9 +67,16 @@ def test_dat_lai_mat_khau_phai_hoi_lai_truoc_khi_lam():
     # CẮT ĐÚNG KHỐI NÚT, không quét cả tệp. Bản đầu của phép thử này dò chuỗi "reset-password"
     # trên toàn tệp và vớ ngay đoạn CHÚ THÍCH giải thích vì sao có nút — rồi báo là nút không hỏi
     # lại. Lại đúng cái bệnh đã gặp hai lần hôm nay: hàng rào quét chữ phải neo vào CÚ PHÁP.
+    # TR-10 · 13/11/2026 — CỬA HỎI ĐỔI CÁCH VIẾT, KHÔNG ĐỔI VIỆC: `window.confirm` (khoá cả
+    # trang, và ngày 13/11 trình duyệt trả thẳng «prompt() is not supported») đổi sang
+    # `await xacNhan(...)` vẽ trên trang, và `web/hang-rao/khong-hop-thoai-trinh-duyet.js` nay
+    # cấm hẳn `confirm(`. Điều phép thử này canh vẫn y nguyên: nút KHÔNG LÙI ĐƯỢC thì phải hỏi
+    # lại trước khi gọi cửa. Nhận cả hai cách viết, để nó đỏ vì thiếu CÂU HỎI chứ không vì một
+    # cái tên hàm.
     khoi = re.search(r'canDatLaiMK && <button.*?</button>', s, re.S)
     assert khoi, "không tìm thấy khối nút đặt lại mật khẩu"
-    assert "confirm(" in khoi.group(0), "nút đặt lại mật khẩu không hỏi lại trước khi gọi cửa"
+    assert re.search(r"xacNhan\(|(?:window\.)?confirm\(", khoi.group(0)), \
+        "nút đặt lại mật khẩu không hỏi lại trước khi gọi cửa"
     assert "reset-password" in khoi.group(0), "nút không gọi cửa đặt lại mật khẩu"
 
 
