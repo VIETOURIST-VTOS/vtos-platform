@@ -448,11 +448,7 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
     {!mo && tab === tabs[0].ma && <>
       {loi && <div className="g5-khoi"><p className="g5-loi">Không đọc được số của bàn: {loi}</p></div>}
       {d?.canh_bao && <div className="g5-khoi g5-canh"><p>{d.canh_bao}</p></div>}
-      {/* R5-8: phạm vi đang đọc theo ô nhóm bán hàng (chưa khai cơ cấu) — chỉ là ghi chú, không phải cảnh báo. */}
-      {d?.ghi_pham_vi && <p className="g5-ghi">{d.ghi_pham_vi}</p>}
-      {/* R5-9: số Lẻ trên màn Chủ tịch để đối chiếu — doanh thu chuyến, khác cơ sở ô doanh thu (giá trị booking). */}
-      {d?.vai === "tp" && <p className="g5-ghi">Doanh thu phòng = doanh thu chuyến Lẻ, cùng số và cùng cách tính với màn Chủ tịch / TGĐ. Bảng Đội ngũ tính giá trị booking từng người{d?.the?.doanh_thu?.tong_booking != null ? ` (cộng ${tien(d.the.doanh_thu.tong_booking)})` : ""} nên cộng lại không bằng tổng phòng.</p>}
-      {d?.vai === "tn" && d?.doi_chieu?.thang != null && <p className="g5-ghi">Doanh thu nhóm tính theo giá trị booking (màn Chủ tịch chưa có số theo nhóm). Doanh thu chuyến Lẻ cả phòng tháng này: {tien(d.doi_chieu.thang)} · {so(d.doi_chieu.chuyen_thang)} chuyến — như màn Chủ tịch / TGĐ.</p>}
+      {/* R5-15 · Chủ tịch 14/11/2026: «hình 1 xoá» — bỏ các dòng ghi chú phạm vi / đối chiếu ở đầu bàn. */}
       {tongQuan({ d, dt, moToi })}
     </>}
 
