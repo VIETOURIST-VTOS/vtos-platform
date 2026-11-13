@@ -17,7 +17,7 @@ const MAU: Record<string, string> = { moi: "warn", dang_xu_ly: "warn", cho_khach
 
 function KhieuNai() {
   const { xacNhan, nhap, hop } = useHoi();
-  const { toast } = useShell();
+  const { toast, user } = useShell();
   const [meta, setMeta] = useState<any>({ kn_nguon: {}, kn_nhom: {}, kn_muc: {}, kn_trang_thai: {}, kn_nguyen_nhan: {}, kn_huong: {}, kn_nhom_can_booking: [] });
   const [ds, setDs] = useState<any[]>([]);
   const [cs, setCs] = useState<any>({});
@@ -52,7 +52,9 @@ function KhieuNai() {
     api("/cskh/meta").then(setMeta).catch(() => {});
     api("/bookings?limit=300").then((r) => setBk(Array.isArray(r) ? r : r.rows || [])).catch(() => {});
     // Chỉ chứng từ nhóm hoàn tiền mới gắn được vào hồ sơ khiếu nại – lọc ở đây cho khớp chốt chặn ở máy chủ.
-    api("/payment-requests").then((r) => setPr((Array.isArray(r) ? r : r.rows || []).filter((x: any) => x.category === "hoan_tien"))).catch(() => {});
+    // R5-18 · 14/11/2026: Phòng KD Lẻ (NV / Trưởng nhóm / TP) không đọc được đề nghị chi (`PAYMENT_REQUEST_ROLES`)
+    // nên không gắn chứng từ hoàn tiền — không gọi để khỏi 403 mỗi lần mở màn.
+    if (!["nv_kd", "tn_kd", "tp_kd"].includes(user?.role || "")) api("/payment-requests").then((r) => setPr((Array.isArray(r) ? r : r.rows || []).filter((x: any) => x.category === "hoan_tien"))).catch(() => {});
   }, []);
   useEffect(load, [load]);
 
