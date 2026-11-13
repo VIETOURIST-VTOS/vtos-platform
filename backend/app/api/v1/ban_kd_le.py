@@ -35,3 +35,27 @@ def doanh_thu(nam: int = 0, u: User = Depends(require_roles(*XEM, mo_ta="doanh t
     """Tách khỏi /tong-quan: 12 tháng doanh thu tốn vài giây, bàn hiện trước rồi biểu đồ hiện sau."""
     from datetime import date
     return S.doanh_thu_le(db, nam or date.today().year)
+
+
+# ─────────────── R5-7 · ba bàn của phòng: Trưởng phòng, Trưởng nhóm, Chuyên viên ───────────────
+# Chủ tịch duyệt bản xem trước 13/11/2026. Cùng tiền tố /api/v1/ban-kd-le — nhóm này đã tới được qua /fit
+# (R5-5), nên ba bàn KHÔNG nới thêm quyền màn hình nào. Hàng rào thật là danh sách dưới đây, và phạm vi
+# số (cả phòng / nhóm / chính mình) cắt ở `services/ban_kd_vai.py`, không ở trình duyệt.
+from app.services import ban_kd_vai as VAI_S  # noqa: E402
+
+VAI_PHONG = tuple(VAI_S.VAI_BAN)          # ("tp_kd", "tn_kd", "nv_kd")
+
+
+@router.get("/vai/tong-quan")
+def vai_tong_quan(u: User = Depends(require_roles(*VAI_PHONG, mo_ta="bàn làm việc của tôi ở Kinh doanh lẻ")),
+                  db: Session = Depends(get_db)):
+    """Không nhận user_id hay đơn vị — cố ý: bàn của ai là của người đăng nhập."""
+    return VAI_S.tong_quan(db, u)
+
+
+@router.get("/vai/doanh-thu")
+def vai_doanh_thu(nam: int = 0,
+                  u: User = Depends(require_roles(*VAI_PHONG, mo_ta="doanh thu – chỉ tiêu trên bàn của tôi")),
+                  db: Session = Depends(get_db)):
+    from datetime import date
+    return VAI_S.doanh_thu_12(db, u, nam or date.today().year)

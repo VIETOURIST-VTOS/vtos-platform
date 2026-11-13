@@ -126,10 +126,18 @@ def tong_quan(db: Session, hom_nay: date | None = None) -> dict:
          "so": f"{len(don_vi)} đơn vị · {chua_pc} người chưa gắn"},
     ]
 
-    # Chuyến cần thúc bán: khởi hành trong 7 ngày, còn chỗ, trống nhiều đứng đầu.
+    return {"ngay": d.isoformat(), "the": the, "viec": viec, "hoat_dong": hoat_dong,
+            "san_sang": san_sang, "thuc_ban": thuc_ban(db, rows), "phai_thu": phai_thu_le(db, d)}
+
+
+def thuc_ban(db: Session, rows: list | None = None) -> list[dict]:
+    """Chuyến cần thúc bán: khởi hành trong 7 ngày, còn chỗ, trống nhiều đứng đầu. R5-7: dùng chung cho
+    bàn GĐ và ba bàn TP / Trưởng nhóm / Chuyên viên — một hàm, cùng số."""
+    if rows is None:
+        rows = BTL.ban_lam_viec(db)["rows"]
     thuc = sorted([r for r in rows if r["days_left"] <= 7 and r["cho_con"] > 0],
                   key=lambda r: (-r["cho_con"], r["start_date"]))
-    thuc_ban = [{"id": r["id"], "code": r["code"], "name": r["name"], "start_date": r["start_date"],
+    return [{"id": r["id"], "code": r["code"], "name": r["name"], "start_date": r["start_date"],
                  "cho_da_ban": r["cho_da_ban"], "cho_mo_ban": r["cho_mo_ban"], "cho_con": r["cho_con"],
                  "gia_ban": r["gia_ban"], "loi_nhuan_tai_so_dang_ban": r["loi_nhuan_tai_so_dang_ban"],
                  "trang_thai_cong": r["trang_thai_cong"],
@@ -137,16 +145,16 @@ def tong_quan(db: Session, hom_nay: date | None = None) -> dict:
                  "bien_muc_tieu": r.get("bien_muc_tieu"), "khach_toi_da": r.get("khach_toi_da"),
                  "bien_khi_day": r.get("bien_khi_day")} for r in thuc]
 
-    return {"ngay": d.isoformat(), "the": the, "viec": viec, "hoat_dong": hoat_dong,
-            "san_sang": san_sang, "thuc_ban": thuc_ban, "phai_thu": phai_thu_le(db, d)}
 
-
-def phai_thu_le(db: Session, hom_nay: date | None = None) -> dict:
+def phai_thu_le(db: Session, hom_nay: date | None = None, sales_ids: list[int] | None = None) -> dict:
     """R5-4 · Phải thu KHÁCH của booking tour LẺ, chia bảy mốc hạn — cùng bảy khoảng với khối Phải thu
     của Chủ tịch (`han_cong_no.khoang`), để hai khối đọc được cạnh nhau.
 
     Còn nợ = giá trị booking − đã thu (booking chưa huỷ). HẠN = ngày khởi hành của chuyến: khách lẻ trả
-    đủ trước ngày đi, và đó là mốc duy nhất mọi booking đều có. Chuyến đã đi mà còn nợ → «Quá hạn»."""
+    đủ trước ngày đi, và đó là mốc duy nhất mọi booking đều có. Chuyến đã đi mà còn nợ → «Quá hạn».
+
+    R5-7: `sales_ids` cắt về booking của những người ấy (bàn TP / Trưởng nhóm / Chuyên viên). `None` = cả
+    phòng (bàn GĐ). Danh sách rỗng khác None: rỗng → không có booking nào."""
     from app.models.core import Booking, Tour
     from app.services import han_cong_no as HCN
     d = hom_nay or date.today()
@@ -155,6 +163,8 @@ def phai_thu_le(db: Session, hom_nay: date | None = None) -> dict:
     so_bk, co = 0, False
     q = (select(Booking, Tour).join(Tour, Tour.id == Booking.tour_id)
          .where(Booking.cancelled == False, Tour.tour_type.in_(SEG.LE_TYPES)))  # noqa: E712
+    if sales_ids is not None:
+        q = q.where(Booking.sales_id.in_(sales_ids))
     for bk, tour in db.execute(q).all():
         if SEG.mang_of(tour) != "le" or tour.start_date is None:
             continue
