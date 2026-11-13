@@ -22,10 +22,14 @@ function NonPackage() {
   // thứ hai. Nó trả lời một câu mà màn hình này chưa hỏi bao giờ: dịch vụ nào có doanh thu mà
   // KHÔNG có một dòng giá vốn nào? Lãi của những dòng ấy đang bằng đúng toàn bộ số thu.
   const [soat, setSoat] = useState<any>(null);
+  // R5-18 · 14/11/2026: chỉ gọi khi vai được xem tờ soát (`quyet_toan_lop3.XEM`) — Phòng KD Lẻ không xem giá vốn
+  // (Chủ tịch quyết 25/9/2026), gọi rồi bị chặn 403 là tiếng ồn trên mọi lần mở màn của người bán.
+  const XEM_SOAT = ["chutich", "tgd", "ptgd_doan", "tp_dh", "nv_dh", "ketoan", "bks", "cntt"];
   useEffect(() => {
+    if (!XEM_SOAT.includes(role)) { setSoat(null); return; }
     const [y, m] = month.split("-");
     api(`/quyet-toan-lop3/dich-vu-le/${y}/${Number(m)}`).then(setSoat).catch(() => setSoat(null));
-  }, [month]);
+  }, [month, role]); // eslint-disable-line react-hooks/exhaustive-deps
   const canCreate = ["nv_kd", "gd_kd", "nv_dh", "tp_dh"].includes(role), isDH = ["nv_dh", "tp_dh"].includes(role);
   // Chủ tịch quyết 25/9/2026 – "gỡ quyền". Chốt tháng chỉ còn Kế toán: nút ấy vừa đóng số vừa ký
   // xác nhận kế toán trong một cú bấm. Giá vốn chỉ còn Điều hành và người điều hành của chính
