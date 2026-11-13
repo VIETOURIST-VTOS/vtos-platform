@@ -129,7 +129,7 @@ export function KhoiNhipDoanhThu({ duong, coToi }: { duong: string; coToi: boole
 .nh-o4>div{border:1px solid #e6ecf5;border-radius:12px;padding:10px 12px;background:linear-gradient(180deg,#f3f7fd,#fff);min-width:0}
 .nh-o4 b{display:block;font-size:20px;font-weight:800;color:#1f4f97}
 .nh-o4 small{font-size:12px;color:#7d8ca3}
-.nh-o4 .tot b,.nh-chan .tot{color:#1c7a52}.nh-o4 .xau b,.nh-chan .xau{color:#b3281f}
+.nh-o4 .tot b,.nh-chan .tot{color:#2f7d3b}.nh-o4 .xau b,.nh-chan .xau{color:#d6336c}
 .nh-chan{font-size:12.5px;color:#7d8ca3}.nh-chan b{color:#1d3a68}
 @media(max-width:720px){.nh-o4{grid-template-columns:repeat(2,minmax(0,1fr))}.nh-o4 b{font-size:17px}}
 `}</style>
@@ -185,14 +185,15 @@ export function BangDoiNgu({ ds, coNhom, don }: { ds: any[]; coNhom?: boolean; d
 .dn-bang tbody tr:hover td{background:#f6f9fe}
 .dn-bang b{color:#1d3a68}
 .dn-hang{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;font-size:12px;font-weight:800;background:#e8f0fc;color:#1f4f97}
-.dn-hang.v1{background:linear-gradient(120deg,#ffd24a,#f0a500);color:#3a2a00}
+.dn-hang.v1{background:linear-gradient(120deg,#5fae66,#7cc983);color:#fff;box-shadow:0 2px 6px rgba(95,174,102,.35)}
 .dn-toi{margin-left:6px;font-size:11px;font-weight:700;color:#fff;background:#2f6fc0;border-radius:999px;padding:1px 7px}
 .dn-nhom{display:inline-block;font-size:11.5px;font-weight:800;color:#1f4f97;background:#e8f0fc;border:1px solid #c9dbf5;border-radius:999px;padding:2px 9px;white-space:nowrap}
 .dn-mo{font-size:12px;color:#8b9ab0}
 .dn-tr{display:inline-block;width:56px;height:7px;border-radius:99px;background:#eef2f8;overflow:hidden;vertical-align:middle;margin-right:6px}
 .dn-tr i{display:block;height:100%;background:linear-gradient(90deg,#2f6fc0,#5b9be6)}
-.dn-lcb{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px;background:#fdeceb;color:#b3281f;white-space:nowrap}
-.dn-lcb.dat{background:#e8f5ef;color:#1c6f50}
+.dn-tr i.dat,.dn-thanh i.dat{background:linear-gradient(90deg,#5fae66,#7cc983)}
+.dn-lcb{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px;background:#fff0f4;color:#d6336c;white-space:nowrap}
+.dn-lcb.dat{background:#ecf7ee;color:#2f7d3b}
 .dn-ds{list-style:none;margin:0;padding:0 4px 0 0;display:grid;gap:8px}
 .dn-ds li{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid #eef2f8;border-left:4px solid #2f6fc0;border-radius:12px;background:linear-gradient(90deg,#f6f9fe,#fff 60%)}
 .dn-ds li:hover{border-color:#c9dbf5;border-left-color:#1f4f97;box-shadow:0 4px 14px rgba(31,79,151,.1)}
@@ -212,12 +213,12 @@ export function BangDoiNgu({ ds, coNhom, don }: { ds: any[]; coNhom?: boolean; d
         <thead><tr><th>#</th><th>Người</th>{coNhom && <th>Nhóm</th>}<th>Doanh thu</th><th>Chỉ tiêu</th><th>Đạt</th><th>Mốc lương cơ bản</th><th>Booking</th></tr></thead>
         <tbody>{ds.map((x, i) => (
           <tr key={x.user_id}>
-            <td className="c-hang"><span className={"dn-hang" + (i === 0 && x.tien > 0 ? " v1" : "")}>{i + 1}</span></td>
+            <td className="c-hang"><span className={"dn-hang" + (i < 3 && x.tien > 0 ? " v1" : "")}>{i + 1}</span></td>
             <td className="c-ten"><b>{x.ho_ten}</b>{x.la_toi && <span className="dn-toi">tôi</span>}</td>
             {coNhom && <td className="c-nhom">{x.don_vi ? <span className="dn-nhom">{x.don_vi}</span> : "—"}</td>}
             <td className="c-dt" data-n="Doanh thu">{tien(x.tien)}</td>
             <td className="c-ct" data-n="Chỉ tiêu">{x.chi_tieu == null ? <span className="dn-mo">chưa giao</span> : tien(x.chi_tieu)}</td>
-            <td className="c-dat">{x.ty_le == null ? "—" : <><span className="dn-tr"><i style={{ width: Math.min(100, x.ty_le * 100) + "%" }} /></span>{pct(x.ty_le)}</>}</td>
+            <td className="c-dat">{x.ty_le == null ? "—" : <><span className="dn-tr"><i className={x.ty_le >= 1 ? "dat" : undefined} style={{ width: Math.min(100, x.ty_le * 100) + "%" }} /></span>{pct(x.ty_le)}</>}</td>
             <td className="c-lcb">{x.moc_lcb == null ? "—" : <span className={"dn-lcb" + (x.dat_lcb ? " dat" : "")}>{x.dat_lcb ? "Đạt" : "Chưa"} {tien(x.moc_lcb)}</span>}</td>
             <td className="c-bk" data-n="Booking">{x.so_booking}</td>
           </tr>))}</tbody>
@@ -235,7 +236,7 @@ export function KhoiTheoNhom({ ds, dang }: { ds: any[] | undefined; dang?: boole
           <span className={"dn-ma" + (chua || String(g.ma).length > 5 ? " xam" : "")}>{chua ? "—" : g.ma}</span>
           <span className="dn-g"><b>{chua ? g.ten : (String(g.ten).startsWith("Nhóm") ? g.ten : "Nhóm " + g.ten)}</b>
             <small>{so(g.so_nguoi)} người · {tien(g.tien)} / {g.chi_tieu == null ? "chưa giao" : tien(g.chi_tieu)}</small>
-            <span className="dn-thanh"><i style={{ width: Math.min(100, (g.ty_le || 0) * 100) + "%" }} /></span></span>
+            <span className="dn-thanh"><i className={(g.ty_le || 0) >= 1 ? "dat" : undefined} style={{ width: Math.min(100, (g.ty_le || 0) * 100) + "%" }} /></span></span>
           <span className="dn-pt">{g.ty_le == null ? "—" : pct(g.ty_le)}</span>
         </li>; })}</ul></div>}
   </section>;
@@ -332,13 +333,13 @@ export function BangThucBan({ ds, moToi }: { ds: any[] | undefined; moToi: (t: s
 .kh-the small{color:#7d8ca3;font-size:12px}
 .kh-bar{height:8px;border-radius:99px;background:#eef3fb;position:relative}.kh-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:#2f6fc0}
 .kh-bar s{position:absolute;top:-4px;bottom:-4px;width:2px;background:#d6336c}
-.kh-so{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;flex-wrap:wrap}.kh-so b{color:#d6336c}.kh-so .dat{color:#1c7a52;font-weight:700}
+.kh-so{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;flex-wrap:wrap}.kh-so b{color:#d6336c}.kh-so .dat{color:#2f7d3b;font-weight:700}
 .kh-the.cam .kh-so b{color:#b45309}
 .kh-phu{font-size:11.5px;color:#7d8ca3}
 .kh-the .g5-cua{justify-content:center;font-size:12.5px;font-weight:700;border-radius:999px;padding:8px;background:#fff0f4;color:#d6336c;text-decoration:none}
 .kh-the .g5-cua:hover{background:var(--vtos-logo-hong);color:#fff}
 .kh-them{margin:0 12px 12px}
-.kh-yen{display:flex;align-items:center;gap:10px;background:#e8f5ef;border:1px solid #bfe3d0;color:#1c7a52;border-radius:14px;padding:12px 16px;font-weight:600}
+.kh-yen{display:flex;align-items:center;gap:10px;background:#ecf7ee;border:1px solid #c9e7cd;color:#2f7d3b;border-radius:14px;padding:12px 16px;font-weight:600}
 @media(max-width:1100px){.kh-ds{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.kh-ds{grid-template-columns:1fr}.kh-dem{margin-left:0}}
 `}</style>;
@@ -463,7 +464,7 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
   background:linear-gradient(120deg,var(--g5-ns-c),#3f80d0);box-shadow:0 2px 6px rgba(31,79,151,.22),inset 0 1px 0 rgba(255,255,255,.3)}
 .g5-tab button:hover{background:linear-gradient(120deg,#4a8ddc,var(--g5-ns-a));transform:translateY(-1px)}
 .g5-tab button[aria-pressed=true]{background:linear-gradient(120deg,var(--g5-ns-a),var(--g5-ns-b));
-  box-shadow:0 0 0 2px #fff,0 0 0 4px #7fb2f0,0 6px 16px rgba(31,79,151,.4),inset 0 1px 0 rgba(255,255,255,.25)}
+  box-shadow:0 0 0 2px #fff,0 0 0 4px #7fb2f0,0 6px 16px rgba(31,79,151,.4),inset 0 1px 0 rgba(255,255,255,.25),inset 0 -3px 0 #5fae66}
 .g5-tab button:focus-visible,.g5-the-lk:focus-visible,.g5-cua:focus-visible{outline:3px solid #719ee1;outline-offset:2px}
 .g5-mo{display:flex;align-items:center;gap:12px}
 .g5-lui{margin:0;font:inherit;font-size:13px;font-weight:700;color:var(--g5-ns-b);background:var(--g5-ns-nhat);border:1px solid var(--g5-ns-vien);border-radius:999px;padding:5px 12px;cursor:pointer}
@@ -496,7 +497,7 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
 .g5-hd .s{font-size:26px;font-weight:800;color:var(--g5-ns-b);font-variant-numeric:tabular-nums;line-height:1.2}
 .g5-hd .s small{font-size:13px;color:var(--g5-chu3);font-weight:700}
 .g5-hd .s.dang{color:var(--g5-chu3);font-size:20px}
-.g5-hd.do .s{color:#b3281f}
+.g5-hd.do .s{color:#d6336c}
 .g5-hd .p{font-size:12.5px;color:var(--g5-chu3);flex:1}
 .g5-cua{flex:0 0 auto;margin:0;font:inherit;font-size:13px;font-weight:600;color:var(--g5-dam);background:none;border:0;padding:3px 0;cursor:pointer;white-space:nowrap}
 .g5-cua:hover{color:var(--g5-ns-a);text-decoration:underline}
@@ -513,8 +514,8 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
 .g5-dau span{font-size:12px;color:var(--g5-chu3)}
 .g5-nho{font-size:12.5px;color:var(--g5-chu2);margin:10px 0 0;line-height:1.6}
 .g5-nocu{border-top:1px dashed var(--g5-line);padding-top:8px;color:#8d6200}
-.g5-lcb{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px;background:#fdeceb;color:#b3281f;white-space:nowrap}
-.g5-lcb.dat{background:#e8f5ef;color:#1c6f50}
+.g5-lcb{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px;background:#fff0f4;color:#d6336c;white-space:nowrap}
+.g5-lcb.dat{background:#ecf7ee;color:#2f7d3b}
 .g5-loi{color:var(--vtos-danger);margin:0}
 .g5-cuon{overflow-x:auto}
 .g5-bang{width:100%;border-collapse:separate;border-spacing:0;margin-top:6px;font-size:13px;min-width:600px}
@@ -525,11 +526,11 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
 .g5-bang tr:last-child td{border-bottom:0}
 .g5-bang .ma{color:var(--g5-dam);font-variant-numeric:tabular-nums}
 .g5-bang .ngay{font-size:12px;color:var(--g5-chu3);margin-top:2px}
-.g5-bang .ngay b.cam{color:#a85c16}.g5-bang .ngay.dat{color:#1c6f50;font-weight:600}
-.g5-bang b.lai{color:#1c6f50;font-size:15px}.g5-bang b.lai.lo{color:#b3281f}
+.g5-bang .ngay b.cam{color:#a85c16}.g5-bang .ngay.dat{color:#2f7d3b;font-weight:600}
+.g5-bang b.lai{color:#2f7d3b;font-size:15px}.g5-bang b.lai.lo{color:#d6336c}
 .g5-bang .vach{position:relative;width:74px;height:4px;border-radius:2px;background:#e4eaf4;margin-top:6px}
 .g5-bang .vach i{display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,var(--g5-ns-a),var(--g5-ns-c))}
-.g5-bang .vach s{position:absolute;top:-3px;width:2px;height:10px;background:#b3281f;text-decoration:none}
+.g5-bang .vach s{position:absolute;top:-3px;width:2px;height:10px;background:#d6336c;text-decoration:none}
 .g5-bang .nhan{display:inline-block;font-size:11.5px;font-weight:600;border-radius:6px;padding:4px 9px}
 .g5-bang .nhan.chua{background:#fbf3e0;color:#8d6200}
 .g5-hang{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;font-size:12px;font-weight:800;background:var(--g5-ns-nhat);color:var(--g5-ns-b)}

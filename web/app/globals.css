@@ -1900,3 +1900,11 @@ html.vtos-khung-ban [aria-pressed="true"]{border-color:var(--vtos-sky)}
     font-size:calc(11.5/14*1rem);text-align:left;flex:0 0 auto;max-width:45%}
   html.vtos-khung-ban table.kb-the td[colspan]{display:block;text-align:left}
 }
+
+/* ══ R5-22 · BA MÀU LOGO — ĐIỂM XUYẾT XANH LÁ (Chủ tịch 14/11/2026 chọn phương án A) ══════════════════
+   Navy sáng là màu chính, hồng logo cảnh báo, xanh lá logo làm điểm nhấn ấn tượng. Ở đây chỉ phần dùng
+   chung: vạch ba màu logo dưới thanh đầu mọi bàn làm việc. Trạng thái «đạt / đã xong / đã duyệt» đi theo
+   --vtos-success (tokens.css) nên mọi quy trình tự đổi sang sắc lá logo, không sửa từng màn. */
+.mh01-ban{position:relative;overflow:hidden}
+.mh01-ban::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;pointer-events:none;
+  background:linear-gradient(90deg,var(--vtos-logo-la) 0 33.3%,var(--vtos-logo-hong) 33.3% 66.6%,var(--vtos-logo-xanh) 66.6%)}

@@ -138,7 +138,7 @@ function BanTourLe() {
 
     {/* Không dùng dấu backtick trong khối style dưới đây (bài học MKT-6/7). */}
     <style>{`
-.btl{display:grid;gap:14px;font-variant-numeric:tabular-nums;--n1:#1f4f97;--n2:#2f6fc0;--n3:#5b9be6;--nn:#e8f0fc;--vien:#e6ecf5;--mo:#7d8ca3;--chu:#1d3a68;--hong:var(--vtos-logo-hong);--hongd:#d6336c;--hongn:#fff0f4;--ok:#1c7a52;--okn:#e8f5ef;--nen:#f6f9fe}
+.btl{display:grid;gap:14px;font-variant-numeric:tabular-nums;--n1:#1f4f97;--n2:#2f6fc0;--n3:#5b9be6;--nn:#e8f0fc;--vien:#e6ecf5;--mo:#7d8ca3;--chu:#1d3a68;--hong:var(--vtos-logo-hong);--hongd:#d6336c;--hongn:#fff0f4;--ok:#2f7d3b;--okn:#ecf7ee;--nen:#f6f9fe}
 .btl-dau{padding:16px 20px;border-radius:16px;color:#fff;background:linear-gradient(120deg,#3a7bd0,#2a63b5 55%,var(--n1));box-shadow:0 10px 26px rgba(31,79,151,.22)}
 .btl-dau h1{margin:0;font-size:20px;color:#fff}.btl-dau p{margin:4px 0 0;font-size:12.5px;opacity:.9;max-width:80ch;color:#fff}
 .btl-o5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
