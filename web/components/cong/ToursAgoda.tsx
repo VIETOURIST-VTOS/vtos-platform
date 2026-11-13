@@ -24,6 +24,8 @@ const ngayVn = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().j
 const nghin = (x: number) => Math.ceil(Math.round(x) / 1000) * 1000;
 const PT: Record<string, string> = { xe: "Xe du lịch", may_bay: "Máy bay", tau_hoa: "Tàu hỏa", du_thuyen: "Du thuyền" };
 const BUA: Record<string, string> = { "sáng": "sáng", "trưa": "trưa", "tối": "tối" };
+// TR-16: ba bữa luôn hiện đủ, theo đúng thứ tự trong ngày.
+const BA_BUA: [string, string][] = [["sáng", "Sáng"], ["trưa", "Trưa"], ["tối", "Tối"]];
 
 type Q = { tab: string; q: string; noi: string; tu: string; den: string; nl: number; te: number; eb: number; loai: string };
 type Loc = { loai: string[]; well: boolean; tl: string[]; gia: string[]; ud: string[]; pt: string[] };
@@ -573,11 +575,23 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
                   {(n.bua?.length > 0 || n.khach_san) && <span className="tra-chips2">{(n.bua || []).map((b: string) => <em key={b}>Ăn {BUA[b] || b}</em>)}{n.khach_san && <em>Nghỉ: {n.khach_san}</em>}</span>}</span>
                 <span className="tra-dsign" aria-hidden="true">{mo ? "−" : "+"}</span></button>
               {mo && <div className="tra-dbody">
-                {n.noi_dung ? <p>{n.noi_dung}</p> : <span className="ksv-muted">Nội dung ngày này đang cập nhật.</span>}
+                {/* TR-16 · Đường thời gian. Thân ngày về dưới dạng một khối chữ liền hơn hai
+                    mươi dòng; máy chủ cắt nó theo mốc giờ có sẵn trong chính câu chữ. Dưới hai
+                    mốc thì không cắt, để nguyên khối — một đường thời gian chỉ có một chặng
+                    trông còn tệ hơn. */}
+                {n.doan?.length ? <ol className="tra-moc">{n.doan.map((p: any, k: number) =>
+                  <li key={k}>{p.luc ? <span className="tra-gio">{p.luc}</span> : <span className="tra-gio trong" aria-hidden="true" />}<p>{p.chu}</p></li>)}</ol>
+                  : n.noi_dung ? <p>{n.noi_dung}</p> : <span className="ksv-muted">Nội dung ngày này đang cập nhật.</span>}
                 {n.anh?.length > 0 && <div className="tra-lt-anh">{n.anh.slice(0, 3).map((a: string) => <img key={a} src={a} alt={`Ngày ${n.ngay}`} loading="lazy" referrerPolicy="no-referrer" />)}</div>}
-                {(n.khach_san || n.bua?.length > 0) && <div className="tra-dfoot">
+                <div className="tra-dfoot">
                   <div><small>Nghỉ đêm</small><b>{n.khach_san || (i === ngayLt.length - 1 ? "Không — kết thúc tour" : "Đang cập nhật")}</b></div>
-                  <div><small>Bữa ăn</small><b>{n.bua?.length ? n.bua.map((b: string) => BUA[b] || b).join(", ") : "Theo chương trình"}</b></div></div>}
+                  {/* TR-16 · Ba bữa LUÔN hiện, bữa không bao gồm cũng hiện (Chủ tịch chốt
+                      14-11-2026). Chỉ in bữa CÓ thì khách không biết bữa còn lại phải tự trả,
+                      và đó là chỗ sinh khiếu nại nhiều nhất sau khi đoàn đã đi. */}
+                  <div><small>Bữa ăn</small><span className="tra-bua">{BA_BUA.map(([ma, ten]) => {
+                    const co = (n.bua || []).includes(ma);
+                    return <em key={ma} className={co ? "co" : ""}><i aria-hidden="true">{co ? "✓" : "✕"}</i>{ten}</em>;
+                  })}</span></div></div>
               </div>}
             </div>
             {i < ngayLt.length - 1 && n.khach_san && <div className="tra-dnoi"><span>Đêm {n.ngay} · {n.khach_san}</span></div>}
@@ -809,6 +823,20 @@ const CSS = `
 .tra-day.on .tra-chips2 em{color:#e3edfb;background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.26)}
 .tra-dbody{display:flex;flex-direction:column;gap:12px;padding:16px;background:#fff}
 .tra-dbody p{margin:0;white-space:pre-line;line-height:1.65;max-width:80ch}
+/* TR-16 · đường thời gian trong thân ngày, và ba viên bữa ăn */
+.tra-moc{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.tra-moc li{position:relative;display:flex;gap:12px;padding:0 0 14px 20px}
+.tra-moc li::before{content:"";position:absolute;left:0;top:7px;width:11px;height:11px;border-radius:50%;border:3px solid var(--tra-navy);background:#fff;box-sizing:border-box}
+.tra-moc li::after{content:"";position:absolute;left:5px;top:20px;bottom:0;width:2px;background:#e0e9f7}
+.tra-moc li:last-child{padding-bottom:0}.tra-moc li:last-child::after{display:none}
+.tra-gio{flex:none;width:62px;align-self:flex-start;font-size:12px;font-weight:700;color:var(--tra-navy);background:var(--tra-navy-s);border-radius:5px;padding:3px 0;text-align:center}
+.tra-gio.trong{background:transparent}
+.tra-moc p{margin:0;line-height:1.65;max-width:80ch}
+.tra-bua{display:flex;flex-wrap:wrap;gap:7px;margin-top:5px}
+.tra-bua em{font-style:normal;display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:#8a8f96;background:#f4f5f7;border:1px solid #e3e5e9;border-radius:999px;padding:3px 11px}
+.tra-bua em.co{color:#1c6b4a;background:#eaf5ef;border-color:#bfe0cd}
+.tra-bua i{font-style:normal;font-size:12px}
+@media (max-width:640px){.tra-moc li{gap:9px;padding-left:18px}.tra-gio{width:54px}}
 .tra-dfoot{display:flex;flex-wrap:wrap;gap:1px;background:var(--tra-navy-l);border:1px solid var(--tra-navy-l);border-radius:8px;overflow:hidden}
 .tra-dfoot>div{flex:1 1 180px;display:flex;flex-direction:column;gap:3px;background:#fafcff;padding:10px 14px}
 .tra-dfoot small{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#5b82c4;font-weight:700}
