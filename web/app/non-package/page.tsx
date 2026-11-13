@@ -15,6 +15,7 @@ function NonPackage() {
   const [data, setData] = useState<any>({ kinds: {}, rows: [], summary: { by_type: [], total: {} } });
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7)); const [kind, setKind] = useState(""); const [paid, setPaid] = useState(""); const [q, setQ] = useState("");
   const [showForm, setShowForm] = useState(false); const [edit, setEdit] = useState<any>(null);
+  const [loaiMoi, setLoaiMoi] = useState("VISA");   // R5-16: «Gửi khách» hiện ô đối tác + số trả đối tác cho người bán
   const load = useCallback(() => api(`/non-package?month=${month}&service_type=${kind}&paid=${paid}&q=${encodeURIComponent(q)}`).then(setData).catch((e) => toast(errMsg(e), true)), [month, kind, paid, q, toast]);
   useEffect(() => { load(); }, [load]);
   // Đ-5 (13/9/2026) · phép soát tháng, ĐỌC từ chính booking và dòng chi phí đang có – không có sổ
@@ -74,13 +75,18 @@ function NonPackage() {
       </div>
       {showForm && <form onSubmit={submit} className="panel" style={{ marginTop: 8 }}><h2>Dịch vụ lẻ mới</h2>
         <div className="grid">
-          <div><label>Loại dịch vụ *</label><select name="service_type" defaultValue="VISA">{Object.entries(K).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></div>
+          <div><label>Loại dịch vụ *</label><select name="service_type" value={loaiMoi} onChange={(e) => setLoaiMoi(e.target.value)}>{Object.entries(K).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></div>
           <div><label>Nội dung dịch vụ *</label><input name="description" required placeholder="VD: Visa Mỹ B1/B2 · Vé SGN–BKK 12/10" /></div>
           <div><label>Quốc gia</label><input name="country" placeholder="MỸ / THÁI LAN…" /></div><div><label>Ngày sử dụng</label><input name="service_date" type="date" /></div>
           <div><label>Tên khách *</label><input name="customer_name" required /></div><div><label>SĐT *</label><input name="customer_phone" required /></div><div><label>Email</label><input name="customer_email" type="email" /></div>
           <div><label>Nguồn khách *</label><input name="source" required placeholder="Zalo / Facebook / Web / Khách cũ…" /></div><div><label>Số khách</label><input name="pax" type="number" min={1} defaultValue={1} /></div>
-          <div><label>Giá dịch vụ (đ) *</label><input name="amount" type="number" step={1000} min={1} required /></div><div><label>Giảm giá (đ)</label><input name="discount" type="number" step={1000} defaultValue={0} /></div>
-          {canCost
+          <div><label>{loaiMoi === "GUI_KHACH" ? "Giá khách trả (đ) *" : "Giá dịch vụ (đ) *"}</label><input name="amount" type="number" step={1000} min={1} required /></div><div><label>Giảm giá (đ)</label><input name="discount" type="number" step={1000} defaultValue={0} /></div>
+          {/* R5-16 · Chủ tịch duyệt 14/11/2026: gửi khách lẻ qua công ty khác hưởng hoa hồng — người bán nhập luôn
+              đối tác và số trả đối tác (số theo thoả thuận); lãi = hoa hồng. Các loại khác giữ luật 25/9/2026. */}
+          {loaiMoi === "GUI_KHACH"
+            ? <><div><label>Công ty đối tác nhận khách *</label><input name="supplier_name" required /></div><div><label>Trả đối tác (đ) *</label><input name="cost_amount" type="number" step={1000} min={1} required /></div>
+                <div style={{ gridColumn: "span 2" }}><p className="muted">Doanh thu = giá khách trả · giá vốn = số trả đối tác · <b>lãi = hoa hồng</b>.</p></div></>
+            : canCost
             ? <><div><label>Giá vốn NCC (đ)</label><input name="cost_amount" type="number" step={1000} defaultValue={0} /></div><div><label>Nhà cung cấp</label><input name="supplier_name" /></div></>
             : <div style={{ gridColumn: "span 2" }}><p className="muted">Giá vốn NCC và nhà cung cấp do <b>Phòng Điều hành</b> nhập sau
                 (Chủ tịch quyết 25/9/2026). Ô để trống là <b>chưa có số</b>, không phải bằng 0 — dòng lãi lỗ của dịch vụ này
