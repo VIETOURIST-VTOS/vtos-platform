@@ -135,7 +135,7 @@ function ChinhSachBan() {
 .csb-nut{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .csb button{font:inherit;font-size:12.5px;font-weight:700;border:0;border-radius:999px;padding:9px 15px;cursor:pointer;background:linear-gradient(120deg,var(--n2),var(--n1));color:#fff;min-height:38px}
 .csb button.phu{background:var(--nn);color:var(--n1)}
-.csb-tt{font-size:12px;font-weight:700;border-radius:999px;padding:5px 11px}.csb-tt.dat{background:#e8f5ef;color:#1c7a52}.csb-tt.cho{background:#fff4e5;color:#b45309}
+.csb-tt{font-size:12px;font-weight:700;border-radius:999px;padding:5px 11px}.csb-tt.dat{background:#ecf7ee;color:#2f7d3b}.csb-tt.cho{background:#fff4e5;color:#b45309}
 .csb-luoi{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.csb-luoi.hai{grid-template-columns:repeat(2,minmax(0,1fr))}
 .csb-o{border:1px solid var(--vien);border-radius:14px;padding:12px 14px;display:grid;gap:6px;align-content:start;min-width:0}
 .csb-o.lk{border-left:4px solid var(--n2);background:linear-gradient(180deg,var(--nen),#fff 80px)}

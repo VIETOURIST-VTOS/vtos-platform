@@ -225,6 +225,7 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
     dt_toi = cua_toi["tien"]
     ct_toi = _chi_tieu_nguoi(bang_ct, u.id, db)
     doi_ngu, theo_nhom, dt_pv, ct_pv, tong_booking_pv = [], [], None, None, None
+    doi_chieu = None
     if vai in ("tp", "tn"):
         if p["nguon"] == "co_cau":
             kq = DT.thang(db, ky, LUONG, p["don_vi_ids"])
@@ -241,7 +242,8 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
             # gồm cả bàn TGĐ»): tổng phòng = doanh thu CHUYẾN Lẻ của tháng — đúng ô «Doanh thu theo phòng · Lẻ»
             # trên màn Chủ tịch / TGĐ (`dashboard.doanh_thu_phong`), không tính lại. Từng người vẫn là giá trị
             # booking (Chủ tịch chọn «giữ giá trị booking cho từng người»), nên cộng từng người không ra tổng phòng.
-            dt_pv = GD.doi_chieu_chu_tich(db, d)["thang"]
+            doi_chieu = GD.doi_chieu_chu_tich(db, d)       # R5-21: tính MỘT lần, dùng lại ở cuối
+            dt_pv = doi_chieu["thang"]
         ten = {n["user_id"]: n for n in TC.nguoi_trong(db, p["don_vi_ids"], _cuoi(ky))} if p["don_vi_ids"] else {}
         for uid in uids:
             doi_ngu.append(_dong(db, bang_ct, uid, ban.get(uid, {}), ten.get(uid) or {}, u.id))
@@ -327,7 +329,7 @@ def tong_quan(db: Session, u: User, hom_nay: date | None = None) -> dict:
             "the": the, "doi_ngu": doi_ngu, "theo_nhom": theo_nhom, "viec": viec,
             "phai_thu": pt, "thuc_ban": GD.thuc_ban(db),
             # R5-9: số Lẻ trên màn Chủ tịch để đối chiếu (doanh thu chuyến — cơ sở khác ô doanh thu ở đây).
-            "doi_chieu": GD.doi_chieu_chu_tich(db, d) if vai in ("tp", "tn") else None}
+            "doi_chieu": (doi_chieu or GD.doi_chieu_chu_tich(db, d)) if vai in ("tp", "tn") else None}
 
 
 def doanh_thu_12(db: Session, u: User, nam: int) -> dict:

@@ -141,11 +141,11 @@
   --vtos-sky:          #1E63C8;  /* 5,72 với chữ trắng — KS-NAVY 07/11: nút chính navy sáng (cũ #14538D) */
   --vtos-navy-light:   #0F4C84;  /* 8,18 */
 
-  --vtos-success:      #1E7A4E;  /* 5,32 */
+  --vtos-success:      #2F7D3B;  /* 5,10 — R5-22 (Chủ tịch 14/11/2026): tông lá logo #5FAE66 đậm một nấc cho chữ đọc được */
   --vtos-danger:       #A8145C;  /* 6,79 — KS-MUC 07/11: trả lại (KS-NAVY đã đổi nhầm sang #1E63C8, gần --vtos-info) */
   --vtos-warning:      #8A5A00;  /* 5,93 */
   --vtos-info:         #14538D;  /* 7,92 */
-  --vtos-success-bg:   #E6F4EC;
+  --vtos-success-bg:   #ECF7EE;  /* R5-22: nền nhạt cùng sắc lá logo */
   --vtos-danger-bg:    #FBE9F0;  /* KS-MUC · trả lại */
   --vtos-warning-bg:   #FBF1DC;
   --vtos-info-bg:      #E7EFF7;
@@ -192,6 +192,11 @@
   --vtos-logo-xanh:      #5A9BD4;
   --vtos-logo-hong:      #FF6F96;
   --vtos-logo-la:        #5FAE66;
+  /* R5-22 · BA MÀU LOGO CHO GIAO DIỆN (Chủ tịch 14/11/2026, phương án A «điểm xuyết»): navy sáng là màu
+     chính, hồng logo cảnh báo, xanh lá logo làm điểm nhấn ấn tượng (đạt, đã xong, hạng đầu). Mảng tô,
+     thanh, chấm dùng đúng màu logo; CHỮ xanh lá dùng --vtos-success (đậm một nấc, đủ tương phản). */
+  --vtos-la-to:          #5FAE66;
+  --vtos-la-to-2:        #7CC983;
   --vtos-logo-vet-sang:  #eef5ff;
   --vtos-logo-quang:     #8cc4ff40;
   --vtos-logo-quang-dam: #8cc4ff70;
