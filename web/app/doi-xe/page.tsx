@@ -8,6 +8,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, fmtDT, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import MauDoiXe from "@/components/doixe/MauDoiXe";
+import { useHoi } from "@/components/HopHoi";
 
 /** Hồ sơ đội xe Vietrip – Đợt 1.
  *
@@ -18,6 +19,7 @@ const MUC_CLS: Record<string, string> = { OK: "ok", UNKNOWN: "warn", REVIEW: "wa
 const MUC_TEN: Record<string, string> = { OK: "Đạt", UNKNOWN: "Chưa đủ dữ liệu", REVIEW: "Cần xem lại", APPROVAL_REQUIRED: "Cần duyệt ngoại lệ", BLOCK: "Chặn" };
 
 function DoiXe() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [tq, setTq] = useState<any>(null);
   const [xe, setXe] = useState<any[]>([]);
@@ -126,7 +128,7 @@ function DoiXe() {
   };
   /** Đóng báo hỏng. Máy chủ BẮT BUỘC ghi kết quả, nên màn hình hỏi trước khi gọi. */
   const dongHong = async (id: number) => {
-    const v = window.prompt("Đã xử lý thế nào? (bắt buộc)\n\nGhi rõ để lần sau gặp lại hiện tượng này còn tra được.");
+    const v = await nhap("Đã xử lý thế nào? (bắt buộc)\n\nGhi rõ để lần sau gặp lại hiện tượng này còn tra được.");
     if (v === null) return;
     try { const r = await api<any>(`/fleet/bao-hong/${id}/dong`, { method: "POST", json: { ket_qua: v } }); toast(r.message); load(); }
     catch (e) { toast(errMsg(e), true); }
@@ -244,7 +246,7 @@ function DoiXe() {
   };
 
   const moLai = async (id: number) => {
-    const ly = prompt("Lý do mở lại phiếu đã xác nhận (bắt buộc – để sau này còn biết vì sao số đổi):");
+    const ly = await nhap("Lý do mở lại phiếu đã xác nhận (bắt buộc – để sau này còn biết vì sao số đổi):");
     if (!ly) return;
     try { await api(`/fleet/chuyen/${id}/mo-lai`, { method: "POST", json: { ly_do: ly } });
           toast("Đã mở lại – sửa xong nhớ xác nhận lại"); load(); }
@@ -260,14 +262,14 @@ function DoiXe() {
   };
 
   const dongViec = async (id: number) => {
-    const kl = prompt("Kết luận xác minh (bắt buộc – để lần sau còn biết việc đã xử lý thế nào):");
+    const kl = await nhap("Kết luận xác minh (bắt buộc – để lần sau còn biết việc đã xử lý thế nào):");
     if (!kl) return;
     try { await api(`/fleet/xac-minh/${id}/ket-luan`, { method: "POST", json: { status: "xong", resolution: kl } }); toast("Đã đóng việc xác minh"); load(); }
     catch (e) { toast(errMsg(e), true); }
   };
 
   if (!tq) return <p className="muted">Đang tải…</p>;
-  return (<>
+  return (<>{hop}
     {!nhung && <>
     <h1>Đội xe Vietrip – hồ sơ và điều kiện khai thác</h1>
 

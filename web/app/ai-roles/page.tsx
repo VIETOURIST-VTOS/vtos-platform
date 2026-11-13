@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Vị trí AI & quyền hạn (đặc tả 07/9/2026, phần C).
  *
@@ -12,6 +13,7 @@ const TABS: [string, string][] = [["bang", "Bảng quyền theo vị trí"], ["n
 const MAU: Record<number, string> = { 0: "", 1: "navy", 2: "navy", 3: "warn", 4: "ok" };
 
 function AiRolesPage() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   const canSua = ["chutich", "tgd", "cntt"].includes(role);
@@ -30,13 +32,13 @@ function AiRolesPage() {
   const datMuc = async (vai: string, tac_vu: string, muc: number, hanMucCu: any) => {
     let han_muc = hanMucCu || {};
     if (muc === 3) {
-      const kg = window.prompt("Khung giờ AI được tự gửi (ví dụ 08:00-21:00):", han_muc.khung_gio || "08:00-21:00");
+      const kg = await nhap("Khung giờ AI được tự gửi (ví dụ 08:00-21:00):", han_muc.khung_gio || "08:00-21:00");
       if (kg === null) return;
-      const sl = window.prompt("Số lượt tối đa mỗi ngày:", String(han_muc.so_luot_ngay || 30));
+      const sl = await nhap("Số lượt tối đa mỗi ngày:", String(han_muc.so_luot_ngay || 30));
       if (sl === null) return;
-      const nd = window.prompt("Loại nội dung được phép gửi:", han_muc.loai_noi_dung || "lịch khởi hành, giá công bố, chính sách cọc và hủy, xin tên và số điện thoại");
+      const nd = await nhap("Loại nội dung được phép gửi:", han_muc.loai_noi_dung || "lịch khởi hành, giá công bố, chính sách cọc và hủy, xin tên và số điện thoại");
       if (nd === null) return;
-      const hk = window.prompt("Người hậu kiểm trong 24 giờ (mã vai trò hoặc tên):", han_muc.nguoi_hau_kiem || "ptgd_mkt");
+      const hk = await nhap("Người hậu kiểm trong 24 giờ (mã vai trò hoặc tên):", han_muc.nguoi_hau_kiem || "ptgd_mkt");
       if (hk === null) return;
       han_muc = { khung_gio: kg.trim(), so_luot_ngay: Number(sl) || 0, loai_noi_dung: nd.trim(), nguoi_hau_kiem: hk.trim() };
     } else han_muc = {};
@@ -49,7 +51,7 @@ function AiRolesPage() {
   const tatKhan = async (dung: boolean) => {
     let ly_do = "";
     if (dung) {
-      const v = window.prompt("Lý do tạm dừng toàn bộ AI đối ngoại (bắt buộc):", "");
+      const v = await nhap("Lý do tạm dừng toàn bộ AI đối ngoại (bắt buộc):", "");
       if (!v || !v.trim()) { toast("Chưa ghi lý do – không tạm dừng", true); return; }
       ly_do = v.trim();
     }
@@ -60,14 +62,14 @@ function AiRolesPage() {
   };
 
   const hauKiem = async (id: number, ket_luan: string) => {
-    const ghi_chu = window.prompt("Ghi chú hậu kiểm (không bắt buộc):", "") || "";
+    const ghi_chu = await nhap("Ghi chú hậu kiểm (không bắt buộc):", "") || "";
     try {
       const r = await api<any>(`/ai/runs/${id}/hau-kiem`, { method: "POST", json: { ket_luan, ghi_chu } });
       toast(r.message); api("/ai/runs?limit=200").then(setLog); api("/ai/report?so_ngay=7").then(setRp);
     } catch (e) { toast(errMsg(e), true); }
   };
 
-  return <>
+  return <>{hop}
     <h1>Vị trí AI & quyền hạn</h1>
 
     {b && <div className={"gate " + (b.tam_dung ? "fail" : b.duoc_tu_gui ? "pass" : "")} style={{ marginBottom: 12 }}>

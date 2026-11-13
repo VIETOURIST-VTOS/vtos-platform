@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Báo chí, KOL & sự kiện – mục 2.2.2.
  *
@@ -77,6 +78,7 @@ function Tien({ x }: { x: number | null | undefined }) {
 }
 
 function BaoChiKol() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   const [the, setThe] = useState("baochi");
@@ -124,14 +126,14 @@ function BaoChiKol() {
       const t = x?.body?.detail;
       if (x?.status === 409 && t?.trung_ten) {
         const ten = t.trung_ten.map((z: any) => `${z.ho_ten} · ${z.kenh}`).join("; ");
-        if (confirm(`${t.message}\n\nĐã có: ${ten}`)) {
+        if (await xacNhan(`${t.message}\n\nĐã có: ${ten}`)) {
           await post("/bao-chi-kol/kol", { ...d, bo_qua_canh_bao_trung_ten: true });
         }
       } else toast(errMsg(x), true);
     }
   };
 
-  return (<>
+  return (<>{hop}
     <h1>Báo chí, KOL &amp; sự kiện</h1>
     <p className="muted">Sổ hoạt động truyền thông và danh bạ người hợp tác nội dung. <b>Báo chí</b> và
       <b> Sự kiện</b> là cùng một sổ, khác nhau bộ lọc loại – một nơi đếm, một con số.

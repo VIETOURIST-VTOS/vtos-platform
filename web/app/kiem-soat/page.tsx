@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Kiểm soát – bàn làm việc của robot giữ vị trí Kiểm soát (chỉ đạo 07/9/2026).
  *
@@ -17,6 +18,7 @@ const TABS: [string, string][] = [
 ];
 
 function KiemSoatPage() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const laLanhDao = ["chutich", "tgd"].includes(user?.role || "");
   const chayDuoc = ["chutich", "tgd", "bks", "cntt"].includes(user?.role || "");
@@ -43,7 +45,7 @@ function KiemSoatPage() {
   const daHet = (d?.phat_hien || []).filter((p: any) => !p.con);
 
   return (
-    <main>
+    <main>{hop}
       <h1>Kiểm soát</h1>
       <p className="muted" style={{ marginTop: -6 }}>
         Vị trí Kiểm soát do robot giữ: kiểm tra, thử, giám sát và báo cáo mọi phòng ban về Chủ tịch.
@@ -191,8 +193,8 @@ function KiemSoatPage() {
                     <td>{laLanhDao && r.trang_thai === "cho_hau_kiem" && (
                       <>
                         <button className="act teal" onClick={() => goi("hau-kiem-diem", { diem_id: r.id, chap_nhan: true })}>Chấp nhận</button>
-                        <button className="act red" onClick={() => {
-                          const g = window.prompt("Bác điểm này vì lý do gì?") || "";
+                        <button className="act red" onClick={async () => {
+                          const g = await nhap("Bác điểm này vì lý do gì?") || "";
                           if (g.trim()) goi("hau-kiem-diem", { diem_id: r.id, chap_nhan: false, ghi_chu: g });
                         }}>Bác</button>
                       </>)}</td>

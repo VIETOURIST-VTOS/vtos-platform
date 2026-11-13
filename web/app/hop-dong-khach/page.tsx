@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** V6 – Hợp đồng khách: mắt xích giữa báo giá đã chốt và booking.
  *
@@ -20,6 +21,7 @@ const vnd = (n: number) => (n || 0).toLocaleString("vi-VN") + " đ";
 const pct = (n: number | null) => (n === null || n === undefined ? "–" : (n * 100).toFixed(1) + "%");
 
 function HopDong() {
+  const { xacNhan, nhap, hop } = useHoi();   // TR-10: hỏi lại trên trang, không dùng hộp thoại trình duyệt
   const { toast, user } = useShell();
   // TR-1d (Chủ tịch 02/11/2026): CHỈ Sale Admin phòng Đoàn tạo / hủy link thanh toán; máy chủ chặn lại lần nữa.
   const laSA = user?.role === "sales_admin";
@@ -38,7 +40,7 @@ function HopDong() {
   // có nút nào: màn hình này chỉ đọc, nên chuỗi dừng ở hợp đồng và không ai nối được sang booking.
   // Bộ kiểm cửa nhập của làn Kiểm soát bắt được chỗ hở này.
   const noiBooking = async (h: HD) => {
-    const id = window.prompt(`Nối hợp đồng ${h.so_hop_dong} với booking nào?\n` +
+    const id = await nhap(`Nối hợp đồng ${h.so_hop_dong} với booking nào?\n` +
                              "Nhập SỐ ID của booking (xem ở màn hình Booking):");
     if (!id || !id.trim()) return;
     const bid = id.trim();
@@ -99,14 +101,14 @@ function HopDong() {
   };
   const chepLink = async (l: any) => {
     try { await navigator.clipboard.writeText(l.link); toast("Đã chép link — dán gửi khách qua Zalo / email"); }
-    catch { window.prompt("Chép link này gửi khách:", l.link); }
+    catch { await nhap("Chép link này gửi khách:", l.link); }
   };
   const guiLaiLink = async (hid: number, l: any) => {
     try { await api<any>(`/ban-hang/link-thanh-toan/${l.ma}/gui-lai`, { method: "POST" }); toast(`Đã gửi lại email tới ${l.email}`); await taiLink(hid); }
     catch (e) { toast(errMsg(e), true); }
   };
   const huyLink = async (hid: number, l: any) => {
-    const ly_do = (window.prompt(`Hủy link ${l.ma}? Ghi lý do (bắt buộc):`) || "").trim();
+    const ly_do = (await nhap(`Hủy link ${l.ma}? Ghi lý do (bắt buộc):`) || "").trim();
     if (!ly_do) return;
     try { await api<any>(`/ban-hang/link-thanh-toan/${l.ma}/huy`, { method: "POST", json: { ly_do } }); toast(`Đã hủy link ${l.ma}`); await taiLink(hid); }
     catch (e) { toast(errMsg(e), true); }
@@ -145,9 +147,9 @@ function HopDong() {
   // Dời hạn một đợt. Hạn GỐC được giữ lại ở máy chủ, nên về sau vẫn đọc được đợt này đã dời mấy lần
   // và vì sao – đó là điểm khác giữa "dời hạn" và "sửa cho khớp".
   const doiHan = async (hid: number, d: any) => {
-    const han = (window.prompt(`Dời hạn đợt "${d.ten}" (${vnd(d.so_tien)}) sang ngày nào?\nDạng 2026-10-15`, d.han || "") || "").trim();
+    const han = (await nhap(`Dời hạn đợt "${d.ten}" (${vnd(d.so_tien)}) sang ngày nào?\nDạng 2026-10-15`, d.han || "") || "").trim();
     if (!han) return;
-    const ly_do = (window.prompt("Lý do dời hạn (bắt buộc – sẽ lưu cùng hạn gốc):") || "").trim();
+    const ly_do = (await nhap("Lý do dời hạn (bắt buộc – sẽ lưu cùng hạn gốc):") || "").trim();
     if (!ly_do) { toast("Phải ghi lý do dời hạn.", true); return; }
     try {
       const r = await api<any>(`/ban-hang/hop-dong/lich-thanh-toan/${d.id}/doi-han`, { method: "POST", json: { han, ly_do } });
@@ -164,6 +166,7 @@ function HopDong() {
 
   return (
     <div className="wrap">
+      {hop}
       <h1>Hợp đồng khách</h1>
       <p className="muted">
         Mắt xích giữa báo giá đã chốt và booking. Giá trị hợp đồng lấy từ <b>bản báo giá đã gửi</b>,

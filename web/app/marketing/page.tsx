@@ -15,6 +15,7 @@ import MucLucPhanHe from "@/components/MucLucPhanHe";
 import KhungNhung from "@/components/KhungNhung";
 import NutLich90, { VAI_NUT_LICH_90 } from "@/components/NutLich90";
 import { useHomNay } from "@/components/DauManHinh01";
+import { useHoi } from "@/components/HopHoi";
 
 /** KHÔNG GIAN LÀM VIỆC MARKETING & PR — bảy màn hình, một chỗ (18/9/2026)
  *
@@ -178,6 +179,7 @@ function The({ nhan, so, nguon, cua, cuaTen, rong, canhBao }:
 }
 
 function Marketing() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   const lapDuoc = ["ptgd_mkt", "nv_mkt", "cntt"].includes(role);
@@ -494,7 +496,7 @@ function Marketing() {
   const ndChoDuyet = nd.filter((n) => ["cho_duyet", "cho_ky_2"].includes(n.status)).length;
   const lechLon = (rep?.by_channel_month || []).filter((a: any) => a.lech_khai_bao).length;
 
-  return (<>
+  return (<>{hop}
     {/* THANH CHỨC NĂNG — MKT-3 · 09/11/2026, khuôn lấy từ màn `/xe`. Thay cho thanh dọc đã
         ẩn: người của phòng vẫn đi được tới MỌI màn của chính phân hệ mình, nhưng không thấy
         phân hệ của phòng khác — đúng điều Chủ tịch chốt 08/11 cho trang riêng từng phòng.
@@ -829,8 +831,8 @@ function Marketing() {
               {c.nguon_tao === "ai" && c.ai_ghi_chu && <p><b>Căn cứ AI đề xuất:</b> {c.ai_ghi_chu}</p>}
               {c.evaluation && <p><b>Đánh giá kết thúc:</b> {c.evaluation}</p>}
               <p className="muted">Người lập {c.created_by}{c.approved_by && ` · Duyệt bởi ${c.approved_by}`}</p>
-              {c.chuyen_duoc.map((s: string) => <button key={s} className="act" style={{ marginRight: 6 }} onClick={() => {
-                if (s === "da_danh_gia") { const dg = prompt("Đánh giá kết thúc chiến dịch (bắt buộc):"); if (dg && dg.trim()) post(`/marketing/campaigns/${c.id}/chuyen-trang-thai`, { status: s, danh_gia: dg.trim() }); }
+              {c.chuyen_duoc.map((s: string) => <button key={s} className="act" style={{ marginRight: 6 }} onClick={async () => {
+                if (s === "da_danh_gia") { const dg = await nhap("Đánh giá kết thúc chiến dịch (bắt buộc):"); if (dg && dg.trim()) post(`/marketing/campaigns/${c.id}/chuyen-trang-thai`, { status: s, danh_gia: dg.trim() }); }
                 else post(`/marketing/campaigns/${c.id}/chuyen-trang-thai`, { status: s });
               }}>→ {meta.trang_thai[s]}</button>)}
             </td></tr>,

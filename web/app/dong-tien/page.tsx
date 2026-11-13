@@ -4,6 +4,7 @@ import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, soTien, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
 import BangBonMoc from "@/components/BangBonMoc";
+import { useHoi } from "@/components/HopHoi";
 
 /** Dòng tiền – bảng bốn mốc, đường số dư từng ngày, và cửa Kế toán chốt số dư.
  *
@@ -239,6 +240,7 @@ function BangDoiChieu({ pn }: { pn: number | null }) {
  */
 function CuaGiaiThich({ pn, dong_bang, dong, xong }:
   { pn: number; dong_bang: any; dong: () => void; xong: () => void }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const [dang, setDang] = useState(false);
   const [ds, setDs] = useState<any[]>([]);
   const { toast } = useShell();
@@ -266,7 +268,7 @@ function CuaGiaiThich({ pn, dong_bang, dong, xong }:
   }
 
   async function go(id: number) {
-    const ly_do = window.prompt("Vì sao gỡ khoản giải thích này?");
+    const ly_do = await nhap("Vì sao gỡ khoản giải thích này?");
     if (!ly_do) return;      // bỏ trống là huỷ thao tác — máy chủ cũng chặn lý do rỗng
     try {
       const r = await api(`/dong-tien/doi-chieu/giai-thich/${id}/huy`,
@@ -275,7 +277,7 @@ function CuaGiaiThich({ pn, dong_bang, dong, xong }:
     } catch (err) { toast(errMsg(err), true); }
   }
 
-  return (<form className="panel wrap" onSubmit={gui}>
+  return (<form className="panel wrap" onSubmit={gui}>{hop}
     <h3>Giải thích chênh lệch — {dong_bang.ten}, chốt đến {fmtD(dong_bang.ngay_chot)}</h3>
     <p className="muted">
       Chênh lệch giữa sổ và số đã chốt: <b>{dong_bang.lech === null ? "—" : vnd(dong_bang.lech)}</b>

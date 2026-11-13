@@ -4,6 +4,7 @@ import DinhKem from "@/components/DinhKem";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtDT } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 // Đội xe thêm 05/10/2026 (Chủ tịch quyết). Hai loại này do Giám đốc đội xe XÁC NHẬN; cửa duyệt vẫn
 // là TGĐ / Chủ tịch như mọi loại khác. Bảng này phải khớp CATEGORY_CONFIRMER ở máy chủ – có hàng rào
@@ -14,6 +15,7 @@ const ST: Record<string, [string, string]> = { cho_tp: ["Chờ bộ phận", "wa
 const CONFIRMER: Record<string, string[]> = { chi_tour: ["tp_dh", "tgd"], marketing: ["ptgd_mkt", "tgd"], hanh_chinh: ["hcns", "tgd"], hoan_tien: ["gd_kd", "tp_dh", "tgd"], tam_ung: ["tp_dh", "tgd"], sua_chua_xe: ["gd_doi_xe", "tgd"], tam_ung_tai_xe: ["gd_doi_xe", "tgd"], chi_doi_xe: ["gd_doi_xe", "tgd"], hoa_hong: ["gd_kd", "tgd"] , tra_ncc_thu_ho: [] };
 
 function Expenses() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   const [tab, setTab] = useState("requests");
@@ -89,7 +91,7 @@ function Expenses() {
   // nhầm thì phải sửa lại được về "chưa biết", chứ không kẹt với một ngày sai.
   const datNgay = async (r: any) => {
     const cu = r.ngay_den_han ? String(r.ngay_den_han).slice(0, 10) : "";
-    const v = prompt(`Ngày phải trả cho ${r.code} (dd/mm/yyyy hoặc yyyy-mm-dd).\nĐể TRỐNG rồi bấm OK = gỡ ngày, khoản này quay lại danh sách chưa có hạn.`, cu);
+    const v = await nhap(`Ngày phải trả cho ${r.code} (dd/mm/yyyy hoặc yyyy-mm-dd).\nĐể TRỐNG rồi bấm OK = gỡ ngày, khoản này quay lại danh sách chưa có hạn.`, cu);
     if (v === null) return;
     const t = v.trim();
     let iso: string | null = null;
@@ -139,7 +141,7 @@ function Expenses() {
     return out;
   };
 
-  return (<>
+  return (<>{hop}
     <h1>Đề nghị chi – Lệnh chi (robot R3) &amp; dòng tiền tour</h1>
     <p className="muted">Đề nghị chi bắt buộc mã tour (chi phí tour), NCC có MST, chứng từ đính kèm. Robot xếp cấp duyệt: chi ngoài dự toán tour hoặc Marketing ≥ hạn mức → <b>Chủ tịch + TGĐ</b> (cổng 15). Luồng: bộ phận xác nhận → Kế toán kiểm tra → TGĐ duyệt → lệnh chi chờ → Kế toán chi trên ngân hàng (SePay tiền ra có mã DC… tự khớp). Duyệt → Nợ 154/641/642 – Có 331; chi → Nợ 331 – Có 1121 (tiền mặt: 1111).</p>
     {chi && (<div style={{ border: "1px solid #0f6f5c", borderRadius: 8, padding: 14, margin: "12px 0", maxWidth: 420 }}>
@@ -228,7 +230,7 @@ function Expenses() {
             {r.robot_ghi_chu && <div style={{ fontSize: 12, color: "#9a5b00" }}>{r.robot_ghi_chu}</div>}
             {r.status === "cho_chi" && !r.co_unc && <div style={{ fontSize: 12 }}><Tag cls="warn">Chưa có UNC</Tag> CK xong tải UNC rồi bấm «Đã chi»</div>}</td>
           <td className="muted">{r.created_by}{r.tp_by && ` → ${r.tp_by}`}{r.kt_by && ` → ${r.kt_by}`}{r.approved_by && ` → ${r.approved_by}`}</td>
-          <td className="dn-nut">{actions(r).map(([l, a, c]) => <button key={a} className={"act " + c} style={{ margin: "0 4px 4px 0" }} disabled={a === "pay" && (r.so_unc ?? (r.co_unc ? 1 : 0)) <= (r.lan_chi || []).length} title={a === "pay" && (r.so_unc ?? 0) <= (r.lan_chi || []).length ? "Tải UNC cho lần chi này trước" : ""} onClick={() => { if (a === "unc") { setTepUnc(true); setTepDN(r.code); return; } if (a === "robot") { post(`/payment-requests/${r.id}/robot-kiem`); return; } if (a === "gui_lai") { setSua({ r, supplier_name: r.supplier_name, supplier_tax_code: r.supplier_tax_code, supplier_bank: r.supplier_bank, description: r.description, document_ref: r.document_ref, amount: r.amount, has_document: r.has_document, has_invoice: r.has_invoice }); return; } let reason = ""; if (a === "reject" || a === "tra_bo_sung") { reason = prompt(a === "reject" ? "Lý do từ chối (bắt buộc):" : "Trả bổ sung — người lập cần bổ sung gì? (bắt buộc)") || ""; if (!reason) return; } if (a === "pay") { setChi({ r, hinh_thuc_tt: "", ma: "", so_tien: String(r.con_phai_chi ?? r.amount) }); return; } step(r, a, reason); }}>{l}</button>)}
+          <td className="dn-nut">{actions(r).map(([l, a, c]) => <button key={a} className={"act " + c} style={{ margin: "0 4px 4px 0" }} disabled={a === "pay" && (r.so_unc ?? (r.co_unc ? 1 : 0)) <= (r.lan_chi || []).length} title={a === "pay" && (r.so_unc ?? 0) <= (r.lan_chi || []).length ? "Tải UNC cho lần chi này trước" : ""} onClick={async () => { if (a === "unc") { setTepUnc(true); setTepDN(r.code); return; } if (a === "robot") { post(`/payment-requests/${r.id}/robot-kiem`); return; } if (a === "gui_lai") { setSua({ r, supplier_name: r.supplier_name, supplier_tax_code: r.supplier_tax_code, supplier_bank: r.supplier_bank, description: r.description, document_ref: r.document_ref, amount: r.amount, has_document: r.has_document, has_invoice: r.has_invoice }); return; } let reason = ""; if (a === "reject" || a === "tra_bo_sung") { reason = await nhap(a === "reject" ? "Lý do từ chối (bắt buộc):" : "Trả bổ sung — người lập cần bổ sung gì? (bắt buộc)") || ""; if (!reason) return; } if (a === "pay") { setChi({ r, hinh_thuc_tt: "", ma: "", so_tien: String(r.con_phai_chi ?? r.amount) }); return; } step(r, a, reason); }}>{l}</button>)}
             {" "}<button className="act grey dn-xem" style={{ margin: "0 4px 4px 0" }} aria-expanded={moCT === r.id}
               onClick={() => setMoCT(moCT === r.id ? null : r.id)}>{moCT === r.id ? "Ẩn chi tiết" : "Xem chi tiết"}</button></td></tr>
           {moCT === r.id && <tr className="dn-ct"><td colSpan={10}>

@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { errMsg } from "@/components/ui";
 import DinhKem from "@/components/DinhKem";
 import BonBuocDeXuatChi from "./BonBuocDeXuatChi";
+import { useHoi } from "@/components/HopHoi";
 
 /** Đội xe v3.3 · thanh con «Đề xuất chi» trên màn /xe — nội dung đổi TẠI CHỖ (Chủ tịch duyệt 10/11/2026).
  *
@@ -13,6 +14,7 @@ import BonBuocDeXuatChi from "./BonBuocDeXuatChi";
 export default function DeXuatChiTaiCho({ vai, toast, moSan = false }: {
   vai: string; toast: (s: string, loi?: boolean) => void; moSan?: boolean;
 }) {
+  const { xacNhan, nhap, hop: hopHoi } = useHoi();
   const [ds, setDs] = useState<any[] | null>(null);
   const [xe, setXe] = useState<any[]>([]);
   const [nguong, setNguong] = useState<number | null>(null);
@@ -38,11 +40,11 @@ export default function DeXuatChiTaiCho({ vai, toast, moSan = false }: {
   const buoc = async (x: any, action: string, them: any = {}) => {
     let reason = "";
     if (action === "reject" || action === "tra_bo_sung") {
-      reason = window.prompt(action === "reject" ? `Lý do từ chối ${x.code} (bắt buộc):`
+      reason = await nhap(action === "reject" ? `Lý do từ chối ${x.code} (bắt buộc):`
         : `Trả ${x.code} về người lập — cần bổ sung gì? (bắt buộc)`) || "";
       if (!reason.trim()) return;
     }
-    if (action === "approve" && !window.confirm(`Ký lệnh chi ${x.code} — ${vnd(x.so_tien)} đ cho ${x.ben_nhan}?`)) return;
+    if (action === "approve" && !await xacNhan(`Ký lệnh chi ${x.code} — ${vnd(x.so_tien)} đ cho ${x.ben_nhan}?`)) return;
     setDang(true);
     try {
       const r = await api<any>(`/fleet/de-nghi-chi/${x.id}/buoc`, { method: "POST", json: { action, reason, ...them } });
@@ -70,7 +72,7 @@ export default function DeXuatChiTaiCho({ vai, toast, moSan = false }: {
   const vnd = (n: number) => Math.round(n || 0).toLocaleString("vi-VN");
   const mau = (tt: string) => tt === "da_chi" ? "ok" : tt === "tu_choi" || tt === "tra_bo_sung" ? "red" : "warn";
 
-  return <>
+  return <>{hopHoi}
     <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between" }}>
       <h2 style={{ margin: 0 }}>Đề xuất chi của đội xe</h2>
       {lap && !mo && <button className="act teal" style={{ margin: 0 }} onClick={() => setMo(true)}>+ Lập đề xuất chi</button>}

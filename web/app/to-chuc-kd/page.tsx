@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Cơ cấu tổ chức khối Kinh doanh – chi nhánh, phòng, team, và ai thuộc đơn vị nào TỪ NGÀY NÀO.
  *
@@ -21,6 +22,7 @@ const nhanCap = (c: string) => CAP.find((x) => x[0] === c)?.[1] || c;
 const nhanVai = (v: string) => VAI.find((x) => x[0] === v)?.[1] || v;
 
 function ToChucKD() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const canWrite = ["chutich", "tgd", "hcns", "cntt"].includes(user?.role || "");
 
@@ -66,7 +68,7 @@ function ToChucKD() {
   const phang = dep(cay?.cay || []);
   const trongPhamVi = (id: number) => cay?.xem_toan_cay || (cay?.pham_vi || []).includes(id);
 
-  return (<>
+  return (<>{hop}
     <h1>Cơ cấu tổ chức khối Kinh doanh</h1>
     <p className="muted">Chi nhánh → phòng → team → người, mỗi phân công có <b>ngày hiệu lực</b>. Đổi ngày xem ở ô bên dưới
       là cây hiện ra đúng như ngày ấy – nhờ vậy nhân viên chuyển team không làm đổi số của kỳ đã chốt.</p>
@@ -104,9 +106,9 @@ function ToChucKD() {
           <td><span className="mono">{r.don_vi_ma}</span> {r.don_vi}</td>
           <td>{r.vai === "nhan_vien" ? nhanVai(r.vai) : <Tag cls="navy">{nhanVai(r.vai)}</Tag>}</td>
           <td className="mono">{r.tu_ngay}{r.den_ngay ? ` → ${r.den_ngay}` : ""}</td>
-          {canWrite && <td>{!r.den_ngay && <button className="act" onClick={() => {
-            const d = prompt("Kết thúc phân công từ ngày nào? (2026-09-30)"); if (!d) return;
-            const ly = prompt("Lý do kết thúc:"); if (!ly) return;
+          {canWrite && <td>{!r.den_ngay && <button className="act" onClick={async () => {
+            const d = await nhap("Kết thúc phân công từ ngày nào? (2026-09-30)"); if (!d) return;
+            const ly = await nhap("Lý do kết thúc:"); if (!ly) return;
             post(`/to-chuc-kd/phan-cong/${r.phan_cong_id}/ket-thuc`, { den_ngay: d, ly_do: ly });
           }}>Kết thúc</button>}</td>}
         </tr>)}

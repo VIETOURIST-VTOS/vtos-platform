@@ -53,6 +53,20 @@ on:
   push: { branches: [main, develop] }
   workflow_dispatch:
 
+# QUYỀN CHỈ-ĐỌC CHO MỌI VIỆC TRONG TỆP NÀY — TR-10, 13/11/2026.
+#
+# Thiếu dòng này, GitHub cấp cho `GITHUB_TOKEN` bộ quyền MẶC ĐỊNH CỦA KHO, và với nhiều kho cũ bộ
+# ấy là ĐỌC-GHI: ghi mã, ghi nhãn, ghi bản phát hành. Kho `vtos-platform` là kho CÔNG KHAI, nên bất
+# kỳ ai cũng mở được một PR từ bản chia đôi (fork) của họ, và PR ấy chạy chính bộ phép thử trong tệp
+# này. Chuỗi lệnh trong một PR như thế không nên có cái quyền nào để ghi vào kho gốc.
+#
+# ĐO TRƯỚC KHI ĐẶT, để không đổi quyền thành đỏ-vì-thiếu-quyền: cả tệp này KHÔNG có một lượt dùng
+# `GITHUB_TOKEN` hay `secrets.*` nào. Mọi việc chỉ `checkout` rồi chạy phép thử, nên `contents: read`
+# là ĐỦ và là tất cả những gì cần. (`dong-so.yml` thì KHÁC — nó mở PR đóng sổ, nên nó khai
+# `contents: write` + `pull-requests: write` của riêng nó; đừng mang dòng dưới sang đó.)
+permissions:
+  contents: read
+
 # ĐẨY LẦN HAI THÌ HUỶ LƯỢT ĐANG CHẠY CỦA LẦN MỘT — 27/9/2026.
 #
 # Bộ đủ mất ~25 phút và GitHub tính tiền theo PHÚT ĐÃ CHẠY, không theo lượt có ai đọc kết quả hay
@@ -252,6 +266,12 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: npm, cache-dependency-path: web/package-lock.json }
       - run: npm ci
+      # HÀNG RÀO HỘP THOẠI — TR-10, 13/11/2026. Chặn `prompt()` / `confirm()` quay lại giao diện,
+      # và canh chỗ sai không ai thấy: `{hop}` đặt nhầm thành phần hay nhầm nhánh return thì nút
+      # đứng im MÀ BẢN DỰNG VẪN XANH. Nên hàng rào này phải đứng TRƯỚC `npm run build`: bản dựng
+      # xanh không nói được gì về chuyện ấy. Nó đọc cây cú pháp TSX bằng chính bộ TypeScript đã
+      # có trong `devDependencies`, nên không thêm gói nào và chạy dưới một giây.
+      - run: npm run hang-rao
       - run: npm run build
         env: { NEXT_TELEMETRY_DISABLED: 1 }
   docker:

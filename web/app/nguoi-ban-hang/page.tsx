@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Ai được bán hàng – nhân viên nào, và đối tác nào.
  *
@@ -17,6 +18,7 @@ const LOAI: [string, string][] = [["ghep_le", "Đối tác ghép lẻ"], ["dai_l
                                   ["san_ve", "Sàn bán vé"], ["ctv_ban_hang", "CTV bán hàng"], ["khac", "Khác"]];
 
 function NguoiBanHang() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const canWrite = ["chutich", "tgd", "hcns", "cntt"].includes(user?.role || "");
   const [d, setD] = useState<any>(null);
@@ -30,8 +32,8 @@ function NguoiBanHang() {
     try { const r = await api(path, { method: "POST", json }); toast(r.message || "Đã ghi"); load(); }
     catch (x) { toast(errMsg(x), true); }
   };
-  const doiQuyen = (r: any, duoc: boolean) => {
-    const ly = prompt(`${duoc ? "Mở" : "Thu"} quyền bán hàng của ${r.ho_ten}. Lý do:`);
+  const doiQuyen = async (r: any, duoc: boolean) => {
+    const ly = await nhap(`${duoc ? "Mở" : "Thu"} quyền bán hàng của ${r.ho_ten}. Lý do:`);
     if (!ly) return;
     post("/nguoi-ban-hang/quyen-ban", { user_id: r.user_id, duoc, ly_do: ly });
   };
@@ -42,7 +44,7 @@ function NguoiBanHang() {
 
   const khoi = d?.khoi_kinh_doanh || [], bat = d?.ngoai_khoi_duoc_ban || [], tat = d?.ngoai_khoi_chua_bat || [];
 
-  return (<>
+  return (<>{hop}
     <h1>Người bán hàng</h1>
     <p className="muted">Ai có thể đứng tên một booking: nhân viên khối Kinh doanh, người bộ phận khác được mở quyền bán,
       và đối tác ngoài công ty. <b>Đối tác không có tài khoản đăng nhập</b> – họ là một danh mục riêng, không phải người dùng hệ thống.</p>
@@ -79,9 +81,9 @@ function NguoiBanHang() {
           <td>{r.lien_he}{r.dien_thoai ? ` · ${r.dien_thoai}` : ""}</td>
           <td className="mono">{r.hieu_luc_tu}{r.hieu_luc_den ? ` → ${r.hieu_luc_den}` : ""}</td>
           <td>{r.con_hop_tac ? <Tag cls="ok">Đang hợp tác</Tag> : <Tag cls="red">Đã dừng</Tag>}</td>
-          {canWrite && <td>{r.con_hop_tac && <button className="act" onClick={() => {
-            const n = prompt("Dừng hợp tác từ ngày nào? (2026-09-30)"); if (!n) return;
-            const ly = prompt("Lý do dừng:"); if (!ly) return;
+          {canWrite && <td>{r.con_hop_tac && <button className="act" onClick={async () => {
+            const n = await nhap("Dừng hợp tác từ ngày nào? (2026-09-30)"); if (!n) return;
+            const ly = await nhap("Lý do dừng:"); if (!ly) return;
             post(`/nguoi-ban-hang/doi-tac/${r.id}/dong`, { den_ngay: n, ly_do: ly });
           }}>Dừng</button>}</td>}
         </tr>)}

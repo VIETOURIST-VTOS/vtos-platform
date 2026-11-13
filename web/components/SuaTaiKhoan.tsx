@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** HS-6 · Hộp Sửa tài khoản — Chủ tịch duyệt bản vẽ 15/10/2026, dựng 16/10/2026.
  *
@@ -51,6 +52,7 @@ export default function SuaTaiKhoan(
   { r, acc, vaiNguoiDung, onClose, onDone }:
   { r: any; acc: any; vaiNguoiDung: string; onClose: () => void; onDone: (msg: string) => void }
 ) {
+  const { xacNhan, nhap, hop } = useHoi();
   const duocSua = VAI_SUA_HO_SO.includes(vaiNguoiDung);
   const duocKhoa = VAI_KHOA.includes(vaiNguoiDung);
   const duocNghi = VAI_NGHI_VIEC.includes(vaiNguoiDung);
@@ -102,10 +104,10 @@ export default function SuaTaiKhoan(
         "PUT", "Đã lưu");
   };
 
-  const ghiNghiViec = () => {
+  const ghiNghiViec = async () => {
     if (!r.ho_so_id) { setLoi("Tài khoản này chưa nối với hồ sơ nhân sự nào — đặt mã nhân viên trước."); return; }
     if (!nvNgay) { setLoi("Chưa chọn ngày nghỉ việc"); return; }
-    if (!window.confirm(
+    if (!await xacNhan(
       `Ghi nhận ${r.full_name} nghỉ việc từ ${nvNgay}?\n\n` +
       `Hồ sơ nhân sự đóng lại và người này ra khỏi bảng lương kỳ sau. ` +
       `Tài khoản đăng nhập KHÔNG tự khoá — đó là một việc riêng ở trên.`)) return;
@@ -129,7 +131,7 @@ export default function SuaTaiKhoan(
   };
 
   const xoaBanGhi = async () => {
-    const ly = window.prompt(
+    const ly = await nhap(
       `XOÁ VĨNH VIỄN bản ghi ${r.full_name} (${r.username}). Không có nút hoàn lại.\n\n` +
       `Lý do (bắt buộc, vào bia mộ và nhật ký):`, "");
     if (!ly || !ly.trim()) { setLoi("Chưa ghi lý do – không xoá"); return; }
@@ -138,7 +140,7 @@ export default function SuaTaiKhoan(
     setBan(true); setLoi("");
     try {
       const xt = await api<any>(`/gop-tai-khoan/${r.id}`, { method: "DELETE", json: { ly_do: ly.trim(), xac_nhan: false } });
-      if (!window.confirm(
+      if (!await xacNhan(
         `${xt?.ghi_chu || ""}\n\n`
         + `Còn ${xt?.tong_dong_con_lai ?? "?"} dòng dữ liệu trỏ tới tài khoản này.\n\n`
         + `Xoá thật ${r.username}?`)) { setBan(false); return; }
@@ -150,7 +152,7 @@ export default function SuaTaiKhoan(
 
   const o: React.CSSProperties = { width: "100%", boxSizing: "border-box" };
 
-  return <div style={{ border: "1px solid var(--line, #2a3b55)", borderRadius: 8, padding: 14, marginTop: 14 }}>
+  return <div style={{ border: "1px solid var(--line, #2a3b55)", borderRadius: 8, padding: 14, marginTop: 14 }}>{hop}
     <div className="row" style={{ gap: 10, alignItems: "baseline", marginBottom: 4 }}>
       <h3 style={{ margin: 0 }}>Sửa tài khoản — {r.full_name}</h3>
       <span className="muted" style={{ fontSize: 12 }}>

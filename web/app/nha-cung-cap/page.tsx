@@ -4,6 +4,7 @@ import DinhKem from "@/components/DinhKem";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtD, fmtDT, soTien } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Nhà cung cấp & đặt dịch vụ.
  *
@@ -13,6 +14,7 @@ import { Tag, errMsg } from "@/components/ui";
 const n = (x: any) => Number(x || 0).toLocaleString("vi-VN");
 
 function NhaCungCap() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [ds, setDs] = useState<any[]>([]);
   const [don, setDon] = useState<any>(null);
@@ -61,7 +63,7 @@ function NhaCungCap() {
   };
 
   const xacNhanTk = async (cid: number, dong_y: boolean) => {
-    const gc = prompt(dong_y ? "Ghi chú xác nhận (đã xác minh với nhà cung cấp bằng cách nào?):"
+    const gc = await nhap(dong_y ? "Ghi chú xác nhận (đã xác minh với nhà cung cấp bằng cách nào?):"
                              : "Lý do từ chối:");
     if (gc === null) return;
     try { const r = await api<any>(`/ncc/doi-tai-khoan/${cid}/xac-nhan`, { method: "POST", json: { dong_y, ghi_chu: gc } });
@@ -79,7 +81,7 @@ function NhaCungCap() {
   const trangThai = async (did: number, status: string) => {
     let xn = "";
     if (status === "da_xac_nhan") {
-      const v = prompt("Căn cứ nhà cung cấp đã xác nhận (số văn bản, email, tin nhắn):");
+      const v = await nhap("Căn cứ nhà cung cấp đã xác nhận (số văn bản, email, tin nhắn):");
       if (!v) return; xn = v;
     }
     try { const r = await api<any>(`/ncc/don/${did}/trang-thai`, { method: "POST", json: { status, xac_nhan_ncc: xn } });
@@ -90,7 +92,7 @@ function NhaCungCap() {
   // VPM-17 – gõ hoặc sửa ngày phải trả NCC. Gửi rỗng = gỡ ngày, đơn quay lại danh sách chưa có hạn.
   const datNgayDon = async (d: any) => {
     const cu = d.ngay_den_han ? String(d.ngay_den_han).slice(0, 10) : "";
-    const v = prompt(`Ngày phải trả NCC cho đơn ${d.code} (dd/mm/yyyy hoặc yyyy-mm-dd).\nĐể TRỐNG rồi bấm OK = gỡ ngày.`, cu);
+    const v = await nhap(`Ngày phải trả NCC cho đơn ${d.code} (dd/mm/yyyy hoặc yyyy-mm-dd).\nĐể TRỐNG rồi bấm OK = gỡ ngày.`, cu);
     if (v === null) return;
     const t = v.trim();
     let iso: string | null = null;
@@ -106,7 +108,7 @@ function NhaCungCap() {
 
 
   if (!dm) return <p className="muted">Đang tải…</p>;
-  return (<>
+  return (<>{hop}
     <h1>Nhà cung cấp & đặt dịch vụ</h1>
     <p className="muted">Số tài khoản nhà cung cấp <b>chỉ đổi được qua đề nghị có người thứ hai xác nhận</b>.
       Form hồ sơ dưới đây không có ô số tài khoản — đó là chủ ý, không phải thiếu sót.</p>

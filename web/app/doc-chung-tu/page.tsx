@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, fmtDT, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Đọc chứng từ ảnh ra số – cửa thứ ba của khuôn ba cửa nhập liệu.
  *
@@ -34,6 +35,7 @@ const TEN_O: Record<string, string> = {
 };
 
 function DocChungTu() {
+  const { xacNhan: xacNhanHoi, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const [meta, setMeta] = useState<any>(null);
   const [loai, setLoai] = useState("");
@@ -85,7 +87,7 @@ function DocChungTu() {
 
   const boBan = async () => {
     if (!mo) return;
-    const ly_do = prompt("Vì sao bỏ bản này? (máy đọc sai / chứng từ không dùng / …)") || "";
+    const ly_do = await nhap("Vì sao bỏ bản này? (máy đọc sai / chứng từ không dùng / …)") || "";
     if (!ly_do.trim()) return;
     try {
       await api(`/doc-chung-tu/${mo.id}/bo`, { method: "POST", json: { ly_do } });
@@ -97,7 +99,7 @@ function DocChungTu() {
   const chuaDoc = new Set(mo?.truong_khong_doc_duoc || []);
 
   return (
-    <div className="wrap">
+    <div className="wrap">{hop}
       <h1>Đọc chứng từ ảnh ra số</h1>
       <p className="muted">
         Máy soạn nháp, người xác nhận. Số máy đọc <b>không nằm ở bất kỳ báo cáo nào</b> cho tới khi

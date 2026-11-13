@@ -15,6 +15,7 @@ import BienDongNhanSu from "@/components/BienDongNhanSu";
 import DinhKem from "@/components/DinhKem";
 import { api, vnd, fmtD, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg, KyO, tenKy } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Visa, HDV & phân chuyến, Đội xe là nghiệp vụ của Điều hành (Đề xuất 06/9/2026 mục 2) nên nằm ở trang
  *  /ops với quyền của Điều hành; Nhân sự giữ hồ sơ lao động, lương và sự vụ. Cùng một màn hình, hai lối vào. */
@@ -45,6 +46,7 @@ const TRA: Record<string, [string, string]> = {
 const lastMonth = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); };
 
 export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   // Bảng lương tách khỏi hồ sơ nhân sự (chỉ đạo 07/9/2026): máy chủ nói tab nào người này mở được.
@@ -175,7 +177,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
   const guides = emps.filter((e) => e.department === "huong_dan");
   const empName = (id: number) => emps.find((e) => e.id === id)?.full_name || id;
 
-  return (<>
+  return (<>{hop}
     {/* Cùng một thành phần phục vụ hai phân hệ, nên tiêu đề phải theo phân hệ đang vào. Trước
         29/9/2026 nó ghi cứng "Nhân sự – Lương (robot R6)": người Điều hành bấm "Bảng giá vận tải"
         hay "Lịch & bố trí hướng dẫn" mở đúng tab, nhưng đọc tiêu đề lại tưởng mình lạc sang màn
@@ -471,7 +473,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
     {tab === "employees" && <>
       {canHR && <div className="panel"><h2>Danh sách nhân viên chính thức (bảng lương HCNS)</h2><p className="muted">Nạp mã NV / phòng / nhóm kinh doanh / chức vụ từ bảng lương HCNS đã đưa vào hệ thống (tháng 9/2026); ghép tài khoản theo họ tên, tạo tài khoản mới cho khối phải báo cáo ngày (mật khẩu ban đầu = mã NV). Nhân sự không còn trên bảng lương → ngưng hoạt động (không xóa).</p>
         <button className="act orange" onClick={() => post("/employees/import-master").then(() => api("/employees").then(setEmps))}>Nạp / cập nhật danh sách nhân viên</button>
-        <button className="act red" onClick={() => { if (confirm("Đặt lại mật khẩu = mã NV cho TẤT CẢ tài khoản trong danh sách (trừ Chủ tịch/TGĐ/CNTT)? Dùng khi cấp tài khoản lần đầu.")) post("/employees/import-master?reset_passwords=true").then(() => api("/employees").then(setEmps)); }}>Nạp + đặt lại mật khẩu = mã NV</button></div>}
+        <button className="act red" onClick={async () => { if (await xacNhan("Đặt lại mật khẩu = mã NV cho TẤT CẢ tài khoản trong danh sách (trừ Chủ tịch/TGĐ/CNTT)? Dùng khi cấp tài khoản lần đầu.")) post("/employees/import-master?reset_passwords=true").then(() => api("/employees").then(setEmps)); }}>Nạp + đặt lại mật khẩu = mã NV</button></div>}
       {canHR && <div className="panel"><h2>Thêm hồ sơ</h2><div className="grid">
         <label>Họ tên<input value={fEmp.full_name} onChange={(e) => setFEmp({ ...fEmp, full_name: e.target.value })} /></label>
         <label>Phòng<select value={fEmp.department} onChange={(e) => setFEmp({ ...fEmp, department: e.target.value })}>{Object.entries(meta.departments).map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select></label>
@@ -525,7 +527,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
           <td className="muted" style={{ maxWidth: 340 }}>{e.duties}</td><td>{fmtD(e.birth_date)}</td><td className="mono">{e.phone}</td>
           <td>{e.department === "huong_dan" && <>{e.card_no} <span className="muted">hạn {fmtD(e.card_expiry)}</span> {e.guide_ok ? <Tag cls="ok">Đủ điều kiện</Tag> : <Tag cls="red">Cổng 13</Tag>}</>}</td><td>{e.probation && <Tag cls="warn">Thử việc 85%</Tag>}{e.active ? "" : <Tag cls="red">Nghỉ</Tag>}</td>
           {canHR && <td>{e.active
-            ? <button className="act red" style={{ margin: 0 }} title="Ngưng hồ sơ (không xóa) – dùng khi trùng hồ sơ hoặc nghỉ việc" onClick={() => { if (confirm(`Ngưng hồ sơ ${e.code} – ${e.full_name}? Hồ sơ vẫn được giữ để tra cứu lịch sử.`)) post(`/employees/${e.id}`, { full_name: e.full_name, department: e.department, active: false }, "PUT"); }}>Ngưng</button>
+            ? <button className="act red" style={{ margin: 0 }} title="Ngưng hồ sơ (không xóa) – dùng khi trùng hồ sơ hoặc nghỉ việc" onClick={async () => { if (await xacNhan(`Ngưng hồ sơ ${e.code} – ${e.full_name}? Hồ sơ vẫn được giữ để tra cứu lịch sử.`)) post(`/employees/${e.id}`, { full_name: e.full_name, department: e.department, active: false }, "PUT"); }}>Ngưng</button>
             : <button className="act" style={{ margin: 0 }} onClick={() => post(`/employees/${e.id}`, { full_name: e.full_name, department: e.department, active: true }, "PUT")}>Mở lại</button>}
             {" "}<button className="act grey" style={{ margin: 0 }} title="Hồ sơ giấy tờ của người này" onClick={() => setTepNV(e.code)}>Giấy tờ</button>
             {" "}<button className="act" style={{ margin: 0 }} title="Sửa thông tin hồ sơ"
@@ -625,7 +627,7 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
               <select value={v.company_id || ""} onChange={(e) => post(`/vehicles/${v.id}/company`, { company_id: e.target.value ? Number(e.target.value) : null })}>
                 <option value="">– chưa gán –</option>{cos.filter((c) => c.active || c.id === v.company_id).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}{c.active ? "" : " (tạm ngưng)"}</option>)}
               </select>
-              <button className={v.active ? "act red" : "act"} style={{ margin: "0 0 0 6px" }} onClick={() => { if (!v.active || confirm(`Ngưng khai thác xe ${v.plate}? Xe vẫn được giữ để tra cứu lệnh điều xe cũ.`)) post(`/vehicles/${v.id}`, { active: !v.active }, "PUT"); }}>{v.active ? "Ngưng" : "Mở lại"}</button>
+              <button className={v.active ? "act red" : "act"} style={{ margin: "0 0 0 6px" }} onClick={async () => { if (!v.active || await xacNhan(`Ngưng khai thác xe ${v.plate}? Xe vẫn được giữ để tra cứu lệnh điều xe cũ.`)) post(`/vehicles/${v.id}`, { active: !v.active }, "PUT"); }}>{v.active ? "Ngưng" : "Mở lại"}</button>
             </td>}</tr>)}</tbody></table>
         <p className="muted">Pháp nhân sở hữu lấy theo <b>giấy đăng ký xe</b>, không suy từ việc xe là xe nội bộ hay thuê ngoài: hiện phần lớn đội xe đứng tên Công ty CP Vietourist Holdings, chỉ một xe đứng tên Vận tải Vietrip. <b>Tài xế hưởng lương ở công ty mẹ</b> dù xe đứng tên pháp nhân nào. Xe thuộc pháp nhân trong phạm vi hợp nhất (mẹ, con, chi nhánh) thì lệnh điều xe là <b>giao dịch nội bộ</b> – phải nhận diện để loại trừ khi lập báo cáo hợp nhất. Xe hợp tác là xe thuê ngoài, không gán pháp nhân trong tập đoàn.</p></div>
       <h2>Bảng giá xe nội bộ theo tuyến ({tenKy(rates[0]?.ten_vai_ky) || "người ký theo luật"} duyệt, hiệu lực theo ngày)</h2>
@@ -672,8 +674,8 @@ export default function HrScreens({ scope = "hr" }: { scope?: "hr" | "ops" }) {
           <td style={{ whiteSpace: "nowrap" }}>
             {role === "hcns" && i.status === "lap" && <button className="act teal" style={{ margin: 0 }} onClick={() => post(`/incidents/${i.id}/confirm`)}>HCNS xác nhận</button>}
             {["gd_kd", "ptgd_doan", "tgd", "chutich"].includes(role) && i.status === "hcns_xac_nhan" && <button className="act" style={{ margin: 0 }} onClick={() => post(`/incidents/${i.id}/approve`)}>Duyệt</button>}
-            {["gd_kd", "ptgd_doan", "tgd", "chutich"].includes(role) && ["khieu_nai", "cho_khieu_nai"].includes(i.status) && <><button className="act grey" style={{ margin: "0 4px 0 0" }} onClick={() => { const n = prompt("Kết luận (giữ nguyên chế tài):"); if (n !== null) post(`/incidents/${i.id}/resolve`, { accept: false, result: n }); }}>Giữ nguyên</button>{i.status === "khieu_nai" && <button className="act grey" style={{ margin: 0 }} onClick={() => { const n = prompt("Kết luận (chấp nhận khiếu nại, hủy chế tài):"); if (n !== null) post(`/incidents/${i.id}/resolve`, { accept: true, result: n }); }}>Chấp nhận KN</button>}</>}
-            {i.is_mine && ["lap", "hcns_xac_nhan", "cho_khieu_nai"].includes(i.status) && <button className="act orange" style={{ margin: "0 0 0 4px" }} onClick={() => { const o = prompt("Ý kiến của anh/chị về biên bản:") || ""; const a = prompt("Khiếu nại (để trống nếu không):") || ""; if (o || a) post(`/incidents/${i.id}/opinion`, { opinion: o, appeal: a }); }}>Ghi ý kiến / khiếu nại</button>}
+            {["gd_kd", "ptgd_doan", "tgd", "chutich"].includes(role) && ["khieu_nai", "cho_khieu_nai"].includes(i.status) && <><button className="act grey" style={{ margin: "0 4px 0 0" }} onClick={async () => { const n = await nhap("Kết luận (giữ nguyên chế tài):"); if (n !== null) post(`/incidents/${i.id}/resolve`, { accept: false, result: n }); }}>Giữ nguyên</button>{i.status === "khieu_nai" && <button className="act grey" style={{ margin: 0 }} onClick={async () => { const n = await nhap("Kết luận (chấp nhận khiếu nại, hủy chế tài):"); if (n !== null) post(`/incidents/${i.id}/resolve`, { accept: true, result: n }); }}>Chấp nhận KN</button>}</>}
+            {i.is_mine && ["lap", "hcns_xac_nhan", "cho_khieu_nai"].includes(i.status) && <button className="act orange" style={{ margin: "0 0 0 4px" }} onClick={async () => { const o = await nhap("Ý kiến của anh/chị về biên bản:") || ""; const a = await nhap("Khiếu nại (để trống nếu không):") || ""; if (o || a) post(`/incidents/${i.id}/opinion`, { opinion: o, appeal: a }); }}>Ghi ý kiến / khiếu nại</button>}
           </td></tr>) : <tr><td colSpan={8} className="muted">Chưa có sự vụ.</td></tr>}</tbody></table></div>
       {["hcns", "cntt"].includes(role) && <button className="act grey" onClick={() => post("/incidents/finalize-expired")}>Chốt hiệu lực sự vụ hết hạn khiếu nại</button>}
     </>}

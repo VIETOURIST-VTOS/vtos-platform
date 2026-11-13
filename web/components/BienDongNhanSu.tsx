@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, getUser } from "@/lib/api";
+import { useHoi } from "@/components/HopHoi";
 
 /** 5.8 Báo cáo biến động nhân sự — đứng ở /hr thẻ "Tổng quan HCNS".
  *
@@ -13,6 +14,7 @@ import { api, getUser } from "@/lib/api";
  *  cân giả: tổng cuối kỳ thiếu đúng bằng số người ấy.
  */
 export default function BienDongNhanSu() {
+  const { xacNhan, nhap, hop } = useHoi();
   const u = getUser();
   const [kyLoai, setKyLoai] = useState("thang");
   const [ky, setKy] = useState(() => new Date().toISOString().slice(0, 7));
@@ -34,11 +36,11 @@ export default function BienDongNhanSu() {
   const laHcns = ["hcns", "cntt", "tgd", "chutich"].includes(u?.role || "");
 
   async function ghiNghi(employee_id: number) {
-    const ngay = window.prompt("Ngày nghỉ (YYYY-MM-DD):") || "";
+    const ngay = await nhap("Ngày nghỉ (YYYY-MM-DD):") || "";
     if (!ngay) return;
-    const loai = window.prompt(
+    const loai = await nhap(
       `Lý do: ${Object.keys(meta?.ly_do_giam || {}).join(" / ")}`, "tu_xin") || "";
-    const ghi = window.prompt("Ghi chú (không bắt buộc):") || "";
+    const ghi = await nhap("Ghi chú (không bắt buộc):") || "";
     try {
       await api("/bien-dong-ns/nghi-viec", { method: "POST",
         json: { employee_id, ngay, ly_do_loai: loai, ly_do: ghi } });
@@ -48,7 +50,7 @@ export default function BienDongNhanSu() {
 
   const t = bc?.tong;
   return (
-    <section>
+    <section>{hop}
       <h2>Biến động nhân sự</h2>
       <p className="muted">
         Một phép tính: <b>đầu kỳ + tăng − giảm = cuối kỳ</b>. Cột <b>Lệch</b> là vế thừa của đẳng thức

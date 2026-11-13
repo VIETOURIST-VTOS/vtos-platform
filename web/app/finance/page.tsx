@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd, fmtD } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 const KIN: Record<string, string> = { thu_booking: "Thu booking (D-7)", thu_hoi_dau_tu: "Thu hồi đầu tư/hợp tác", nhan_vay: "Nhận giải ngân vay" };
 const KOUT: Record<string, string> = { chi_ncc: "Đề nghị chi NCC", chi_tour_du_toan: "Chi tour theo dự toán", tra_goc_vay: "Trả gốc vay", lai_vay: "Lãi vay", giai_ngan_dau_tu: "Giải ngân đầu tư", luong: "Lương", thue: "Thuế", thue_van_phong: "Thuê văn phòng", khac: "Khác" };
@@ -11,6 +12,7 @@ const SK: Record<string, string> = { tra_goc: "Trả gốc", tra_lai: "Trả lã
 const today = () => new Date().toISOString().slice(0, 10);
 
 function Finance() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const role = user?.role || "";
   const isKT = role === "ketoan";
@@ -40,7 +42,7 @@ function Finance() {
   const keysIn = fc ? Array.from(new Set(fc.weeks.flatMap((w: any) => Object.keys(w.in)))) as string[] : [];
   const keysOut = fc ? Array.from(new Set(fc.weeks.flatMap((w: any) => Object.keys(w.out)))) as string[] : [];
 
-  return (<>
+  return (<>{hop}
     <h1>Ngân quỹ – Tài chính: dự báo 13 tuần, vay, đầu tư &amp; hợp tác (mục 3.9)</h1>
     <p className="muted">Dự báo dòng tiền lấy tự động từ: booking còn phải thu (dự kiến thu trước khởi hành 7 ngày), đề nghị chi & dự toán tour sắp chạy, lịch trả gốc/lãi từng khế ước, lịch thu hồi hợp tác/ký quỹ/cọc/cho vay, bảng lương gần nhất và các khoản Kế toán nhập (thuế, thuê văn phòng…). Cảnh báo khi số dư dự kiến âm hoặc dưới ngưỡng tối thiểu.</p>
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{[["forecast", "Dự báo 13 tuần"], ["contracts", "Hợp đồng vay & đầu tư"], ["weekly", "Báo cáo tài chính tuần"], ["vayxe", "Vay & thế chấp xe"], ["doichieu", "Đối chiếu sao kê vay"]].map(([k, l]) => <button key={k} className={"act " + (tab === k ? "" : "grey")} style={{ margin: 0 }} onClick={() => setTab(k)}>{l}</button>)}</div>
@@ -89,8 +91,8 @@ function Finance() {
           {open === c.id && <tr key={c.id + "s"}><td colSpan={10}><div style={{ margin: "4px 0 8px 16px" }}><div className="muted">{c.purpose} · TSĐB: {c.collateral}</div>
             <table style={{ width: "auto" }}><thead><tr><th>Ngày</th><th>Loại</th><th style={{ textAlign: "right" }}>Số tiền</th><th>Trạng thái</th><th>GD ngân hàng</th>{isKT && <th></th>}</tr></thead><tbody>
               {c.schedule.map((s: any) => <tr key={s.id}><td>{fmtD(s.due_date)}</td><td>{SK[s.kind]}</td><td style={{ textAlign: "right" }}>{vnd(s.amount)}</td><td><Tag cls={s.status === "da_thuc_hien" ? "ok" : s.status === "qua_han" ? "red" : "warn"}>{s.status === "da_thuc_hien" ? "Đã thực hiện" : s.status === "qua_han" ? "Quá hạn" : "Kế hoạch"}</Tag></td><td className="muted">{s.bank_ref}{s.done_on && ` · ${fmtD(s.done_on)}`}</td>
-                {isKT && <td>{s.status !== "da_thuc_hien" && <button className="act teal" style={{ margin: 0 }} onClick={() => { const ref = prompt("Mã giao dịch ngân hàng:") || ""; post(`/fin/schedule/${s.id}/settle`, { done_on: today(), bank_ref: ref }); }}>Đã thực hiện</button>}</td>}</tr>)}</tbody></table>
-            {isKT && <button className="act grey" onClick={() => { const d = prompt("Ngày (YYYY-MM-DD):", today()); const k = prompt("Loại: tra_goc / tra_lai / thu_hoi / giai_ngan / nhan_vay:", c.kind === "vay" ? "tra_goc" : "thu_hoi"); const a = prompt("Số tiền:"); if (d && k && a) post(`/fin/contracts/${c.id}/schedule`, { due_date: d, kind: k, amount: Number(a) }); }}>+ dòng lịch</button>}
+                {isKT && <td>{s.status !== "da_thuc_hien" && <button className="act teal" style={{ margin: 0 }} onClick={async () => { const ref = await nhap("Mã giao dịch ngân hàng:") || ""; post(`/fin/schedule/${s.id}/settle`, { done_on: today(), bank_ref: ref }); }}>Đã thực hiện</button>}</td>}</tr>)}</tbody></table>
+            {isKT && <button className="act grey" onClick={async () => { const d = await nhap("Ngày (YYYY-MM-DD):", today()); const k = await nhap("Loại: tra_goc / tra_lai / thu_hoi / giai_ngan / nhan_vay:", c.kind === "vay" ? "tra_goc" : "thu_hoi"); const a = await nhap("Số tiền:"); if (d && k && a) post(`/fin/contracts/${c.id}/schedule`, { due_date: d, kind: k, amount: Number(a) }); }}>+ dòng lịch</button>}
             <DinhKem doiTuong="khe_uoc_vay" doiTuongId={c.code} loai="hop_dong"
               tieuDe={`Bản gốc khế ước ${c.contract_no || c.code} – ${c.partner}`}
               goi={"Bản scan khế ước / hợp đồng, phụ lục gia hạn, thông báo lãi suất, giấy nhận nợ từng lần " +
@@ -125,12 +127,12 @@ function Finance() {
           <td><Tag cls={c.muc === "gap" || c.muc === "qua_han" ? "red" : c.muc === "thieu_du_lieu" ? "warn" : "warn"}>{c.muc === "gap" ? "GẤP" : c.muc === "qua_han" ? "QUÁ HẠN" : c.muc === "thieu_du_lieu" ? "THIẾU DỮ LIỆU" : "SỚM"}</Tag></td>
           <td>{c.noi_dung}</td><td className="muted">{c.viec}
             {c.loai === "xe_da_ra_khoi_doi_van_the_chap" && c.collateral_id && isKT && <div style={{ marginTop: 6 }}>
-              <button className="act grey" style={{ margin: 0, fontSize: 12 }} onClick={() => {
-                const so = prompt(`Số văn bản giải chấp của ngân hàng cho xe ${c.xe}:`);
+              <button className="act grey" style={{ margin: 0, fontSize: 12 }} onClick={async () => {
+                const so = await nhap(`Số văn bản giải chấp của ngân hàng cho xe ${c.xe}:`);
                 if (so && so.trim()) post(`/fleet/the-chap/${c.collateral_id}/giai-chap`, { van_ban: so.trim() }).then(() => api("/fin/vay-xe").then(setVx));
               }}>Ghi giải chấp (có văn bản)</button>
-              <button className="act grey" style={{ margin: "0 0 0 6px", fontSize: 12 }} onClick={() => {
-                const ly = prompt(`Gỡ ${c.xe} khỏi theo dõi thế chấp — ĐÂY KHÔNG PHẢI GIẢI CHẤP. Lý do:`);
+              <button className="act grey" style={{ margin: "0 0 0 6px", fontSize: 12 }} onClick={async () => {
+                const ly = await nhap(`Gỡ ${c.xe} khỏi theo dõi thế chấp — ĐÂY KHÔNG PHẢI GIẢI CHẤP. Lý do:`);
                 if (ly && ly.trim()) post(`/fleet/the-chap/${c.collateral_id}/go-khoi-theo-doi`, { ly_do: ly.trim() }).then(() => api("/fin/vay-xe").then(setVx));
               }}>Gỡ khỏi theo dõi</button>
             </div>}
@@ -192,7 +194,7 @@ function Finance() {
             {dc.lech.map((l: any) => <tr key={l.ke_uoc}><td>{l.ke_uoc}</td><td>{l.partner}</td>
               <td>{l.sai_lech.map((s: any, i: number) => <div key={i}>{s.truong === "du_no" ? <>Dư nợ: hệ thống {vnd(s.he_thong)} → sao kê {vnd(s.sao_ke)} <b style={{ color: s.chenh < 0 ? "var(--teal)" : "var(--red)" }}>({s.chenh > 0 ? "+" : ""}{vnd(s.chenh)})</b></> : s.truong === "lai_suat" ? <>Lãi suất: {s.he_thong}% → <b>{s.sao_ke}%</b></> : <>Đáo hạn: {s.he_thong} → <b>{s.sao_ke}</b></>}</div>)}</td></tr>)}
           </tbody></table></div>
-          {isKT && <button className="act" onClick={() => { if (confirm(`Ghi dư nợ, lãi suất và ngày đáo hạn theo sao kê ${sk.ngan_hang} cho ${dc.lech.length} khế ước?`)) post("/fin/cap-nhat-theo-sao-ke", { ngan_hang: sk.ngan_hang, den_ngay: sk.den_ngay, dong: dc._dong }).then((r) => { if (r) { toast(r.message); setDc(null); } }); }}>Cập nhật hệ thống theo sao kê</button>}
+          {isKT && <button className="act" onClick={async () => { if (await xacNhan(`Ghi dư nợ, lãi suất và ngày đáo hạn theo sao kê ${sk.ngan_hang} cho ${dc.lech.length} khế ước?`)) post("/fin/cap-nhat-theo-sao-ke", { ngan_hang: sk.ngan_hang, den_ngay: sk.den_ngay, dong: dc._dong }).then((r) => { if (r) { toast(r.message); setDc(null); } }); }}>Cập nhật hệ thống theo sao kê</button>}
         </>}
         {dc.khong_thay_tren_sao_ke.length > 0 && <><h2>Hệ thống đang theo dõi nhưng không có trên sao kê</h2>
           <div className="panel" style={{ borderColor: "var(--red)" }}>{dc.khong_thay_tren_sao_ke.map((k: any) => <div key={k.ke_uoc} style={{ marginBottom: 8 }}>

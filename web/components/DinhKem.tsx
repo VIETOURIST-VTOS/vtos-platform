@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, fmtDT, getToken } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Ô đính kèm tệp & hình ảnh – dùng lại ở mọi màn hình phòng ban.
  *
@@ -16,6 +17,7 @@ export default function DinhKem({ doiTuong, doiTuongId, tieuDe = "Tệp & hình 
                                   goi = "", chiXem = false, onDoi }:
   { doiTuong: string; doiTuongId: string | number; tieuDe?: string; loai?: string; goi?: string; chiXem?: boolean;
     onDoi?: () => void }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const [ds, setDs] = useState<any[]>([]);
   const [cf, setCf] = useState<any>(null);
   const [dang, setDang] = useState(false);
@@ -50,7 +52,7 @@ export default function DinhKem({ doiTuong, doiTuongId, tieuDe = "Tệp & hình 
   };
 
   const go = async (a: any) => {
-    const ly_do = window.prompt(`Gỡ "${a.ten_tep}" khỏi hồ sơ vì lý do gì?\n\n` +
+    const ly_do = await nhap(`Gỡ "${a.ten_tep}" khỏi hồ sơ vì lý do gì?\n\n` +
       "Tệp không bị xóa – bản ghi vẫn còn kèm lý do để sau này đối chiếu.");
     if (!ly_do || !ly_do.trim()) return;
     try { const d = await api<any>(`/tep/${a.id}/thu-hoi`, { method: "POST", json: { ly_do } });
@@ -68,7 +70,7 @@ export default function DinhKem({ doiTuong, doiTuongId, tieuDe = "Tệp & hình 
 
   if (!id) return null;
   return (
-    <div className="panel">
+    <div className="panel">{hop}
       <h2>{tieuDe}</h2>
       {goi && <p className="muted">{goi}</p>}
       {!chiXem && <>

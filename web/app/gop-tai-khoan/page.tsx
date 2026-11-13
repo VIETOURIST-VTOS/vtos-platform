@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Shell, { useShell } from "@/components/Shell";
 import { api } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Tài khoản trùng – gộp, sửa hồ sơ, và xoá tài khoản đã trống.
  *
@@ -37,6 +38,7 @@ import { Tag, errMsg } from "@/components/ui";
  *  Màn hình cố ý KHÔNG có nút "gộp tất cả" hay "xoá tất cả". Mỗi dòng là một con người thật.
  */
 function GopTaiKhoan() {
+  const { xacNhan, nhap, hop } = useHoi();
   const { user, toast } = useShell();
   const vai = user?.role || "";
   const canGop = ["chutich", "tgd", "hcns", "cntt"].includes(vai);
@@ -83,7 +85,7 @@ function GopTaiKhoan() {
 
   const gop = async () => {
     if (!dang || !xt) return;
-    const ly = prompt(`Gộp ${xt.bo.ho_ten} (${xt.bo.tai_khoan}) vào ${xt.giu.ho_ten} (${xt.giu.tai_khoan}).\n` +
+    const ly = await nhap(`Gộp ${xt.bo.ho_ten} (${xt.bo.tai_khoan}) vào ${xt.giu.ho_ten} (${xt.giu.tai_khoan}).\n` +
                       `${xt.tong_dong_se_chuyen} dòng dữ liệu sẽ chuyển. Việc này KHÔNG hoàn lại được.\n\nLý do:`);
     if (!ly) return;
     try {
@@ -113,7 +115,7 @@ function GopTaiKhoan() {
   const xoaThat = async () => {
     if (!xoa?.xoa_duoc) return;
     const t = xoa.tai_khoan;
-    const ly = prompt(`XOÁ VĨNH VIỄN tài khoản ${t.tai_khoan} (${t.ho_ten}).\n` +
+    const ly = await nhap(`XOÁ VĨNH VIỄN tài khoản ${t.tai_khoan} (${t.ho_ten}).\n` +
                       `Không có nút hoàn lại. Hệ thống chỉ giữ một dòng bia mộ để nhật ký cũ còn tra ra người.\n\nLý do:`);
     if (!ly) return;
     try {
@@ -124,7 +126,7 @@ function GopTaiKhoan() {
 
   const soCot = 6 + (canGop || canSua || canXoa ? 1 : 0);
 
-  return (<>
+  return (<>{hop}
     <h1>Tài khoản trùng</h1>
     <p className="muted">Một người có hai tài khoản thì doanh số bị xẻ đôi, và không bảng nào báo lỗi.
       <b> Gộp</b> là chuyển hết dữ liệu sang một tài khoản rồi khoá cái thừa – không xoá, để nhật ký

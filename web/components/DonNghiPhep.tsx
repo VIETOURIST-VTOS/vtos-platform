@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useShell } from "@/components/Shell";
 import { api, fmtD } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHoi } from "@/components/HopHoi";
 
 /** Đơn nghỉ phép / ốm / vắng việc — MỘT thành phần cho MỌI màn hình có ô bấm đơn.
  *
@@ -25,6 +26,7 @@ const RONG = { mo: false, kind: "phep_nam", date_from: "", date_to: "", days: ""
 
 export default function DonNghiPhep({ guiDuoc = true, tieuDe = "Đơn nghỉ phép / ốm / vắng việc" }:
   { guiDuoc?: boolean; tieuDe?: string }) {
+  const { xacNhan, nhap, hop } = useHoi();
   const { toast } = useShell();
   const [don, setDon] = useState<any[]>([]);
   const [quy, setQuy] = useState<any>(null);
@@ -62,7 +64,7 @@ export default function DonNghiPhep({ guiDuoc = true, tieuDe = "Đơn nghỉ ph�
   const quyet = async (id: number, duyet: boolean) => {
     let note = "";
     if (!duyet) {
-      const v = window.prompt("Từ chối đơn này. Ghi lý do để người làm đơn biết vì sao:");
+      const v = await nhap("Từ chối đơn này. Ghi lý do để người làm đơn biết vì sao:");
       if (v === null) return;
       if (!v.trim()) { toast("Từ chối phải ghi lý do", true); return; }
       note = v.trim();
@@ -83,7 +85,7 @@ export default function DonNghiPhep({ guiDuoc = true, tieuDe = "Đơn nghỉ ph�
   // và cái đoán ấy sai vào đúng ngày tầng lọc máy chủ đổi.
   const choKy = don.filter((x: any) => x.co_the_ky);
 
-  return (<>
+  return (<>{hop}
     {guiDuoc && <div className="panel"><h2>{tieuDe}</h2>
       <p className="muted">Gửi đơn ở đây. Đơn đi thẳng tới người ký của phòng bạn — <b>một chữ ký</b>,
         không qua bàn nào khác. Tổng giám đốc và Chủ tịch đọc được mọi đơn nhưng không ký ở bước này.

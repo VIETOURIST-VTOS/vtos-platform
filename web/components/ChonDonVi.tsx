@@ -7,6 +7,7 @@ import {
   type DonVi, type Kieu, type KetQuaPhamVi,
 } from "@/lib/phamvi";
 import { tenNgan } from "@/lib/ten_don_vi";
+import { useHoi } from "@/components/HopHoi";
 
 /** TC-1 · Nút chọn đơn vị trên thanh ngang.
  *
@@ -37,6 +38,7 @@ import { tenNgan } from "@/lib/ten_don_vi";
  *  để trống chỗ ấy; đường dẫn có thật thì ô chọn tự hiện. Xem thử giao diện: ?giaLapDonVi=1.
  */
 export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean; toast?: (m: string, e?: boolean) => void }) {
+  const { xacNhan, nhap, hop: hopHoi } = useHoi();
   const [mo, setMo] = useState(false);
   const [kq, setKq] = useState<KetQuaPhamVi | null>(null);
   const [tim, setTim] = useState("");
@@ -87,7 +89,7 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
   async function chon(kieu: Kieu, ma: number | null, ten: string) {
     // Ràng buộc 4: hỏi TRƯỚC khi đổi, không hỏi sau.
     if (chuaLuu?.()) {
-      const ok = window.confirm(
+      const ok = await xacNhan(
         `Màn hình đang mở còn dữ liệu chưa lưu.\n\nĐổi sang “${ten}” sẽ tải lại dữ liệu và phần đang gõ dở sẽ mất.\n\nVẫn đổi?`);
       if (!ok) return;
     }
@@ -145,14 +147,14 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
     return null;
   }
   if (kq?.tinh_trang === "loi") {
-    return <button type="button" className="soon" disabled title={kq.loi}>Không đọc được đơn vị</button>;
+    return <>{hopHoi}<button type="button" className="soon" disabled title={kq.loi}>Không đọc được đơn vị</button></>;
   }
-  if (!kq) return <button type="button" className="soon" disabled>Đang tải đơn vị…</button>;
+  if (!kq) return <>{hopHoi}<button type="button" className="soon" disabled>Đang tải đơn vị…</button></>;
 
   // Chỉ một đơn vị trong phạm vi thì nút chọn không đổi được gì – hiện tên, không hiện hộp. Đây là
   // `co_the_thu_hep` của máy chủ: một ô bấm mở ra rồi đóng lại mà không làm gì là một lời hứa hụt.
   if (duLieu && !duLieu.co_the_thu_hep) {
-    return <button type="button" className="soon" disabled title={chon_ht?.cau_hien_thi || nhan}>{nhan}</button>;
+    return <>{hopHoi}<button type="button" className="soon" disabled title={chon_ht?.cau_hien_thi || nhan}>{nhan}</button></>;
   }
 
   const muc = (nhan_: string, kieu: Kieu, ma: number | null, chuThich: string) => (
@@ -164,7 +166,7 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
   );
 
   return (
-    <span ref={hop} style={{ position: "relative" }}>
+    <>{hopHoi}<span ref={hop} style={{ position: "relative" }}>
       <button type="button" onClick={() => setMo((m) => !m)} aria-haspopup="listbox" aria-expanded={mo}
         title={chon_ht?.cau_hien_thi || `Đơn vị đang xem: ${nhan}`} disabled={dangDat}>
         {nhan} ▾
@@ -269,6 +271,6 @@ export default function ChonDonVi({ chuaLuu, toast }: { chuaLuu?: () => boolean;
           )}
         </span>
       )}
-    </span>
+    </span></>
   );
 }
