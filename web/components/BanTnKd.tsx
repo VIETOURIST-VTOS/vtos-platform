@@ -44,7 +44,7 @@ export default function BanTnKd() {
           <OSo nhan="Chăm sóc quá hạn" nong v={d ? so(th.cham_soc_qua_han?.so) : undefined} phu="Của người trong nhóm" lk="Chăm sóc" bam={() => moToi("/cham-soc")} />
         </div>
         <div className="g5-hai">
-          <BangDoiNgu ds={d?.doi_ngu || []} />
+          <BangDoiNgu ds={d?.doi_ngu || []} don />
           <BieuDo12 dt={dt} ten="Doanh thu – chỉ tiêu nhóm" />
         </div>
         <KhoiPhaiThu pt={d?.phai_thu} moToi={moToi} />
