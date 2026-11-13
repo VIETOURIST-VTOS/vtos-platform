@@ -230,6 +230,8 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
     {!mo && tab === tabs[0].ma && <>
       {loi && <div className="g5-khoi"><p className="g5-loi">Không đọc được số của bàn: {loi}</p></div>}
       {d?.canh_bao && <div className="g5-khoi g5-canh"><p>{d.canh_bao}</p></div>}
+      {/* R5-8: phạm vi đang đọc theo ô nhóm bán hàng (chưa khai cơ cấu) — chỉ là ghi chú, không phải cảnh báo. */}
+      {d?.ghi_pham_vi && <p className="g5-ghi">{d.ghi_pham_vi}</p>}
       {tongQuan({ d, dt, moToi })}
     </>}
 
@@ -278,6 +280,7 @@ export default function BanKdKhung({ ten, phamVi, tabs, tongQuan }: {
 .g5-hai{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;align-items:start}
 .g5-khoi{background:#fff;border:1px solid var(--g5-line);border-radius:16px;padding:18px 20px;min-width:0;box-shadow:0 1px 2px rgba(23,38,63,.04)}
 .g5-canh{background:#fbf3e0;border-color:#f1d98a}.g5-canh p{margin:0;font-size:13px;color:#8d6200}
+.g5-ghi{margin:-4px 2px 0;font-size:12px;color:var(--g5-chu3)}
 .g5-dau{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--g5-line2)}
 .g5-dau h2{margin:0;font-size:16.5px;font-weight:700;color:var(--g5-dam);display:flex;align-items:center;gap:9px}
 .g5-dau h2::before{content:"";flex:none;width:4px;height:18px;border-radius:3px;background:linear-gradient(var(--g5-ns-a),var(--g5-ns-b))}
