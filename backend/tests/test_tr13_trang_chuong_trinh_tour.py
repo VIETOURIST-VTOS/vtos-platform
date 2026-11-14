@@ -82,8 +82,13 @@ def test_tr13_7_moi_muc_chinh_sach_deu_dung_tu_du_lieu_that():
     Dựng đủ 5 cho đẹp mục lục nghĩa là bịa điều khoản — thứ ràng buộc hai bên khi có tranh chấp."""
     s = doc()
     i = s.index("const csMuc")
-    j = s.index("return <div className=\"ksv tra\">", i)
-    khoi = s[i:j]
+    # TR-21 · Mốc cắt cũ ghim cứng thẻ «div». TR-15 đổi hai màn khách đọc sang thẻ «main» để
+    # người dùng trình đọc màn hình nhảy thẳng vào nội dung được, và từ lúc ấy dòng này ném
+    # ValueError ở MỌI lần gộp của MỌI làn — một chấm đỏ không nói lên điều gì về vòng đang
+    # gộp. Nhận cả hai thẻ: điều phép thử này canh là nội dung khối csMuc, không phải tên thẻ.
+    m = re.search(r'return <(?:div|main) className="ksv tra">', s[i:])
+    assert m, "không tìm thấy chỗ bắt đầu dựng màn sau khối csMuc"
+    khoi = s[i:i + m.start()]
     assert "sp.coc_pt" in khoi and "sp.dong_so_truoc" in khoi, "mục cọc phải đọc số thật của sản phẩm"
     assert "sp.quy_dinh" in khoi, "mục quy định phải đọc nguyên văn quy định đọc từ trang tour"
     assert "csMuc.push" in khoi

@@ -45,7 +45,12 @@ def test_p1_01_3_lich_trinh_san_pham_dung_phan_chuong_trinh(monkeypatch):
     from app.services import tour_online as T
     p = NS(noi_dung_web={}, program=VB_6591)
     r = T.lich_trinh(None, p)
-    assert r == {"nguon": "van_ban", "ngay": [], "van_ban": ""}          # cổng hiện «Chương trình chi tiết đang cập nhật»
+    # TR-21 · Trước đây dòng này so BẰNG NHAU cả cuốn từ điển. TR-18 thêm khoá «theo_chuyen»
+    # (lịch trình này của riêng chuyến nào — rỗng là bản chung) để trang khách biết lúc nào
+    # KHÔNG phải gọi lại máy chủ, và phép so bằng nhau đỏ ngay, dù không có gì sai. Nay soi
+    # đúng ba điều P1-01 muốn canh: cổng hiện «Chương trình chi tiết đang cập nhật». Thêm
+    # khoá mới thì không đỏ; đổi ba điều này thì vẫn đỏ.
+    assert r["nguon"] == "van_ban" and r["ngay"] == [] and r["van_ban"] == ""
     p2 = NS(noi_dung_web={}, program="NGÀY 1: A\nx\nNGÀY 2: B\ny\nGIÁ TOUR BAO GỒM:\n- Xe")
     r2 = T.lich_trinh(None, p2)
     assert r2["nguon"] == "san_pham" and r2["ngay"][1]["noi_dung"] == "y"
