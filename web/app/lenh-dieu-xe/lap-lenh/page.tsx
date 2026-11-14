@@ -21,6 +21,8 @@ function LapLenh() {
   const { toast } = useShell();
   const [tu, setTu] = useState(homNay());
   const [den, setDen] = useState(homNay());
+  // R5-26 (Chủ tịch duyệt 14/11/2026): xổ ra MỌI xe đủ điều kiện ngoài nhóm đề xuất để GĐ đội xe tự chọn.
+  const [xoHet, setXoHet] = useState(false);
   const [khach, setKhach] = useState(0);
   const [km, setKm] = useState(0);
   const [gy, setGy] = useState<any>(null);
@@ -194,10 +196,11 @@ function LapLenh() {
     </div>}
 
     {gy && <>
-      <div className="panel"><h2>Phương án đề xuất ({gy.phuong_an.length})</h2>
+      <div className="panel"><h2>{xoHet ? `Tất cả xe đủ điều kiện (${(gy.tat_ca || []).length})` : `Phương án đề xuất (${gy.phuong_an.length})`}</h2>
         <p className="muted">{gy.ghi_chu} <span className="muted">Bộ quy tắc {gy.rule_version}.</span></p>
         {gy.phuong_an.length ? <table><thead><tr><th>#</th><th>Xe</th><th>Chỗ</th><th>Điểm</th><th>Vì sao đề xuất</th><th>Điều kiện</th><th>Chốt</th></tr></thead>
-          <tbody>{gy.phuong_an.map((p: any, i: number) => <tr key={p.vehicle_id}>
+          <tbody>{(xoHet ? (gy.tat_ca || gy.phuong_an) : gy.phuong_an).map((p: any, i: number) => <tr key={p.vehicle_id}
+            style={i >= gy.phuong_an.length ? { background: "var(--panel2)" } : undefined}>
             <td><b>{i + 1}</b></td><td>{p.ma_xe} · {p.xe}</td><td className="num">{p.so_cho}</td>
             <td className="num">{p.diem}</td>
             <td>{p.ly_do.join(" · ")}</td>
@@ -210,7 +213,11 @@ function LapLenh() {
               title={tour ? "" : "Chọn tour trước"} onClick={() => chot(p, "")}>Chốt lệnh</button>}</td>
           </tr>)}</tbody></table>
           : <p className="muted">Không còn xe nào hợp lệ cho khoảng ngày này.</p>}
-        {gy.con_lai > 0 && <p className="muted">Còn {gy.con_lai} xe hợp lệ khác không nằm trong nhóm đề xuất.</p>}
+        {/* R5-26: thanh xổ ra / thu gọn mọi xe đủ điều kiện; xe điểm thấp hơn nhóm đề xuất vẫn bị hỏi lý do khi chốt. */}
+        {gy.con_lai > 0 && <button type="button" className="xo-het" aria-expanded={xoHet} onClick={() => setXoHet(!xoHet)}>
+          {xoHet ? "▴ Thu gọn về nhóm đề xuất"
+                 : `▾ Xem tất cả ${(gy.tat_ca || []).length} xe đủ điều kiện (thêm ${gy.con_lai} xe ngoài nhóm đề xuất)`}</button>}
+        <style>{".xo-het{display:block;width:100%;text-align:left;margin:10px 0 0;padding:9px 12px;font:inherit;font-weight:700;cursor:pointer;color:var(--vtos-navy);background:var(--vtos-info-bg);border:1px dashed var(--vtos-sky);border-radius:10px}"}</style>
       </div>
 
       {gy.bi_loai.length > 0 && <div className="panel wrap"><h2>Xe bị loại ({gy.bi_loai.length})</h2>
