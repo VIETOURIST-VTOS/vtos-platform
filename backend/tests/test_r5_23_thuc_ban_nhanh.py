@@ -49,4 +49,4 @@ def test_duong_nhanh_cung_ket_qua_duong_day_du(db):
 
 def test_ban_vai_dung_duong_nhanh():
     s = (Path(__file__).resolve().parents[1] / "app/services/ban_kd_le.py").read_text(encoding="utf-8")
-    assert "rows = BTL.dong_sap_di(db, 7)" in s
+    assert "thuc_ban(db, BTL.dong_sap_di(db, 7))" in s     # R5-24: bọc thêm chỗ nhớ 2 phút

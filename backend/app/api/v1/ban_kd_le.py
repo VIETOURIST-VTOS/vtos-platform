@@ -12,6 +12,24 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.core import User
 from app.services import ban_kd_le as S
+from app.services import nho_tam as NHO
+
+# R5-24 · NHỚ 2 PHÚT (Chủ tịch 14/11/2026 «load rất chậm», chọn «1»: lưu sẵn 1–2 phút, chấp nhận số chậm cập
+# nhật tối đa 2 phút). Đo trên crm: tổng quan bàn TP 5,4 giây khi gọi riêng, 25–42 giây khi cả bàn bắn bảy
+# cửa cùng lúc vì máy chủ một tiến trình xếp hàng mọi lệnh. Nhớ lại thì lần mở thứ hai (F5, đổi tab về, người
+# khác cùng vai) không tính lại. KHOÁ MANG VAI VÀ NGƯỜI (luật 1 · services/nho_tam.py): bàn TP / Trưởng nhóm /
+# Chuyên viên cắt số theo chính người đăng nhập. `refresh=true` tính lại ngay (luật 2). Lỗi không được nhớ (luật 3).
+KHO_BAN = NHO.Kho("ban_kd_le", 120)
+
+
+def _nho(khoa: tuple, refresh: bool, tinh, db: Session):
+    from datetime import date
+    khoa = (*khoa, date.today().isoformat(), id(db.get_bind()))
+    if not refresh:
+        cu = KHO_BAN.lay(khoa)
+        if cu is not None:
+            return {**cu, "nho_tam": True}
+    return KHO_BAN.dat(khoa, tinh())
 
 # R5-5 (13/11/2026): bàn chạy ở /fit — màn của CẢ phòng Lẻ — nên phạm vi nhóm API rộng hơn bàn; hàng rào
 # THẬT của bàn là danh sách này (TP, trưởng nhóm, NV mở /fit gặp trang hai tab, gọi cửa này thì 403).
@@ -24,9 +42,11 @@ router = APIRouter(prefix="/api/v1/ban-kd-le", tags=["ban-kd-le"])
 
 
 @router.get("/tong-quan")
-def tong_quan(u: User = Depends(require_roles(*XEM, mo_ta="bàn làm việc Giám đốc Kinh doanh lẻ")),
+def tong_quan(refresh: bool = False,
+              u: User = Depends(require_roles(*XEM, mo_ta="bàn làm việc Giám đốc Kinh doanh lẻ")),
               db: Session = Depends(get_db)):
-    return S.tong_quan(db)
+    # Bàn GĐ không cắt theo người (cả phòng) — khoá theo vai là đủ.
+    return _nho(NHO.khoa_vai(u.role, "tong_quan"), refresh, lambda: S.tong_quan(db), db)
 
 
 @router.get("/doanh-thu")
@@ -47,10 +67,11 @@ VAI_PHONG = tuple(VAI_S.VAI_BAN)          # ("tp_kd", "tn_kd", "nv_kd")
 
 
 @router.get("/vai/tong-quan")
-def vai_tong_quan(u: User = Depends(require_roles(*VAI_PHONG, mo_ta="bàn làm việc của tôi ở Kinh doanh lẻ")),
+def vai_tong_quan(refresh: bool = False,
+                  u: User = Depends(require_roles(*VAI_PHONG, mo_ta="bàn làm việc của tôi ở Kinh doanh lẻ")),
                   db: Session = Depends(get_db)):
     """Không nhận user_id hay đơn vị — cố ý: bàn của ai là của người đăng nhập."""
-    return VAI_S.tong_quan(db, u)
+    return _nho(NHO.khoa_vai(u.role, u.id, "vai_tong_quan"), refresh, lambda: VAI_S.tong_quan(db, u), db)
 
 
 @router.get("/vai/doanh-thu")
@@ -63,21 +84,22 @@ def vai_doanh_thu(nam: int = 0,
 
 # ─────────────── R5-12 · một khối Doanh thu – Chỉ tiêu kiểu đường lũy kế ───────────────
 @router.get("/nhip")
-def nhip_phong(ky: str = "thang", u: User = Depends(require_roles(*XEM, mo_ta="doanh thu – chỉ tiêu tour lẻ")),
+def nhip_phong(ky: str = "thang", refresh: bool = False,
+               u: User = Depends(require_roles(*XEM, mo_ta="doanh thu – chỉ tiêu tour lẻ")),
                db: Session = Depends(get_db)):
     """Bàn GĐ KD: chỉ «Của phòng» (Chủ tịch chốt 14/11/2026)."""
     try:
-        return VAI_S.nhip(db, u, "phong", ky)
+        return _nho(NHO.khoa_vai(u.role, u.id, "nhip", "phong", ky), refresh, lambda: VAI_S.nhip(db, u, "phong", ky), db)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
 
 @router.get("/vai/nhip")
-def vai_nhip(pham_vi: str = "phong", ky: str = "thang",
+def vai_nhip(pham_vi: str = "phong", ky: str = "thang", refresh: bool = False,
              u: User = Depends(require_roles(*VAI_PHONG, mo_ta="doanh thu – chỉ tiêu trên bàn của tôi")),
              db: Session = Depends(get_db)):
     """Bàn TP / Trưởng nhóm / Chuyên viên: «Của phòng» hoặc «Của tôi» (chỉ chính người đăng nhập)."""
     try:
-        return VAI_S.nhip(db, u, pham_vi, ky)
+        return _nho(NHO.khoa_vai(u.role, u.id, "nhip", pham_vi, ky), refresh, lambda: VAI_S.nhip(db, u, pham_vi, ky), db)
     except ValueError as e:
         raise HTTPException(400, str(e))
