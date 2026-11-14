@@ -116,6 +116,26 @@ PHAM_VI = ("dang_ban", "sap_mo_ban", "da_di")
 TOI_DA_XEM = 300
 
 
+def dong_sap_di(db: Session, so_ngay: int = 7) -> list[dict]:
+    """R5-23 · Dòng bàn bán của chuyến ĐANG BÁN khởi hành trong `so_ngay` ngày tới — cho khối «Chuyến cần
+    thúc bán» trên bốn bàn KD (Chủ tịch 14/11/2026 «load rất chậm»). Cùng luật chọn và cùng `_dong` với
+    `ban_lam_viec(pham_vi="dang_ban")`, chỉ không dựng dòng cho mọi chuyến đang bán rồi bỏ đi gần hết:
+    đo trên crm `ban_lam_viec` mất ≈ 3,8 giây, khối này chỉ cần vài chuyến."""
+    from datetime import timedelta
+    hom_nay = date.today()
+    ts = [t for t in db.execute(select(Tour).where(
+              Tour.tour_type.in_(SEG.LE_TYPES), Tour.status.in_(DANG_BAN),
+              Tour.start_date >= hom_nay, Tour.start_date <= hom_nay + timedelta(days=so_ngay))).scalars()
+          if SEG.mang_of(t) == "le"]
+    rows, nho = [], {}
+    for t in sorted(ts, key=lambda t: t.start_date):
+        nguong = nho.get(t.start_date)
+        if nguong is None:
+            nguong = nho[t.start_date] = R.get_param(db, "nguong_bien", t.start_date)
+        rows.append(_dong(db, t, nguong))
+    return rows
+
+
 def ban_lam_viec(db: Session, pham_vi: str = "dang_ban") -> dict:
     """Danh sách chuyến LẺ đang bán, sắp theo ngày khởi hành gần nhất.
 

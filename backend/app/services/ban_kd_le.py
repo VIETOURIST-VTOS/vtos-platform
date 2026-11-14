@@ -172,7 +172,7 @@ def thuc_ban(db: Session, rows: list | None = None) -> list[dict]:
     """Chuyến cần thúc bán: khởi hành trong 7 ngày, còn chỗ, trống nhiều đứng đầu. R5-7: dùng chung cho
     bàn GĐ và ba bàn TP / Trưởng nhóm / Chuyên viên — một hàm, cùng số."""
     if rows is None:
-        rows = BTL.ban_lam_viec(db)["rows"]
+        rows = BTL.dong_sap_di(db, 7)
     thuc = sorted([r for r in rows if r["days_left"] <= 7 and r["cho_con"] > 0],
                   key=lambda r: (-r["cho_con"], r["start_date"]))
     return [{"id": r["id"], "code": r["code"], "name": r["name"], "start_date": r["start_date"],
