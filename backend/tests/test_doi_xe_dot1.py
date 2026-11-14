@@ -28,6 +28,25 @@ from app.main import app
 #
 # Nên tệp này TẮT luật bằng tham số, và khai thẳng ra việc tắt. Hàng rào thật được đo riêng ở
 # `test_dl7_lenh_phai_ra_tu_de_nghi.py` — chỗ duy nhất nói về chuỗi.
+
+def _tour_o(d1, d2=None):
+    """R5-28: ngày lệnh phải nằm trong ngày tour — phép thử lập lệnh ở một ngày xa thì dựng một tour đúng ngày ấy."""
+    import uuid
+    from datetime import date as _d
+    from app.db.session import SessionLocal as _SL
+    from app.models.core import Tour as _T, User as _U
+    d1 = _d.fromisoformat(str(d1)); d2 = _d.fromisoformat(str(d2 or d1))
+    db = _SL()
+    try:
+        op = db.query(_U).filter_by(username="dh.lan").first()
+        t = _T(code="XE-" + uuid.uuid4().hex[:6].upper(), name="Tour thử lệnh xe", tour_type="le_noi_dia",
+               start_date=d1, end_date=d2, operator_id=op.id, price_per_pax=1_000_000, fixed_cost=0,
+               var_cost_per_pax=0, planned_pax=20, status="da_duyet")
+        db.add(t); db.commit()
+        return t.id
+    finally:
+        db.close()
+
 def _tat_luat_chuoi_de_nghi():
     from datetime import date as _date
     from app.db.session import SessionLocal as _S
@@ -261,8 +280,8 @@ def test_lap_lenh_dieu_xe_bi_chan_khi_khong_du_dieu_kien():
     """Kiểm tra phải nằm ở đường LẬP LỆNH, không chỉ ở màn hình xem trước – nếu chỉ ở màn hình thì gọi thẳng
     API vẫn phát được lệnh."""
     v = xe("51B-123.45")
-    r = client.post("/api/v1/dispatch", headers=login("dh.lan"),
-                    json={"tour_id": 1, "vehicle_id": v["id"], "date_from": str(HOM_NAY + timedelta(days=11)),
+    r = client.post("/api/v1/dispatch", headers=login("gd.doixe"),
+                    json={"tour_id": _tour_o(HOM_NAY + timedelta(days=11)), "vehicle_id": v["id"], "date_from": str(HOM_NAY + timedelta(days=11)),
                           "date_to": str(HOM_NAY + timedelta(days=11)), "internal_price": 1_000_000})
     assert r.status_code == 422, r.text
     d = r.json()["detail"]
@@ -276,8 +295,8 @@ def test_lenh_hop_le_van_lap_duoc_va_kem_canh_bao_chua_du_du_lieu():
     v = xe("51B-123.45")
     # ly_do_khac_goi_y: xe này đã có lệnh trước đó nên bộ gợi ý Đợt 4 xếp nó dưới nhóm đề xuất theo tiêu chí
     # cân bằng ngày công tài xế. Một câu lý do là qua – đúng ý đồ "ghi vết", không phải rào chặn.
-    r = client.post("/api/v1/dispatch", headers=login("dh.lan"),
-                    json={"tour_id": 1, "vehicle_id": v["id"], "date_from": str(HOM_NAY + timedelta(days=40)),
+    r = client.post("/api/v1/dispatch", headers=login("gd.doixe"),
+                    json={"tour_id": _tour_o(HOM_NAY + timedelta(days=40), HOM_NAY + timedelta(days=41)), "vehicle_id": v["id"], "date_from": str(HOM_NAY + timedelta(days=40)),
                           "date_to": str(HOM_NAY + timedelta(days=41)), "internal_price": 1_000_000,
                           "ly_do_khac_goi_y": "Kiểm thử: chọn đúng xe này"})
     assert r.status_code == 201, r.text

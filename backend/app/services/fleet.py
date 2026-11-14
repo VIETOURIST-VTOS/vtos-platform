@@ -656,16 +656,33 @@ def nguoi_duoc_lap_lenh(db: Session) -> tuple[list, str]:
     im lặng bỏ qua thì chỉ đạo "chỉ một người" âm thầm hết hiệu lực mà không ai biết; còn chặn sạch thì cả
     đội xe đứng vì một ô cấu hình gõ sai."""
     from app.models.core import User as U
+    # R5-28 (Chủ tịch 14/11/2026 «chỉ GĐ điều xe»): tham số trống hoặc gõ sai thì KHÔNG còn mở cho mọi vai lập
+    # lệnh (Điều hành, Trưởng phòng Điều hành, CNTT) như trước — chỉ còn tài khoản vai Giám đốc đội xe đang hoạt
+    # động. Không có ai thì danh sách rỗng, và nơi gọi CHẶN (xem `chan_neu_khong_phai`), không thả.
+    gd = lambda: list(db.execute(select(U).where(U.active == True, U.role == VAI_LAP_LENH)).scalars())  # noqa: E712,E731
     raw = (R.get_param_text(db, "xe_nguoi_lap_lenh") or "").strip()
     if not raw:
-        return [], "Chưa cấu hình người lập lệnh – áp dụng quy tắc theo vai trò"
+        return gd(), "Chưa cấu hình người lập lệnh – chỉ Giám đốc đội xe được lập lệnh"
     keys = [k.strip() for k in raw.split(",") if k.strip()]
     users = list(db.execute(select(U).where(U.active == True,
                                             or_(U.username.in_(keys), U.staff_code.in_(keys)))).scalars())
     if not users:
-        return [], (f"Tham số xe_nguoi_lap_lenh đang đặt là \"{raw}\" nhưng không khớp tài khoản đang hoạt "
-                    "động nào – tạm áp dụng quy tắc theo vai trò, cần sửa lại tham số")
+        return gd(), (f"Tham số xe_nguoi_lap_lenh đang đặt là \"{raw}\" nhưng không khớp tài khoản đang hoạt "
+                      "động nào – chỉ Giám đốc đội xe được lập lệnh, cần sửa lại tham số")
     return users, ""
+
+
+VAI_LAP_LENH = "gd_doi_xe"
+
+
+def chan_neu_khong_phai(db: Session, u, viec: str = "lập lệnh điều xe") -> None:
+    """R5-28 · Hàng rào DUY NHẤT cho lập / chốt / đổi / đóng lệnh: chỉ người trong `nguoi_duoc_lap_lenh`.
+    Danh sách rỗng (không còn Giám đốc đội xe nào hoạt động) thì chặn hết — PermissionError."""
+    ai, _ = nguoi_duoc_lap_lenh(db)
+    if u.id in {x.id for x in ai}:
+        return
+    ten = ", ".join(f"{x.full_name} ({x.username})" for x in ai) or "Giám đốc đội xe (chưa có tài khoản nào hoạt động)"
+    raise PermissionError(f"Chỉ {ten} được {viec} (chỉ đạo Chủ tịch 07/9 và 14/11/2026).")
 
 
 # ====================== NẠP NHẬT TRÌNH TỪ BÁO CÁO NGOÀI ======================
