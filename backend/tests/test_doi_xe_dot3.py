@@ -406,17 +406,21 @@ def test_chi_dinh_nguoi_lap_lenh_bang_cau_hinh_khong_viet_ten_vao_ma():
     db = SessionLocal()
     try:
         p = db.execute(sel(Param).where(Param.key == "xe_nguoi_lap_lenh")).scalars().first()
-        p.value = "dh.lan"; db.commit()
+        p.value = "gd.doixe"; db.commit()      # R5-28: người lập lệnh là Giám đốc đội xe
     finally:
         db.close()
     t = client.get("/api/v1/tours", headers=login("cntt")).json()["rows"][0]
     v = client.get("/api/v1/fleet/xe", headers=login("cntt")).json()[0]
-    body = {"tour_id": t["id"], "vehicle_id": v["id"], "date_from": str(HOM_NAY + timedelta(days=400)),
-            "date_to": str(HOM_NAY + timedelta(days=401)), "internal_price": 1_000_000}
+    # R5-28: ngày lệnh phải nằm trong ngày tour.
+    body = {"tour_id": t["id"], "vehicle_id": v["id"], "date_from": t["start_date"],
+            "date_to": t["start_date"], "internal_price": 1_000_000}
     r = client.post("/api/v1/dispatch", headers=login("cntt"), json=body)
     assert r.status_code == 403 and "được tạo lệnh điều xe" in r.json()["detail"]
-    r2 = client.post("/api/v1/dispatch", headers=login("dh.lan"), json=body)
-    assert r2.status_code == 201, r2.text
+    # R5-28: Điều hành không bao giờ lập lệnh, kể cả khi tham số gõ sai.
+    assert client.post("/api/v1/dispatch", headers=login("dh.lan"), json=body).status_code == 403
+    r2 = client.post("/api/v1/dispatch", headers=login("gd.doixe"), json=body)
+    assert r2.status_code in (201, 422), r2.text       # 422 nếu xe vướng điều kiện — cửa người đã qua
+    assert r2.status_code == 201 or "lập lệnh" not in str(r2.json().get("detail"))
 
     db = SessionLocal()
     try:
@@ -427,10 +431,11 @@ def test_chi_dinh_nguoi_lap_lenh_bang_cau_hinh_khong_viet_ten_vao_ma():
 
 
 def test_cau_hinh_tro_toi_tai_khoan_khong_ton_tai_thi_noi_ra_chu_khong_im_lang():
-    """Im lặng bỏ qua thì chỉ đạo "chỉ một người" âm thầm hết hiệu lực mà không ai biết; còn chặn sạch thì cả
-    đội xe đứng vì một ô cấu hình gõ sai. Nên: giữ quy tắc theo vai trò VÀ nói ra."""
+    """Im lặng bỏ qua thì chỉ đạo "chỉ một người" âm thầm hết hiệu lực mà không ai biết. R5-28 (Chủ tịch
+    14/11/2026 «chỉ GĐ điều xe»): ô gõ sai thì CHỈ vai Giám đốc đội xe lập được — không mở cho Điều hành — và
+    vẫn nói ra cần sửa tham số."""
     d = client.get("/api/v1/fleet/danh-muc-dot3", headers=login("chutich")).json()
-    assert d["nguoi_lap_lenh"] == []
+    assert [x["username"] for x in d["nguoi_lap_lenh"]] == ["gd.doixe"]
     assert "không khớp tài khoản đang hoạt động nào" in d["nguoi_lap_lenh_ghi_chu"]
 
 
