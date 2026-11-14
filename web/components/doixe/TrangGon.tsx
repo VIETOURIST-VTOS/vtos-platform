@@ -53,7 +53,9 @@ export function LichLenhGon({ mo }: { mo: Mo }) {
              ["Lệnh chưa xác nhận", chuaXacNhan.length]]} />
     {homNay.map((x) => <Dong key={x.id} t={`${x.xe} · ${x.tour || "—"}`} p={`${x.date_from} → ${x.date_to} · ${x.tai_xe || "chưa có tài xế"}`} />)}
     {!homNay.length && <p className="muted">Hôm nay chưa có lệnh VTOS.</p>}
-    <p><button type="button" className="act grey" style={{ margin: 0 }} onClick={() => mo("/lenh-dieu-xe")}>Mở lịch & lệnh đầy đủ</button></p>
+    {/* R5-26 (Chủ tịch duyệt 14/11/2026): nút navy sáng «Mở lịch và lập lệnh». */}
+    <p><button type="button" className="act" style={{ margin: 0, background: "var(--vtos-sky)", borderColor: "var(--vtos-sky)", color: "var(--vtos-text-on-navy, #fff)" }}
+      onClick={() => mo("/lenh-dieu-xe")}>Mở lịch và lập lệnh →</button></p>
   </>;
 }
 
