@@ -21,7 +21,7 @@ def test_1_mot_thanh_dau_khuon_chung():
 def test_2_ten_theo_vai_va_giau_thanh_cua_ban_nhung():
     s = _w("app", "marketing", "page.tsx")
     assert '"Bàn làm việc P.TGĐ Marketing"' in s and '"Bàn làm việc nhân viên Marketing"' in s
-    assert "anDauBan />" in s
+    assert "anDauBan khungBan />" in s          # R5-25: thêm khung bàn chung navy trắng sáng
     assert '.mh01-ban{display:none!important}' in _w("components", "KhungNhung.tsx")
 
 

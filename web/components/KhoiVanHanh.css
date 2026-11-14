@@ -42,7 +42,7 @@
 .vh-thanh i{display:block;height:100%}
 /* KS-MUC 07/11: ba mức ba màu — đỏ/hồng = nghiêm trọng, vàng = cảnh báo, xanh = theo dõi; chưa phân loại = xám.
    Trước đây «c-vang» lấy nhầm --vtos-info (xanh), nên Cảnh báo và Theo dõi cùng một màu. */
-.c-do{background:var(--vtos-danger)}.c-vang{background:var(--vtos-warning)}.c-xanh{background:var(--vtos-info)}.c-xam{background:var(--vtos-text-mute)}
+.c-do{background:var(--vtos-logo-hong)}.c-vang{background:var(--vtos-warning)}.c-xanh{background:var(--vtos-info)}.c-xam{background:var(--vtos-text-mute)}
 
 /* danh sách */
 .vh-ds{display:grid;gap:12px}
@@ -76,7 +76,7 @@
 .vh-khoi{background:var(--vtos-card);border:1px solid var(--vtos-line);
   border-radius:var(--vtos-radius-md,10px);border-left-width:4px;padding:12px 14px;
   display:flex;flex-direction:column;gap:8px;min-width:0;height:100%}
-.vh-khoi.do{border-left-color:var(--vtos-danger)}
+.vh-khoi.do{border-left-color:var(--vtos-logo-hong)}   /* R5-25: hồng logo làm cảnh báo */
 .vh-khoi .vh-so{color:var(--vtos-danger)}
 .vh-dong{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:baseline;min-width:0}
 .vh-dong .v{font-family:var(--vtos-font-mono);font-variant-numeric:tabular-nums;font-weight:700;

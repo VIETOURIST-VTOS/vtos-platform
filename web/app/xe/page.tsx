@@ -10,6 +10,7 @@ import DeXuatChiTaiCho from "@/components/doixe/DeXuatChiTaiCho";
 import * as G from "@/components/doixe/TrangGon";
 import SanSangVanHanh from "@/components/doixe/SanSangVanHanh";
 import LichXe90 from "@/components/doixe/LichXe90";
+import { batKhungBan } from "@/components/KhungNhung";
 
 /** Bàn làm việc Giám đốc đội xe — màn `/xe`. Bố cục v3.3, bản vẽ anh Tuấn gửi 09/11/2026.
  *
@@ -151,7 +152,7 @@ const CUA_NHAP: { nhan: string; ten: string; buoc: string; trang: string; mo: st
 const DUONG_DOI_XE = ["/doi-xe", "/lai-lo-doi-xe", "/lenh-dieu-xe", "/tai-xe", "/hieu-qua-doi-xe", "/su-co-tour", "/nap-du-lieu"];
 const laDoiXe = (href: string) => DUONG_DOI_XE.some((t) => href === t || href.startsWith(t + "/") || href.startsWith(t + "?"));
 
-function KhungNhung({ toi, ten, mo }: { toi: string; ten: string; mo?: string }) {
+function KhungNhung({ toi, ten, mo, khungBan }: { toi: string; ten: string; mo?: string; khungBan?: boolean }) {
   const [cao, setCao] = useState(640);
   const src = toi + (mo ? (toi.includes("?") ? "&" : "?") + `mo=${mo}` : "");
   const doCao = (f: HTMLIFrameElement) => {
@@ -169,6 +170,7 @@ function KhungNhung({ toi, ten, mo }: { toi: string; ten: string; mo?: string })
           // của đội xe đã có trên thanh nghiệp vụ /xe — giữ lại là lặp nút trên một màn. Thanh trống thì giấu.
           + ".thanh-viec a.tv:not(.chinh),.thanh-viec .tv-nhan{display:none!important}.thanh-viec:not(:has(a.tv.chinh)){display:none!important}";
         doc.head.appendChild(st);
+        if (khungBan) batKhungBan(doc, b);          // R5-25: khung bàn chung navy trắng sáng
         // VH-6: liên kết trong khung — màn đội xe mở NGAY TRONG KHUNG (kể cả nút ↗ vốn mở tab mới);
         // liên kết về trang chủ / phân hệ CRM thì không đi đâu cả.
         doc.addEventListener("click", (e) => {
@@ -379,17 +381,22 @@ function BanLamViecXe() {
   );
 
   return (<div onClickCapture={giuTaiCho}>
-    {/* VH-8 (Chủ tịch duyệt bản xem trước 11/11/2026): TIÊU ĐỀ LÊN ĐẦU, in hoa đậm; năm nhóm xuống dưới. */}
-    <div className="xe-dau">
-      <div>
-        <span className="xe-dau-eb">Đội xe · Công ty TNHH Vận tải Vietrip</span>
-        <h1>Bàn làm việc Giám đốc đội xe</h1>
-      </div>
-      <div className="xe-ky">
-        <button type="button" className="xe-ky-quyen" onClick={() => setQuyen(!quyen)} aria-expanded={quyen}>Quyền của tôi</button>
-        <button type="button" aria-label="Kỳ trước" onClick={() => setKy(doiKy(ky, -1))}>‹</button>
-        <strong>{kyDoc(ky)}</strong>
-        <button type="button" aria-label="Kỳ sau" onClick={() => setKy(doiKy(ky, 1))}>›</button>
+    {/* R5-25 (Chủ tịch duyệt bản xem trước 14/11/2026): tên bàn vào thanh đầu navy sáng có vạch ba màu logo như
+        mọi bàn (`.mh01-ban`, globals.css); nút «Lịch xe 90 ngày» lên thanh đầu, số «trống» nền hồng; ô chọn kỳ giữ. */}
+    <div className="mh01-ban">
+      <h1 className="mh01-ban-ten" title="Đội xe · Công ty TNHH Vận tải Vietrip">Bàn làm việc Giám đốc đội xe</h1>
+      <div className="mh01-ban-cum">
+        <button type="button" className="n90s xe-n90s" title="Lịch xe 90 ngày — xe nào còn trống, ưu tiên bán tour"
+              onClick={() => { setNhom("dispatch"); setTrang("lich-90"); setMoSan(""); setChiTiet(null); }}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>
+          <span>Lịch xe 90 ngày</span>{trong30 !== null && <b>{trong30} trống</b>}
+        </button>
+        <div className="xe-ky">
+          <button type="button" className="xe-ky-quyen" onClick={() => setQuyen(!quyen)} aria-expanded={quyen}>Quyền của tôi</button>
+          <button type="button" aria-label="Kỳ trước" onClick={() => setKy(doiKy(ky, -1))}>‹</button>
+          <strong>{kyDoc(ky)}</strong>
+          <button type="button" aria-label="Kỳ sau" onClick={() => setKy(doiKy(ky, 1))}>›</button>
+        </div>
       </div>
     </div>
 
@@ -450,7 +457,7 @@ function BanLamViecXe() {
             {coGon && <p style={{ margin: "0 0 8px" }}><button type="button" className="act grey" style={{ margin: 0 }}
               onClick={() => { setChiTiet(null); setMoSan(""); }}>← Về màn gọn {trangMo.ten}</button></p>}
             {/* VH-33: không in tên trang con ở đây — trang trong khung đã có tiêu đề riêng (trước lặp hai lần). */}
-            <KhungNhung key={toi + moSan} toi={toi} ten={trangMo.ten} mo={moSan || undefined} />
+            <KhungNhung key={toi + moSan} toi={toi} ten={trangMo.ten} mo={moSan || undefined} khungBan />
           </>;
         })()}
     </section>}
@@ -459,7 +466,7 @@ function BanLamViecXe() {
     {!nhomMo && caNhan && <section className="panel">
       <p style={{ margin: "0 0 8px" }}><button type="button" className="act grey" style={{ margin: 0 }}
         onClick={() => setCaNhan(null)}>← Về bàn làm việc</button></p>
-      <KhungNhung key={caNhan.href} toi={caNhan.href} ten={caNhan.ten} />
+      <KhungNhung key={caNhan.href} toi={caNhan.href} ten={caNhan.ten} khungBan />
     </section>}
 
     {/* ④ TỔNG QUAN */}
@@ -474,17 +481,8 @@ function BanLamViecXe() {
 
       {/* HAI CỬA NHẬP — chỉ xuất hiện MỘT lần trên cả màn (v3.3). */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center",
-                    justifyContent: "space-between", marginBottom: 10 }}>
-        {/* VH-10 (Chủ tịch duyệt 11/11/2026): bỏ chữ «THÁNG …» lặp ô chọn kỳ; chỗ ấy là nút vàng nổi bật
-            nhất màn, mở Lịch xe 90 ngày tại chỗ — xe nào còn trống để ưu tiên bán tour. */}
-        <button type="button" className="xe-n90"
-              onClick={() => { setNhom("dispatch"); setTrang("lich-90"); setMoSan(""); setChiTiet(null); }}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2" />
-            <path d="M3 9h18M8 2v4M16 2v4M8 14h2M14 14h2M8 17h2" /></svg>
-          <span><span className="xe-n90-t">Lịch xe 90 ngày</span>
-            <span className="xe-n90-p">Xe nào còn trống · ưu tiên bán tour</span></span>
-          {trong30 !== null && <span className="xe-n90-so">{trong30} ngày-xe trống</span>}
-        </button>
+                    justifyContent: "flex-end", marginBottom: 10 }}>
+        {/* R5-25: nút «Lịch xe 90 ngày» đã lên thanh đầu (một nút một chỗ). */}
         <label className="muted">Số tiền theo{" "}
           <select value={theoTien} onChange={(e) => setTheoTien(e.target.value as any)}>
             <option value="qt">Chuyến đã quyết toán</option>
@@ -582,39 +580,12 @@ const RONG = <style>{`main{max-width:1440px!important;margin:0 auto!important}
 /* VH-8 · HAI TẦNG: nền xám xanh (tầng 1), thẻ trắng có bóng nổi lên (tầng 2). Chỉ sống khi /xe đang mở. */
 body,.shell{background:#eaf0f7!important}
 :root{--xe-b1:0 1px 2px #12305414,0 4px 12px #1230541a;--xe-b2:0 2px 4px #12305414,0 10px 24px #12305421}
-.xe-dau{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:6px 0 16px}
-.xe-dau-eb{display:block;font-size:11.5px;letter-spacing:1.6px;text-transform:uppercase;font-weight:700;color:var(--xe-nhan);margin-bottom:4px}
-/* Tiêu đề nổi bật + hiệu ứng sáng (Chủ tịch dặn 11/11/2026): chữ chuyển màu navy → xanh sáng, một vệt sáng
-   lướt qua chậm, quầng sáng nhẹ quanh chữ. Người tắt chuyển động thì chữ đứng yên, vẫn chuyển màu. */
-.xe-dau h1{margin:0;font-size:34px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;line-height:1.15;color:var(--xe-dam);
-  background:linear-gradient(100deg,#183c69 0%,#2c5fa2 35%,#8cc4ff 50%,#2c5fa2 65%,#183c69 100%);background-size:220% 100%;
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 2px 10px #2c5fa240);animation:xe-sang 5s ease-in-out infinite}
-@keyframes xe-sang{0%,100%{background-position:100% 0}50%{background-position:0 0}}
-@media (prefers-reduced-motion:reduce){.xe-dau h1{animation:none;background-position:50% 0}}
-.xe-dau p{margin:6px 0 0}
-@media (max-width:640px){.xe-dau h1{font-size:23px}}
+/* R5-25: tiêu đề cũ `.xe-dau` (chữ chuyển màu) bỏ — bàn dùng thanh đầu chung `.mh01-ban`. */
 .xe-ky{display:flex;align-items:center;gap:6px;background:#fff;border-radius:12px;padding:6px;box-shadow:var(--xe-b1)}
 .xe-ky button{font:inherit;border:0;background:var(--xe-nhat);color:var(--xe-nhan);min-width:34px;height:34px;border-radius:9px;font-weight:700;cursor:pointer}
 .xe-ky .xe-ky-quyen{background:#fff;border:1px solid #c9d6e8;padding:0 12px;font-weight:600}
 .xe-ky strong{min-width:92px;text-align:center;color:var(--xe-dam);font-variant-numeric:tabular-nums}
-/* VH-10 · nút vàng Lịch xe 90 ngày — khác hẳn dàn nút navy; quầng sáng thở + vệt sáng lướt. */
-.xe-n90{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:14px;border:0;cursor:pointer;
-  padding:12px 22px 12px 16px;border-radius:14px;color:#3b2300;font:inherit;text-align:left;
-  background:linear-gradient(135deg,#ffd76a 0%,#ffb627 55%,#ff9a1f 100%);
-  box-shadow:0 0 0 3px #ffe7a8,0 6px 22px #ff9f1f66;animation:xe-tho 2.4s ease-in-out infinite;transition:transform .15s}
-.xe-n90::after{content:"";position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(110deg,transparent 35%,#ffffffb0 50%,transparent 65%);transform:translateX(-120%);animation:xe-luot 3.2s ease-in-out infinite}
-.xe-n90:hover{transform:translateY(-2px)}
-.xe-n90:focus-visible{outline:3px solid #b86b00;outline-offset:3px}
-.xe-n90 svg{width:30px;height:30px;flex:none;fill:none;stroke:#5a3500;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.xe-n90-t{display:block;font-size:19px;font-weight:800;letter-spacing:.4px;text-transform:uppercase}
-.xe-n90-p{display:block;font-size:13px;font-weight:600;opacity:.85}
-.xe-n90-so{margin-left:6px;background:#3b2300;color:#ffd76a;border-radius:999px;padding:4px 11px;font-weight:800;font-size:13.5px;white-space:nowrap}
-@keyframes xe-tho{0%,100%{box-shadow:0 0 0 3px #ffe7a8,0 6px 22px #ff9f1f55}50%{box-shadow:0 0 0 5px #ffe7a8,0 8px 34px #ff9f1fa0}}
-@keyframes xe-luot{0%,55%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
-@media (prefers-reduced-motion:reduce){.xe-n90,.xe-n90::after{animation:none}}
-@media (max-width:900px){.xe-n90{width:100%}.xe-n90-so{margin-left:auto}}
+/* R5-25: nút vàng «Lịch xe 90 ngày» to giữa màn bỏ — nút lên thanh đầu (`.n90s`, như mọi bàn). */
 .xe-nhom-dinh{position:sticky;top:0;z-index:5;background:#eaf0f7;padding:6px 0 2px;margin-bottom:8px}
 .xe-nhom button{display:inline-flex;gap:9px;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s,background .15s}
 .xe-nhom button svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -714,7 +685,19 @@ a.brand small{cursor:pointer;border-radius:6px;padding:2px 6px;transition:backgr
 a.brand small:hover{background:#ffffff26;text-decoration:underline}
 .xe-cua:hover{transform:translateY(-2px);box-shadow:var(--xe-b2)!important}
 button.act.teal{background:var(--xe-nhan)!important;border-color:var(--xe-nhan)!important;color:#fff!important}
-`}</style>;
+
+/* R5-25 · ba màu logo: nút lịch xe trên thanh đầu là <button>; tab đang mở có vạch lá; ba ô số thành thẻ trắng
+   vạch navy (ô lợi nhuận vạch lá); đỏ cũ của bàn → hồng logo. */
+.xe-n90s{border:0;font:inherit;cursor:pointer}
+.xe-nhom button[aria-pressed=true]{box-shadow:0 0 0 3px #9fc0ec,inset 0 -3px 0 #5fae66}
+.xe-so-chu{background:#fff!important;color:var(--xe-dam)!important;border-top:4px solid var(--xe-nhan)!important}
+.xe-so-chu:nth-child(2){background:#fff!important;border-top-color:#5fae66!important}
+.xe-so-chu:nth-child(3){background:#fff!important;border-top-color:var(--xe-dam)!important}
+.xe-so-chu *{color:inherit}
+.xe-so-chu .v14-o-nhan{color:#5f6f86!important}
+.xe-so-chu .v14-o-so{color:var(--xe-dam)!important}
+.xe-so-chu:nth-child(2) .v14-o-so{color:#2f7d3b!important}
+:root{--xe-do:#d6336c;--xe-do-nen:#fff0f4}`}</style>;
 
 export default function Page() {
   return <Shell khongThanhBen>{RONG}<BanLamViecXe /></Shell>;

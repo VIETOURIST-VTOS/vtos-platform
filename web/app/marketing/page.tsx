@@ -543,7 +543,7 @@ function Marketing() {
         })}
       </nav>); })()}
     {khung && <KhungNhung key={khung} toi={khung} ten={(NHOM_MKT.find((g) => g.ma === nhom) || NHOM_MKT[0]).con[con]?.ten || "Marketing"}
-      cuaBan={laMkt} ngoai={ngoaiKhung} anDauBan />}
+      cuaBan={laMkt} ngoai={ngoaiKhung} anDauBan khungBan />}
     {!khung && <>
 
     {/* ═══════════════ 8 · MỤC LỤC CHỨC NĂNG ═══════════════
@@ -1206,7 +1206,7 @@ main .panel.mkt-luu-y{background:#fdf6e7!important;
   border-radius:10px;min-height:46px;padding:8px 12px;cursor:pointer;line-height:1.2;
   text-align:center;box-shadow:0 2px 6px #2c5fa230;transition:background .15s,box-shadow .15s}
 .mkt-chuc button:hover{background:#3a6fb5}
-.mkt-chuc button[aria-pressed=true]{background:var(--mkt-dam);box-shadow:0 0 0 3px #9fc0ec}
+.mkt-chuc button[aria-pressed=true]{background:var(--mkt-dam);box-shadow:0 0 0 3px #9fc0ec,inset 0 -3px 0 #5fae66}
 .mkt-chuc button:focus-visible{outline:3px solid #719ee1;outline-offset:2px}
 @media(max-width:980px){.mkt-chuc{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
@@ -1229,8 +1229,8 @@ a.brand small:hover{background:#ffffff26;text-decoration:underline}
 .mkt-nhom button{margin:0;font:inherit;font-size:13.5px;font-weight:700;color:#fff;background:var(--mkt-nhan);border:0;
   border-radius:10px;min-height:46px;padding:8px 10px;cursor:pointer;line-height:1.2;text-align:center;box-shadow:0 2px 6px #2c5fa230}
 .mkt-nhom button:hover{background:#3a6fb5}
-.mkt-nhom button[aria-pressed=true]{background:var(--mkt-dam);box-shadow:0 0 0 3px #9fc0ec}
-.mkt-nhom button.khan{background:#a8243f}.mkt-nhom button.khan[aria-pressed=true]{background:#7d1530;box-shadow:0 0 0 3px #f3b3c2}
+.mkt-nhom button[aria-pressed=true]{background:var(--mkt-dam);box-shadow:0 0 0 3px #9fc0ec,inset 0 -3px 0 #5fae66}
+.mkt-nhom button.khan{background:#d6336c}.mkt-nhom button.khan[aria-pressed=true]{background:#b8235a;box-shadow:0 0 0 3px #f3b3c2,inset 0 -3px 0 #5fae66}
 .mkt-nhom button:focus-visible,.mkt-con button:focus-visible{outline:3px solid #719ee1;outline-offset:2px}
 @media(max-width:1100px){.mkt-nhom{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:560px){.mkt-nhom{grid-template-columns:repeat(2,minmax(0,1fr))}}

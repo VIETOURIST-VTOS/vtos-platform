@@ -61,7 +61,8 @@ def test_khung_ban_chung_bat_o_hai_ban():
         assert "anDauBan khungBan" in doc(f"components/{f}.tsx"), f
     css = doc("app/globals.css")
     khoi = css[css.index("R5-19 · KHUNG BÀN CHUNG"):]
-    assert "html.vtos-khung-ban th{" in khoi and "var(--vtos-info-bg)" in khoi and "text-transform:none" in khoi
+    # R5-25: luật đầu bảng dùng chung cho bàn PTGĐ Đoàn (.ban-navy)
+    assert "html.vtos-khung-ban th,.ban-navy th{" in khoi and "var(--vtos-info-bg)" in khoi and "text-transform:none" in khoi
     assert not re.search(r"#[0-9a-fA-F]{3,6}\b", khoi), "màu phải dùng token"
 
 

@@ -4,6 +4,8 @@ import Link from "next/link";
 import Shell, { useShell } from "@/components/Shell";
 import { api, vnd } from "@/lib/api";
 import { Tag, errMsg } from "@/components/ui";
+import { useHomNay } from "@/components/DauManHinh01";
+import NutLich90 from "@/components/NutLich90";
 
 /** BÀN LÀM VIỆC CỦA PHÓ TỔNG GIÁM ĐỐC TOUR ĐOÀN — 24/9/2026.
  *
@@ -52,7 +54,8 @@ function ConLai({ n }: { n: number | null }) {
 
 function O({ nhan, so: n, phu, manh }: { nhan: string; so: number; phu?: string; manh?: boolean }) {
   return (
-    <div className="panel" style={{ marginBottom: 0, borderLeft: `4px solid var(--${manh ? "red" : "orange"})` }}>
+    // R5-25: thẻ vạch navy; ô «mạnh» (việc của tôi / quá hạn) có việc thì vạch hồng logo.
+    <div className="panel" style={{ marginBottom: 0, borderTop: `3px solid var(--${manh && Number(n) > 0 ? "vtos-logo-hong" : "vtos-sky"})` }}>
       <div className="muted" style={{ fontSize: "calc(11/14*1rem)", textTransform: "uppercase", letterSpacing: ".04em", fontWeight: 600 }}>{nhan}</div>
       <div style={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}>{n}</div>
       {phu ? <div className="muted" style={{ fontSize: "calc(12/14*1rem)" }}>{phu}</div> : null}
@@ -62,6 +65,7 @@ function O({ nhan, so: n, phu, manh }: { nhan: string; so: number; phu?: string;
 
 function BanLamViec() {
   const { toast } = useShell();
+  const homNay = useHomNay();
   const [ky, setKy] = useState(kyMacDinh());
   const [d, setD] = useState<any>(null);
   const [dang, setDang] = useState(true);
@@ -81,8 +85,17 @@ function BanLamViec() {
   const qh = d.qua_han_quyet_toan || {};
   const ll = d.lai_lo || {};
 
-  return (<>
-    <h1>Việc chờ tôi</h1>
+  return (<div className="ban-navy">
+    {/* R5-25 (Chủ tịch duyệt bản xem trước 14/11/2026): thanh đầu navy sáng có vạch ba màu như mọi bàn; đầu bảng
+        navy trên nền trắng sáng (`.ban-navy th`, globals.css). */}
+    <div className="mh01-ban">
+      <h1 className="mh01-ban-ten">Bàn làm việc Phó TGĐ Đoàn</h1>
+      <div className="mh01-ban-cum">
+        <div className="mh01-ban-ngay"><span>Hôm nay</span>{homNay || "…"}</div>
+        <NutLich90 />
+      </div>
+    </div>
+    <h2 style={{ margin: "0 0 10px" }}>Việc chờ tôi</h2>
 
     <div className="panel">
       <div className="row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -97,7 +110,7 @@ function BanLamViec() {
            phu={`${dem.cho_toi_duyet_khoi_hanh_duoi_7_ngay ?? 0} chuyến khởi hành trong 7 ngày · ${dem.cho_toi_duyet_du_truong ?? 0} hồ sơ đủ trường`} />
       </div>
       <div style={{ flex: "1 1 240px" }}>
-        <O nhan="Đoàn quá hạn chưa đóng sổ" so={dem.qua_han_chua_dong_so ?? 0}
+        <O nhan="Đoàn quá hạn chưa đóng sổ" so={dem.qua_han_chua_dong_so ?? 0} manh
            phu={`đã đóng muộn: ${dem.dong_so_muon ?? 0} chuyến`} />
       </div>
       <div style={{ flex: "1 1 240px" }}>
@@ -230,7 +243,7 @@ function BanLamViec() {
         </p>
       )}
     </div>
-  </>);
+  </div>);
 }
 
 export default function Page() { return <Shell><BanLamViec /></Shell>; }

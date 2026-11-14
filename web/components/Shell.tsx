@@ -1082,7 +1082,7 @@ export default function Shell({ children, khongThanhBen = false }:
           {xuLy && <section className="xu-ly-ban" aria-label="Xử lý tại bàn" ref={xuLyRef}>
             <div className="xu-ly-dau"><b>Xử lý tại bàn</b><span>{xuLy.label}</span>
               <button type="button" className="act grey" onClick={() => setXuLy(null)}>Đóng ✕</button></div>
-            <KhungNhung key={xuLy.href} toi={xuLy.href} ten={xuLy.label} cuaBan={(h) => h !== "/"} />
+            <KhungNhung key={xuLy.href} toi={xuLy.href} ten={xuLy.label} cuaBan={(h) => h !== "/"} khungBan />
           </section>}
           {children}
         </main>
