@@ -1633,7 +1633,7 @@ def de_lap_lenh(tu: date, den: date, u: User = Depends(require_roles(*READ)),
                      for r in rates],
         "nguoi_duoc_lap_lenh": [{"username": x.username, "full_name": x.full_name} for x in ai],
         "ly_do_khong_gioi_han": ly_do,
-        "toi_duoc_lap": (not ai) or u.id in {x.id for x in ai},
+        "toi_duoc_lap": u.id in {x.id for x in ai},      # R5-28: danh sách rỗng = không ai, không phải mọi người
         "ghi_chu": ("Danh sách tour ở đây chỉ có lịch trình và số khách – không kèm giá bán hay dự "
                     "toán. Đội xe cần mã tour để lập lệnh, không cần biết tour lãi bao nhiêu."),
     }

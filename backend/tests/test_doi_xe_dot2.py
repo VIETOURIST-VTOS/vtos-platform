@@ -29,6 +29,25 @@ from app.main import app
 #
 # Nên tệp này TẮT luật bằng tham số, và khai thẳng ra việc tắt. Hàng rào thật được đo riêng ở
 # `test_dl7_lenh_phai_ra_tu_de_nghi.py` — chỗ duy nhất nói về chuỗi.
+
+def _tour_o(d1, d2=None):
+    """R5-28: ngày lệnh phải nằm trong ngày tour — phép thử lập lệnh ở một ngày xa thì dựng một tour đúng ngày ấy."""
+    import uuid
+    from datetime import date as _d
+    from app.db.session import SessionLocal as _SL
+    from app.models.core import Tour as _T, User as _U
+    d1 = _d.fromisoformat(str(d1)); d2 = _d.fromisoformat(str(d2 or d1))
+    db = _SL()
+    try:
+        op = db.query(_U).filter_by(username="dh.lan").first()
+        t = _T(code="XE-" + uuid.uuid4().hex[:6].upper(), name="Tour thử lệnh xe", tour_type="le_noi_dia",
+               start_date=d1, end_date=d2, operator_id=op.id, price_per_pax=1_000_000, fixed_cost=0,
+               var_cost_per_pax=0, planned_pax=20, status="da_duyet")
+        db.add(t); db.commit()
+        return t.id
+    finally:
+        db.close()
+
 def _tat_luat_chuoi_de_nghi():
     from datetime import date as _date
     from app.db.session import SessionLocal as _S
@@ -334,9 +353,10 @@ def test_hai_xe_hop_tac_chay_cung_ngay_khong_bi_bao_tai_xe_trung_lich():
         pytest.skip("bản nền không có đủ hai xe hợp tác chưa gán tài xế")
     di, ve = HOM_NAY + timedelta(days=300), HOM_NAY + timedelta(days=301)
     ok = 0
+    tid = _tour_o(di, ve)
     for vid in ids:
-        r = client.post("/api/v1/dispatch", headers=login("dh.lan"),
-                        json={"tour_id": 1, "vehicle_id": vid, "date_from": str(di), "date_to": str(ve),
+        r = client.post("/api/v1/dispatch", headers=login("gd.doixe"),
+                        json={"tour_id": tid, "vehicle_id": vid, "date_from": str(di), "date_to": str(ve),
                               "internal_price": 1_000_000})
         if r.status_code == 201: ok += 1
         else:

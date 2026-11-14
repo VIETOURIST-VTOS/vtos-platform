@@ -27,6 +27,25 @@ from app.main import app
 #
 # Nên tệp này TẮT luật bằng tham số, và khai thẳng ra việc tắt. Hàng rào thật được đo riêng ở
 # `test_dl7_lenh_phai_ra_tu_de_nghi.py` — chỗ duy nhất nói về chuỗi.
+
+def _tour_o(d1, d2=None):
+    """R5-28: ngày lệnh phải nằm trong ngày tour — phép thử lập lệnh ở một ngày xa thì dựng một tour đúng ngày ấy."""
+    import uuid
+    from datetime import date as _d
+    from app.db.session import SessionLocal as _SL
+    from app.models.core import Tour as _T, User as _U
+    d1 = _d.fromisoformat(str(d1)); d2 = _d.fromisoformat(str(d2 or d1))
+    db = _SL()
+    try:
+        op = db.query(_U).filter_by(username="dh.lan").first()
+        t = _T(code="XE-" + uuid.uuid4().hex[:6].upper(), name="Tour thử lệnh xe", tour_type="le_noi_dia",
+               start_date=d1, end_date=d2, operator_id=op.id, price_per_pax=1_000_000, fixed_cost=0,
+               var_cost_per_pax=0, planned_pax=20, status="da_duyet")
+        db.add(t); db.commit()
+        return t.id
+    finally:
+        db.close()
+
 def _tat_luat_chuoi_de_nghi():
     from datetime import date as _date
     from app.db.session import SessionLocal as _S
@@ -254,10 +273,9 @@ def test_chon_xe_he_thong_danh_gia_thap_hon_thi_phai_ghi_ly_do():
     if diem.get(vid) is None or diem[vid] >= thap_nhat_top:
         pytest.skip("không dựng được tình huống hệ thống đánh giá thấp hơn trên bản nền này")
 
-    t = client.get("/api/v1/tours", headers=login("cntt")).json()["rows"][0]
-    body = {"tour_id": t["id"], "vehicle_id": vid, "date_from": str(d1), "date_to": str(d1),
+    body = {"tour_id": _tour_o(d1), "vehicle_id": vid, "date_from": str(d1), "date_to": str(d1),
             "internal_price": 1_000_000}
-    r = client.post("/api/v1/dispatch", headers=login("dh.lan"), json=body)
+    r = client.post("/api/v1/dispatch", headers=login("gd.doixe"), json=body)
     assert r.status_code == 422, r.text
     d = r.json()["detail"]
     assert "phải ghi lý do" in d["message"]
@@ -265,7 +283,7 @@ def test_chon_xe_he_thong_danh_gia_thap_hon_thi_phai_ghi_ly_do():
     assert d["he_thong_nhan_xet"], "phải nói ra hệ thống chê điểm gì, không chỉ đưa hai con số điểm"
     assert d["goi_y"], "phải trả kèm danh sách gợi ý để người chốt lệnh so sánh"
 
-    r2 = client.post("/api/v1/dispatch", headers=login("dh.lan"),
+    r2 = client.post("/api/v1/dispatch", headers=login("gd.doixe"),
                      json={**body, "ly_do_khac_goi_y": "Khách yêu cầu đúng xe này vì đã đi lần trước"})
     assert r2.status_code == 201, r2.text
     assert r2.json()["kem_hon_de_xuat"] is True
@@ -292,9 +310,8 @@ def test_diem_bang_nhau_thi_khong_bat_giai_trinh():
         bang_diem = [p for p in g["tat_ca"]
                      if p["vehicle_id"] not in [q["vehicle_id"] for q in g["phuong_an"]] and p["diem"] >= thap_nhat]
     if not bang_diem: pytest.skip("không dựng được xe ngoài top mà điểm bằng nhóm đề xuất")
-    t = client.get("/api/v1/tours", headers=login("cntt")).json()["rows"][0]
-    r = client.post("/api/v1/dispatch", headers=login("dh.lan"),
-                    json={"tour_id": t["id"], "vehicle_id": bang_diem[0]["vehicle_id"],
+    r = client.post("/api/v1/dispatch", headers=login("gd.doixe"),
+                    json={"tour_id": _tour_o(d1), "vehicle_id": bang_diem[0]["vehicle_id"],
                           "date_from": str(d1), "date_to": str(d1), "internal_price": 1_000_000})
     assert r.status_code == 201, "điểm không thấp hơn thì không được đòi lý do: " + r.text
 
@@ -303,9 +320,8 @@ def test_chon_dung_xe_trong_top_thi_khong_bat_ghi_ly_do():
     d1 = HOM_NAY + timedelta(days=540)
     g = client.get(f"/api/v1/fleet/goi-y-dieu-xe?date_from={d1}&date_to={d1}", headers=login("tp.dieuhanh")).json()
     if not g["phuong_an"]: pytest.skip("không còn xe hợp lệ")
-    t = client.get("/api/v1/tours", headers=login("cntt")).json()["rows"][0]
-    r = client.post("/api/v1/dispatch", headers=login("dh.lan"),
-                    json={"tour_id": t["id"], "vehicle_id": g["phuong_an"][0]["vehicle_id"],
+    r = client.post("/api/v1/dispatch", headers=login("gd.doixe"),
+                    json={"tour_id": _tour_o(d1), "vehicle_id": g["phuong_an"][0]["vehicle_id"],
                           "date_from": str(d1), "date_to": str(d1), "internal_price": 1_000_000})
     assert r.status_code == 201, r.text
     assert r.json()["theo_goi_y"] is True

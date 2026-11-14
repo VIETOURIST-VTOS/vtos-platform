@@ -224,15 +224,15 @@ def test_vehicle_rate_table_and_dispatch_pricing():
     # phải ghi lý do – ghi vết bắt buộc của đặc tả A1, không phải rào chặn: một câu là qua.
     assert client.post("/api/v1/dispatch", json={**base, "vehicle_id": veh["50F-009.60"]["id"],
                                                  "ly_do_khac_goi_y": "Kiểm thử bảng giá – chọn đúng xe này"},
-                       headers=login("dh.lan")).status_code == 201
-    assert client.post("/api/v1/dispatch", json={**base, "vehicle_id": veh["50E-955.31"]["id"]}, headers=login("dh.lan")).status_code == 201
+                       headers=login("gd.doixe")).status_code == 201
+    assert client.post("/api/v1/dispatch", json={**base, "vehicle_id": veh["50E-955.31"]["id"]}, headers=login("gd.doixe")).status_code == 201
     ds = {d["vehicle"]: d for d in client.get("/api/v1/dispatch", headers=login("dh.lan")).json() if d["tour_code"] == "PT-DL-0912"}
     assert ds["50F-009.60"]["internal_price"] == 9_000_000 and ds["50E-955.31"]["internal_price"] == 10_000_000 and ds["50F-009.60"]["route"] == "Phan Thiết 2 ngày"
     # đề xuất giá mới cần 2 chữ ký
     r = client.post("/api/v1/vehicle-rates", json={"route": "Phan Thiết 2 ngày", "days": 2, "internal_price": 9_500_000, "partner_price": 10_500_000, "effective_from": "2026-10-01"}, headers=login("cntt"))
     assert r.status_code == 201
     new = [x for x in client.get("/api/v1/vehicle-rates", headers=login("cntt")).json() if x["status"] == "pending"][0]
-    assert client.post("/api/v1/dispatch", json={**base, "vehicle_id": veh["50F-009.60"]["id"], "rate_id": new["id"]}, headers=login("dh.lan")).status_code == 422
+    assert client.post("/api/v1/dispatch", json={**base, "vehicle_id": veh["50F-009.60"]["id"], "rate_id": new["id"]}, headers=login("gd.doixe")).status_code == 422
     client.post(f"/api/v1/vehicle-rates/{new['id']}/sign", headers=login("tgd"))
     assert "hiệu lực" in client.post(f"/api/v1/vehicle-rates/{new['id']}/sign", headers=login("chutich")).json()["message"]
 

@@ -1922,11 +1922,18 @@ class DispatchIn(BaseModel):
 
 @router.post("/dispatch", status_code=201)
 def dispatch_create(data: DispatchIn,
-                    u: User = Depends(require_roles("nv_dh", "tp_dh", "cntt", "gd_doi_xe")),
+                    # R5-28 (Chủ tịch 14/11/2026 «chỉ GĐ điều xe»): Điều hành rời cửa này; ai thật sự được lập
+                    # do `fleet.chan_neu_khong_phai` quyết, kể cả khi tham số người lập lệnh gõ sai.
+                    u: User = Depends(require_roles("gd_doi_xe", "cntt")),
                     db: Session = Depends(get_db)):
     v = db.get(Vehicle, data.vehicle_id); t = db.get(Tour, data.tour_id)
     if not v or not t: raise HTTPException(404, "Không có xe hoặc tour")
     if data.date_to < data.date_from: raise HTTPException(422, "Ngày không hợp lệ")
+    # R5-28 (Chủ tịch 14/11/2026): ngày của lệnh phải nằm trong ngày của tour — lệnh lệch ngày là lệnh cho
+    # một chuyến không có thật, và nó vẫn chiếm xe, chiếm tài xế trên lịch.
+    if t.start_date and t.end_date and (data.date_from < t.start_date or data.date_to > t.end_date):
+        raise HTTPException(422, f"Ngày lệnh {data.date_from:%d/%m/%Y} → {data.date_to:%d/%m/%Y} nằm ngoài ngày tour "
+                                 f"{t.code} ({t.start_date:%d/%m/%Y} → {t.end_date:%d/%m/%Y}). Chọn ngày trong khoảng ấy.")
     rt = db.get(VehicleRate, data.rate_id) if data.rate_id else None
     if rt and rt.status != "active": raise HTTPException(422, "Tuyến trong bảng giá chưa được Chủ tịch + TGĐ duyệt")
     # DL-5 (15/10/2026): phép tính giá nội bộ RÚT RA một chỗ, vì cửa đổi xe cũng phải tính lại
@@ -1948,10 +1955,10 @@ def dispatch_create(data: DispatchIn,
     from app.services import fleet as FL
     # Chỉ đạo Chủ tịch 07/9/2026: GĐ điều hành đội xe là người DUY NHẤT được tạo và chốt lệnh điều xe.
     ai, ly_do = FL.nguoi_duoc_lap_lenh(db)
-    if ai and u.id not in {x.id for x in ai}:
-        ten = ", ".join(f"{x.full_name} ({x.username})" for x in ai)
-        raise HTTPException(403, f"Chỉ {ten} được tạo lệnh điều xe (chỉ đạo 07/9/2026). "
-                                 "Đổi người phụ trách thì sửa tham số chính sách xe_nguoi_lap_lenh.")
+    try:
+        FL.chan_neu_khong_phai(db, u, "tạo lệnh điều xe")
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex) + " Đổi người phụ trách thì sửa tham số chính sách xe_nguoi_lap_lenh.")
     # Truyền tài xế THẬT của xe, không truyền người thay thế ở trên. Với xe hợp tác do đối tác tự lái, hệ
     # thống đang tạm gắn một nhân sự đội xe chỉ để có chỗ ghi – gọi đó là "tài xế" khi kiểm trùng lịch thì
     # hai xe hợp tác chạy cùng ngày sẽ báo tài xế trùng lịch, trong khi ngoài đời là hai người khác nhau.
@@ -2010,6 +2017,13 @@ def dispatch_create(data: DispatchIn,
             raise HTTPException(422, f"Đề nghị #{dn.id} là của chuyến khác – lệnh và đề nghị phải "
                                      "cùng một chuyến, nếu không thì chuỗi đề nghị → lệnh đứt mà "
                                      "bảng vẫn trông đầy đủ")
+        # R5-28 (Chủ tịch 14/11/2026): một đề nghị ra tối đa ĐÚNG số xe nó xin. Lệnh đã huỷ không tính.
+        da_lap = db.execute(select(func.count()).select_from(DispatchOrder).where(
+            DispatchOrder.de_nghi_id == dn.id, DispatchOrder.status != "huy")).scalar() or 0
+        can = max(1, int(dn.so_xe_can or 1))
+        if da_lap >= can:
+            raise HTTPException(422, f"Đề nghị #{dn.id} xin {can} xe và đã có {da_lap} lệnh – không lập thêm. "
+                                     "Cần thêm xe thì Điều hành sửa số xe trên đề nghị hoặc gửi đề nghị mới.")
     d = DispatchOrder(tour_id=t.id, vehicle_id=v.id, driver_id=driver_id, de_nghi_id=data.de_nghi_id, date_from=data.date_from, date_to=data.date_to, rate_id=rt.id if rt else None, internal_price=price, created_by=u.username,
                       phuong_an_ai_goi_y=json.dumps(gy["phuong_an"], ensure_ascii=False, default=str)[:8000],
                       phuong_an_da_chon=v.code or v.plate, ly_do_khac_goi_y=data.ly_do_khac_goi_y.strip())
@@ -2041,13 +2055,14 @@ def dispatch_update(did: int, data: DispatchUpdate,
     d = db.get(DispatchOrder, did)
     if not d: raise HTTPException(404, "Không có lệnh")
     if data.status not in ("da_xac_nhan", "hoan_thanh", "huy"): raise HTTPException(422, "Trạng thái không hợp lệ")
-    if data.status == "da_xac_nhan":
-        # "Tạo VÀ CHỐT" – chốt lệnh cũng chỉ một người, nếu không thì siết cửa vào mà bỏ ngỏ cửa ra.
-        from app.services import fleet as FL
-        ai, _ = FL.nguoi_duoc_lap_lenh(db)
-        if ai and u.id not in {x.id for x in ai}:
-            ten = ", ".join(f"{x.full_name} ({x.username})" for x in ai)
-            raise HTTPException(403, f"Chỉ {ten} được chốt lệnh điều xe (chỉ đạo 07/9/2026)")
+    # "Tạo VÀ CHỐT" – chốt lệnh cũng chỉ một người, nếu không thì siết cửa vào mà bỏ ngỏ cửa ra.
+    # R5-28 (Chủ tịch 14/11/2026 «chỉ GĐ điều xe»): đóng (hoàn thành) và huỷ lệnh cũng chỉ người ấy.
+    from app.services import fleet as FL
+    try:
+        FL.chan_neu_khong_phai(db, u, {"da_xac_nhan": "chốt lệnh điều xe", "hoan_thanh": "đóng lệnh điều xe",
+                                       "huy": "huỷ lệnh điều xe"}[data.status])
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex))
     if data.status == "da_xac_nhan": d.confirmed_at = datetime.now()
     cu = d.status
     d.status = data.status; d.incident_note = data.incident_note or d.incident_note
@@ -2130,11 +2145,10 @@ def _lenh_de_doi(db: Session, did: int, u: User) -> DispatchOrder:
     if not d:
         raise HTTPException(404, "Không có lệnh này")
     from app.services import fleet as FL
-    ai, _ = FL.nguoi_duoc_lap_lenh(db)
-    if ai and u.id not in {x.id for x in ai}:
-        ten = ", ".join(f"{x.full_name} ({x.username})" for x in ai)
-        raise HTTPException(403, f"Chỉ {ten} được đổi xe hay đổi tài xế của lệnh điều xe – "
-                                 "cùng người được lập và chốt lệnh (chỉ đạo 07/9/2026)")
+    try:
+        FL.chan_neu_khong_phai(db, u, "đổi xe hay đổi tài xế của lệnh điều xe – cùng người được lập và chốt lệnh")
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex))
     return d
 
 
@@ -2201,7 +2215,7 @@ def _doi(db: Session, d: DispatchOrder, phien_ban, lam) -> dict:
 
 @router.post("/dispatch/{did}/doi-xe")
 def dispatch_doi_xe(did: int, data: DoiXeIn, u: User = Depends(require_roles(
-        "cntt", "gd_doi_xe", "tp_dh", "nv_dh")), db: Session = Depends(get_db)):
+        "cntt", "gd_doi_xe")), db: Session = Depends(get_db)):     # R5-28: Điều hành rời cửa này
     """Cửa GHI: đổi xe. Tài xế đi theo xe – kết quả nói rõ ai thay ai và giá cũ → giá mới."""
     from app.services import doi_xe_lenh as DX
     d = _lenh_de_doi(db, did, u)
@@ -2214,7 +2228,7 @@ def dispatch_doi_xe(did: int, data: DoiXeIn, u: User = Depends(require_roles(
 
 @router.post("/dispatch/{did}/doi-tai-xe")
 def dispatch_doi_tai_xe(did: int, data: DoiTaiXeIn, u: User = Depends(require_roles(
-        "cntt", "gd_doi_xe", "tp_dh", "nv_dh")), db: Session = Depends(get_db)):
+        "cntt", "gd_doi_xe")), db: Session = Depends(get_db)):     # R5-28: Điều hành rời cửa này
     """Cửa GHI: đổi tài xế, giữ nguyên xe. Giá không đổi – giá theo xe và tuyến, không theo người."""
     from app.services import doi_xe_lenh as DX
     d = _lenh_de_doi(db, did, u)
