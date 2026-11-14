@@ -27,6 +27,9 @@ USERS = [
     ("tp.dieuhanh", "Trưởng phòng Điều hành", "tp_dh", "Điều hành"),
     ("dh.lan", "Nguyễn Thị Lan (điều hành nội địa)", "nv_dh", "Điều hành"),
     ("dh.minh", "Trần Văn Minh (điều hành outbound)", "nv_dh", "Điều hành"),
+    # R5-28 (Chủ tịch 14/11/2026 «chỉ GĐ điều xe»): dữ liệu mẫu phải có Giám đốc đội xe — người DUY NHẤT lập,
+    # chốt, đổi và đóng lệnh điều xe. Không có thì phép thử chỉ chạy được nhờ đường thoát cho Điều hành.
+    ("gd.doixe", "Giám đốc điều hành đội xe", "gd_doi_xe", "Đội xe"),
     ("gd.kd", "Giám đốc Kinh doanh", "gd_kd", "Kinh doanh Lẻ"),
     ("kd.hoa", "Lê Thị Hoa (sale lẻ HCM)", "nv_kd", "Kinh doanh Lẻ"),
     ("kd.tuan", "Phạm Anh Tuấn (sale đoàn)", "nv_kd", "Kinh doanh Đoàn"),
