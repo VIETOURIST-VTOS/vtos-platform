@@ -49,6 +49,18 @@ def _doanh_thu_tinh_chi_tieu(db: Session, ky: str, ids: list[int]):
         return None, f"Không đọc được: {ex}"
 
 
+# R5-24 · hai phần DÙNG CHUNG mọi người (không cắt theo ai): nhớ 2 phút để bàn TP, Trưởng nhóm, Chuyên viên,
+# GĐ mở cùng lúc chỉ tính một lần. Không nhớ lỗi (luật 3 · services/nho_tam.py).
+from app.services import nho_tam as _NHO  # noqa: E402
+KHO_CHUNG = _NHO.Kho("ban_kd_le_chung", 120)
+
+
+def _kho_khoa(db: Session, *phan) -> tuple:
+    """Khoá mang cả mã máy cơ sở dữ liệu: hai kho dữ liệu (máy thử chạy nhiều kho trong một tiến trình)
+    không bao giờ đọc nhầm số của nhau. Trên máy chủ chỉ có một kho nên không đổi gì."""
+    return (id(db.get_bind()), *phan)
+
+
 def doi_chieu_chu_tich(db: Session, d: date) -> dict:
     """R5-9 · Số Lẻ trên màn Chủ tịch (khối «Doanh thu theo phòng») — đặt cạnh để đối chiếu. Cơ sở: doanh
     thu chuyến, khác cơ sở chỉ tiêu (giá trị booking).
@@ -58,11 +70,16 @@ def doi_chieu_chu_tich(db: Session, d: date) -> dict:
     đầu năm — chỉ để lấy MỘT ô của tháng này, và bàn TP gọi hai lần (≈ 24 lượt tính một tháng). Nay đọc
     thẳng `ket_qua_that.thang` của tháng này: đúng dòng `thang_nay[...]` mà `doanh_thu_phong` dùng cho ô
     «tháng», nên số không đổi — chỉ bỏ phần năm không ai đọc."""
+    khoa = _kho_khoa(db, "doi_chieu", d.isoformat())
+    cu = KHO_CHUNG.lay(khoa)
+    if cu is not None:
+        return cu
     try:
         from app.services import ket_qua_that as KQT
         le = KQT.thang(db, f"{d:%Y-%m}")["theo_mang"]["le"]
-        return {"thang": le.get("doanh_thu"), "chuyen_thang": le.get("chuyen"),
-                "co_so": "Doanh thu chuyến — khối «Doanh thu theo phòng» trên màn Chủ tịch / TGĐ"}
+        return KHO_CHUNG.dat(khoa,
+                             {"thang": le.get("doanh_thu"), "chuyen_thang": le.get("chuyen"),
+                              "co_so": "Doanh thu chuyến — khối «Doanh thu theo phòng» trên màn Chủ tịch / TGĐ"})
     except Exception:  # noqa: BLE001
         return {"thang": None, "chuyen_thang": None, "co_so": ""}
 
@@ -172,7 +189,11 @@ def thuc_ban(db: Session, rows: list | None = None) -> list[dict]:
     """Chuyến cần thúc bán: khởi hành trong 7 ngày, còn chỗ, trống nhiều đứng đầu. R5-7: dùng chung cho
     bàn GĐ và ba bàn TP / Trưởng nhóm / Chuyên viên — một hàm, cùng số."""
     if rows is None:
-        rows = BTL.dong_sap_di(db, 7)
+        khoa = _kho_khoa(db, "thuc_ban", date.today().isoformat())
+        cu = KHO_CHUNG.lay(khoa)
+        if cu is not None:
+            return cu
+        return KHO_CHUNG.dat(khoa, thuc_ban(db, BTL.dong_sap_di(db, 7)))
     thuc = sorted([r for r in rows if r["days_left"] <= 7 and r["cho_con"] > 0],
                   key=lambda r: (-r["cho_con"], r["start_date"]))
     return [{"id": r["id"], "code": r["code"], "name": r["name"], "start_date": r["start_date"],
