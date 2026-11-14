@@ -115,7 +115,9 @@ def allowed_actions(db: Session, t: Tour, u: User) -> list[str]:
         if u.role == "sales_admin": a += ["chuyen_dieu_hanh", "tra_lai_kinh_doanh"]
     if t.status == "nhap" and (u.id == t.operator_id or u.role == "tp_dh"): a += ["edit", "submit"]
     if t.status == "cho_xac_nhan" and u.role == "tp_dh": a.append("confirm")
-    if t.status == "cho_duyet":
+    if t.status == "cho_duyet" and R.approver_role(t) == "chutich":
+        if u.role == "chutich": a.append("approve")      # R5-30: HĐ thuê xe đội xe — Chủ tịch duyệt, cả khi dưới biên
+    elif t.status == "cho_duyet":
         if t.below_margin and u.role in ("chutich", "tgd") and not getattr(t, f"signed_{u.role}"): a.append("sign")
         if not t.below_margin and u.role == R.approver_role(t): a.append("approve")
     # Hai nút quyết toán đi theo CHỦ HỒ SƠ, không theo người điều hành (25/9/2026, câu 4). Bảng
@@ -393,6 +395,14 @@ def confirm(db: Session, u: User, t: Tour, note: str = "") -> str:
 
 def approve(db: Session, u: User, t: Tour, note: str = "") -> str:
     if t.status != "cho_duyet": raise Gate("TRANG_THAI", "Trạng thái không phù hợp")
+    # R5-30: hợp đồng thuê xe của ĐỘI XE chỉ Chủ tịch duyệt — kể cả khi dưới biên (giải trình đi kèm khi trình),
+    # nên không qua đường hai chữ ký của tour dưới biên ở dưới.
+    if R.approver_role(t) == "chutich":
+        if u.role != "chutich": raise Gate("PHAN_QUYEN", "Hợp đồng thuê xe của đội xe do Chủ tịch duyệt")
+        t.status, t.approved_by = "da_duyet", u.username
+        EV(db, t, "duyet", u.username, note)
+        R.audit(db, u.username, u.role, "duyet_hop_dong_thue_xe", f"tour:{t.code}", after=snap(t)); db.commit()
+        return "Đã duyệt hợp đồng thuê xe – Giám đốc đội xe lập lệnh được"
     if t.below_margin:
         # NGƯỜI KÝ ĐỔI, Chủ tịch chốt 11/10/2026: P.TGĐ tour đoàn + TGĐ. Chủ tịch RA KHỎI LUẬT.
         # Luật nằm ở `chu_ky.VAI_KY_CAN["du_toan_duoi_bien"]`, đọc từ đó chứ không viết tay.

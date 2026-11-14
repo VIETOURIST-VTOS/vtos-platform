@@ -1045,7 +1045,11 @@ def settlement_deadline(db: Session, tour: Tour) -> date:
 
 
 def approver_role(tour: Tour) -> str:
-    """Điều 4 Văn bản đính chính: lẻ → TGĐ; đoàn → PTGĐ tour đoàn."""
+    """Điều 4 Văn bản đính chính: lẻ → TGĐ; đoàn → PTGĐ tour đoàn.
+
+    R5-30 (Chủ tịch 14/11/2026 «CT duyệt, TGĐ thấy»): hợp đồng thuê xe do ĐỘI XE tự nhận → Chủ tịch duyệt."""
+    if tour.tour_type == "thue_xe" and getattr(getattr(tour, "operator", None), "role", "") == "gd_doi_xe":
+        return "chutich"
     return "ptgd_doan" if is_doan(tour) else "tgd"
 
 

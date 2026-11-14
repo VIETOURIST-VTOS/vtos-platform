@@ -78,6 +78,8 @@ const NHOM: { ma: string; ten: string; tom: string; trang: Trang[] }[] = [
     { ma: "de-nghi", ten: "Đề nghị xe", toi: "/lenh-dieu-xe/de-nghi",
       ghi: "Điều hành tour gửi sang sau khi dự toán được duyệt" },
     { ma: "lap-lenh", ten: "Lập lệnh điều xe", toi: "/lenh-dieu-xe/lap-lenh" },
+    // R5-30 (Chủ tịch duyệt 14/11/2026): khách thuê xe đội xe tự nhận — tạo hợp đồng, Chủ tịch duyệt, lập lệnh.
+    { ma: "thue-xe", ten: "Hợp đồng thuê xe", toi: "/lenh-dieu-xe/thue-xe" },
     { ma: "chua-nhan", ten: "Tài xế chưa nhận lệnh", toi: "/lenh-dieu-xe/chua-nhan",
       ghi: "Hạn nhận: trước giờ khởi hành 24 giờ" },
     { ma: "xe-hom-nay", ten: "Xe hôm nay", toi: "/doi-xe/xe-hom-nay" },

@@ -1505,7 +1505,9 @@ MATRIX = {
 # CHỦ. Vai gd_doi_xe (danh sách CHO PHÉP, ngay dưới) được thêm đủ bốn trang, để danh sách ẩn của ông
 # không gọi tên chính những màn ông dùng để lập lệnh.
 MAN_CON_LENH_DIEU_XE = ("/lenh-dieu-xe/de-nghi", "/lenh-dieu-xe/de-nghi/moi",
-                        "/lenh-dieu-xe/lap-lenh", "/lenh-dieu-xe/chua-nhan")
+                        "/lenh-dieu-xe/lap-lenh", "/lenh-dieu-xe/chua-nhan",
+                        # R5-30: hợp đồng thuê xe đội xe tự nhận — chỉ gọi /fleet/hop-dong-thue-xe và /tours/{id}/approve.
+                        "/lenh-dieu-xe/thue-xe")
 # Bốn trang con của "/doi-xe" thêm 17/10/2026 — HAI CỬA NHẬP CÒN THIẾU của đội xe (phạt tài xế,
 # giá dầu ngày), Chủ tịch duyệt bản xem thử 16/10. Bảng và cửa API đã có từ đợt DX-3; thiếu đúng
 # màn hình, nên không ai nhập được — `services/ks_cua_nhap.py` đã ghi đúng điều đó ở hai dòng
