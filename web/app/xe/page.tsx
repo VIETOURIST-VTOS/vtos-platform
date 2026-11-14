@@ -580,12 +580,12 @@ const RONG = <style>{`main{max-width:1440px!important;margin:0 auto!important}
 /* VH-8 · HAI TẦNG: nền xám xanh (tầng 1), thẻ trắng có bóng nổi lên (tầng 2). Chỉ sống khi /xe đang mở. */
 body,.shell{background:#eaf0f7!important}
 :root{--xe-b1:0 1px 2px #12305414,0 4px 12px #1230541a;--xe-b2:0 2px 4px #12305414,0 10px 24px #12305421}
-/* R5-25: tiêu đề cũ `.xe-dau` (chữ chuyển màu) bỏ — bàn dùng thanh đầu chung `.mh01-ban`. */
+/* R5-25: tiêu đề cũ .xe-dau (chữ chuyển màu) bỏ — bàn dùng thanh đầu chung .mh01-ban. */
 .xe-ky{display:flex;align-items:center;gap:6px;background:#fff;border-radius:12px;padding:6px;box-shadow:var(--xe-b1)}
 .xe-ky button{font:inherit;border:0;background:var(--xe-nhat);color:var(--xe-nhan);min-width:34px;height:34px;border-radius:9px;font-weight:700;cursor:pointer}
 .xe-ky .xe-ky-quyen{background:#fff;border:1px solid #c9d6e8;padding:0 12px;font-weight:600}
 .xe-ky strong{min-width:92px;text-align:center;color:var(--xe-dam);font-variant-numeric:tabular-nums}
-/* R5-25: nút vàng «Lịch xe 90 ngày» to giữa màn bỏ — nút lên thanh đầu (`.n90s`, như mọi bàn). */
+/* R5-25: nút vàng «Lịch xe 90 ngày» to giữa màn bỏ — nút lên thanh đầu (.n90s, như mọi bàn). */
 .xe-nhom-dinh{position:sticky;top:0;z-index:5;background:#eaf0f7;padding:6px 0 2px;margin-bottom:8px}
 .xe-nhom button{display:inline-flex;gap:9px;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s,background .15s}
 .xe-nhom button svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
