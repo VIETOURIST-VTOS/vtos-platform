@@ -3225,3 +3225,81 @@ def chuyen_xlsx(ky: str, u: User = Depends(require_roles(*READ)), db: Session = 
     d1, d2 = _ky_hop_le(ky)
     ds = danh_sach_chuyen(vehicle_id=None, tu=d1, den=d2, u=u, db=db)
     return _tep(XL.bao_cao_xe(ds, ky), XL.ten_tep("BAO_CAO_TUNG_XE", ky))
+
+
+# ═══ R5-30 · HỢP ĐỒNG THUÊ XE ĐỘI XE TỰ NHẬN (Chủ tịch 14/11/2026: phương án B; «CT duyệt, TGĐ thấy») ═══
+# Luật ở `services/hop_dong_thue_xe.py`. Đọc: Giám đốc đội xe, Chủ tịch, TGĐ (và vai nền đọc). Ghi: chỉ người
+# được lập lệnh điều xe. Duyệt: cửa duyệt dự toán có sẵn `POST /tours/{id}/approve` — `rules.approver_role` trả
+# `chutich` cho hợp đồng của đội xe.
+from pydantic import BaseModel as _BM  # noqa: E402
+from app.services import hop_dong_thue_xe as HD  # noqa: E402
+
+XEM_HD = ("gd_doi_xe", "chutich", "tgd", "bks", "cntt")
+
+
+class HopDongIn(_BM):
+    ma: str
+    khach: str
+    lo_trinh: str = ""
+    ngay_di: date
+    ngay_ve: date
+    so_xe: int = 1
+    so_khach: int
+    gia: float
+    chi_phi: float
+    diem_dung: str = ""
+
+
+class TrinhIn(_BM):
+    giai_trinh: str = ""
+
+
+@router.get("/hop-dong-thue-xe")
+def hd_danh_sach(u: User = Depends(require_roles(*XEM_HD)), db: Session = Depends(get_db)):
+    return {"rows": HD.danh_sach(db), "duoc_tao": u.role == HD.VAI_DOI_XE, "duoc_duyet": u.role == "chutich"}
+
+
+@router.post("/hop-dong-thue-xe", status_code=201)
+def hd_tao(data: HopDongIn, u: User = Depends(require_roles("gd_doi_xe")), db: Session = Depends(get_db)):
+    try:
+        t = HD.tao(db, u, **data.model_dump())
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex))
+    except HD.LoiHopDong as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    return {"id": t.id, "message": f"Đã lưu nháp hợp đồng {t.code}. Bấm «Trình duyệt» để gửi Chủ tịch."}
+
+
+def _hd(db: Session, tid: int):
+    from app.models.core import Tour as _T
+    t = db.get(_T, tid)
+    if t is None:
+        raise HTTPException(404, "Không có hợp đồng này")
+    return t
+
+
+@router.post("/hop-dong-thue-xe/{tid}/trinh")
+def hd_trinh(tid: int, data: TrinhIn, u: User = Depends(require_roles("gd_doi_xe")), db: Session = Depends(get_db)):
+    t = _hd(db, tid)
+    try:
+        msg = HD.trinh(db, u, t, data.giai_trinh)
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex))
+    except HD.LoiHopDong as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    return {"message": msg}
+
+
+@router.post("/hop-dong-thue-xe/{tid}/lap-lenh")
+def hd_lap_lenh(tid: int, u: User = Depends(require_roles("gd_doi_xe")), db: Session = Depends(get_db)):
+    t = _hd(db, tid)
+    try:
+        dn = HD.de_nghi_de_lap_lenh(db, u, t)
+    except PermissionError as ex:
+        raise HTTPException(403, str(ex))
+    except (HD.LoiHopDong, ValueError) as ex:
+        raise HTTPException(422, str(ex))
+    db.commit()
+    return {"de_nghi_id": dn}

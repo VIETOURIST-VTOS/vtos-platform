@@ -76,6 +76,8 @@ function DanhSach() {
     ...(dnQ?.toi_duoc_de_nghi ? [{ nhan: "Điều hành đề nghị xe", href: "/lenh-dieu-xe/de-nghi/moi" }] : []),
     { nhan: "Tài xế chưa nhận", href: "/lenh-dieu-xe/chua-nhan",
       so: nhan?.dem ? (nhan.dem.qua_han || 0) + (nhan.dem.tu_choi || 0) : null },
+    // R5-30: hợp đồng thuê xe đội xe tự nhận (Chủ tịch duyệt 14/11/2026).
+    { nhan: "Hợp đồng thuê xe", href: "/lenh-dieu-xe/thue-xe" },
   ];
 
   return (<>
