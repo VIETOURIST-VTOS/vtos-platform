@@ -24,7 +24,7 @@ import ThanhViec, { docUrl, baoDaDoi, useDaDoi, type Viec } from "@/components/T
  *  phụ thuộc vào kết luận của mô hình ngôn ngữ." */
 
 const DUONG = <><a href="/">VTOS</a> · <a href="/phan-he/dhxe">Đội xe</a> · <a href="/lenh-dieu-xe">Lệnh điều xe</a></>;
-const VIEC_MOT = ["doi-xe", "doi-tai-xe", "dong-lenh", "xoa-lenh"] as const;
+const VIEC_MOT = ["xac-nhan", "doi-xe", "doi-tai-xe", "dong-lenh", "xoa-lenh"] as const;
 
 function LenhDieuXe() {
   // Đọc đường dẫn MỘT LẦN khi mở: `?ma=` là màn một lệnh, không có là màn danh sách. Chưa đọc xong
@@ -195,6 +195,7 @@ function MotLenh({ ma, viec }: { ma: number; viec: string }) {
     <div className="panel">
       {viec === "doi-xe" && <DoiXe key={"doi" + d.id} lenh={d} che="xe" xong={() => xongViec("vừa đổi xe")} thoi={() => { window.location.href = veMot; }} />}
       {viec === "doi-tai-xe" && <DoiXe key={"tx" + d.id} lenh={d} che="tx" xong={() => xongViec("vừa đổi tài xế")} thoi={() => { window.location.href = veMot; }} />}
+      {viec === "xac-nhan" && <XacNhanLenh key={"xn" + d.id} lenh={d} xong={() => xongViec("vừa được xác nhận")} />}
       {viec === "dong-lenh" && <DongLenh key={"dong" + d.id} lenh={d} xong={() => xongViec("vừa đóng")} />}
       {/* `key` theo id lệnh là BẮT BUỘC: không có nó thì soát lệnh này rồi bấm sang lệnh khác
           sẽ thấy câu trả lời của lệnh trước — đã xảy ra thật ở cửa xoá xe ngày 14/10/2026,
@@ -207,7 +208,11 @@ function MotLenh({ ma, viec }: { ma: number; viec: string }) {
   return (<>
     <ThanhViec toanMan duong={duong} daDoi={{ ...daDoi, napLai }} viec={[
       { nhan: "‹ Lên một cấp", href: "/lenh-dieu-xe", len: true },
-      { nhan: "Đổi xe", href: `${veMot}&viec=doi-xe`, chinh: true, tat: doiDuoc ? "" : lyDoKhongDoi },
+      // R5-27 (Chủ tịch 14/11/2026 chọn «Xác nhận lệnh»): GĐ đội xe xác nhận lệnh ngay trên màn một lệnh —
+      // trước đây chỉ có ở màn cũ cho các vai mà máy chủ không cho xác nhận, nên lệnh kẹt ở «chờ xác nhận».
+      { nhan: "Xác nhận lệnh", href: `${veMot}&viec=xac-nhan`, chinh: d.status === "cho_xac_nhan",
+        tat: d.status === "cho_xac_nhan" ? "" : "Chỉ xác nhận được lệnh đang chờ xác nhận." },
+      { nhan: "Đổi xe", href: `${veMot}&viec=doi-xe`, chinh: d.status !== "cho_xac_nhan", tat: doiDuoc ? "" : lyDoKhongDoi },
       { nhan: "Đổi tài xế", href: `${veMot}&viec=doi-tai-xe`, tat: doiDuoc ? "" : lyDoKhongDoi },
       { nhan: "Đóng lệnh", href: `${veMot}&viec=dong-lenh`,
         tat: dongDuoc ? "" : "Chỉ đóng được lệnh đã xác nhận." },
@@ -220,7 +225,7 @@ function MotLenh({ ma, viec }: { ma: number; viec: string }) {
 }
 
 const TEN_VIEC: Record<string, string> = {
-  "doi-xe": "Đổi xe", "doi-tai-xe": "Đổi tài xế", "dong-lenh": "Đóng lệnh", "xoa-lenh": "Xoá lệnh",
+  "xac-nhan": "Xác nhận lệnh", "doi-xe": "Đổi xe", "doi-tai-xe": "Đổi tài xế", "dong-lenh": "Đóng lệnh", "xoa-lenh": "Xoá lệnh",
 };
 
 /** Nội dung lệnh, in trước mọi việc: người bấm phải nhìn tận mắt tour, xe, tài xế, ngày và giá rồi
@@ -237,6 +242,31 @@ const TomTat = ({ d }: { d: any }) => (
     <tr><td>Ghi vết gợi ý</td><td><GhiVet d={d} /></td></tr>
     <tr><td>Người lập</td><td>{d.created_by}{d.confirmed_at && <span className="muted"> · chốt {fmtDT(d.confirmed_at)}</span>}</td></tr>
   </tbody></table></div>);
+
+/** R5-27 · XÁC NHẬN LỆNH (Chủ tịch chọn 14/11/2026). Hai bước như đóng lệnh: màn hình nói trước điều sẽ xảy
+ *  ra, nút xác nhận đứng riêng. Máy chủ quyết ai được bấm (chỉ người lập lệnh theo `xe_nguoi_lap_lenh`); xác nhận
+ *  lại một lệnh tài xế đã nhận thì dấu nhận hết hiệu lực (LUẬT 3, 12/10/2026) — nói trước cho người bấm. */
+function XacNhanLenh({ lenh, xong }: { lenh: any; xong: () => void }) {
+  const { toast } = useShell();
+  const [dang, setDang] = useState(false);
+  const xacNhan = async () => {
+    setDang(true);
+    try {
+      const r: any = await api(`/dispatch/${lenh.id}/update`, { method: "POST", json: { status: "da_xac_nhan" } });
+      toast(r.message); xong();
+    } catch (e) { toast(errMsg(e), true); } finally { setDang(false); }
+  };
+  if (lenh.status !== "cho_xac_nhan") return <p className="muted">
+    Chỉ xác nhận được lệnh <b>đang chờ xác nhận</b>. Lệnh này đang ở trạng thái <TrangThai d={lenh} />.</p>;
+  return (<div>
+    <p>Xác nhận là chốt lệnh này để chạy: tour, xe, tài xế, ngày và giá như bảng trên. Sau khi xác nhận, lệnh
+      mới <b>đóng được</b> khi chuyến chạy xong.</p>
+    {lenh.nhan_luc && <p className="muted">Tài xế đã nhận lệnh này. Xác nhận bây giờ thì tài xế phải bấm nhận lại
+      trên điện thoại (lệnh được chốt lại).</p>}
+    <button className="act" style={{ margin: "8px 0 0", background: "var(--vtos-sky)", borderColor: "var(--vtos-sky)" }}
+      disabled={dang} onClick={xacNhan}>{dang ? "Đang xác nhận…" : `Xác nhận lệnh #${lenh.id}`}</button>
+  </div>);
+}
 
 /** DL-3 · ĐÓNG LỆNH (Chủ tịch chốt 15/10/2026: đóng lệnh thì máy sinh chuyến).
  *
