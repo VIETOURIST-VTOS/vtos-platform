@@ -13,7 +13,7 @@ import { useState } from "react";
  *  · còn lại (trang chủ, phân hệ khác của CRM) → không đi đâu cả; lối ra duy nhất là thanh đầu. */
 /** R5-19 · gắn nhãn cột (đầu bảng) lên từng ô để điện thoại xếp mỗi dòng thành một thẻ. Chỉ thêm thuộc
  *  tính `data-nhan` và lớp `kb-the` — không di chuyển nút nào của trang con. */
-function ganNhanCot(doc: Document) {
+export function ganNhanCot(doc: Document) {
   doc.querySelectorAll("main table").forEach((t) => {
     const ths = Array.from(t.querySelectorAll(":scope > thead > tr:first-child > th"));
     if (ths.length < 3) return;
@@ -28,6 +28,21 @@ function ganNhanCot(doc: Document) {
       });
     });
   });
+}
+
+/** R5-19 / R5-25 · bật khung bàn chung (nền trắng sáng, điểm nhấn navy) cho một trang con đang nhúng. Dùng chung
+ *  cho khung nhúng của mọi bàn (cả khung riêng của /xe), để không có hai bản của cùng một luật. */
+export function batKhungBan(doc: Document, b: HTMLElement) {
+  doc.documentElement.classList.add("vtos-khung-ban");
+  // Bấm tiêu đề màn: mở / thu ghi chú kỹ thuật đầu màn (dòng «ⓘ»).
+  doc.addEventListener("click", (e) => {
+    const h = (e.target as HTMLElement | null)?.closest?.("main h1");
+    if (h) doc.documentElement.classList.toggle("kb-mo-ghi");
+  });
+  let hen = 0;
+  const gan = () => { cancelAnimationFrame(hen); hen = requestAnimationFrame(() => ganNhanCot(doc)); };
+  gan();
+  new MutationObserver(gan).observe(b, { childList: true, subtree: true });
 }
 
 export default function KhungNhung({ toi, ten, mo, cuaBan, ngoai, anDauBan, khungBan }: {
@@ -55,18 +70,7 @@ export default function KhungNhung({ toi, ten, mo, cuaBan, ngoai, anDauBan, khun
           + ".thanh-viec a.tv:not(.chinh),.thanh-viec .tv-nhan{display:none!important}.thanh-viec:not(:has(a.tv.chinh)){display:none!important}";
         if (anDauBan) st.textContent += ".mh01-ban{display:none!important}";
         doc.head.appendChild(st);
-        if (khungBan) {
-          doc.documentElement.classList.add("vtos-khung-ban");
-          // Bấm tiêu đề màn: mở / thu ghi chú kỹ thuật đầu màn (dòng «ⓘ»).
-          doc.addEventListener("click", (e) => {
-            const h = (e.target as HTMLElement | null)?.closest?.("main h1");
-            if (h) doc.documentElement.classList.toggle("kb-mo-ghi");
-          });
-          let hen = 0;
-          const gan = () => { cancelAnimationFrame(hen); hen = requestAnimationFrame(() => ganNhanCot(doc)); };
-          gan();
-          new MutationObserver(gan).observe(b, { childList: true, subtree: true });
-        }
+        if (khungBan) batKhungBan(doc, b);
         doc.addEventListener("click", (e) => {
           const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
           if (!a) return;

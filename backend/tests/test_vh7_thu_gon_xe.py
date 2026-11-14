@@ -18,8 +18,8 @@ def _xe():
 
 def test_tieu_de_len_dau_nam_nhom_xuong_duoi():
     s = _xe()
-    assert s.index('<div className="xe-dau">') < s.index('<nav aria-label="Nghiệp vụ đội xe" className="xe-nhom">')
-    assert "@keyframes xe-sang" in s and "prefers-reduced-motion:reduce){.xe-dau h1{animation:none" in s
+    # R5-25 (Chủ tịch duyệt 14/11/2026): tiêu đề vào thanh đầu navy chung `.mh01-ban`, vẫn đứng trên năm nhóm.
+    assert s.index('<div className="mh01-ban">') < s.index('<nav aria-label="Nghiệp vụ đội xe" className="xe-nhom">')
 
 
 def test_hai_tang_va_ba_the_so():

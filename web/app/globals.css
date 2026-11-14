@@ -1883,9 +1883,9 @@ html.vtos-khung-ban main h1:has(+ p.muted)::after{content:"ⓘ  Ghi chú cách �
 html.vtos-khung-ban.kb-mo-ghi main h1:has(+ p.muted)::after{content:"ⓘ  Thu gọn ghi chú"}
 html.vtos-khung-ban:not(.kb-mo-ghi) main h1 + p.muted,
 html.vtos-khung-ban:not(.kb-mo-ghi) main h1 + p.muted + p.muted{display:none}
-html.vtos-khung-ban th{background:var(--vtos-info-bg);color:var(--vtos-navy);text-transform:none;letter-spacing:0;
+html.vtos-khung-ban th,.ban-navy th{background:var(--vtos-info-bg);color:var(--vtos-navy);text-transform:none;letter-spacing:0;
   font-family:inherit;font-weight:700;border-bottom:2px solid var(--vtos-sky)}
-html.vtos-khung-ban th.num{font-family:inherit}
+html.vtos-khung-ban th.num,.ban-navy th.num{font-family:inherit}
 html.vtos-khung-ban .kpi{border-left:4px solid var(--vtos-sky)}
 html.vtos-khung-ban [aria-pressed="true"]{border-color:var(--vtos-sky)}
 /* Điện thoại: mỗi dòng bảng một thẻ (khuôn R5-13); nhãn cột lấy từ đầu bảng (KhungNhung gắn `data-nhan`). */
