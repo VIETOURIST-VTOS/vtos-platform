@@ -23,7 +23,9 @@ const ngayDep = (s: string) => { const d = new Date(s + "T00:00:00"); return `${
 const ngayVn = (s?: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "");
 const nghin = (x: number) => Math.ceil(Math.round(x) / 1000) * 1000;
 const PT: Record<string, string> = { xe: "Xe du lịch", may_bay: "Máy bay", tau_hoa: "Tàu hỏa", du_thuyen: "Du thuyền" };
-const BUA: Record<string, string> = { "sáng": "sáng", "trưa": "trưa", "tối": "tối" };
+// TR-20 bỏ bảng BUA: nó chỉ còn một chỗ dùng là chip «Ăn trưa» trên đầu ngày, mà chip ấy nay
+// thay bằng ba viên ✓/✕ dưới đây. Để lại một hằng không ai gọi là để lại một câu hỏi cho
+// người đọc sau: «chỗ nào còn dùng cái này?».
 // TR-16: ba bữa luôn hiện đủ, theo đúng thứ tự trong ngày.
 const BA_BUA: [string, string][] = [["sáng", "Sáng"], ["trưa", "Trưa"], ["tối", "Tối"]];
 
@@ -596,7 +598,13 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
               <button type="button" className="tra-dhead" aria-expanded={mo} onClick={() => setMoNgay({ ...moNgay, [n.ngay]: !mo })}>
                 <span className="tra-dno" aria-hidden="true">{n.ngay}</span>
                 <span className="tra-dmid"><small>Ngày {n.ngay}</small><b>{ten || "Chương trình trong ngày"}</b>
-                  {(n.bua?.length > 0 || n.khach_san) && <span className="tra-chips2">{(n.bua || []).map((b: string) => <em key={b}>Ăn {BUA[b] || b}</em>)}{n.khach_san && <em>Nghỉ: {n.khach_san}</em>}</span>}</span>
+                  {/* TR-20 · Ba bữa hiện ĐỦ BA ngay trên đầu ngày, kể cả khi ngày đang gập
+                      (Chủ tịch chốt 14-11-2026). Trước đây đầu ngày chỉ in bữa CÓ, nên khách
+                      chưa mở ngày ra thì không thể biết bữa còn lại phải tự trả. */}
+                  <span className="tra-chips2">{BA_BUA.map(([ma, ten]) => {
+                    const co = (n.bua || []).includes(ma);
+                    return <em key={ma} className={co ? "b co" : "b"}><i aria-hidden="true">{co ? "✓" : "✕"}</i>{ten}</em>;
+                  })}{n.khach_san && <em>Nghỉ: {n.khach_san}</em>}</span></span>
                 <span className="tra-dsign" aria-hidden="true">{mo ? "−" : "+"}</span></button>
               {mo && <div className="tra-dbody">
                 {/* TR-16 · Đường thời gian. Thân ngày về dưới dạng một khối chữ liền hơn hai
@@ -815,13 +823,19 @@ const CSS = `
 @media (max-width:1100px){.tra-sbar{grid-template-columns:1fr 1fr}.tra-sbar .ksv-btn-tim{grid-column:span 2}}
 @media (max-width:900px){.tra-gal{grid-template-columns:1fr 1fr;grid-template-rows:200px 110px}.tra-gal>span:first-child{grid-column:1 / -1;grid-row:auto}.tra-gal>span:nth-child(n+4){display:none}}
 /* TR-13 · navy sáng làm điểm nhấn cho trang chương trình tour (Chủ tịch duyệt bản xem thử 14/11/2026) */
-.tra{--tra-navy:#1a4fa3;--tra-navy-s:#eff4fd;--tra-navy-l:#d3e0f6}
+/* TR-20 · --tra-nhan: màu các dòng nhãn nhỏ in hoa («THỜI LƯỢNG», «NGHỈ ĐÊM», «BỮA ĂN»,
+   «NGÀY 1», dấu +/− gập ngày). Quét lại tương phản CẢ trang tour trên bản chạy thì còn 9 chỗ
+   không đạt, và 7 trong số đó là đúng một màu: #5B82C4 — 3,86:1 trên nền trắng, dưới ngưỡng
+   4,5:1. Chữ 11px thì không có ngoại lệ «chữ lớn» nào cứu được. #4B6BA1 là chính sắc ấy đậm
+   thêm 18%, cho 5,36:1 trên trắng, 5,22:1 trên #FAFCFF và 4,86:1 trên nền navy nhạt — đạt ở
+   cả ba chỗ nó xuất hiện. Hai chỗ còn lại là viên bữa xám, vòng này cũng chữa. */
+.tra{--tra-navy:#1a4fa3;--tra-navy-s:#eff4fd;--tra-navy-l:#d3e0f6;--tra-nhan:#4b6ba1}
 .tra-h{display:flex;align-items:center;gap:11px}
 .tra-h::before{content:"";flex:none;width:4px;height:24px;border-radius:2px;background:var(--tra-navy)}
 .tra-ma{align-self:flex-start;background:var(--tra-navy);color:#fff;font-size:12px;font-weight:700;letter-spacing:.05em;border-radius:5px;padding:3px 9px}
 .tra-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;margin:2px 0 0;background:var(--tra-navy-l);border:1px solid var(--tra-navy-l);border-top:3px solid var(--tra-navy);border-radius:10px;overflow:hidden}
 .tra-facts>div{background:#fff;padding:12px 14px}
-.tra-facts dt{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#5b82c4;font-weight:700}
+.tra-facts dt{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--tra-nhan);font-weight:700}
 .tra-facts dd{margin:4px 0 0;font-size:15px;font-weight:600}
 .tra-nbg{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
 .tra-nbc{display:flex;gap:9px;align-items:flex-start;background:#fafcff;border:1px solid var(--tra-navy-l);border-top:3px solid var(--tra-navy);border-radius:10px;padding:12px 14px}
@@ -837,14 +851,45 @@ const CSS = `
 .tra-dno{flex:none;width:32px;height:32px;border-radius:50%;background:#e6eefc;color:var(--tra-navy);display:flex;align-items:center;justify-content:center;font-weight:700}
 .tra-day.on .tra-dno{background:rgba(255,255,255,.18);color:#fff}
 .tra-dmid{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
-.tra-dmid small{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#5b82c4;font-weight:700}
+.tra-dmid small{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--tra-nhan);font-weight:700}
 .tra-day.on .tra-dmid small{color:#afc9ee}
 .tra-dmid b{font-size:17px;line-height:1.35}
-.tra-dsign{flex:none;padding-top:4px;font-size:22px;line-height:1;color:#5b82c4}
+.tra-dsign{flex:none;padding-top:4px;font-size:22px;line-height:1;color:var(--tra-nhan)}
 .tra-day.on .tra-dsign{color:#afc9ee}
 .tra-chips2{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
 .tra-chips2 em{font-style:normal;font-size:12px;font-weight:600;color:#3a5a8c;background:var(--tra-navy-s);border:1px solid var(--tra-navy-l);border-radius:99px;padding:2px 10px}
 .tra-day.on .tra-chips2 em{color:#e3edfb;background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.26)}
+/* TR-20 · Ba viên bữa trên đầu ngày, theo BA MÀU LOGO (Chủ tịch chốt 14-11-2026).
+   DÙNG LẠI BỘ MÀU CỦA LÀN R5, KHÔNG TỰ ĐẶT BỘ KHÁC. Làn R5 đã chốt bộ này trong R5-22 cùng
+   ngày: --vtos-logo-xanh #5A9BD4 navy sáng, --vtos-logo-hong #FF6F96 cảnh báo, --vtos-logo-la
+   #5FAE66 điểm nhấn; và vì #5FAE66 làm chữ chỉ được 2,72:1 trên trắng nên R5 đậm một nấc
+   thành --vtos-success #2F7D3B trên nền --vtos-success-bg #ECF7EE. Lấy đúng hai số ấy.
+   Hai làn tự pha hai sắc xanh «gần giống nhau» là chỗ sinh lệch nhận diện khó thấy nhất.
+
+   NHƯNG KHÔNG GỌI var(--vtos-success) Ở ĐÂY, và đây là chỗ suýt sai: đo trên chính trang tour
+   đang chạy thì --vtos-success ra #53C49A, --vtos-success-bg ra #14392F — tức gốc trang đang
+   ở BẢN TỐI, trong khi nội dung trang khách là nền sáng. Gọi token vào đây là chữ bạc hà trên
+   nền xanh nhạt, 1,96:1. Nên chép giá trị bản SÁNG ra chữ thật, đúng cách mọi luật .tra- khác
+   trong tệp này vẫn làm. Làn nào sau này mang token hệ thống vào trang khách phải đo lại.
+
+   Bữa KHÔNG bao gồm giữ màu xám: nó là một sự VẮNG MẶT, không phải cảnh báo — đem hồng dùng
+   ở đây là làm nhạt chính tín hiệu cảnh báo khi cần thật.
+
+   Bốn ô màu, bốn tỉ lệ đã tính chứ không chọn bằng mắt:
+       đóng · có     #2F7D3B trên #ECF7EE          4,64:1
+       đóng · không  #5F6B77 trên #F4F5F7          4,99:1
+       mở   · có     #2F7D3B trên TRẮNG ĐẶC        5,10:1
+       mở   · không  #FFFFFF trên đen .22          8,27:1   (đầu navy sáng nhất)
+   Viên «có» lúc mở dùng trắng ĐẶC chứ không trắng .92: pha .92 trên đầu navy sẫm nhất chỉ
+   còn 4,39:1 — thiếu đúng một chút so với ngưỡng 4,5.
+
+   Độ ưu tiên cố ý LỚN HƠN hẳn chứ không hoà: (0,3,1) và (0,5,1) đè (0,1,1) và (0,3,1), nên
+   thứ tự dòng đổi lúc nào cũng không ảnh hưởng — đúng bài học TR-15b. */
+.tra-chips2 em.b{display:inline-flex;align-items:center;gap:5px;color:#5f6b77;background:#f4f5f7;border-color:#e3e5e9}
+.tra-chips2 em.b i{font-style:normal;font-size:11px}
+.tra-chips2 em.b.co{color:#2f7d3b;background:#ecf7ee;border-color:#a7d2ab}
+.tra-day.on .tra-chips2 em.b{color:#fff;background:rgba(0,0,0,.22);border-color:rgba(255,255,255,.3)}
+.tra-day.on .tra-chips2 em.b.co{color:#2f7d3b;background:#fff;border-color:rgba(255,255,255,.6)}
 .tra-dbody{display:flex;flex-direction:column;gap:12px;padding:16px;background:#fff}
 .tra-dbody p{margin:0;white-space:pre-line;line-height:1.65;max-width:80ch}
 /* TR-16 · đường thời gian trong thân ngày, và ba viên bữa ăn */
@@ -857,13 +902,18 @@ const CSS = `
 .tra-gio.trong{background:transparent}
 .tra-moc p{margin:0;line-height:1.65;max-width:80ch}
 .tra-bua{display:flex;flex-wrap:wrap;gap:7px;margin-top:5px}
-.tra-bua em{font-style:normal;display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:#8a8f96;background:#f4f5f7;border:1px solid #e3e5e9;border-radius:999px;padding:3px 11px}
-.tra-bua em.co{color:#1c6b4a;background:#eaf5ef;border-color:#bfe0cd}
+/* TR-20 · Hai chỗ tương phản TR-16 làm sai, đo lại bằng số chứ không nhìn:
+   xám cũ #8A8F96 trên #F4F5F7 chỉ được 2,98:1 — dưới ngưỡng 4,5:1 của WCAG 1.4.3, tức chính
+   viên «bữa KHÔNG bao gồm» (cái dấu ✕ đặt ra để khách khỏi hiểu lầm) lại là chữ khó đọc nhất
+   trên màn. #5F6B77 cho 4,99:1. Xanh cũ #1C6B4A không thuộc bộ màu nào, đổi sang #2F7D3B của
+   làn R5. */
+.tra-bua em{font-style:normal;display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:#5f6b77;background:#f4f5f7;border:1px solid #e3e5e9;border-radius:999px;padding:3px 11px}
+.tra-bua em.co{color:#2f7d3b;background:#ecf7ee;border-color:#a7d2ab}
 .tra-bua i{font-style:normal;font-size:12px}
 @media (max-width:640px){.tra-moc li{gap:9px;padding-left:18px}.tra-gio{width:54px}}
 .tra-dfoot{display:flex;flex-wrap:wrap;gap:1px;background:var(--tra-navy-l);border:1px solid var(--tra-navy-l);border-radius:8px;overflow:hidden}
 .tra-dfoot>div{flex:1 1 180px;display:flex;flex-direction:column;gap:3px;background:#fafcff;padding:10px 14px}
-.tra-dfoot small{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#5b82c4;font-weight:700}
+.tra-dfoot small{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--tra-nhan);font-weight:700}
 .tra-dnoi{display:flex;align-items:center;gap:12px;padding:12px 0 12px 18px}
 .tra-dnoi::before{content:"";width:2px;height:30px;background:repeating-linear-gradient(var(--tra-navy) 0 5px,transparent 5px 10px)}
 .tra-dnoi span{font-size:13px;font-weight:600;color:var(--tra-navy);background:var(--tra-navy-s);border:1px dashed #a8c3ec;border-radius:99px;padding:5px 14px}
@@ -871,7 +921,7 @@ const CSS = `
 .tra-ihead{display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--ksv-line)}
 .tra-ihead b{font-size:13px;letter-spacing:.06em}
 .tra-ihead.ok b{color:var(--ksv-ok)}.tra-ihead.no b{color:#a3261b}
-.tra-ihead em{font-style:normal;font-size:11px;font-weight:600;color:#5b82c4;background:var(--tra-navy-s);border-radius:99px;padding:2px 8px}
+.tra-ihead em{font-style:normal;font-size:11px;font-weight:600;color:var(--tra-nhan);background:var(--tra-navy-s);border-radius:99px;padding:2px 8px}
 .tra-tbl{border:1px solid var(--tra-navy-l);border-radius:10px;overflow:hidden}
 .tra-tbl table{width:100%;border-collapse:collapse;font-size:15px}
 .tra-tbl th{background:var(--tra-navy);color:#fff;text-align:left;padding:12px 16px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;font-weight:600}
