@@ -262,13 +262,18 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
     if (moDon) return;
     // P0-06: vừa đăng nhập giữa chừng → trả lại tìm kiếm, tour đang xem, ngày khởi hành, số khách; màn tự thiết kế tự đọc bản của nó.
     const nho = layLuaChon<{ q: Q; spId: number | null; chon: number | null; buoc: string; yc: any }>("tours");
+    // TR-18 · Khách mở THẲNG một tour thì KHÔNG tải danh sách nữa. Đo trên bản chạy sau TR-17:
+    // cửa «tim» mất 2.611 ms và là thứ chậm nhất trang, trong khi trang chi tiết không hiện
+    // danh sách ở đâu cả — em đếm được 0 đường dẫn sang tour khác trên màn ấy. Bấm quay lại
+    // vẫn đủ danh sách: veDs() đã sẵn «if (!ds) tim()» từ trước, nên nó tải đúng lúc cần.
     if (nho?.q) {
-      setQ(nho.q); tim(nho.q); if (nho.yc) setYc({ ...nho.yc, dong_y: false });
-      if (nho.buoc === "doan" && !nho.spId) { setBuoc("doan"); return; }
-      if (nho.spId) moSp(nho.spId).then(() => { if (nho.chon) setChon(nho.chon); if (nho.buoc === "doan") setBuoc("doan"); });
+      setQ(nho.q); if (nho.yc) setYc({ ...nho.yc, dong_y: false });
+      if (nho.buoc === "doan" && !nho.spId) { tim(nho.q); setBuoc("doan"); return; }
+      if (nho.spId) { moSp(nho.spId).then(() => { if (nho.chon) setChon(nho.chon); if (nho.buoc === "doan") setBuoc("doan"); }); return; }
+      tim(nho.q);
       return;
     }
-    tim(); if (moId) moSp(moId);
+    if (moId) moSp(moId); else tim();
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (buoc === "don" || buoc === "da_gui") return;
@@ -276,6 +281,14 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
   }, [q, sp, chon, buoc, yc]);   // P0-06
   useEffect(() => {      // đổi ngày → lịch trình của đúng chuyến (chuyến có chương trình riêng thì hiện chương trình ấy)
     if (!sp || !chon) return;
+    // TR-18 · Chỉ gọi lại khi lịch trình THẬT SỰ đổi. Máy chủ nói rõ hai điều trong cùng lần
+    // trả về của trang tour: «ct_rieng» là các chuyến có chương trình soạn riêng, và
+    // «lich_trinh.theo_chuyen» là chuyến của bản đang hiện (rỗng = bản chung của sản phẩm,
+    // mọi chuyến giống nhau). Hai thứ ấy khớp nhau thì gọi lại là gọi đúng cái đang có.
+    // Đo HC001: nguồn «web_gioi_thieu_ngay», không chuyến nào có chương trình riêng — vòng
+    // gọi 545 ms ấy xưa nay chỉ để lấy lại đúng bản vừa nhận.
+    const can = (sp.ct_rieng || []).includes(chon) ? chon : null;
+    if (can === ((lt && lt.theo_chuyen) ?? null)) return;
     goiCong(`/mo/tour-online/san-pham/${sp.id}/lich-trinh/${chon}`).then(setLt).catch(() => { /* giữ lịch trình đang hiện */ });
   }, [chon]);  // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {      // số tiền: máy chủ tính (giá chuyến, trẻ em, em bé, cọc, hạn)

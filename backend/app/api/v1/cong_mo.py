@@ -201,7 +201,7 @@ def tr_mot(pid: int, background: BackgroundTasks, resp: Response, nguoi_lon: int
 
 
 @router.get("/tour-online/san-pham/{pid:int}/danh-gia")
-def tr_danh_gia(pid: int, trang: int = 1, db: Session = Depends(get_db)):
+def tr_danh_gia(pid: int, resp: Response, trang: int = 1, db: Session = Depends(get_db)):
     """Đánh giá khách tự chấm cho một tour — phần được phép hiện công khai.
 
     KHÔNG trả tên, điện thoại, email, mã đơn hay mã chuyến: câu hỏi xin đồng ý đã hứa với khách
@@ -209,6 +209,11 @@ def tr_danh_gia(pid: int, trang: int = 1, db: Session = Depends(get_db)):
     `dong_y.cong_khai_duoc(r, "trang_tour")` — không dựng lại mệnh đề ở đây.
     """
     from app.services import tour_online as TR
+    # TR-18 · TR-17 bỏ sót đúng cửa này, vì lúc ấy em đọc một bản cong_mo.py cũ chưa có nó.
+    # Đo trên bản chạy sau khi gộp TR-17: 1.516 ms lúc tải trang, 509 ms khi gọi lại — và nó
+    # thành thứ chậm thứ hai của trang tour. Nhận xét khách viết cả tuần mới có một cái nên
+    # giữ lâu như chữ chương trình.
+    _dem(resp, DEM_LICH_TRINH)
     return _tr(TR.danh_gia_cong_khai, db, pid, trang)
 
 
