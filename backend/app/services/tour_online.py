@@ -1241,16 +1241,21 @@ def lich_trinh(db: Session, p: Product, tour_id: int | None = None) -> dict:
         ngay = db.execute(select(ChuongTrinhNgay).where(ChuongTrinhNgay.tour_id == tour_id)
                           .order_by(ChuongTrinhNgay.ngay_thu)).scalars().all()
         if any((n.tieu_de or n.noi_dung or "").strip() for n in ngay):
-            return {"nguon": "chuyen", "ngay": [{"ngay": n.ngay_thu, "tieu_de": n.tieu_de, "noi_dung": n.noi_dung,
-                                                "bua": [b for b, co in (("sáng", n.bua_sang), ("trưa", n.bua_trua), ("tối", n.bua_toi)) if co],
-                                                "khach_san": n.khach_san, "anh": []} for n in ngay], "van_ban": ""}
+            return {"nguon": "chuyen", "theo_chuyen": tour_id,
+                    "ngay": [{"ngay": n.ngay_thu, "tieu_de": n.tieu_de, "noi_dung": n.noi_dung,
+                              "bua": [b for b, co in (("sáng", n.bua_sang), ("trưa", n.bua_trua), ("tối", n.bua_toi)) if co],
+                              "khach_san": n.khach_san, "anh": []} for n in ngay], "van_ban": ""}
+    # TR-18 · «theo_chuyen» nói lịch trình này của RIÊNG chuyến nào. Chỉ nhánh «chuyen» ở trên
+    # mới đổi theo chuyến; bốn nhánh dưới đọc từ sản phẩm hoặc từ bài web nên MỌI chuyến của
+    # tour đều ra đúng một kết quả. Trang khách nhờ đó biết lúc nào đổi ngày là KHÔNG phải gọi
+    # lại máy chủ — xem phép đo trong test_tr18.
     web = (p.noi_dung_web or {}).get("lich_trinh") or []
     if web:
-        return {"nguon": "web", "ngay": ngay_day_du(web), "van_ban": ""}
+        return {"nguon": "web", "theo_chuyen": None, "ngay": ngay_day_du(web), "van_ban": ""}
     ct = tach_muc(p.program or "")["chuong_trinh"]                     # P1-01: bỏ phần bao gồm / quy định lẫn vào
     tn = tach_ngay(ct)
     if tn:
-        return {"nguon": "san_pham", "ngay": ngay_day_du(tn), "van_ban": ""}
+        return {"nguon": "san_pham", "theo_chuyen": None, "ngay": ngay_day_du(tn), "van_ban": ""}
     gt = ((p.noi_dung_web or {}).get("gioi_thieu") or "").strip()   # TR-1c: bài giới thiệu trên web trước văn bản sản phẩm
     if gt:
         # TR-14: rất nhiều bài trên web gói CẢ chương trình từng ngày vào phần giới thiệu — HC001
@@ -1258,9 +1263,26 @@ def lich_trinh(db: Session, p: Product, tour_id: int | None = None) -> dict:
         # vẫn đổ ra một khối chữ liền, vì chỗ này chưa bao giờ thử tách. Thử tách trước đã.
         tg = tach_ngay(gt)
         if tg:
-            return {"nguon": "web_gioi_thieu_ngay", "ngay": ngay_day_du(tg), "van_ban": ""}
-        return {"nguon": "web_gioi_thieu", "ngay": [], "van_ban": gt[:8000]}
-    return {"nguon": "van_ban", "ngay": [], "van_ban": ct[:8000]}
+            return {"nguon": "web_gioi_thieu_ngay", "theo_chuyen": None, "ngay": ngay_day_du(tg), "van_ban": ""}
+        return {"nguon": "web_gioi_thieu", "theo_chuyen": None, "ngay": [], "van_ban": gt[:8000]}
+    return {"nguon": "van_ban", "theo_chuyen": None, "ngay": [], "van_ban": ct[:8000]}
+
+
+def chuyen_co_ct_rieng(db: Session, tour_ids: list[int]) -> list[int]:
+    """Trong ngần ấy chuyến, chuyến nào có chương trình RIÊNG đã soạn (không rỗng).
+
+    Một truy vấn cho cả danh sách, không hỏi từng chuyến. Trang khách cần đúng con số này để
+    biết đổi ngày thì có phải gọi lại lịch trình hay không: chuyến không có tên trong đây dùng
+    chung lịch trình của sản phẩm, mà bản ấy đã nằm sẵn trong cùng một lần trả về rồi.
+    """
+    from app.models.chuong_trinh import ChuongTrinhNgay
+    ids = [int(t) for t in tour_ids if t]
+    if not ids:
+        return []
+    hang = db.execute(select(ChuongTrinhNgay.tour_id, ChuongTrinhNgay.tieu_de, ChuongTrinhNgay.noi_dung)
+                      .where(ChuongTrinhNgay.tour_id.in_(ids))).all()
+    co = {int(tid) for tid, td, nd in hang if ((td or "") + (nd or "")).strip()}
+    return sorted(co)
 
 
 def chi_tiet(db: Session, pid: int, nguoi_lon: int = 2, tre_em: int = 0, hom_nay: date | None = None) -> dict:
@@ -1283,7 +1305,8 @@ def chi_tiet(db: Session, pid: int, nguoi_lon: int = 2, tre_em: int = 0, hom_nay
     bao, bo1 = _loc_so_ao(list(nd.get("bao_gom") or tm["bao_gom"]))
     khong, bo2 = _loc_so_ao(list(nd.get("khong_bao_gom") or tm["khong_bao_gom"]))
     qd, bo3 = _quy_dinh_sach(nd.get("quy_dinh") or tm["quy_dinh"])
-    return {**the, "chuyen": chuyen, "lich_trinh": lich_trinh(db, p, chuyen[0]["tour_id"] if chuyen else None),
+    return {**the, "chuyen": chuyen, "ct_rieng": chuyen_co_ct_rieng(db, [c["tour_id"] for c in chuyen]),
+            "lich_trinh": lich_trinh(db, p, chuyen[0]["tour_id"] if chuyen else None),
             "anh": anh_tai + list(nd.get("anh") or []), "bao_gom": bao,
             "khong_bao_gom": khong, "bo_so_ao": bo1 + bo2 + bo3,
             "quy_dinh": qd, "bang_gia_web": list(nd.get("bang_gia") or []),
