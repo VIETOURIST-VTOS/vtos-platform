@@ -1908,3 +1908,11 @@ html.vtos-khung-ban [aria-pressed="true"]{border-color:var(--vtos-sky)}
 .mh01-ban{position:relative;overflow:hidden}
 .mh01-ban::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;pointer-events:none;
   background:linear-gradient(90deg,var(--vtos-logo-la) 0 33.3%,var(--vtos-logo-hong) 33.3% 66.6%,var(--vtos-logo-xanh) 66.6%)}
+
+/* ══ R5-29 · ĐẦU BẢNG NAVY TRÊN NỀN TRẮNG SÁNG CHO TOÀN HỆ THỐNG (Chủ tịch 14/11/2026 «làm tiếp phần 3» —
+   mục 5 bản xem trước R5-25). Trước đây kiểu này chỉ áp cho màn mở TRONG bàn (`html.vtos-khung-ban th`); mở
+   cùng màn ấy từ menu thì đầu bảng vẫn chữ hoa xám. Nay mọi bảng: nền xanh rất nhạt, chữ navy thường, gạch
+   chân navy sáng, bỏ phông máy chữ ở cột số. Bảng nào đã có kiểu riêng (lớp riêng) vẫn giữ kiểu của nó. */
+th{background:var(--vtos-info-bg);color:var(--vtos-navy);text-transform:none;letter-spacing:0;font-weight:700;
+  border-bottom:2px solid var(--vtos-sky)}
+th.num{font-family:inherit}
