@@ -202,6 +202,17 @@ export default function ToursAgoda({ toi, moId, moDon }: { toi: any; moId?: numb
     vat: false, mst: "", cty: "", dc: "", vat_email: "", dong_y: false, khach: [] as any[] });
   const [yc, setYc] = useState<any>({ so_khach: 20, tu: "", den: "", noi: "", ngan_sach: "", hang_ks: "", cong_ty: "", hoa_don: false, dien_thoai: "", ghi_chu: "", dong_y: false });
   const [loi, setLoi] = useState(""); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState("");
+  // TR-19 · Từ vòng này màn tour dựng NGAY, không đợi cửa /cong/toi trả lời, nên `toi` có thể
+  // về MUỘN hơn lúc dựng. Ba ô liên hệ ở trên khởi tạo một lần từ `toi`, phiên về sau thì
+  // chúng ở lại rỗng — điền bù ở đây. Chỉ điền ô CÒN TRỐNG: khách gõ tên khác tên trong tài
+  // khoản (đặt hộ người nhà là chuyện thường) thì tuyệt đối không được đè lên.
+  useEffect(() => {
+    if (!toi) return;
+    setKh((k: any) => ({ ...k,
+      ho_ten: k.ho_ten || toi.ho_ten || "",
+      dien_thoai: k.dien_thoai || toi.dien_thoai || "",
+      email: k.email || emailThat(toi.email) }));
+  }, [toi]);
   // TR-13: trang tour gập theo ngày và theo mục chính sách (Chủ tịch duyệt bản xem thử 14-11-2026)
   const [moNgay, setMoNgay] = useState<Record<number, boolean>>({ 1: true });
   const [moHet, setMoHet] = useState(false);
